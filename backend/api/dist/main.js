@@ -12,8 +12,9 @@ async function bootstrap() {
     app.useStaticAssets((0, path_1.join)(__dirname, '..', 'uploads'), {
         prefix: '/uploads/',
     });
-    app.enableCors({
-        origin: [
+    const corsOrigins = process.env.CORS_ORIGINS
+        ? process.env.CORS_ORIGINS.split(',')
+        : [
             'http://localhost:3000',
             'http://localhost:3001',
             'http://localhost:19000',
@@ -27,9 +28,12 @@ async function bootstrap() {
             'http://192.168.100.6:19000',
             'http://192.168.100.6:19001',
             'http://192.168.100.6:19002',
-            '*',
-        ],
+        ];
+    app.enableCors({
+        origin: corsOrigins.includes('*') ? true : corsOrigins,
         credentials: true,
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
     });
     app.useGlobalPipes(new common_1.ValidationPipe({
         whitelist: true,

@@ -16,7 +16,7 @@ async function bootstrap() {
   });
 
   // Enable CORS - Allow development and production origins
-  const corsOrigins = process.env.CORS_ORIGINS 
+  const corsOrigins = process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(',')
     : [
         // Development origins
