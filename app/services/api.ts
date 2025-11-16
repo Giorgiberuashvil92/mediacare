@@ -98,6 +98,9 @@ class ApiService {
 
   constructor() {
     this.baseURL = API_BASE_URL;
+    console.log('🚀 ApiService initialized with baseURL:', this.baseURL);
+    console.log('🔧 __DEV__ mode:', __DEV__);
+    console.log('🎯 USE_MOCK_API:', USE_MOCK_API);
   }
 
   // Public getter for baseURL
@@ -119,10 +122,18 @@ class ApiService {
   }
 
   private async handleResponse<T>(response: Response): Promise<T> {
+    console.log('🔍 Handling response:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      headers: Object.fromEntries(response.headers.entries())
+    });
+
     if (!response.ok) {
       // Clone response to avoid "Already read" error
       const clonedResponse = response.clone();
       const errorData = await clonedResponse.json().catch(() => ({}));
+      console.log('❌ Error response data:', errorData);
       const errorMessage =
         errorData.message || `HTTP error! status: ${response.status}`;
       
@@ -139,6 +150,12 @@ class ApiService {
 
   // Auth endpoints
   async login(credentials: LoginRequest): Promise<AuthResponse> {
+    console.log('🔐 Login attempt:', {
+      email: credentials.email,
+      passwordLength: credentials.password?.length || 0,
+      baseURL: this.baseURL,
+      mockMode: USE_MOCK_API
+    });
     logger.auth.login(credentials.email);
     if (USE_MOCK_API) {
       // simple validation mimic
@@ -719,19 +736,39 @@ class ApiService {
 
   // Generic API call method
   async apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const fullUrl = `${this.baseURL}${endpoint}`;
+    console.log('📡 API Call:', {
+      method: options.method || 'GET',
+      url: fullUrl,
+      endpoint: endpoint,
+      baseURL: this.baseURL,
+      mockMode: USE_MOCK_API,
+      devMode: __DEV__
+    });
+
     if (USE_MOCK_API) {
+      console.log('🎭 Using mock API - returning empty response');
       // Generic mock response placeholder
       return Promise.resolve({} as T);
     }
 
     const headers = await this.getAuthHeaders();
+    console.log('🔑 Auth headers prepared:', headers ? 'Token present' : 'No token');
 
-    const response = await fetch(`${this.baseURL}${endpoint}`, {
+    console.log('🌐 Making fetch request to:', fullUrl);
+    const response = await fetch(fullUrl, {
       ...options,
       headers: {
         ...headers,
         ...options.headers,
       },
+    });
+
+    console.log('📨 Response received:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      url: response.url
     });
 
     return this.handleResponse<T>(response);
