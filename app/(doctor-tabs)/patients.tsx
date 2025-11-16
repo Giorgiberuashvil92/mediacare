@@ -1,8 +1,12 @@
+import { apiService } from "@/app/services/api";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import { useState } from "react";
+import { LinearGradient } from "expo-linear-gradient";
+import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Modal,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,15 +15,62 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Patient, patients } from "../../assets/data/doctorDashboard";
+import { Patient } from "../../assets/data/doctorDashboard";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function DoctorPatients() {
+  const { user } = useAuth();
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [filterGender, setFilterGender] = useState<"all" | "male" | "female">(
     "all"
   );
+
+  useEffect(() => {
+    if (user?.id) {
+      console.log('Loading patients for doctor ID:', user.id);
+      loadPatients();
+    }
+     
+  }, [user?.id]);
+
+  const loadPatients = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      if (apiService.isMockMode()) {
+        throw new Error(
+          "Mock API mode is disabled. Please disable USE_MOCK_API.",
+        );
+      }
+
+      const response = await apiService.getDoctorPatients();
+
+      if (response.success && response.data) {
+        setPatients(response.data);
+      } else {
+        setPatients([]);
+      }
+    } catch (err: any) {
+      console.error("Error loading patients:", err);
+      setError(err.message || "პაციენტების ჩატვირთვა ვერ მოხერხდა");
+      setPatients([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadPatients();
+    setRefreshing(false);
+  };
 
   // Filter patients
   const filteredPatients = patients.filter((patient) => {
@@ -45,9 +96,48 @@ export default function DoctorPatients() {
     return gender === "male" ? "#06B6D4" : "#EC4899";
   };
 
+  if (loading && patients.length === 0) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#06B6D4" />
+          <Text style={styles.loadingText}>პაციენტების ჩატვირთვა...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error && patients.length === 0) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={loadPatients}
+          >
+            <LinearGradient
+              colors={["#06B6D4", "#0891B2"]}
+              style={styles.retryButtonGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <Text style={styles.retryButtonText}>ხელახლა ცდა</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         {/* Header */}
         <View style={styles.header}>
           <View>
@@ -55,7 +145,14 @@ export default function DoctorPatients() {
             <Text style={styles.subtitle}>სულ {patients.length} პაციენტი</Text>
           </View>
           <TouchableOpacity style={styles.addButton}>
-            <Ionicons name="person-add" size={24} color="#FFFFFF" />
+            <LinearGradient
+              colors={["#06B6D4", "#0891B2"]}
+              style={styles.addButtonGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <Ionicons name="person-add" size={24} color="#FFFFFF" />
+            </LinearGradient>
           </TouchableOpacity>
         </View>
 
@@ -282,7 +379,7 @@ export default function DoctorPatients() {
                   <View style={styles.footerItem}>
                     <Ionicons name="time-outline" size={16} color="#6B7280" />
                     <Text style={styles.footerText}>
-                      ბოლო ვიზიტი: {patient.lastVisit}
+                      ბოლო ვიზიტი: 
                     </Text>
                   </View>
                   {patient.nextAppointment && (
@@ -383,6 +480,21 @@ export default function DoctorPatients() {
                       </Text>
                     </View>
                   </View>
+                  {selectedPatient.dateOfBirth && (
+                    <View style={styles.detailRow}>
+                      <Ionicons name="calendar" size={20} color="#06B6D4" />
+                      <View style={styles.detailContent}>
+                        <Text style={styles.detailLabel}>დაბადების თარიღი</Text>
+                        <Text style={styles.detailValue}>
+                          {new Date(selectedPatient.dateOfBirth).toLocaleDateString('ka-GE', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
                 </View>
 
                 {/* Medical Information */}
@@ -524,12 +636,6 @@ export default function DoctorPatients() {
                       </Text>
                       <Text style={styles.statLabel}>სულ ვიზიტი</Text>
                     </View>
-                    <View style={styles.statItem}>
-                      <Text style={styles.statValue}>
-                        {selectedPatient.lastVisit}
-                      </Text>
-                      <Text style={styles.statLabel}>ბოლო ვიზიტი</Text>
-                    </View>
                   </View>
                 </View>
               </ScrollView>
@@ -540,7 +646,14 @@ export default function DoctorPatients() {
                 style={styles.modalButton}
                 onPress={() => setShowDetailsModal(false)}
               >
-                <Text style={styles.modalButtonText}>დახურვა</Text>
+                <LinearGradient
+                  colors={["#06B6D4", "#0891B2"]}
+                  style={styles.modalButtonGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                >
+                  <Text style={styles.modalButtonText}>დახურვა</Text>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
           </View>
@@ -578,14 +691,18 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "#06B6D4",
-    justifyContent: "center",
-    alignItems: "center",
+    overflow: "hidden",
     shadowColor: "#06B6D4",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 5,
+  },
+  addButtonGradient: {
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
   },
   searchSection: {
     paddingHorizontal: 20,
@@ -637,6 +754,11 @@ const styles = StyleSheet.create({
   filterButtonActive: {
     borderColor: "#06B6D4",
     backgroundColor: "#F0FDFA",
+    shadowColor: "#06B6D4",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
   filterButtonText: {
     fontSize: 11,
@@ -664,10 +786,12 @@ const styles = StyleSheet.create({
     padding: 18,
     marginBottom: 12,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
     elevation: 4,
+    borderWidth: 1,
+    borderColor: "#F3F4F6",
   },
   patientHeader: {
     flexDirection: "row",
@@ -690,6 +814,11 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     justifyContent: "center",
     alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   patientDetails: {
     flex: 1,
@@ -839,6 +968,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#5EEAD4",
+    shadowColor: "#06B6D4",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   nextAppointmentText: {
     fontSize: 12,
@@ -865,6 +1001,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 20,
+    shadowColor: "#06B6D4",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   emptyStateTitle: {
     fontSize: 18,
@@ -1072,10 +1213,65 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: "center",
-    backgroundColor: "#06B6D4",
+    overflow: "hidden",
+    shadowColor: "#06B6D4",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  modalButtonGradient: {
+    width: "100%",
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
   },
   modalButtonText: {
     fontSize: 16,
+    fontFamily: "Poppins-SemiBold",
+    color: "#FFFFFF",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#EF4444",
+    marginBottom: 16,
+    textAlign: "center",
+  },
+  retryButton: {
+    overflow: "hidden",
+    borderRadius: 8,
+    shadowColor: "#06B6D4",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  retryButtonGradient: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  retryButtonText: {
+    fontSize: 14,
     fontFamily: "Poppins-SemiBold",
     color: "#FFFFFF",
   },

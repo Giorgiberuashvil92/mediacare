@@ -5,29 +5,35 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const AppointmentSuccess = () => {
+  const params = useLocalSearchParams();
   const {
     doctorId,
+    appointmentId,
     selectedDate,
     selectedTime,
     paymentMethod,
     patientName,
     problem,
-  } = useLocalSearchParams();
+    appointmentNumber,
+  } = params;
 
   const handleBackToHome = () => {
     router.replace("/(tabs)");
   };
 
   const handleViewDetails = () => {
+    // Navigate to appointment details with all available params
+    // Use appointmentId (MongoDB ObjectId) if available, otherwise use appointmentNumber
     router.push({
       pathname: "/screens/appointment/appointment-details",
       params: {
-        doctorId,
-        selectedDate,
-        selectedTime,
-        paymentMethod,
-        patientName,
-        problem,
+        doctorId: doctorId as string,
+        appointmentId: (appointmentId as string) || (appointmentNumber as string) || "",
+        selectedDate: selectedDate as string,
+        selectedTime: selectedTime as string,
+        paymentMethod: paymentMethod as string,
+        patientName: patientName as string,
+        problem: problem as string,
       },
     });
   };
@@ -46,10 +52,9 @@ const AppointmentSuccess = () => {
         </View>
 
         {/* Success Text */}
-        <Text style={styles.successTitle}>Appointment Success!</Text>
+        <Text style={styles.successTitle}>ჯავშანი წარმატებით დაჯავშნა!</Text>
         <Text style={styles.successMessage}>
-          Your appointment has been successfully scheduled. You can see details
-          from your Appointments Tab.
+          თქვენი ჯავშანი წარმატებით დაჯავშნა. დეტალები შეგიძლიათ ნახოთ ჯავშნების ჩანართში.
         </Text>
 
         {/* Action Buttons */}
@@ -58,14 +63,14 @@ const AppointmentSuccess = () => {
             style={styles.secondaryButton}
             onPress={handleBackToHome}
           >
-            <Text style={styles.secondaryButtonText}>Back to Home</Text>
+            <Text style={styles.secondaryButtonText}>მთავარზე დაბრუნება</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.primaryButton}
             onPress={handleViewDetails}
           >
-            <Text style={styles.primaryButtonText}>View Details</Text>
+            <Text style={styles.primaryButtonText}>დეტალების ნახვა</Text>
           </TouchableOpacity>
         </View>
       </View>

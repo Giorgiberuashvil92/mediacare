@@ -1,50 +1,135 @@
 import { Image } from "expo-image";
-import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { router } from "expo-router";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { apiService, Specialization } from "../../services/api";
+
+// Icon mapping for symptoms
+const getIconForSymptom = (symptomName: string) => {
+  const iconMap: Record<string, any> = {
+    "ცხელება": require("../../../assets/images/icons/fever.png"),
+    "ხველა": require("../../../assets/images/icons/cemineba.png"),
+    "სისხლის წნევა": require("../../../assets/images/icons/blood_pressure.png"),
+    "დიაბეტი": require("../../../assets/images/icons/diabetics.png"),
+    "თავის ტკივილი": require("../../../assets/images/icons/headache.png"),
+    "მუცლის ტკივილი": require("../../../assets/images/icons/stomach.png"),
+    "თავბრუსხვევა": require("../../../assets/images/icons/dizziness.png"),
+    "თვალების პრობლემები": require("../../../assets/images/icons/eye_problem.png"),
+    "გულის ტკივილი": require("../../../assets/images/icons/cardiology.png"),
+    "გულისცემა": require("../../../assets/images/icons/cardiology.png"),
+    "ნევრალგია": require("../../../assets/images/icons/brain1.png"),
+    "მენსტრუალური დარღვევები": require("../../../assets/images/icons/pregnant.png"),
+    "ქალთა ჯანმრთელობის პრობლემები": require("../../../assets/images/icons/pregnant.png"),
+    "ბავშვთა დაავადებები": require("../../../assets/images/icons/baby.png"),
+    "ალერგია": require("../../../assets/images/icons/allergy.png"),
+    "ქავილი": require("../../../assets/images/icons/allergy.png"),
+    "ალერგიული რეაქციები": require("../../../assets/images/icons/allergy.png"),
+    "კბილის ტკივილი": require("../../../assets/images/icons/dendist.png"),
+    "პირის ღრუს პრობლემები": require("../../../assets/images/icons/dendist.png"),
+    "შარდის პრობლემები": require("../../../assets/images/icons/urology.png"),
+    "შარდსასქესო სისტემის დაავადებები": require("../../../assets/images/icons/urology.png"),
+    "საჭმლის მომნელებელი პრობლემები": require("../../../assets/images/icons/gastrology.png"),
+    "კანის პრობლემები": require("../../../assets/images/icons/cardiology.png"),
+    "კანის დაავადებები": require("../../../assets/images/icons/cardiology.png"),
+    "სახსრების ტკივილი": require("../../../assets/images/icons/brain1.png"),
+    "ძვლების პრობლემები": require("../../../assets/images/icons/brain1.png"),
+    "მხედველობის დაქვეითება": require("../../../assets/images/icons/eye_problem.png"),
+    "სტრესი": require("../../../assets/images/icons/phycatry.png"),
+    "დეპრესია": require("../../../assets/images/icons/phycatry.png"),
+    "ფსიქიკური პრობლემები": require("../../../assets/images/icons/phycatry.png"),
+  };
+  return iconMap[symptomName] || require("../../../assets/images/icons/fever.png");
+};
+
+// Background color mapping
+const getBgColorForSymptom = (symptomName: string) => {
+  const colorMap: Record<string, string> = {
+    "ცხელება": "#E3F2FD",
+    "ხველა": "#FFEBEE",
+    "სისხლის წნევა": "#F3E5F5",
+    "დიაბეტი": "#E8F5E8",
+    "თავის ტკივილი": "#FFF3E0",
+    "მუცლის ტკივილი": "#E0F2F1",
+    "თავბრუსხვევა": "#E1F5FE",
+    "თვალების პრობლემები": "#FCE4EC",
+    "გულის ტკივილი": "#FFEBEE",
+    "გულისცემა": "#FFEBEE",
+    "ნევრალგია": "#E3F2FD",
+    "მენსტრუალური დარღვევები": "#F3E5F5",
+    "ქალთა ჯანმრთელობის პრობლემები": "#F3E5F5",
+    "ბავშვთა დაავადებები": "#E8F5E8",
+    "ალერგია": "#FFF3E0",
+    "ქავილი": "#FFF3E0",
+    "ალერგიული რეაქციები": "#FFF3E0",
+    "კბილის ტკივილი": "#E0F2F1",
+    "პირის ღრუს პრობლემები": "#E0F2F1",
+    "შარდის პრობლემები": "#E1F5FE",
+    "შარდსასქესო სისტემის დაავადებები": "#E1F5FE",
+    "საჭმლის მომნელებელი პრობლემები": "#FCE4EC",
+    "კანის პრობლემები": "#FFF8E1",
+    "კანის დაავადებები": "#FFF8E1",
+    "სახსრების ტკივილი": "#E8EAF6",
+    "ძვლების პრობლემები": "#E8EAF6",
+    "მხედველობის დაქვეითება": "#F1F8E9",
+    "სტრესი": "#FCE4EC",
+    "დეპრესია": "#FCE4EC",
+    "ფსიქიკური პრობლემები": "#FCE4EC",
+  };
+  return colorMap[symptomName] || "#E3F2FD";
+};
 
 const CommonSymptoms = () => {
-  const commonSymptoms = [
-    {
-      name: "Fever",
-      imageUrl: require("../../../assets/images/icons/fever.png"),
-      bgColor: "#E3F2FD",
-    },
-    {
-      name: "Cough",
-      imageUrl: require("../../../assets/images/icons/cemineba.png"),
-      bgColor: "#FFEBEE",
-    },
-    {
-      name: "Blood pressure",
-      imageUrl: require("../../../assets/images/icons/blood_pressure.png"),
-      bgColor: "#F3E5F5",
-    },
-    {
-      name: "Diabetics",
-      imageUrl: require("../../../assets/images/icons/diabetics.png"),
-      bgColor: "#E8F5E8",
-    },
-    {
-      name: "Headache",
-      imageUrl: require("../../../assets/images/icons/headache.png"),
-      bgColor: "#FFF3E0",
-    },
-    {
-      name: "Stomach pain",
-      imageUrl: require("../../../assets/images/icons/stomach.png"),
-      bgColor: "#E0F2F1",
-    },
-    {
-      name: "Dizziness",
-      imageUrl: require("../../../assets/images/icons/dizziness.png"),
-      bgColor: "#E1F5FE",
-    },
-    {
-      name: "Eye problem",
-      imageUrl: require("../../../assets/images/icons/eye_problem.png"),
-      bgColor: "#FCE4EC",
-    },
-  ];
+  const [allSymptoms, setAllSymptoms] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadSymptoms();
+  }, []);
+
+  const loadSymptoms = async () => {
+    try {
+      setLoading(true);
+      const response = await apiService.getSpecializations();
+      if (response.success) {
+        // Collect all unique symptoms from all specializations
+        const symptomsSet = new Set<string>();
+        response.data.forEach((spec: Specialization) => {
+          if (spec.symptoms && spec.symptoms.length > 0) {
+            spec.symptoms.forEach((symptom) => symptomsSet.add(symptom));
+          }
+        });
+        // Convert to array and take first 8 for display
+        const uniqueSymptoms = Array.from(symptomsSet).slice(0, 8);
+        setAllSymptoms(uniqueSymptoms);
+      }
+    } catch (error) {
+      console.error("Failed to load symptoms:", error);
+      setAllSymptoms([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View>
+        <Text
+          style={{
+            padding: 24,
+            fontSize: 16,
+            fontFamily: "Poppins-SemiBold",
+            color: "#333333",
+          }}
+        >
+          გავრცელებული სიმპტომები
+        </Text>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="small" color="#06B6D4" />
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View>
       <Text
@@ -55,25 +140,38 @@ const CommonSymptoms = () => {
           color: "#333333",
         }}
       >
-        Common Symptoms
+        გავრცელებული სიმპტომები
       </Text>
       <View style={styles.grid}>
-        {commonSymptoms.map((symptom, index) => (
-          <TouchableOpacity key={index} style={styles.departmentCard}>
-            <View
-              style={[
-                styles.iconContainer,
-                { backgroundColor: symptom.bgColor || "#E3F2FD" },
-              ]}
+        {allSymptoms.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>სიმპტომები არ მოიძებნა</Text>
+          </View>
+        ) : (
+          allSymptoms.map((symptom, index) => (
+            <TouchableOpacity
+              key={index}
+              style={styles.departmentCard}
+              onPress={() => {
+                // Navigate to doctors list filtered by symptom
+                router.push(`/screens/doctors/doctors-list?symptom=${encodeURIComponent(symptom)}`);
+              }}
             >
-              <Image
-                source={symptom.imageUrl}
-                style={{ width: 34, height: 34 }}
-              />
-            </View>
-            <Text style={styles.departmentName}>{symptom.name}</Text>
-          </TouchableOpacity>
-        ))}
+              <View
+                style={[
+                  styles.iconContainer,
+                  { backgroundColor: getBgColorForSymptom(symptom) || "#E3F2FD" },
+                ]}
+              >
+                <Image
+                  source={getIconForSymptom(symptom)}
+                  style={{ width: 34, height: 34 }}
+                />
+              </View>
+              <Text style={styles.departmentName}>{symptom}</Text>
+            </TouchableOpacity>
+          ))
+        )}
       </View>
     </View>
   );
@@ -106,6 +204,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
+    paddingHorizontal: 16,
   },
   departmentCard: {
     width: "23%",
@@ -126,5 +225,21 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins-Medium",
     color: "#333333",
     textAlign: "center",
+  },
+  loadingContainer: {
+    padding: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyContainer: {
+    padding: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+  },
+  emptyText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#9CA3AF",
   },
 });

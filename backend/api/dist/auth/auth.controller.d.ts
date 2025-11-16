@@ -16,6 +16,7 @@ export declare class AuthController {
                 email: string;
                 phone: string;
                 isVerified: boolean;
+                approvalStatus: import("../schemas/user.schema").ApprovalStatus;
             };
             token: string;
             refreshToken: string;
@@ -32,6 +33,7 @@ export declare class AuthController {
                 email: string;
                 phone: string;
                 isVerified: boolean;
+                approvalStatus: import("../schemas/user.schema").ApprovalStatus;
             };
             token: string;
             refreshToken: string;

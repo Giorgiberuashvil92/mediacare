@@ -2,6 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import { useEffect, useState } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -10,28 +11,148 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import type {
+  Consultation,
+  DoctorStatistics,
+} from "../../assets/data/doctorDashboard";
 import {
-  doctorStatistics,
   getConsultationTypeLabel,
   getStatusColor,
   getStatusLabel,
-  recentConsultations,
-  weeklySchedule,
 } from "../../assets/data/doctorDashboard";
 import { useAuth } from "../contexts/AuthContext";
 import { useSchedule } from "../contexts/ScheduleContext";
+import { apiService } from "../services/api";
 
 export default function DoctorDashboard() {
   const { user } = useAuth();
   const router = useRouter();
   const { schedules, selectedDates } = useSchedule();
-  const stats = doctorStatistics;
-  const todaySchedule = weeklySchedule[0];
+  const [stats, setStats] = useState<DoctorStatistics | null>(null);
+  const [recentConsultations, setRecentConsultations] = useState<
+    Consultation[]
+  >([]);
+  const [todaySchedule, setTodaySchedule] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const [statsResponse, appointmentsResponse, scheduleResponse] =
+          await Promise.all([
+            apiService.getDoctorDashboardStats(),
+            apiService.getDoctorDashboardAppointments(5),
+            apiService.getDoctorDashboardSchedule(),
+          ]);
+
+        if (statsResponse.success) {
+          setStats(statsResponse.data as any);
+        }
+        if (appointmentsResponse.success) {
+          setRecentConsultations(appointmentsResponse.data as any);
+        }
+        if (scheduleResponse.success) {
+          setTodaySchedule(scheduleResponse.data);
+        }
+      } catch (err) {
+        console.error("Error fetching dashboard data:", err);
+        setError("დეშბორდის მონაცემების ჩატვირთვა ვერ მოხერხდა");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
 
   // Calculate percentages
-  const appointmentCompletionRate = Math.round(
-    (stats.appointments.completed / stats.appointments.total) * 100
-  );
+  const appointmentCompletionRate = stats
+    ? Math.round(
+        (stats.appointments.completed / stats.appointments.total) * 100
+      )
+    : 0;
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <Text style={{ fontSize: 16, color: "#6B7280" }}>
+            დეშბორდის ჩატვირთვა...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 20 }}>
+          <Text style={{ fontSize: 16, color: "#EF4444", marginBottom: 12 }}>
+            {error}
+          </Text>
+          <TouchableOpacity
+            onPress={() => {
+              setError(null);
+              setLoading(true);
+              const fetchDashboardData = async () => {
+                try {
+                  const [statsResponse, appointmentsResponse, scheduleResponse] =
+                    await Promise.all([
+                      apiService.getDoctorDashboardStats(),
+                      apiService.getDoctorDashboardAppointments(5),
+                      apiService.getDoctorDashboardSchedule(),
+                    ]);
+
+                  if (statsResponse.success) {
+                    setStats(statsResponse.data as any);
+                  }
+                  if (appointmentsResponse.success) {
+                    setRecentConsultations(appointmentsResponse.data as any);
+                  }
+                  if (scheduleResponse.success) {
+                    setTodaySchedule(scheduleResponse.data);
+                  }
+                } catch (err) {
+                  console.error("Error fetching dashboard data:", err);
+                  setError("დეშბორდის მონაცემების ჩატვირთვა ვერ მოხერხდა");
+                } finally {
+                  setLoading(false);
+                }
+              };
+              fetchDashboardData();
+            }}
+            style={{
+              backgroundColor: "#06B6D4",
+              paddingHorizontal: 20,
+              paddingVertical: 10,
+              borderRadius: 8,
+            }}
+          >
+            <Text style={{ color: "#FFFFFF", fontWeight: "600" }}>
+              ხელახლა ცდა
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!stats) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <Text style={{ fontSize: 16, color: "#6B7280" }}>
+            მონაცემები არ მოიძებნა
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -268,28 +389,35 @@ export default function DoctorDashboard() {
         )}
 
         {/* Today's Schedule */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>დღევანდელი განრიგი</Text>
-            <Text style={styles.dateText}>26 ოქტომბერი</Text>
-          </View>
-          <View style={styles.scheduleCard}>
-            <View style={styles.scheduleHeader}>
-              <View style={styles.scheduleInfo}>
-                <Text style={styles.scheduleDay}>
-                  {todaySchedule.dayOfWeek}
-                </Text>
-                <Text style={styles.scheduleCount}>
-                  {todaySchedule.consultations.length} კონსულტაცია დაგეგმილია
-                </Text>
-              </View>
-              <View style={styles.scheduleBadge}>
-                <Text style={styles.scheduleBadgeText}>
-                  {todaySchedule.availableSlots.length} ხელმისაწვდომი
-                </Text>
-              </View>
+        {todaySchedule && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>დღევანდელი განრიგი</Text>
+              <Text style={styles.dateText}>
+                {new Date(todaySchedule.date).toLocaleDateString("ka-GE", {
+                  day: "numeric",
+                  month: "long",
+                })}
+              </Text>
             </View>
-            {todaySchedule.consultations.slice(0, 3).map((consultation) => (
+            <View style={styles.scheduleCard}>
+              <View style={styles.scheduleHeader}>
+                <View style={styles.scheduleInfo}>
+                  <Text style={styles.scheduleDay}>
+                    {todaySchedule.dayOfWeek}
+                  </Text>
+                  <Text style={styles.scheduleCount}>
+                    {todaySchedule.consultations?.length || 0} კონსულტაცია დაგეგმილია
+                  </Text>
+                </View>
+                <View style={styles.scheduleBadge}>
+                  <Text style={styles.scheduleBadgeText}>
+                    {todaySchedule.availableSlots?.length || 0} ხელმისაწვდომი
+                  </Text>
+                </View>
+              </View>
+              {todaySchedule.consultations &&
+                todaySchedule.consultations.slice(0, 3).map((consultation: any) => (
               <View key={consultation.id} style={styles.consultationItem}>
                 <View style={styles.consultationTime}>
                   <Ionicons name="time-outline" size={16} color="#6B7280" />
@@ -331,18 +459,22 @@ export default function DoctorDashboard() {
                   </Text>
                 </View>
               </View>
-            ))}
-            <TouchableOpacity
-              style={styles.viewAllButton}
-              onPress={() => router.push("/(doctor-tabs)/appointments")}
-            >
-              <Text style={styles.viewAllButtonText}>
-                ყველა კონსულტაციის ნახვა
-              </Text>
-              <Ionicons name="arrow-forward" size={16} color="#06B6D4" />
-            </TouchableOpacity>
+                ))}
+              {todaySchedule.consultations &&
+                todaySchedule.consultations.length > 0 && (
+                  <TouchableOpacity
+                    style={styles.viewAllButton}
+                    onPress={() => router.push("/(doctor-tabs)/appointments")}
+                  >
+                    <Text style={styles.viewAllButtonText}>
+                      ყველა კონსულტაციის ნახვა
+                    </Text>
+                    <Ionicons name="arrow-forward" size={16} color="#06B6D4" />
+                  </TouchableOpacity>
+                )}
+            </View>
           </View>
-        </View>
+        )}
 
         {/* Recent Activity */}
         <View style={styles.section}>

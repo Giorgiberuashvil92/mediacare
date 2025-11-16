@@ -9,11 +9,17 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AppModule = void 0;
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
+const jwt_1 = require("@nestjs/jwt");
 const mongoose_1 = require("@nestjs/mongoose");
 const throttler_1 = require("@nestjs/throttler");
+const admin_module_1 = require("./admin/admin.module");
 const app_controller_1 = require("./app.controller");
 const app_service_1 = require("./app.service");
+const appointments_module_1 = require("./appointments/appointments.module");
 const auth_module_1 = require("./auth/auth.module");
+const doctors_module_1 = require("./doctors/doctors.module");
+const profile_module_1 = require("./profile/profile.module");
+const specializations_module_1 = require("./specializations/specializations.module");
 const upload_module_1 = require("./upload/upload.module");
 let AppModule = class AppModule {
 };
@@ -26,6 +32,13 @@ exports.AppModule = AppModule = __decorate([
             }),
             mongoose_1.MongooseModule.forRoot(process.env.DATABASE_URL ||
                 'mongodb+srv://Giorgiberuashvili1999:Berobero12@medicarehera.3obzg53.mongodb.net/medicare?retryWrites=true&w=majority&appName=Medicarehera'),
+            jwt_1.JwtModule.registerAsync({
+                global: true,
+                useFactory: () => ({
+                    secret: process.env.JWT_SECRET || 'your-secret-key',
+                    signOptions: { expiresIn: '24h' },
+                }),
+            }),
             throttler_1.ThrottlerModule.forRoot([
                 {
                     ttl: 60000,
@@ -34,6 +47,11 @@ exports.AppModule = AppModule = __decorate([
             ]),
             auth_module_1.AuthModule,
             upload_module_1.UploadModule,
+            profile_module_1.ProfileModule,
+            doctors_module_1.DoctorsModule,
+            specializations_module_1.SpecializationsModule,
+            appointments_module_1.AppointmentsModule,
+            admin_module_1.AdminModule,
         ],
         controllers: [app_controller_1.AppController],
         providers: [app_service_1.AppService],

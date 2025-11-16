@@ -21,7 +21,7 @@ interface AuthContextType {
   userRole: UserRole;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (credentials: LoginRequest) => Promise<void>;
+  login: (credentials: LoginRequest) => Promise<{ data: { user: User; role: string } }>;
   register: (userData: RegisterRequest) => Promise<void>;
   logout: () => Promise<void>;
   setUserRole: (role: UserRole) => Promise<void>;
@@ -83,6 +83,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(authResponse.data.user);
       setUserRoleState(authResponse.data.user.role);
       await AsyncStorage.setItem(ROLE_STORAGE_KEY, authResponse.data.user.role);
+      return { data: { user: authResponse.data.user, role: authResponse.data.user.role } };
     } catch (error) {
       console.error("Login error:", error);
       throw error;
@@ -96,8 +97,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsLoading(true);
       const authResponse = await apiService.register(userData);
       setUser(authResponse.data.user);
-      setUserRoleState(authResponse.data.user.role);
-      await AsyncStorage.setItem(ROLE_STORAGE_KEY, authResponse.data.user.role);
+      setUserRole(authResponse.data.user.role);
     } catch (error) {
       console.error("Register error:", error);
       throw error;
@@ -121,15 +121,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const setUserRole = async (role: UserRole) => {
-    try {
-      setUserRoleState(role);
-      if (role) {
-        await AsyncStorage.setItem(ROLE_STORAGE_KEY, role);
-      } else {
-        await AsyncStorage.removeItem(ROLE_STORAGE_KEY);
-      }
-    } catch (error) {
-      console.error("Error setting user role:", error);
+    setUserRoleState(role);
+    if (role) {
+      await AsyncStorage.setItem(ROLE_STORAGE_KEY, role);
+    } else {
+      await AsyncStorage.removeItem(ROLE_STORAGE_KEY);
     }
   };
 

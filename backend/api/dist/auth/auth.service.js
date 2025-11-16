@@ -60,17 +60,24 @@ let AuthService = class AuthService {
         this.jwtService = jwtService;
     }
     async register(registerDto) {
-        const { email, password, role, ...userData } = registerDto;
+        const { email, password, role, dateOfBirth, ...userData } = registerDto;
         const existingUser = await this.userModel.findOne({ email });
         if (existingUser) {
             throw new common_1.ConflictException('User with this email already exists');
         }
         const hashedPassword = await bcrypt.hash(password, 10);
+        const isDoctor = role === user_schema_1.UserRole.DOCTOR;
+        const dateOfBirthDate = dateOfBirth ? new Date(dateOfBirth) : undefined;
         const user = new this.userModel({
             ...userData,
             email,
             password: hashedPassword,
             role,
+            dateOfBirth: dateOfBirthDate,
+            isActive: isDoctor ? false : true,
+            approvalStatus: isDoctor
+                ? user_schema_1.ApprovalStatus.PENDING
+                : user_schema_1.ApprovalStatus.APPROVED,
         });
         const savedUser = await user.save();
         const tokens = await this.generateTokens(savedUser._id.toString());
@@ -85,6 +92,7 @@ let AuthService = class AuthService {
                     email: savedUser.email,
                     phone: savedUser.phone,
                     isVerified: savedUser.isVerified,
+                    approvalStatus: savedUser.approvalStatus,
                 },
                 token: tokens.accessToken,
                 refreshToken: tokens.refreshToken,
@@ -116,6 +124,7 @@ let AuthService = class AuthService {
                     email: user.email,
                     phone: user.phone,
                     isVerified: user.isVerified,
+                    approvalStatus: user.approvalStatus,
                 },
                 token: tokens.accessToken,
                 refreshToken: tokens.refreshToken,

@@ -16,8 +16,8 @@ const Services = () => {
               }}
               contentFit="cover"
             />
-            <Text style={styles.serviceTitle}>Instant Consultation </Text>
-            <Text style={styles.serviceDescription}>Start from $50</Text>
+            <Text style={styles.serviceTitle}>სწრაფი კონსულტაცია</Text>
+            <Text style={styles.serviceDescription}>დაწყება $50-დან</Text>
           </View>
           <View style={styles.serviceCard}>
             <Image
@@ -27,8 +27,8 @@ const Services = () => {
               }}
               contentFit="cover"
             />
-            <Text style={styles.serviceTitle}>Book a Specialist</Text>
-            <Text style={styles.serviceDescription}>Start from $100</Text>
+            <Text style={styles.serviceTitle}>სპეციალისტის ჯავშანი</Text>
+            <Text style={styles.serviceDescription}>დაწყება $100-დან</Text>
           </View>
           <View style={styles.serviceCard}>
             <Image

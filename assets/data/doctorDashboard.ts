@@ -68,6 +68,7 @@ export interface Patient {
   id: string;
   name: string;
   age: number;
+  dateOfBirth?: string;
   gender: "male" | "female";
   phone: string;
   email: string;

@@ -1,6 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
+  Alert,
   Modal,
   ScrollView,
   StyleSheet,
@@ -9,7 +10,9 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useAuth } from "../contexts/AuthContext";
 import { useSchedule } from "../contexts/ScheduleContext";
+import { apiService } from "../services/api";
 
 const AVAILABLE_HOURS = [
   "09:00",
@@ -26,11 +29,51 @@ const AVAILABLE_HOURS = [
 export default function DoctorSchedule() {
   const { schedules, selectedDates, setSchedules, setSelectedDates } =
     useSchedule();
+  const { user } = useAuth();
   const [showTimeModal, setShowTimeModal] = useState(false);
   const [currentEditDate, setCurrentEditDate] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [hasSaved, setHasSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Load existing availability on mount
+  useEffect(() => {
+    const loadAvailability = async () => {
+      if (!user?.id) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const response = await apiService.getDoctorAvailability(user.id);
+
+        if (response.success && response.data) {
+          // Convert availability to schedules format
+          const loadedSchedules: { [key: string]: string[] } = {};
+          const loadedDates: string[] = [];
+
+          response.data.forEach((avail: any) => {
+            if (avail.isAvailable && avail.timeSlots && avail.timeSlots.length > 0) {
+              loadedSchedules[avail.date] = avail.timeSlots;
+              loadedDates.push(avail.date);
+            }
+          });
+
+          setSchedules(loadedSchedules);
+          setSelectedDates(loadedDates);
+        }
+      } catch (error) {
+        console.error("Error loading availability:", error);
+        // Don't show error, just start with empty schedule
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAvailability();
+  }, [user?.id, setSchedules, setSelectedDates]);
 
   // Generate calendar by months
   const generateCalendarByMonths = () => {
@@ -144,22 +187,50 @@ export default function DoctorSchedule() {
   };
 
   const saveSchedule = async () => {
-    setIsSaving(true);
+    if (!allDatesHaveSlots()) {
+      Alert.alert(
+        "შეცდომა",
+        "გთხოვთ დაამატოთ საათები ყველა არჩეულ დღეს"
+      );
+      return;
+    }
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {
+      setIsSaving(true);
 
-    // TODO: Save to backend
-    console.log("Saving schedules:", schedules);
+      // Prepare availability data for API
+      const availabilityData = selectedDates.map((dateStr) => ({
+        date: dateStr,
+        timeSlots: schedules[dateStr] || [],
+        isAvailable: (schedules[dateStr] || []).length > 0,
+      }));
 
-    setIsSaving(false);
-    setSaveSuccess(true);
-    setHasSaved(true); // Mark as saved
+      // Save to backend
+      const response = await apiService.updateAvailability(availabilityData);
 
-    // Hide success message after 2 seconds
-    setTimeout(() => {
-      setSaveSuccess(false);
-    }, 2000);
+      if (response.success) {
+        setSaveSuccess(true);
+        setHasSaved(true); // Mark as saved
+
+        // Hide success message after 2 seconds
+        setTimeout(() => {
+          setSaveSuccess(false);
+        }, 2000);
+      } else {
+        Alert.alert(
+          "შეცდომა",
+          response.message || "განრიგის შენახვა ვერ მოხერხდა"
+        );
+      }
+    } catch (error: any) {
+      console.error("Error saving schedule:", error);
+      Alert.alert(
+        "შეცდომა",
+        error.message || "განრიგის შენახვა ვერ მოხერხდა. გთხოვთ სცადოთ თავიდან."
+      );
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const isToday = (date: Date) => {
@@ -178,6 +249,18 @@ export default function DoctorSchedule() {
       return slots && slots.length > 0;
     });
   };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <Text style={{ fontSize: 16, color: "#6B7280" }}>
+            განრიგის ჩატვირთვა...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>

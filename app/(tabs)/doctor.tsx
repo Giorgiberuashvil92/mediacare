@@ -1,10 +1,11 @@
 import { useFavorites } from "@/app/contexts/FavoritesContext";
-import { doctors } from "@/assets/data/doctors";
+import { apiService } from "@/app/services/api";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   Modal,
   StyleSheet,
@@ -15,6 +16,37 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
+  let imageSource;
+  if (doctor.profileImage) {
+    if (doctor.profileImage.startsWith("http")) {
+      imageSource = { uri: doctor.profileImage };
+    } else {
+      imageSource = { uri: `${apiBaseUrl}/${doctor.profileImage}` };
+    }
+  } else {
+    imageSource = require("@/assets/images/doctors/doctor1.png");
+  }
+
+  return {
+    id: doctor.id, // Keep as string (MongoDB ObjectId)
+    name: doctor.name || "",
+    specialization: doctor.specialization || "",
+    rating: doctor.rating || 0,
+    reviewCount: doctor.reviewCount || 0,
+    reviews: doctor.reviewCount || 0,
+    isActive: doctor.isActive !== undefined ? doctor.isActive : true,
+    image: imageSource,
+    degrees: doctor.degrees || "",
+    location: doctor.location || "",
+    consultationFee: doctor.consultationFee
+      ? `$${doctor.consultationFee}`
+      : undefined,
+    followUpFee: doctor.followUpFee ? `$${doctor.followUpFee}` : undefined,
+    about: doctor.about || "",
+  };
+};
+
 const Doctor = () => {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
@@ -22,6 +54,9 @@ const Doctor = () => {
   const { isFavorite, toggleFavorite } = useFavorites();
   const [selectedDoctor, setSelectedDoctor] = useState<any>(null);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
+  const [doctors, setDoctors] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Filter options
   const filterOptions = [
@@ -37,6 +72,38 @@ const Doctor = () => {
     { id: "Gastrology", label: "გასტროენტეროლოგი" },
   ];
 
+  useEffect(() => {
+    loadDoctors();
+  }, []);
+
+  const loadDoctors = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      if (apiService.isMockMode()) {
+        throw new Error(
+          "Mock API mode is disabled for doctors screen. Please disable USE_MOCK_API.",
+        );
+      }
+
+      const response = await apiService.getDoctors({ page: 1, limit: 100 });
+
+      if (response.success) {
+        const apiBaseUrl = apiService.getBaseURL();
+        const mappedDoctors = response.data.doctors.map((doctor: any) =>
+          mapDoctorFromAPI(doctor, apiBaseUrl),
+        );
+        setDoctors(mappedDoctors);
+      }
+    } catch (err: any) {
+      setError(err.message || "ექიმების ჩატვირთვა ვერ მოხერხდა");
+      setDoctors([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Filter doctors
   const filteredDoctors = useMemo(() => {
     let filtered = doctors;
@@ -44,20 +111,24 @@ const Doctor = () => {
     // Filter by specialty
     if (selectedFilter !== "all") {
       filtered = filtered.filter((doctor) =>
-        doctor.specialization.toLowerCase().includes(selectedFilter.toLowerCase())
+        doctor.specialization
+          ?.toLowerCase()
+          .includes(selectedFilter.toLowerCase()),
       );
     }
 
     // Filter by search query
     if (searchQuery) {
       filtered = filtered.filter((doctor) =>
-        doctor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        doctor.specialization.toLowerCase().includes(searchQuery.toLowerCase())
+        doctor.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        doctor.specialization
+          ?.toLowerCase()
+          .includes(searchQuery.toLowerCase()),
       );
     }
 
     return filtered;
-  }, [selectedFilter, searchQuery]);
+  }, [doctors, selectedFilter, searchQuery]);
 
   const handleToggleFavorite = (doctor: (typeof doctors)[0]) => {
     if (isFavorite(doctor.id)) {
@@ -105,7 +176,7 @@ const Doctor = () => {
         <Text style={styles.doctorName}>{doctor.name}</Text>
         <Text style={styles.doctorSpecialty}>{doctor.specialization}</Text>
         <Text style={styles.doctorQualification}>
-          {doctor.degrees || "MBBS, FCPS"}
+          {doctor.degrees || ""}
         </Text>
         <View style={styles.ratingRow}>
           <Ionicons name="star" size={16} color="#F59E0B" />
@@ -113,9 +184,11 @@ const Doctor = () => {
             {doctor.rating} ({doctor.reviewCount || doctor.reviews || 0})
           </Text>
         </View>
-        <Text style={styles.consultationFee}>
-          {doctor.consultationFee || "$100"}
-        </Text>
+        {doctor.consultationFee && (
+          <Text style={styles.consultationFee}>
+            {doctor.consultationFee}
+          </Text>
+        )}
       </View>
 
       <View style={styles.doctorActions}>
@@ -188,22 +261,41 @@ const Doctor = () => {
       </View>
 
       {/* Doctors List */}
-      <FlatList
-        data={filteredDoctors}
-        renderItem={renderDoctorCard}
-        keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Ionicons name="medical-outline" size={64} color="#D1D5DB" />
-            <Text style={styles.emptyStateTitle}>ექიმები ვერ მოიძებნა</Text>
-            <Text style={styles.emptyStateText}>
-              სცადეთ განსხვავებული ფილტრები
-            </Text>
-          </View>
-        }
-      />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#20BEB8" />
+          <Text style={styles.loadingText}>ექიმების ჩატვირთვა...</Text>
+        </View>
+      ) : error ? (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={loadDoctors}>
+            <Text style={styles.retryButtonText}>ხელახლა ცდა</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredDoctors}
+          renderItem={renderDoctorCard}
+          keyExtractor={(item, index) => {
+            const key = item?.id ?? item?.email ?? item?.name;
+            return key ? String(key) : `doctor-${index}`;
+          }}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+          onRefresh={loadDoctors}
+          refreshing={loading}
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Ionicons name="medical-outline" size={64} color="#D1D5DB" />
+              <Text style={styles.emptyStateTitle}>ექიმები ვერ მოიძებნა</Text>
+              <Text style={styles.emptyStateText}>
+                სცადეთ განსხვავებული ფილტრები
+              </Text>
+            </View>
+          }
+        />
+      )}
 
       {/* Remove Confirmation Modal */}
       <Modal
@@ -233,12 +325,12 @@ const Doctor = () => {
                     {selectedDoctor.specialization}
                   </Text>
                   <Text style={styles.doctorQualificationModal}>
-                    {selectedDoctor.degrees || "MBBS, FCPS"}
+                    {selectedDoctor.degrees || ""}
                   </Text>
                   <View style={styles.doctorDetailsModal}>
                     <View style={styles.consultationFeeModal}>
                       <Text style={styles.consultationFeeTextModal}>
-                        {selectedDoctor.consultationFee || "$100"}
+                        {selectedDoctor.consultationFee || "არ არის მითითებული"}
                       </Text>
                     </View>
                     <View style={styles.ratingContainerModal}>
@@ -568,6 +660,42 @@ const styles = StyleSheet.create({
   },
   removeButtonText: {
     fontSize: 16,
+    fontFamily: "Poppins-SemiBold",
+    color: "#FFFFFF",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 60,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 24,
+  },
+  errorText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#EF4444",
+    textAlign: "center",
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: "#20BEB8",
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  retryButtonText: {
+    fontSize: 14,
     fontFamily: "Poppins-SemiBold",
     color: "#FFFFFF",
   },

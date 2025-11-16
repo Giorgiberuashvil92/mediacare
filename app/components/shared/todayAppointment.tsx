@@ -1,7 +1,7 @@
-import { patientAppointments } from "@/assets/data/patientAppointments";
+import { apiService } from "@/app/services/api";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Modal,
   StyleSheet,
@@ -9,21 +9,81 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useAuth } from "../../contexts/AuthContext";
+
+interface PatientAppointment {
+  id: string;
+  doctorName: string;
+  doctorSpecialty: string;
+  date: string;
+  time: string;
+  status: string;
+  type: string;
+  fee: string | number;
+  isPaid: boolean;
+  symptoms?: string;
+  diagnosis?: string;
+  doctorImage?: any;
+  // API response fields
+  appointmentDate?: string;
+  appointmentTime?: string;
+  doctorId?: any;
+  patientDetails?: any;
+}
 
 const TodayAppointment = () => {
   const router = useRouter();
+  const { user, isAuthenticated } = useAuth();
   const [showModal, setShowModal] = useState(false);
+  const [todayAppointments, setTodayAppointments] = useState<PatientAppointment[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Get today's date in YYYY-MM-DD format
-  const today = new Date().toISOString().split("T")[0];
+  // Load today's appointments from API
+  useEffect(() => {
+    const loadTodayAppointments = async () => {
+      if (!isAuthenticated || !user?.id) {
+        setLoading(false);
+        return;
+      }
 
-  // Find today's appointments
-  const todayAppointments = patientAppointments.filter(
-    (appointment) => appointment.date === today && appointment.status === "scheduled"
-  );
+      try {
+        setLoading(true);
+        console.log('🏠 TodayAppointment - Loading appointments for user:', user.id);
+        
+        const response = await apiService.getPatientAppointments();
+        console.log('🏠 TodayAppointment - API response:', response);
 
-  // If no appointments for today, don't show banner
-  if (todayAppointments.length === 0) {
+        if (response.success && response.data) {
+          // Get today's date in YYYY-MM-DD format
+          const today = new Date().toISOString().split("T")[0];
+          
+          // Filter for today's scheduled appointments
+          const todayScheduled = response.data.filter((appointment: any) => {
+            const appointmentDate = appointment.appointmentDate 
+              ? new Date(appointment.appointmentDate).toISOString().split("T")[0]
+              : appointment.date;
+            
+            return appointmentDate === today && 
+                   (appointment.status === "scheduled" || 
+                    appointment.status === "confirmed" || 
+                    appointment.status === "pending");
+          });
+
+          console.log('🏠 TodayAppointment - Today\'s appointments:', todayScheduled);
+          setTodayAppointments(todayScheduled);
+        }
+      } catch (error) {
+        console.error('🏠 TodayAppointment - Error loading appointments:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadTodayAppointments();
+  }, [isAuthenticated, user?.id]);
+
+  // If loading or no appointments for today, don't show banner
+  if (loading || todayAppointments.length === 0) {
     return null;
   }
 
@@ -32,7 +92,11 @@ const TodayAppointment = () => {
 
   // Calculate time until appointment
   const getTimeUntil = () => {
-    const appointmentDateTime = new Date(`${appointment.date}T${appointment.time}`);
+    const appointmentDate = appointment.date || 
+      (appointment.appointmentDate ? new Date(appointment.appointmentDate).toISOString().split("T")[0] : '');
+    const appointmentTime = appointment.time || appointment.appointmentTime;
+    
+    const appointmentDateTime = new Date(`${appointmentDate}T${appointmentTime}`);
     const now = new Date();
     const diff = appointmentDateTime.getTime() - now.getTime();
 
@@ -52,7 +116,11 @@ const TodayAppointment = () => {
 
   // Check if appointment is within 1 hour from now
   const isUrgent = () => {
-    const appointmentDateTime = new Date(`${appointment.date}T${appointment.time}`);
+    const appointmentDate = appointment.date || 
+      (appointment.appointmentDate ? new Date(appointment.appointmentDate).toISOString().split("T")[0] : '');
+    const appointmentTime = appointment.time || appointment.appointmentTime;
+    
+    const appointmentDateTime = new Date(`${appointmentDate}T${appointmentTime}`);
     const now = new Date();
     const diff = appointmentDateTime.getTime() - now.getTime();
     return diff > 0 && diff <= 60 * 60 * 1000; // 1 hour
@@ -77,11 +145,15 @@ const TodayAppointment = () => {
           </Text>
           <View style={styles.infoRow}>
             <Ionicons name="medical" size={16} color="#FFFFFF" />
-            <Text style={styles.doctorName}>{appointment.doctorName}</Text>
+            <Text style={styles.doctorName}>
+              {appointment.doctorName || appointment.doctorId?.name || 'ექიმი'}
+            </Text>
           </View>
           <View style={styles.infoRow}>
             <Ionicons name="time-outline" size={16} color="#FFFFFF" />
-            <Text style={styles.time}>{appointment.time}</Text>
+            <Text style={styles.time}>
+              {appointment.time || appointment.appointmentTime}
+            </Text>
           </View>
         </View>
         <Ionicons name="chevron-forward" size={24} color="#FFFFFF" />
@@ -112,9 +184,11 @@ const TodayAppointment = () => {
                   <Ionicons name="medical" size={20} color="#06B6D4" />
                   <View style={styles.detailContent}>
                     <Text style={styles.detailLabel}>ექიმი</Text>
-                    <Text style={styles.detailValue}>{appointment.doctorName}</Text>
+                    <Text style={styles.detailValue}>
+                      {appointment.doctorName || appointment.doctorId?.name || 'ექიმი'}
+                    </Text>
                     <Text style={styles.detailSubValue}>
-                      {appointment.doctorSpecialty}
+                      {appointment.doctorSpecialty || appointment.doctorId?.specialization || ''}
                     </Text>
                   </View>
                 </View>
@@ -123,17 +197,21 @@ const TodayAppointment = () => {
                   <Ionicons name="time-outline" size={20} color="#8B5CF6" />
                   <View style={styles.detailContent}>
                     <Text style={styles.detailLabel}>დრო</Text>
-                    <Text style={styles.detailValue}>{appointment.time}</Text>
+                    <Text style={styles.detailValue}>
+                      {appointment.time || appointment.appointmentTime}
+                    </Text>
                     <Text style={styles.detailSubValue}>{getTimeUntil()} დარჩა</Text>
                   </View>
                 </View>
 
-                {appointment.symptoms && (
+                {(appointment.symptoms || appointment.patientDetails?.problem) && (
                   <View style={styles.detailRow}>
                     <Ionicons name="pulse" size={20} color="#EF4444" />
                     <View style={styles.detailContent}>
                       <Text style={styles.detailLabel}>სიმპტომები</Text>
-                      <Text style={styles.detailValue}>{appointment.symptoms}</Text>
+                      <Text style={styles.detailValue}>
+                        {appointment.symptoms || appointment.patientDetails?.problem}
+                      </Text>
                     </View>
                   </View>
                 )}

@@ -9,13 +9,20 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UserSchema = exports.User = exports.Gender = exports.UserRole = void 0;
+exports.UserSchema = exports.User = exports.Gender = exports.ApprovalStatus = exports.UserRole = void 0;
 const mongoose_1 = require("@nestjs/mongoose");
 var UserRole;
 (function (UserRole) {
     UserRole["PATIENT"] = "patient";
     UserRole["DOCTOR"] = "doctor";
+    UserRole["ADMIN"] = "admin";
 })(UserRole || (exports.UserRole = UserRole = {}));
+var ApprovalStatus;
+(function (ApprovalStatus) {
+    ApprovalStatus["PENDING"] = "pending";
+    ApprovalStatus["APPROVED"] = "approved";
+    ApprovalStatus["REJECTED"] = "rejected";
+})(ApprovalStatus || (exports.ApprovalStatus = ApprovalStatus = {}));
 var Gender;
 (function (Gender) {
     Gender["MALE"] = "male";
@@ -58,6 +65,23 @@ __decorate([
     __metadata("design:type", String)
 ], User.prototype, "profileImage", void 0);
 __decorate([
+    (0, mongoose_1.Prop)({
+        type: {
+            street: String,
+            city: String,
+            state: String,
+            zipCode: String,
+            country: String,
+        },
+        _id: false,
+    }),
+    __metadata("design:type", Object)
+], User.prototype, "address", void 0);
+__decorate([
+    (0, mongoose_1.Prop)(),
+    __metadata("design:type", String)
+], User.prototype, "licenseNumber", void 0);
+__decorate([
     (0, mongoose_1.Prop)({ default: false }),
     __metadata("design:type", Boolean)
 ], User.prototype, "isVerified", void 0);
@@ -65,6 +89,10 @@ __decorate([
     (0, mongoose_1.Prop)({ default: true }),
     __metadata("design:type", Boolean)
 ], User.prototype, "isActive", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ enum: ApprovalStatus, default: ApprovalStatus.PENDING }),
+    __metadata("design:type", String)
+], User.prototype, "approvalStatus", void 0);
 __decorate([
     (0, mongoose_1.Prop)(),
     __metadata("design:type", String)
@@ -105,6 +133,18 @@ __decorate([
     (0, mongoose_1.Prop)({ default: 0 }),
     __metadata("design:type", Number)
 ], User.prototype, "reviewCount", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: false }),
+    __metadata("design:type", Boolean)
+], User.prototype, "isTopRated", void 0);
+__decorate([
+    (0, mongoose_1.Prop)(),
+    __metadata("design:type", Date)
+], User.prototype, "createdAt", void 0);
+__decorate([
+    (0, mongoose_1.Prop)(),
+    __metadata("design:type", Date)
+], User.prototype, "updatedAt", void 0);
 exports.User = User = __decorate([
     (0, mongoose_1.Schema)({ timestamps: true })
 ], User);

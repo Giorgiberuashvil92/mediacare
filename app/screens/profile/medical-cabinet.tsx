@@ -1,7 +1,9 @@
+import { apiService } from "@/app/services/api";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Modal,
   ScrollView,
   StyleSheet,
@@ -11,14 +13,20 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import {
-  patientVisits,
-  VisitRecord,
-} from "../../../assets/data/patientRecords";
+import { useAuth } from "../../contexts/AuthContext";
+
+interface VisitRecord {
+  id: string;
+  date: string;
+  doctorName: string;
+  doctorSpecialty: string;
+  appointmentId?: string;
+}
 
 type TabType = "records" | "personal-info";
 
 export default function MedicalCabinetScreen() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>("personal-info");
   const [selectedGender, setSelectedGender] = useState<string>("");
   const [birthDate, setBirthDate] = useState<string>("");
@@ -29,6 +37,49 @@ export default function MedicalCabinetScreen() {
   const [hasAllergy, setHasAllergy] = useState(false);
   const [allergyText, setAllergyText] = useState<string>("");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [patientVisits, setPatientVisits] = useState<VisitRecord[]>([]);
+  const [loadingRecords, setLoadingRecords] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === "records" && user?.id) {
+      loadMedicalRecords();
+    }
+  }, [activeTab, user?.id]);
+
+  const loadMedicalRecords = async () => {
+    try {
+      setLoadingRecords(true);
+
+      if (apiService.isMockMode()) {
+        setLoadingRecords(false);
+        return;
+      }
+
+      const response = await apiService.getPatientAppointments();
+
+      if (response.success && response.data) {
+        // Map appointments to visit records
+        const visits: VisitRecord[] = response.data.map((apt: any) => {
+          const doctor = apt.doctorId || {};
+          return {
+            id: apt._id || apt.id || "",
+            date: apt.appointmentDate || "",
+            doctorName: doctor.name || "ექიმი",
+            doctorSpecialty: doctor.specialization || "",
+            appointmentId: apt._id || apt.id || "",
+          };
+        });
+        setPatientVisits(visits);
+      } else {
+        setPatientVisits([]);
+      }
+    } catch (err: any) {
+      console.error("Error loading medical records:", err);
+      setPatientVisits([]);
+    } finally {
+      setLoadingRecords(false);
+    }
+  };
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -57,7 +108,15 @@ export default function MedicalCabinetScreen() {
       <TouchableOpacity
         key={visit.id}
         style={styles.visitCard}
-        onPress={() => router.push(`/screens/profile/visit/${visit.id}` as any)}
+        onPress={() =>
+          router.push({
+            pathname: "/screens/appointment/appointment-details",
+            params: {
+              appointmentId: visit.appointmentId || visit.id,
+              doctorId: "",
+            },
+          })
+        }
       >
         <View style={styles.visitCardContent}>
           <View style={[styles.visitIconContainer, { backgroundColor: `${statusColor}15` }]}>
@@ -173,18 +232,27 @@ export default function MedicalCabinetScreen() {
                   <Ionicons name="medical" size={24} color="#10B981" />
                 </View>
                 <Text style={styles.summaryValue}>
-                  {patientVisits.filter((v) => v.followUp.required).length}
+                  {patientVisits.filter((v) => {
+                    const visitDate = new Date(v.date);
+                    const today = new Date();
+                    const diffDays = Math.ceil((today.getTime() - visitDate.getTime()) / (1000 * 60 * 60 * 24));
+                    return diffDays <= 15;
+                  }).length}
                 </Text>
-                <Text style={styles.summaryLabel}>განმეორებითი</Text>
+                <Text style={styles.summaryLabel}>ბოლო 15 დღე</Text>
               </View>
               <View style={styles.summaryCard}>
                 <View style={styles.summaryIconContainer}>
-                  <Ionicons name="bandage" size={24} color="#F59E0B" />
+                  <Ionicons name="calendar" size={24} color="#F59E0B" />
                 </View>
                 <Text style={styles.summaryValue}>
-                  {patientVisits.reduce((acc, v) => acc + v.medications.length, 0)}
+                  {patientVisits.filter((v) => {
+                    const visitDate = new Date(v.date);
+                    const today = new Date();
+                    return visitDate >= today;
+                  }).length}
                 </Text>
-                <Text style={styles.summaryLabel}>წამლები</Text>
+                <Text style={styles.summaryLabel}>მომავალი</Text>
               </View>
             </View>
 
@@ -198,7 +266,24 @@ export default function MedicalCabinetScreen() {
 
             {/* Visits List */}
             <View style={styles.visitsSection}>
-              {patientVisits.map((visit) => renderVisitCard(visit))}
+              {loadingRecords ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color="#06B6D4" />
+                  <Text style={styles.loadingText}>მონაცემების ჩატვირთვა...</Text>
+                </View>
+              ) : patientVisits.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Ionicons name="document-outline" size={64} color="#D1D5DB" />
+                  <Text style={styles.emptyStateTitle}>
+                    მედიცინური ჩანაწერები ვერ მოიძებნა
+                  </Text>
+                  <Text style={styles.emptyStateText}>
+                    თქვენ არ გაქვთ დაჯავშნილი ვიზიტები
+                  </Text>
+                </View>
+              ) : (
+                patientVisits.map((visit) => renderVisitCard(visit))
+              )}
             </View>
           </View>
         ) : (
@@ -926,6 +1011,40 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Poppins-SemiBold",
     color: "#FFFFFF",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 40,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+  },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 48,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    marginTop: 20,
+  },
+  emptyStateTitle: {
+    fontSize: 18,
+    fontFamily: "Poppins-Bold",
+    color: "#1F2937",
+    marginTop: 16,
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  emptyStateText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+    textAlign: "center",
   },
 });
 

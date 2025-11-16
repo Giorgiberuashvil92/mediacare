@@ -43,11 +43,11 @@ export default function RoleSelectionScreen() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>Choose Your Role</Text>
+          <Text style={styles.title}>აირჩიე შენი როლი</Text>
           <Text style={styles.subtitle}>
             {isAuthenticated
-              ? "Select which interface you want to use"
-              : "Choose your role to get started"}
+              ? "აირჩიე რომელი ნაწილი გინდა გამოიყენო"
+              : "არჩევე რომელი პროფილით დავიწყოთ"}
           </Text>
         </View>
 
@@ -78,9 +78,9 @@ export default function RoleSelectionScreen() {
                 <Ionicons name="checkmark-circle" size={28} color="#20BEB8" />
               )}
             </View>
-            <Text style={styles.roleTitle}>I&apos;m a Doctor</Text>
+            <Text style={styles.roleTitle}>მე ვარ ექიმი</Text>
             <Text style={styles.roleDescription}>
-              Register as healthcare provider
+              შემოუერთდი როგორც სამედიცინო მომსახურების მიმწოდებელი
             </Text>
           </TouchableOpacity>
 
@@ -109,9 +109,9 @@ export default function RoleSelectionScreen() {
                 <Ionicons name="checkmark-circle" size={28} color="#20BEB8" />
               )}
             </View>
-            <Text style={styles.roleTitle}>I&apos;m a Patient</Text>
+            <Text style={styles.roleTitle}>მე ვარ პაციენტი</Text>
             <Text style={styles.roleDescription}>
-              Find doctors and book appointments
+              მოძებნე ექიმი და დაჯავშნე ვიზიტი
             </Text>
           </TouchableOpacity>
         </View>
@@ -125,17 +125,17 @@ export default function RoleSelectionScreen() {
           onPress={handleContinue}
           disabled={!selectedRole}
         >
-          <Text style={styles.continueButtonText}>Continue</Text>
+          <Text style={styles.continueButtonText}>გასაგრძელებლად</Text>
         </TouchableOpacity>
 
         {/* Login Link - only show if not authenticated */}
         {!isAuthenticated && (
           <View style={styles.loginContainer}>
-            <Text style={styles.loginText}>Already have an account? </Text>
+            <Text style={styles.loginText}>უკვე გაქვს ანგარიში? </Text>
             <TouchableOpacity
               onPress={() => router.push("/screens/auth/login")}
             >
-              <Text style={styles.loginLink}>Login</Text>
+              <Text style={styles.loginLink}>შესვლა</Text>
             </TouchableOpacity>
           </View>
         )}

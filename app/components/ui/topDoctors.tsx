@@ -1,11 +1,12 @@
 import { useFavorites } from "@/app/contexts/FavoritesContext";
-import { doctors } from "@/assets/data/doctors";
+import { apiService } from "@/app/services/api";
 import Fontisto from "@expo/vector-icons/Fontisto";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Modal,
   ScrollView,
   StyleSheet,
@@ -16,11 +17,89 @@ import {
 import DoctorFilters from "../shared/doctorFilters";
 import SeeAll from "../shared/seeAll";
 
+const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
+  // Build image URL from backend
+  let imageSource;
+  if (doctor.profileImage) {
+    // If profileImage is a full URL, use it; otherwise construct it
+    if (doctor.profileImage.startsWith('http')) {
+      imageSource = { uri: doctor.profileImage };
+    } else {
+      imageSource = { uri: `${apiBaseUrl}/${doctor.profileImage}` };
+    }
+  } else {
+    // Fallback to default image
+    imageSource = require("@/assets/images/doctors/doctor1.png");
+  }
+
+  return {
+    id: doctor.id || doctor._id,
+    name: doctor.name || "",
+    specialization: doctor.specialization || "",
+    rating: doctor.rating || 0,
+    reviewCount: doctor.reviewCount || 0,
+    reviews: doctor.reviewCount || 0,
+    isActive: doctor.isActive !== undefined ? doctor.isActive : true,
+    isTopRated: doctor.isTopRated || false,
+    image: imageSource,
+    degrees: doctor.degrees || "",
+    location: doctor.location || "",
+    consultationFee: doctor.consultationFee
+      ? `$${doctor.consultationFee}`
+      : undefined,
+    followUpFee: doctor.followUpFee ? `$${doctor.followUpFee}` : undefined,
+    about: doctor.about || "",
+    experience: doctor.experience || "",
+  };
+};
+
 const TopDoctors = () => {
   const [selectedFilter, setSelectedFilter] = useState(1);
   const { isFavorite, toggleFavorite } = useFavorites();
   const [selectedDoctor, setSelectedDoctor] = useState<any>(null);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
+  const [doctors, setDoctors] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadDoctors();
+  }, [selectedFilter]);
+
+  const loadDoctors = async () => {
+    try {
+      setLoading(true);
+      
+      // Get all approved doctors first
+      const response = await apiService.getDoctors({
+        page: 1,
+        limit: 100,
+      });
+
+      if (response.success) {
+        const apiBaseUrl = apiService.getBaseURL();
+        const mappedDoctors = response.data.doctors.map((doctor: any) =>
+          mapDoctorFromAPI(doctor, apiBaseUrl)
+        );
+        
+        // Filter only top rated doctors (isTopRated === true)
+        const topRatedDoctors = mappedDoctors.filter((doctor: any) => 
+          doctor.isTopRated === true
+        );
+        
+        // Sort by rating (descending)
+        const sortedDoctors = topRatedDoctors.sort((a: any, b: any) => 
+          (b.rating || 0) - (a.rating || 0)
+        );
+        
+        setDoctors(sortedDoctors);
+      }
+    } catch (error) {
+      console.error("Failed to load top doctors:", error);
+      setDoctors([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredDoctors = useMemo(() => {
     if (selectedFilter === 1) {
@@ -28,24 +107,26 @@ const TopDoctors = () => {
     } else {
       // Filter by specialization
       const filterMap: { [key: number]: string } = {
-        2: "Neurology",
-        3: "Cardiology",
-        4: "Gynecology",
-        5: "Pediatrics",
-        6: "Allergy",
-        7: "Dentist",
-        8: "Urology",
-        9: "Gastrology",
+        2: "ნევროლოგია",
+        3: "კარდიოლოგია",
+        4: "გინეკოლოგია",
+        5: "პედიატრია",
+        6: "ალერგოლოგია",
+        7: "სტომატოლოგია",
+        8: "უროლოგია",
+        9: "გასტროენტეროლოგია",
       };
 
       const filterSpecialization = filterMap[selectedFilter];
+      if (!filterSpecialization) return doctors;
+      
       return doctors.filter((doctor) =>
         doctor.specialization
           .toLowerCase()
           .includes(filterSpecialization.toLowerCase())
       );
     }
-  }, [selectedFilter]);
+  }, [selectedFilter, doctors]);
 
   const handleToggleFavorite = (doctor: any, e: any) => {
     e.stopPropagation();
@@ -74,63 +155,73 @@ const TopDoctors = () => {
 
   return (
     <View style={styles.container}>
-      <SeeAll title="Top Rated Doctors" route="/screens/doctors/topdoctors" />
+      <SeeAll title="ტოპ ექიმები" route="/screens/doctors/topdoctors" />
       <DoctorFilters
         selectedFilter={selectedFilter}
         onFilterChange={setSelectedFilter}
       />
-      <ScrollView
-        style={styles.doctorList}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-      >
-        {filteredDoctors.map((doctor) => (
-          <TouchableOpacity
-            key={doctor.id}
-            style={styles.doctorCard}
-            onPress={() =>
-              router.push({
-                pathname: "/screens/doctors/doctor/[id]",
-                params: { id: doctor.id.toString() },
-              })
-            }
-          >
-            <View style={styles.imageContainer}>
-              <Image source={doctor.image} style={styles.doctorImage} />
-              {doctor.isActive && (
-                <View style={styles.activeIndicator}>
-                  <Fontisto name="radio-btn-active" size={18} color="#22C55E" />
-                </View>
-              )}
-            </View>
-            <View style={styles.doctorInfo}>
-              <Text style={styles.doctorName}>{doctor.name}</Text>
-              <Text style={styles.doctorSpecialization}>
-                {doctor.specialization}
-              </Text>
-              <View style={styles.ratingContainer}>
-                <View style={styles.ratingLeft}>
-                  <Ionicons name="star" size={16} color="#FFD700" />
-                  <Text style={styles.doctorRating}>{doctor.rating}</Text>
-                  <Text style={styles.doctorReviews}>
-                    ({doctor.reviewCount})
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.favoriteButton}
-                  onPress={(e) => handleToggleFavorite(doctor, e)}
-                >
-                  <Ionicons
-                    name={isFavorite(doctor.id) ? "heart" : "heart-outline"}
-                    size={20}
-                    color={isFavorite(doctor.id) ? "#EF4444" : "#D4D4D4"}
-                  />
-                </TouchableOpacity>
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="small" color="#06B6D4" />
+        </View>
+      ) : filteredDoctors.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>ექიმები არ მოიძებნა</Text>
+        </View>
+      ) : (
+        <ScrollView
+          style={styles.doctorList}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+        >
+          {filteredDoctors.map((doctor) => (
+            <TouchableOpacity
+              key={doctor.id}
+              style={styles.doctorCard}
+              onPress={() =>
+                router.push({
+                  pathname: "/screens/doctors/doctor/[id]",
+                  params: { id: doctor.id.toString() },
+                })
+              }
+            >
+              <View style={styles.imageContainer}>
+                <Image source={doctor.image} style={styles.doctorImage} />
+                {doctor.isActive && (
+                  <View style={styles.activeIndicator}>
+                    <Fontisto name="radio-btn-active" size={18} color="#22C55E" />
+                  </View>
+                )}
               </View>
-            </View>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+              <View style={styles.doctorInfo}>
+                <Text style={styles.doctorName}>{doctor.name}</Text>
+                <Text style={styles.doctorSpecialization}>
+                  {doctor.specialization}
+                </Text>
+                <View style={styles.ratingContainer}>
+                  <View style={styles.ratingLeft}>
+                    <Ionicons name="star" size={16} color="#FFD700" />
+                    <Text style={styles.doctorRating}>{doctor.rating.toFixed(1)}</Text>
+                    <Text style={styles.doctorReviews}>
+                      ({doctor.reviewCount})
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.favoriteButton}
+                    onPress={(e) => handleToggleFavorite(doctor, e)}
+                  >
+                    <Ionicons
+                      name={isFavorite(doctor.id) ? "heart" : "heart-outline"}
+                      size={20}
+                      color={isFavorite(doctor.id) ? "#EF4444" : "#D4D4D4"}
+                    />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
 
       {/* Remove Confirmation Modal */}
       <Modal
@@ -143,7 +234,7 @@ const TopDoctors = () => {
           <View style={styles.modalContainer}>
             <View style={styles.modalHandle} />
 
-            <Text style={styles.modalTitle}>Remove from Favourites?</Text>
+            <Text style={styles.modalTitle}>ფავორიტებიდან წაშლა?</Text>
 
             {selectedDoctor && (
               <View style={styles.doctorCardModal}>
@@ -162,18 +253,18 @@ const TopDoctors = () => {
                     {selectedDoctor.specialization}
                   </Text>
                   <Text style={styles.doctorQualificationModal}>
-                    {selectedDoctor.degrees || "MBBS, FCPS"}
+                    {selectedDoctor.degrees || ""}
                   </Text>
                   <View style={styles.doctorDetailsModal}>
                     <View style={styles.consultationFeeModal}>
                       <Text style={styles.consultationFeeTextModal}>
-                        {selectedDoctor.consultationFee || "$100"}
+                        {selectedDoctor.consultationFee || "არ არის მითითებული"}
                       </Text>
                     </View>
                     <View style={styles.ratingContainerModal}>
                       <Ionicons name="star" size={16} color="#F59E0B" />
                       <Text style={styles.ratingTextModal}>
-                        {selectedDoctor.rating} (
+                        {selectedDoctor.rating.toFixed(1)} (
                         {selectedDoctor.reviewCount ||
                           selectedDoctor.reviews ||
                           0}
@@ -194,14 +285,14 @@ const TopDoctors = () => {
                 style={styles.cancelButton}
                 onPress={cancelRemoveFavorite}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={styles.cancelButtonText}>გაუქმება</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.removeButton}
                 onPress={confirmRemoveFavorite}
               >
-                <Text style={styles.removeButtonText}>Yes, remove</Text>
+                <Text style={styles.removeButtonText}>დიახ, წაშლა</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -295,6 +386,21 @@ const styles = StyleSheet.create({
     height: 28,
     justifyContent: "center",
     alignItems: "center",
+  },
+  loadingContainer: {
+    padding: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyContainer: {
+    padding: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#9CA3AF",
   },
   // Modal Styles
   modalOverlay: {

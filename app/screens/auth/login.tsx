@@ -21,7 +21,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const { login, userRole, user } = useAuth();
+  const { login } = useAuth();
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -31,12 +31,16 @@ export default function LoginScreen() {
 
     try {
       setIsLoading(true);
-      await login({ email: email.trim(), password });
+      const authResponse = await login({ email: email.trim(), password });
+      
+      // Get role from response
+      const role = authResponse.data.user.role || authResponse.data.role;
       
       // Show success toast
-      showToast.auth.loginSuccess(user?.name || "მომხმარებელო");
+      showToast.auth.loginSuccess(authResponse.data.user.name || "მომხმარებელო");
       
-      if (userRole === "doctor") {
+      // Navigate based on role
+      if (role === "doctor") {
         router.replace("/(doctor-tabs)");
       } else {
         router.replace("/(tabs)");
@@ -63,7 +67,7 @@ export default function LoginScreen() {
   };
 
   const handleSignup = () => {
-    router.push("/screens/auth/register");
+    router.push("/screens/auth/roleSelection");
   };
 
   return (
@@ -82,16 +86,14 @@ export default function LoginScreen() {
           </View>
 
           {/* Title */}
-          <Text style={styles.title}>Hello Again!</Text>
-          <Text style={styles.subtitle}>
-            Welcome back you&apos;ve been missed!
-          </Text>
+          <Text style={styles.title}>კეთილი იყოს შენი დაბრუნება!</Text>
+          <Text style={styles.subtitle}>მოგვენატრე, შევიდეთ?</Text>
 
           {/* Form */}
           <View style={styles.form}>
             {/* Email Input */}
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Email</Text>
+              <Text style={styles.label}>ელ. ფოსტა</Text>
               <View style={styles.inputWrapper}>
                 <Ionicons
                   name="mail-outline"
@@ -101,7 +103,7 @@ export default function LoginScreen() {
                 />
                 <TextInput
                   style={styles.input}
-                  placeholder="mizanurrahman@gmail.com"
+                  placeholder="შეიყვანე ელ. ფოსტა"
                   placeholderTextColor="#9CA3AF"
                   value={email}
                   onChangeText={setEmail}
@@ -114,7 +116,7 @@ export default function LoginScreen() {
 
             {/* Password Input */}
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Password</Text>
+              <Text style={styles.label}>პაროლი</Text>
               <View style={styles.inputWrapper}>
                 <Ionicons
                   name="lock-closed-outline"
@@ -179,42 +181,22 @@ export default function LoginScreen() {
               </Text>
             </TouchableOpacity>
 
-            {/* Divider */}
-            <View style={styles.dividerContainer}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or Login with</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            {/* Social Login Buttons */}
-            <TouchableOpacity style={styles.socialButton}>
-              <Image
-                source={{
-                  uri: "https://developers.google.com/identity/images/g-logo.png",
-                }}
-                style={styles.socialIcon}
-              />
-              <Text style={styles.socialButtonText}>Continue with google</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.socialButton}>
-              <View style={[styles.socialIcon, styles.facebookIcon]}>
-                <Ionicons name="logo-facebook" size={20} color="#FFFFFF" />
-              </View>
-              <Text style={styles.socialButtonText}>
-                Continue with Facebook
-              </Text>
-            </TouchableOpacity>
-
-            {/* Signup Link */}
-            <View style={styles.signupContainer}>
-              <Text style={styles.signupText}>
-                Don&apos;t have an account?{" "}
-              </Text>
+            <View style={styles.signupContainerInline}>
+              <Text style={styles.signupText}>ანგარიში არ გაქვს? </Text>
               <TouchableOpacity onPress={handleSignup}>
-                <Text style={styles.signupLink}>signup</Text>
+                <Text style={styles.signupLink}>დარეგისტრირდი</Text>
               </TouchableOpacity>
             </View>
+
+            {/* Divider */}
+            {/* <View style={styles.dividerContainer}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>ან შესვლა სხვა გზით</Text>
+              <View style={styles.dividerLine} />
+            </View> */}
+
+            {/* Social Login Buttons */}
+         
           </View>
         </View>
       </SafeAreaView>
@@ -394,6 +376,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginTop: 10,
+  },
+  signupContainerInline: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 16,
+    marginBottom: 16,
   },
   signupText: {
     fontSize: 16,

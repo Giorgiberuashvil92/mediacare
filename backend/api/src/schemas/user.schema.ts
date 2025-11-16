@@ -6,6 +6,13 @@ export type UserDocument = User & Document;
 export enum UserRole {
   PATIENT = 'patient',
   DOCTOR = 'doctor',
+  ADMIN = 'admin',
+}
+
+export enum ApprovalStatus {
+  PENDING = 'pending',
+  APPROVED = 'approved',
+  REJECTED = 'rejected',
 }
 
 export enum Gender {
@@ -40,11 +47,35 @@ export class User {
   @Prop()
   profileImage?: string;
 
+  @Prop({
+    type: {
+      street: String,
+      city: String,
+      state: String,
+      zipCode: String,
+      country: String,
+    },
+    _id: false,
+  })
+  address?: {
+    street?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+    country?: string;
+  };
+
+  @Prop()
+  licenseNumber?: string;
+
   @Prop({ default: false })
   isVerified: boolean;
 
   @Prop({ default: true })
   isActive: boolean;
+
+  @Prop({ enum: ApprovalStatus, default: ApprovalStatus.PENDING })
+  approvalStatus: ApprovalStatus;
 
   // Doctor specific fields
   @Prop()
@@ -76,6 +107,15 @@ export class User {
 
   @Prop({ default: 0 })
   reviewCount: number;
+
+  @Prop({ default: false })
+  isTopRated?: boolean;
+
+  @Prop()
+  createdAt?: Date;
+
+  @Prop()
+  updatedAt?: Date;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

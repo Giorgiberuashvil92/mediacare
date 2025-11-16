@@ -11,7 +11,12 @@ import {
   RefreshToken,
   RefreshTokenDocument,
 } from '../schemas/refresh-token.schema';
-import { User, UserDocument } from '../schemas/user.schema';
+import {
+  ApprovalStatus,
+  User,
+  UserDocument,
+  UserRole,
+} from '../schemas/user.schema';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 
@@ -25,23 +30,30 @@ export class AuthService {
   ) {}
 
   async register(registerDto: RegisterDto) {
-    const { email, password, role, ...userData } = registerDto;
+    const { email, password, role, dateOfBirth, ...userData } = registerDto;
 
-    // Check if user already exists
     const existingUser = await this.userModel.findOne({ email });
     if (existingUser) {
       throw new ConflictException('User with this email already exists');
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user
+    const isDoctor = role === UserRole.DOCTOR;
+
+    // Convert dateOfBirth string to Date if provided
+    const dateOfBirthDate = dateOfBirth ? new Date(dateOfBirth) : undefined;
+
     const user = new this.userModel({
       ...userData,
       email,
       password: hashedPassword,
       role,
+      dateOfBirth: dateOfBirthDate,
+      isActive: isDoctor ? false : true,
+      approvalStatus: isDoctor
+        ? ApprovalStatus.PENDING
+        : ApprovalStatus.APPROVED,
     });
 
     const savedUser = await user.save();
@@ -62,6 +74,7 @@ export class AuthService {
           email: savedUser.email,
           phone: savedUser.phone,
           isVerified: savedUser.isVerified,
+          approvalStatus: savedUser.approvalStatus,
         },
         token: tokens.accessToken,
         refreshToken: tokens.refreshToken,
@@ -72,24 +85,20 @@ export class AuthService {
   async login(loginDto: LoginDto) {
     const { email, password } = loginDto;
 
-    // Find user
     const user = await this.userModel.findOne({ email });
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // Check password
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // Check if user is active
     if (!user.isActive) {
       throw new UnauthorizedException('Account is deactivated');
     }
 
-    // Generate tokens
     const tokens = await this.generateTokens((user._id as string).toString());
 
     return {
@@ -103,6 +112,7 @@ export class AuthService {
           email: user.email,
           phone: user.phone,
           isVerified: user.isVerified,
+          approvalStatus: user.approvalStatus,
         },
         token: tokens.accessToken,
         refreshToken: tokens.refreshToken,

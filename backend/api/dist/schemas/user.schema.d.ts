@@ -2,7 +2,13 @@ import { Document } from 'mongoose';
 export type UserDocument = User & Document;
 export declare enum UserRole {
     PATIENT = "patient",
-    DOCTOR = "doctor"
+    DOCTOR = "doctor",
+    ADMIN = "admin"
+}
+export declare enum ApprovalStatus {
+    PENDING = "pending",
+    APPROVED = "approved",
+    REJECTED = "rejected"
 }
 export declare enum Gender {
     MALE = "male",
@@ -18,8 +24,17 @@ export declare class User {
     dateOfBirth?: Date;
     gender?: Gender;
     profileImage?: string;
+    address?: {
+        street?: string;
+        city?: string;
+        state?: string;
+        zipCode?: string;
+        country?: string;
+    };
+    licenseNumber?: string;
     isVerified: boolean;
     isActive: boolean;
+    approvalStatus: ApprovalStatus;
     specialization?: string;
     licenseDocument?: string;
     degrees?: string;
@@ -30,6 +45,9 @@ export declare class User {
     location?: string;
     rating: number;
     reviewCount: number;
+    isTopRated?: boolean;
+    createdAt?: Date;
+    updatedAt?: Date;
 }
 export declare const UserSchema: import("mongoose").Schema<User, import("mongoose").Model<User, any, any, any, Document<unknown, any, User, any, {}> & User & {
     _id: import("mongoose").Types.ObjectId;

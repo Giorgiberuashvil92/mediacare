@@ -4,12 +4,12 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
-  FlatList,
-  Modal,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    FlatList,
+    Modal,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -60,10 +60,10 @@ export default function FavouritesScreen() {
         <Text style={styles.doctorName}>{doctor.name}</Text>
         <Text style={styles.doctorSpecialty}>{doctor.specialization}</Text>
         <Text style={styles.doctorQualification}>
-          {doctor.degrees || "MBBS, FCPS"}
+          {doctor.degrees || ""}
         </Text>
         <Text style={styles.consultationFee}>
-          {doctor.consultationFee || "$100"}
+          {doctor.consultationFee || "არ არის მითითებული"}
         </Text>
       </View>
 
@@ -159,12 +159,12 @@ export default function FavouritesScreen() {
                     {selectedDoctor.specialization}
                   </Text>
                   <Text style={styles.doctorQualificationModal}>
-                    {selectedDoctor.degrees || "MBBS, FCPS"}
+                    {selectedDoctor.degrees || ""}
                   </Text>
                   <View style={styles.doctorDetailsModal}>
                     <View style={styles.consultationFeeModal}>
                       <Text style={styles.consultationFeeTextModal}>
-                        {selectedDoctor.consultationFee || "$100"}
+                        {selectedDoctor.consultationFee || "არ არის მითითებული"}
                       </Text>
                     </View>
                     <View style={styles.ratingContainerModal}>

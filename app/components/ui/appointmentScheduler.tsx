@@ -1,3 +1,4 @@
+import { apiService } from "@/app/services/api";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useState } from "react";
@@ -13,6 +14,7 @@ interface DayAvailability {
   date: string;
   dayOfWeek: string;
   timeSlots: string[];
+  bookedSlots?: string[]; // დაჯავშნული დროები
   isAvailable: boolean;
 }
 
@@ -29,8 +31,24 @@ interface AppointmentSchedulerProps {
   availability: DayAvailability[];
   totalReviews: number;
   reviews: Review[];
-  doctorId?: number;
+  doctorId?: string;
+  onTimeSlotBlocked?: () => void; // Callback after blocking time slot
 }
+
+// Function to temporarily block a time slot
+const blockTimeSlot = async (doctorId: string, date: string, time: string) => {
+  try {
+    const response = await apiService.blockTimeSlot({
+      doctorId,
+      date,
+      time,
+    });
+    return response;
+  } catch (error) {
+    console.error('Error blocking time slot:', error);
+    throw error;
+  }
+};
 
 const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
   workingHours,
@@ -38,13 +56,35 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
   totalReviews,
   reviews,
   doctorId,
+  onTimeSlotBlocked,
 }) => {
   const [selectedDate, setSelectedDate] = useState<string>(
     availability[0]?.date || ""
   );
   const [selectedTime, setSelectedTime] = useState<string>("");
 
-  const currentMonth = "January 2024"; // This could be dynamic based on selected date
+  // Dynamic month/year based on selected date
+  const getCurrentMonth = () => {
+    if (!selectedDate) return "";
+    const date = new Date(selectedDate);
+    const months = [
+      "იანვარი",
+      "თებერვალი",
+      "მარტი",
+      "აპრილი",
+      "მაისი",
+      "ივნისი",
+      "ივლისი",
+      "აგვისტო",
+      "სექტემბერი",
+      "ოქტომბერი",
+      "ნოემბერი",
+      "დეკემბერი",
+    ];
+    return `${months[date.getMonth()]} ${date.getFullYear()}`;
+  };
+
+  const currentMonth = getCurrentMonth();
 
   const handleDateSelect = (date: string) => {
     setSelectedDate(date);
@@ -63,13 +103,13 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
     <View style={styles.container}>
       {/* Working Time Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Working Time</Text>
+        <Text style={styles.sectionTitle}>სამუშაო საათები</Text>
         <Text style={styles.workingHours}>{workingHours}</Text>
       </View>
 
       {/* Schedule Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Schedule</Text>
+        <Text style={styles.sectionTitle}>განრიგი</Text>
 
         {/* Month/Year Selector */}
         <View style={styles.monthSelector}>
@@ -116,33 +156,44 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
 
       {/* Time Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Time</Text>
+        <Text style={styles.sectionTitle}>დრო</Text>
         <View style={styles.timeGrid}>
-          {selectedDayAvailability?.timeSlots.map((time) => (
-            <TouchableOpacity
-              key={time}
-              style={[
-                styles.timeSlot,
-                selectedTime === time && styles.selectedTimeSlot,
-              ]}
-              onPress={() => handleTimeSelect(time)}
-            >
-              <Text
+          {selectedDayAvailability?.timeSlots.map((time) => {
+            const isBooked = selectedDayAvailability?.bookedSlots?.includes(time) || false;
+            return (
+              <TouchableOpacity
+                key={time}
                 style={[
-                  styles.timeText,
-                  selectedTime === time && styles.selectedTimeText,
+                  styles.timeSlot,
+                  selectedTime === time && styles.selectedTimeSlot,
+                  isBooked && styles.bookedTimeSlot,
                 ]}
+                onPress={() => !isBooked && handleTimeSelect(time)}
+                disabled={isBooked}
               >
-                {time}
-              </Text>
-            </TouchableOpacity>
-          ))}
+                <Text
+                  style={[
+                    styles.timeText,
+                    selectedTime === time && styles.selectedTimeText,
+                    isBooked && styles.bookedTimeText,
+                  ]}
+                >
+                  {time}
+                </Text>
+                {isBooked && (
+                  <View style={styles.bookedIndicator}>
+                    <Ionicons name="lock-closed" size={12} color="#EF4444" />
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </View>
 
       {/* Reviews Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Reviews ({totalReviews})</Text>
+        <Text style={styles.sectionTitle}>შეფასებები ({totalReviews})</Text>
         {reviews.map((review) => (
           <View key={review.id} style={styles.reviewCard}>
             <View style={styles.reviewHeader}>
@@ -169,20 +220,41 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
           (!selectedDate || !selectedTime) && styles.disabledButton,
         ]}
         disabled={!selectedDate || !selectedTime}
-        onPress={() => {
+        onPress={async () => {
           if (selectedDate && selectedTime && doctorId) {
-            router.push({
-              pathname: "/screens/appointment/make-appointment",
-              params: {
-                doctorId: doctorId.toString(),
-                selectedDate: selectedDate,
-                selectedTime: selectedTime,
-              },
-            });
+            try {
+              // Block the time slot temporarily before navigating
+              await blockTimeSlot(doctorId, selectedDate, selectedTime);
+              
+              // Call callback to refresh doctor data
+              if (onTimeSlotBlocked) {
+                onTimeSlotBlocked();
+              }
+              
+              router.push({
+                pathname: "/screens/appointment/make-appointment",
+                params: {
+                  doctorId: doctorId,
+                  selectedDate: selectedDate,
+                  selectedTime: selectedTime,
+                },
+              });
+            } catch (error) {
+              console.error('Failed to block time slot:', error);
+              // Still navigate even if blocking fails
+              router.push({
+                pathname: "/screens/appointment/make-appointment",
+                params: {
+                  doctorId: doctorId,
+                  selectedDate: selectedDate,
+                  selectedTime: selectedTime,
+                },
+              });
+            }
           }
         }}
       >
-        <Text style={styles.bookButtonText}>Book Appointment</Text>
+        <Text style={styles.bookButtonText}>ჯავშნის გაკეთება</Text>
       </TouchableOpacity>
     </View>
   );
@@ -286,6 +358,21 @@ const styles = StyleSheet.create({
   },
   selectedTimeText: {
     color: "#FFFFFF",
+  },
+  bookedTimeSlot: {
+    backgroundColor: "#FEE2E2",
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    opacity: 0.6,
+  },
+  bookedTimeText: {
+    color: "#EF4444",
+    textDecorationLine: "line-through",
+  },
+  bookedIndicator: {
+    position: "absolute",
+    top: 4,
+    right: 4,
   },
   reviewCard: {
     marginBottom: 16,

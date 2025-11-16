@@ -1,8 +1,10 @@
-import { doctors } from "@/assets/data/doctors";
+import { apiService } from "@/app/services/api";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,41 +13,139 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+// Helper function to map backend doctor to app format
+const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
+  let imageSource;
+  if (doctor.profileImage) {
+    if (doctor.profileImage.startsWith("http")) {
+      imageSource = { uri: doctor.profileImage };
+    } else {
+      imageSource = { uri: `${apiBaseUrl}/${doctor.profileImage}` };
+    }
+  } else {
+    imageSource = require("@/assets/images/doctors/doctor1.png");
+  }
+
+  return {
+    id: doctor.id,
+    name: doctor.name || "",
+    specialization: doctor.specialization || "",
+    rating: doctor.rating || 0,
+    reviewCount: doctor.reviewCount || 0,
+    image: imageSource,
+    degrees: doctor.degrees || "",
+    consultationFee: doctor.consultationFee || 0,
+  };
+};
+
 const AppointmentDetails = () => {
   const {
     doctorId,
+    appointmentId,
     selectedDate,
     selectedTime,
     paymentMethod,
     patientName,
     problem,
   } = useLocalSearchParams();
-  const doctor = doctors.find((d) => d.id === parseInt(doctorId as string));
+  const [doctor, setDoctor] = useState<any>(null);
+  const [appointment, setAppointment] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  if (!doctor) {
+  useEffect(() => {
+    loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doctorId, appointmentId]);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      if (apiService.isMockMode()) {
+        throw new Error(
+          "Mock API mode is disabled. Please disable USE_MOCK_API.",
+        );
+      }
+
+      // Load doctor
+      if (doctorId) {
+        const doctorResponse = await apiService.getDoctorById(doctorId as string);
+        if (doctorResponse.success && doctorResponse.data) {
+          const apiBaseUrl = apiService.getBaseURL();
+          const mappedDoctor = mapDoctorFromAPI(doctorResponse.data, apiBaseUrl);
+          setDoctor(mappedDoctor);
+        }
+      }
+
+      // Load appointment details if appointmentId is provided
+      if (appointmentId) {
+        const appointmentResponse = await apiService.getAppointmentById(
+          appointmentId as string
+        );
+        if (appointmentResponse.success && appointmentResponse.data) {
+          setAppointment(appointmentResponse.data);
+        }
+      }
+    } catch (err: any) {
+      setError(err.message || "მონაცემების ჩატვირთვა ვერ მოხერხდა");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <Text>Doctor not found</Text>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#20BEB8" />
+          <Text style={styles.loadingText}>მონაცემების ჩატვირთვა...</Text>
+        </View>
       </SafeAreaView>
     );
   }
+
+  if (!doctor || error) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error || "ექიმი არ მოიძებნა"}</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={loadData}
+          >
+            <Text style={styles.retryButtonText}>ხელახლა ცდა</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Use appointment data if available, otherwise use params
+  const appointmentDate = appointment?.appointmentDate || selectedDate;
+  const appointmentTime = appointment?.appointmentTime || selectedTime;
+  const finalPatientName = appointment?.patientDetails?.name || patientName;
+  const finalProblem = appointment?.notes || problem;
+  const consultationFee = appointment?.consultationFee || doctor.consultationFee;
+  const totalAmount = appointment?.totalAmount || (consultationFee * 1.05);
 
   // Format the date for display
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const months = [
-      "January",
-      "February",
-      "March",
-      "April",
-      "May",
-      "June",
-      "July",
-      "August",
-      "September",
-      "October",
-      "November",
-      "December",
+      "იანვარი",
+      "თებერვალი",
+      "მარტი",
+      "აპრილი",
+      "მაისი",
+      "ივნისი",
+      "ივლისი",
+      "აგვისტო",
+      "სექტემბერი",
+      "ოქტომბერი",
+      "ნოემბერი",
+      "დეკემბერი",
     ];
     return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
   };
@@ -64,7 +164,7 @@ const AppointmentDetails = () => {
         >
           <Ionicons name="arrow-back" size={24} color="#333333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Appointment Details</Text>
+        <Text style={styles.headerTitle}>ჯავშნის დეტალები</Text>
         <View style={styles.placeholder} />
       </View>
 
@@ -75,24 +175,28 @@ const AppointmentDetails = () => {
             <Ionicons name="checkmark-circle" size={32} color="#4CAF50" />
           </View>
           <View style={styles.statusInfo}>
-            <Text style={styles.statusTitle}>Confirmed</Text>
+            <Text style={styles.statusTitle}>დადასტურებული</Text>
             <Text style={styles.statusSubtitle}>
-              Your appointment is confirmed
+              თქვენი ჯავშანი დადასტურებულია
             </Text>
           </View>
         </View>
 
         {/* Doctor Information */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Doctor Information</Text>
+          <Text style={styles.sectionTitle}>ექიმის ინფორმაცია</Text>
           <View style={styles.doctorCard}>
             <View style={styles.doctorImagePlaceholder}>
-              <Text style={styles.doctorInitials}>
-                {doctor.name
-                  .split(" ")
-                  .map((n) => n[0])
-                  .join("")}
-              </Text>
+              {doctor.image && typeof doctor.image === 'object' && 'uri' in doctor.image ? (
+                <Image source={doctor.image} style={styles.doctorImage} />
+              ) : (
+                <Text style={styles.doctorInitials}>
+                  {doctor.name
+                    .split(" ")
+                    .map((n: string) => n[0])
+                    .join("")}
+                </Text>
+              )}
             </View>
             <View style={styles.doctorInfo}>
               <Text style={styles.doctorName}>{doctor.name}</Text>
@@ -110,73 +214,72 @@ const AppointmentDetails = () => {
 
         {/* Appointment Details */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Appointment Details</Text>
+          <Text style={styles.sectionTitle}>ჯავშნის დეტალები</Text>
           <View style={styles.detailsCard}>
             <View style={styles.detailRow}>
               <Ionicons name="calendar-outline" size={20} color="#20BEB8" />
-              <Text style={styles.detailLabel}>Date</Text>
+              <Text style={styles.detailLabel}>თარიღი</Text>
               <Text style={styles.detailValue}>
-                {formatDate(selectedDate as string)}
+                {formatDate(appointmentDate as string)}
               </Text>
             </View>
             <View style={styles.detailRow}>
               <Ionicons name="time-outline" size={20} color="#20BEB8" />
-              <Text style={styles.detailLabel}>Time</Text>
-              <Text style={styles.detailValue}>{selectedTime}</Text>
+              <Text style={styles.detailLabel}>დრო</Text>
+              <Text style={styles.detailValue}>{appointmentTime}</Text>
             </View>
             <View style={styles.detailRow}>
               <Ionicons name="person-outline" size={20} color="#20BEB8" />
-              <Text style={styles.detailLabel}>Patient</Text>
+              <Text style={styles.detailLabel}>პაციენტი</Text>
               <Text style={styles.detailValue}>
-                {patientName || "Not specified"}
+                {finalPatientName || "არ არის მითითებული"}
               </Text>
             </View>
             <View style={styles.detailRow}>
               <Ionicons name="card-outline" size={20} color="#20BEB8" />
-              <Text style={styles.detailLabel}>Payment Method</Text>
+              <Text style={styles.detailLabel}>გადახდის მეთოდი</Text>
               <Text style={styles.detailValue}>
-                {paymentMethod || "Not specified"}
+                {appointment?.paymentMethod || paymentMethod || "მოსალოდნელი"}
               </Text>
             </View>
           </View>
         </View>
 
         {/* Problem Description */}
-        {problem && (
+        {finalProblem && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Problem Description</Text>
+            <Text style={styles.sectionTitle}>პრობლემის აღწერა</Text>
             <View style={styles.problemCard}>
-              <Text style={styles.problemText}>{problem}</Text>
+              <Text style={styles.problemText}>{finalProblem}</Text>
             </View>
           </View>
         )}
 
         {/* Payment Information */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Payment Information</Text>
+          <Text style={styles.sectionTitle}>გადახდის ინფორმაცია</Text>
           <View style={styles.paymentCard}>
             <View style={styles.paymentRow}>
-              <Text style={styles.paymentLabel}>Consultation Fee</Text>
-              <Text style={styles.paymentAmount}>{doctor.consultationFee}</Text>
+              <Text style={styles.paymentLabel}>კონსულტაციის საფასური</Text>
+              <Text style={styles.paymentAmount}>
+                {typeof consultationFee === 'number' 
+                  ? `${consultationFee} ₾`
+                  : consultationFee || "0 ₾"}
+              </Text>
             </View>
             <View style={styles.paymentRow}>
-              <Text style={styles.paymentLabel}>VAT (5%)</Text>
+              <Text style={styles.paymentLabel}>დღგ (5%)</Text>
               <Text style={styles.paymentAmount}>
-                $
-                {Math.round(
-                  parseInt(doctor.consultationFee.replace("$", "")) * 0.05
-                )}
+                {Math.round((typeof consultationFee === 'number' ? consultationFee : parseFloat(String(consultationFee).replace(/[^\d.]/g, '')) || 0) * 0.05)} ₾
               </Text>
             </View>
             <View style={styles.divider} />
             <View style={styles.paymentRow}>
-              <Text style={styles.netAmountLabel}>Total Amount</Text>
+              <Text style={styles.netAmountLabel}>საერთო თანხა</Text>
               <Text style={styles.netAmountValue}>
-                $
-                {parseInt(doctor.consultationFee.replace("$", "")) +
-                  Math.round(
-                    parseInt(doctor.consultationFee.replace("$", "")) * 0.05
-                  )}
+                {typeof totalAmount === 'number' 
+                  ? `${Math.round(totalAmount)} ₾`
+                  : totalAmount || "0 ₾"}
               </Text>
             </View>
           </View>
@@ -184,7 +287,7 @@ const AppointmentDetails = () => {
 
         {/* Important Notes */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Important Notes</Text>
+          <Text style={styles.sectionTitle}>მნიშვნელოვანი შენიშვნები</Text>
           <View style={styles.notesCard}>
             <View style={styles.noteItem}>
               <Ionicons
@@ -193,7 +296,7 @@ const AppointmentDetails = () => {
                 color="#FF9800"
               />
               <Text style={styles.noteText}>
-                Please arrive 15 minutes before your appointment time
+                გთხოვთ მოხვდეთ 15 წუთით ადრე თქვენი ჯავშნის დრომდე
               </Text>
             </View>
             <View style={styles.noteItem}>
@@ -203,13 +306,13 @@ const AppointmentDetails = () => {
                 color="#FF9800"
               />
               <Text style={styles.noteText}>
-                Bring your ID and any relevant medical documents
+                წაიღეთ პირადობის მოწმობა და შესაბამისი სამედიცინო დოკუმენტები
               </Text>
             </View>
             <View style={styles.noteItem}>
               <Ionicons name="call-outline" size={20} color="#FF9800" />
               <Text style={styles.noteText}>
-                Contact us if you need to reschedule or cancel
+                დაგვიკავშირდით თუ გჭირდებათ ჯავშნის გადადება ან გაუქმება
               </Text>
             </View>
           </View>
@@ -219,7 +322,7 @@ const AppointmentDetails = () => {
       {/* Back to Home Button */}
       <View style={styles.buttonContainer}>
         <TouchableOpacity style={styles.homeButton} onPress={handleBackToHome}>
-          <Text style={styles.homeButtonText}>Back to Home</Text>
+          <Text style={styles.homeButtonText}>მთავარზე დაბრუნება</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -500,6 +603,46 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Poppins-SemiBold",
     color: "#FFFFFF",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#333333",
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#333333",
+    marginBottom: 16,
+    textAlign: "center",
+  },
+  retryButton: {
+    backgroundColor: "#20BEB8",
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#FFFFFF",
+  },
+  doctorImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 30,
   },
 });
 

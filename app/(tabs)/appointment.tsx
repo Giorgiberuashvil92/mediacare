@@ -1,12 +1,12 @@
-import {
-  PatientAppointment,
-  patientAppointments,
-} from "@/assets/data/patientAppointments";
+import { apiService } from "@/app/services/api";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Modal,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,6 +16,21 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../contexts/AuthContext";
+
+interface PatientAppointment {
+  id: string;
+  doctorName: string;
+  doctorSpecialty: string;
+  date: string;
+  time: string;
+  status: string;
+  type: string;
+  fee: string | number;
+  isPaid: boolean;
+  symptoms?: string;
+  diagnosis?: string;
+  doctorImage?: any;
+}
 
 const getStatusLabel = (status: string) => {
   switch (status) {
@@ -60,9 +75,75 @@ const getConsultationTypeLabel = (type: string) => {
   }
 };
 
+// Helper function to map backend appointment to app format
+const mapAppointmentFromAPI = (appointment: any, apiBaseUrl: string): PatientAppointment => {
+  // Handle populated doctorId (object) or non-populated doctorId (string/ObjectId)
+  let doctor: any = {};
+  if (appointment.doctorId) {
+    if (typeof appointment.doctorId === 'object' && appointment.doctorId.name) {
+      // Populated doctor object
+      doctor = appointment.doctorId;
+    } else {
+      // Non-populated, just ID - this shouldn't happen if backend populates correctly
+      console.warn('Doctor not populated for appointment:', appointment._id);
+      doctor = {};
+    }
+  }
+  
+  let doctorImage;
+  if (doctor.profileImage) {
+    if (doctor.profileImage.startsWith("http")) {
+      doctorImage = { uri: doctor.profileImage };
+    } else {
+      doctorImage = { uri: `${apiBaseUrl}/${doctor.profileImage}` };
+    }
+  } else {
+    doctorImage = require("@/assets/images/doctors/doctor1.png");
+  }
+
+  // Format date from ISO to YYYY-MM-DD
+  const appointmentDate = appointment.appointmentDate
+    ? new Date(appointment.appointmentDate).toISOString().split("T")[0]
+    : "";
+
+  // Map status
+  const statusMap: { [key: string]: string } = {
+    pending: "scheduled",
+    confirmed: "scheduled",
+    completed: "completed",
+    cancelled: "cancelled",
+    "in-progress": "in-progress",
+  };
+  const mappedStatus = statusMap[appointment.status] || appointment.status || "scheduled";
+
+  // Determine consultation type (default to consultation)
+  const consultationType = "consultation";
+
+  // Format fee
+  const fee = appointment.totalAmount || appointment.consultationFee || 0;
+
+  return {
+    id: appointment._id || appointment.id || "",
+    doctorName: doctor.name || "ექიმი",
+    doctorSpecialty: doctor.specialization || "",
+    date: appointmentDate,
+    time: appointment.appointmentTime || "",
+    status: mappedStatus,
+    type: consultationType,
+    fee: typeof fee === 'number' ? fee : parseFloat(String(fee).replace(/[^\d.]/g, '')) || 0,
+    isPaid: appointment.paymentStatus === "paid" || appointment.paymentStatus === "completed",
+    symptoms: appointment.patientDetails?.problem || appointment.notes || "",
+    diagnosis: appointment.diagnosis || "",
+    doctorImage: doctorImage,
+  };
+};
+
 const Appointment = () => {
   const router = useRouter();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const [appointments, setAppointments] = useState<PatientAppointment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<
     "all" | "completed" | "scheduled" | "cancelled"
   >("all");
@@ -71,6 +152,17 @@ const Appointment = () => {
     useState<PatientAppointment | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Load appointments from API
+  useEffect(() => {
+    if (isAuthenticated && user?.id) {
+      loadAppointments();
+    } else {
+      setLoading(false);
+    }
+     
+  }, [isAuthenticated, user?.id]);
 
   // Update current time every minute for countdown
   useEffect(() => {
@@ -80,6 +172,37 @@ const Appointment = () => {
 
     return () => clearInterval(interval);
   }, []);
+
+  const loadAppointments = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      if (apiService.isMockMode()) {
+        throw new Error(
+          "Mock API mode is disabled. Please disable USE_MOCK_API.",
+        );
+      }
+
+      const response = await apiService.getPatientAppointments();
+
+      if (response.success && response.data) {
+        const apiBaseUrl = apiService.getBaseURL();
+        const mappedAppointments = response.data.map((appointment: any) =>
+          mapAppointmentFromAPI(appointment, apiBaseUrl)
+        );
+        setAppointments(mappedAppointments);
+      } else {
+        setAppointments([]);
+      }
+    } catch (err: any) {
+      console.error("Error loading appointments:", err);
+      setError(err.message || "ჯავშნების ჩატვირთვა ვერ მოხერხდა");
+      setAppointments([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Function to calculate time until appointment
   const getTimeUntilAppointment = (appointment: PatientAppointment) => {
@@ -115,7 +238,7 @@ const Appointment = () => {
   };
 
   // Filter appointments
-  const filteredAppointments = patientAppointments.filter((appointment) => {
+  const filteredAppointments = appointments.filter((appointment) => {
     const matchesStatus =
       filterStatus === "all" || appointment.status === filterStatus;
     const matchesSearch = appointment.doctorName
@@ -126,12 +249,12 @@ const Appointment = () => {
 
   // Stats
   const stats = {
-    all: patientAppointments.length,
-    completed: patientAppointments.filter((a) => a.status === "completed")
+    all: appointments.length,
+    completed: appointments.filter((a) => a.status === "completed")
       .length,
-    scheduled: patientAppointments.filter((a) => a.status === "scheduled")
+    scheduled: appointments.filter((a) => a.status === "scheduled")
       .length,
-    cancelled: patientAppointments.filter((a) => a.status === "cancelled")
+    cancelled: appointments.filter((a) => a.status === "cancelled")
       .length,
   };
 
@@ -146,16 +269,54 @@ const Appointment = () => {
         <View style={styles.content}>
           <Text style={styles.title}>ჯავშნები</Text>
           <Text style={styles.subtitle}>
-            ჯავშნების სისტემა მალე იქნება მზად...
+            გთხოვთ შეხვიდეთ სისტემაში ჯავშნების სანახავად
           </Text>
         </View>
       </SafeAreaView>
     );
   }
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#06B6D4" />
+          <Text style={styles.loadingText}>ჯავშნების ჩატვირთვა...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error && appointments.length === 0) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={loadAppointments}
+          >
+            <Text style={styles.retryButtonText}>ხელახლა ცდა</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadAppointments();
+    setRefreshing(false);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerContent}>
@@ -341,7 +502,11 @@ const Appointment = () => {
                   <View style={styles.appointmentHeader}>
                     <View style={styles.doctorInfo}>
                       <View style={styles.avatarContainer}>
-                        <Ionicons name="medical" size={24} color="#06B6D4" />
+                        {appointment.doctorImage && typeof appointment.doctorImage === 'object' && 'uri' in appointment.doctorImage ? (
+                          <Image source={appointment.doctorImage} style={styles.doctorAvatarImage} />
+                        ) : (
+                          <Ionicons name="medical" size={24} color="#06B6D4" />
+                        )}
                       </View>
                       <View style={styles.doctorDetails}>
                         <View style={styles.doctorNameRow}>
@@ -494,7 +659,11 @@ const Appointment = () => {
                 <View style={styles.appointmentFooter}>
                   <View style={styles.feeRow}>
                     <Ionicons name="wallet" size={16} color="#6B7280" />
-                    <Text style={styles.feeAmount}>${appointment.fee}</Text>
+                    <Text style={styles.feeAmount}>
+                      {typeof appointment.fee === 'number' 
+                        ? `${appointment.fee} ₾`
+                        : appointment.fee || "0 ₾"}
+                    </Text>
                     <View
                       style={[
                         styles.paymentBadge,
@@ -592,7 +761,9 @@ const Appointment = () => {
                 <View style={styles.detailSection}>
                   <Text style={styles.detailLabel}>ანაზღაურება</Text>
                   <Text style={styles.detailValue}>
-                    ${selectedAppointment.fee}
+                    {typeof selectedAppointment.fee === 'number' 
+                      ? `${selectedAppointment.fee} ₾`
+                      : selectedAppointment.fee || "0 ₾"}
                   </Text>
                 </View>
 
@@ -1079,6 +1250,46 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#EF4444",
+    marginBottom: 16,
+    textAlign: "center",
+  },
+  retryButton: {
+    backgroundColor: "#06B6D4",
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#FFFFFF",
+  },
+  doctorAvatarImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 24,
   },
 });
 

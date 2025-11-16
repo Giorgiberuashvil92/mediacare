@@ -49,8 +49,12 @@ const path = __importStar(require("path"));
 let UploadService = class UploadService {
     constructor() {
         this.uploadDir = path.join(process.cwd(), 'uploads', 'licenses');
+        this.imagesDir = path.join(process.cwd(), 'uploads', 'images');
         if (!fs.existsSync(this.uploadDir)) {
             fs.mkdirSync(this.uploadDir, { recursive: true });
+        }
+        if (!fs.existsSync(this.imagesDir)) {
+            fs.mkdirSync(this.imagesDir, { recursive: true });
         }
     }
     saveLicenseDocument(file) {
@@ -66,6 +70,16 @@ let UploadService = class UploadService {
             fs.unlinkSync(fullPath);
         }
     }
+    saveImage(file) {
+        if (!this.validateImageFile(file)) {
+            throw new common_1.BadRequestException('Invalid image file. Only JPG, JPEG, PNG, WEBP files up to 5MB are allowed.');
+        }
+        const timestamp = Date.now();
+        const fileName = `${timestamp}-${file.originalname}`;
+        const filePath = path.join(this.imagesDir, fileName);
+        fs.writeFileSync(filePath, file.buffer);
+        return `uploads/images/${fileName}`;
+    }
     validateLicenseFile(file) {
         const allowedTypes = [
             'application/pdf',
@@ -73,6 +87,17 @@ let UploadService = class UploadService {
             'image/jpg',
             'image/png',
         ];
+        if (!allowedTypes.includes(file.mimetype)) {
+            return false;
+        }
+        const maxSize = 5 * 1024 * 1024;
+        if (file.size > maxSize) {
+            return false;
+        }
+        return true;
+    }
+    validateImageFile(file) {
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
         if (!allowedTypes.includes(file.mimetype)) {
             return false;
         }

@@ -1,8 +1,9 @@
+import { apiService } from "@/app/services/api";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
   ScrollView,
@@ -24,6 +25,37 @@ export default function DoctorProfile() {
     messages: true,
     updates: false,
   });
+  const [doctorProfile, setDoctorProfile] = useState<any>(null);
+  const [stats, setStats] = useState<any>(null);
+
+  useEffect(() => {
+    loadProfileData();
+     
+  }, [user?.id]);
+
+  const loadProfileData = async () => {
+    try {
+      if (apiService.isMockMode()) {
+        return;
+      }
+
+      // Load profile and stats in parallel
+      const [profileResponse, statsResponse] = await Promise.all([
+        apiService.getProfile(),
+        apiService.getDoctorDashboardStats(),
+      ]);
+
+      if (profileResponse.success && profileResponse.data) {
+        setDoctorProfile(profileResponse.data);
+      }
+
+      if (statsResponse.success && statsResponse.data) {
+        setStats(statsResponse.data);
+      }
+    } catch (error) {
+    console.log(error);
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert("გასვლა", "დარწმუნებული ხართ რომ გსურთ გასვლა?", [
@@ -66,14 +98,18 @@ export default function DoctorProfile() {
             <Text style={styles.profileEmail}>
               {user?.email || "doctor@medicare.ge"}
             </Text>
-            <View style={styles.profileBadge}>
-              <MaterialCommunityIcons
-                name="stethoscope"
-                size={14}
-                color="#06B6D4"
-              />
-              <Text style={styles.profileBadgeText}>კარდიოლოგი</Text>
-            </View>
+            {doctorProfile?.specialization && (
+              <View style={styles.profileBadge}>
+                <MaterialCommunityIcons
+                  name="stethoscope"
+                  size={14}
+                  color="#06B6D4"
+                />
+                <Text style={styles.profileBadgeText}>
+                  {doctorProfile.specialization}
+                </Text>
+              </View>
+            )}
           </View>
           <TouchableOpacity style={styles.editButton}>
             <Ionicons name="create-outline" size={20} color="#06B6D4" />
@@ -86,21 +122,27 @@ export default function DoctorProfile() {
             <View style={styles.statIcon}>
               <Ionicons name="calendar" size={20} color="#06B6D4" />
             </View>
-            <Text style={styles.statValue}>156</Text>
+            <Text style={styles.statValue}>
+              {stats?.appointments?.total || 0}
+            </Text>
             <Text style={styles.statLabel}>კონსულტაციები</Text>
           </View>
           <View style={styles.statCard}>
             <View style={styles.statIcon}>
               <Ionicons name="people" size={20} color="#10B981" />
             </View>
-            <Text style={styles.statValue}>342</Text>
+            <Text style={styles.statValue}>
+              {stats?.patients?.total || 0}
+            </Text>
             <Text style={styles.statLabel}>პაციენტები</Text>
           </View>
           <View style={styles.statCard}>
             <View style={styles.statIcon}>
               <Ionicons name="star" size={20} color="#F59E0B" />
             </View>
-            <Text style={styles.statValue}>4.9</Text>
+            <Text style={styles.statValue}>
+              {doctorProfile?.rating?.toFixed(1) || "0.0"}
+            </Text>
             <Text style={styles.statLabel}>რეიტინგი</Text>
           </View>
         </View>

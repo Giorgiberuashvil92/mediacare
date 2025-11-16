@@ -18,14 +18,16 @@ async function bootstrap() {
   // Enable CORS - Allow all local origins for development
   app.enableCors({
     origin: [
-      'http://localhost:3000',
-      'http://localhost:19000',
+      'http://localhost:3000', // Next.js default
+      'http://localhost:3001', // Admin panel alternative port
+      'http://localhost:19000', // Expo
       'http://localhost:19001',
       'http://localhost:19002',
       'exp://127.0.0.1:19000',
       'exp://127.0.0.1:19001',
       'exp://127.0.0.1:19002',
       'http://192.168.100.6:3000',
+      'http://192.168.100.6:3001', // Admin panel
       'http://192.168.100.6:19000',
       'http://192.168.100.6:19001',
       'http://192.168.100.6:19002',
@@ -41,6 +43,30 @@ async function bootstrap() {
       transform: true,
     }),
   );
+
+  // Log all incoming requests for debugging
+  app.use((req: any, res: any, next: any) => {
+    console.log('📥 Incoming Request:', {
+      method: req.method,
+      url: req.url,
+      headers: req.headers.authorization ? 'Bearer token present' : 'No token',
+    });
+    next();
+  });
+
+  // Global error handler
+  app.use((err: any, req: any, res: any, next: any) => {
+    console.error('🚨 Global Error Handler:', {
+      error: err,
+      message: err.message,
+      status: err.status,
+      statusCode: err.statusCode,
+      url: req.url,
+      method: req.method,
+      stack: err.stack,
+    });
+    next(err);
+  });
 
   // Swagger documentation
   const config = new DocumentBuilder()

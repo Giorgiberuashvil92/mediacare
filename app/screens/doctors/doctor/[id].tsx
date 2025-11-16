@@ -1,11 +1,12 @@
 import AppointmentScheduler from "@/app/components/ui/appointmentScheduler";
 import { useFavorites } from "@/app/contexts/FavoritesContext";
-import { doctors } from "@/assets/data/doctors";
+import { apiService } from "@/app/services/api";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,24 +15,122 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+// Helper function to map backend doctor to app format
+const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
+  // Build image URL from backend
+  let imageSource;
+  if (doctor.profileImage) {
+    // If profileImage is a full URL, use it; otherwise construct it
+    if (doctor.profileImage.startsWith('http')) {
+      imageSource = { uri: doctor.profileImage };
+    } else {
+      imageSource = { uri: `${apiBaseUrl}/${doctor.profileImage}` };
+    }
+  } else {
+    // Fallback to default image
+    imageSource = require("@/assets/images/doctors/doctor1.png");
+  }
+
+  return {
+    id: doctor.id, // Keep as string (MongoDB ObjectId)
+    name: doctor.name || "",
+    specialization: doctor.specialization || "",
+    rating: doctor.rating || 0,
+    reviewCount: doctor.reviewCount || 0,
+    reviews: doctor.reviewCount || 0,
+    isActive: doctor.isActive !== undefined ? doctor.isActive : true,
+    image: imageSource,
+    degrees: doctor.degrees || "",
+    location: doctor.location || "",
+    patients: doctor.patients || undefined,
+    experience: doctor.experience || "",
+    consultationFee: doctor.consultationFee
+      ? `${doctor.consultationFee} ₾`
+      : undefined,
+    followUpFee: doctor.followUpFee ? `${doctor.followUpFee} ₾` : undefined,
+    about: doctor.about || "",
+    workingHours: doctor.workingHours || undefined,
+    availability: doctor.availability || [],
+    totalReviews: doctor.reviewCount || 0,
+  };
+};
+
 const DoctorDetail = () => {
   const { id } = useLocalSearchParams();
-  const doctor = doctors.find((d) => d.id === parseInt(id as string));
+  const [doctor, setDoctor] = useState<any>(null);
+  console.log('🏥 Frontend doctor object:', doctor);
+  console.log('🏥 Frontend doctor availability:', doctor?.availability);
   const [showAppointmentScheduler, setShowAppointmentScheduler] =
     useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { isFavorite, toggleFavorite } = useFavorites();
+
+  useEffect(() => {
+    loadDoctor();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  const loadDoctor = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      if (apiService.isMockMode()) {
+        throw new Error(
+          "Mock API mode is disabled for doctor detail. Please disable USE_MOCK_API.",
+        );
+      }
+
+      const response = await apiService.getDoctorById(id as string);
+
+      if (response.success && response.data) {
+        const apiBaseUrl = apiService.getBaseURL();
+        const mappedDoctor = mapDoctorFromAPI(response.data, apiBaseUrl);
+        setDoctor(mappedDoctor);
+      } else {
+        setDoctor(null);
+        setError("ექიმი არ მოიძებნა");
+      }
+    } catch (err: any) {
+      setError(err.message || "ექიმის ჩატვირთვა ვერ მოხერხდა");
+      setDoctor(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#FFFFFF" />
+          <Text style={styles.loadingText}>ექიმის ჩატვირთვა...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (!doctor) {
     return (
       <SafeAreaView style={styles.container}>
-        <Text>Doctor not found</Text>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>
+            {error || "ექიმი არ მოიძებნა"}
+          </Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={loadDoctor}
+          >
+            <Text style={styles.retryButtonText}>ხელახლა ცდა</Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header Section */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
@@ -72,57 +171,58 @@ const DoctorDetail = () => {
           <View style={styles.statItem}>
             <Ionicons name="people" size={24} color="#333333" />
             <Text style={styles.statNumber}>{doctor.patients}</Text>
-            <Text style={styles.statLabel}>Patients</Text>
+            <Text style={styles.statLabel}>პაციენტები</Text>
           </View>
           <View style={styles.statItem}>
             <Ionicons name="briefcase" size={24} color="#333333" />
             <Text style={styles.statNumber}>{doctor.experience}</Text>
-            <Text style={styles.statLabel}>Experience</Text>
+            <Text style={styles.statLabel}>გამოცდილება</Text>
           </View>
           <View style={styles.statItem}>
             <Ionicons name="star" size={24} color="#333333" />
             <Text style={styles.statNumber}>{doctor.rating}</Text>
-            <Text style={styles.statLabel}>Rating</Text>
+            <Text style={styles.statLabel}>რეიტინგი</Text>
           </View>
           <View style={styles.statItem}>
             <Ionicons name="chatbubbles" size={24} color="#333333" />
             <Text style={styles.statNumber}>{doctor.reviewCount}+</Text>
-            <Text style={styles.statLabel}>Reviews</Text>
+            <Text style={styles.statLabel}>შეფასებები</Text>
           </View>
         </View>
 
         {/* Fees Section */}
         <View style={styles.feesSection}>
           <View style={styles.feeItem}>
-            <Text style={styles.feeLabel}>Consultation fee</Text>
+            <Text style={styles.feeLabel}>კონსულტაციის საფასური</Text>
             <Text style={styles.feeAmount}>{doctor.consultationFee}</Text>
-            <Text style={styles.feeNote}>/ consultation</Text>
+            <Text style={styles.feeNote}>/ კონსულტაცია</Text>
           </View>
           <View style={styles.feeItem}>
-            <Text style={styles.feeLabel}>Follow-up fee</Text>
+            <Text style={styles.feeLabel}>განმეორებითი ვიზიტის საფასური</Text>
             <Text style={styles.feeAmount}>{doctor.followUpFee}</Text>
-            <Text style={styles.feeNote}>(within 15 Days)</Text>
+            <Text style={styles.feeNote}>(15 დღის განმავლობაში)</Text>
           </View>
         </View>
 
         {/* About Doctor */}
         <View style={styles.aboutSection}>
-          <Text style={styles.aboutTitle}>About Doctor</Text>
+          <Text style={styles.aboutTitle}>ექიმის შესახებ</Text>
           <Text style={styles.aboutText}>{doctor.about}</Text>
           <TouchableOpacity>
-            <Text style={styles.readMore}>Read More</Text>
+            <Text style={styles.readMore}>მეტის წაკითხვა</Text>
           </TouchableOpacity>
         </View>
 
         {showAppointmentScheduler && (
           <View style={styles.appointmentSection}>
-            <Text style={styles.appointmentTitle}>Book Appointment</Text>
+            <Text style={styles.appointmentTitle}>ჯავშნის გაკეთება</Text>
             <AppointmentScheduler
-              workingHours={doctor.workingHours || "Mon - Fri, 9 AM - 6 PM"}
+              workingHours={doctor.workingHours}
               availability={doctor.availability || []}
               totalReviews={doctor.totalReviews || 0}
               reviews={Array.isArray(doctor.reviews) ? doctor.reviews : []}
               doctorId={doctor.id}
+              onTimeSlotBlocked={loadDoctor} // Reload doctor data after blocking
             />
           </View>
         )}
@@ -134,7 +234,7 @@ const DoctorDetail = () => {
             style={styles.appointmentButton}
             onPress={() => setShowAppointmentScheduler(true)}
           >
-            <Text style={styles.buttonText}>Make Appointments</Text>
+            <Text style={styles.buttonText}>ჯავშნის გაკეთება</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -355,5 +455,40 @@ const styles = StyleSheet.create({
     color: "#333333",
     marginBottom: 16,
     textAlign: "center",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#FFFFFF",
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#FFFFFF",
+    marginBottom: 16,
+    textAlign: "center",
+  },
+  retryButton: {
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#20BEB8",
   },
 });

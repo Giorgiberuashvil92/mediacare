@@ -1,7 +1,7 @@
 import { JwtService } from '@nestjs/jwt';
 import * as mongoose from 'mongoose';
 import { RefreshTokenDocument } from '../schemas/refresh-token.schema';
-import { UserDocument } from '../schemas/user.schema';
+import { ApprovalStatus, UserDocument, UserRole } from '../schemas/user.schema';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 export declare class AuthService {
@@ -15,11 +15,12 @@ export declare class AuthService {
         data: {
             user: {
                 id: string;
-                role: import("../schemas/user.schema").UserRole;
+                role: UserRole;
                 name: string;
                 email: string;
                 phone: string;
                 isVerified: boolean;
+                approvalStatus: ApprovalStatus;
             };
             token: string;
             refreshToken: string;
@@ -31,11 +32,12 @@ export declare class AuthService {
         data: {
             user: {
                 id: string;
-                role: import("../schemas/user.schema").UserRole;
+                role: UserRole;
                 name: string;
                 email: string;
                 phone: string;
                 isVerified: boolean;
+                approvalStatus: ApprovalStatus;
             };
             token: string;
             refreshToken: string;

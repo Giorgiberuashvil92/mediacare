@@ -18,8 +18,8 @@ import {
   getConsultationTypeLabel,
   getStatusColor,
   getStatusLabel,
-  recentConsultations,
 } from "../../assets/data/doctorDashboard";
+import { apiService } from "../services/api";
 
 export default function DoctorAppointments() {
   const router = useRouter();
@@ -34,6 +34,9 @@ export default function DoctorAppointments() {
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [consultations, setConsultations] = useState<Consultation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Appointment form state
   const [appointmentData, setAppointmentData] = useState({
@@ -49,6 +52,31 @@ export default function DoctorAppointments() {
     followUpReason: "",
     notes: "",
   });
+
+  // Fetch consultations from API
+  useEffect(() => {
+    const fetchConsultations = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const response = await apiService.getDoctorDashboardAppointments(100);
+
+        if (response.success) {
+          setConsultations(response.data as any);
+        } else {
+          setError("კონსულტაციების ჩატვირთვა ვერ მოხერხდა");
+        }
+      } catch (err) {
+        console.error("Error fetching consultations:", err);
+        setError("კონსულტაციების ჩატვირთვა ვერ მოხერხდა");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchConsultations();
+  }, []);
 
   // Update current time every minute for countdown
   useEffect(() => {
@@ -93,7 +121,7 @@ export default function DoctorAppointments() {
   };
 
   // Filter consultations
-  const filteredConsultations = recentConsultations.filter((consultation) => {
+  const filteredConsultations = consultations.filter((consultation) => {
     const matchesStatus =
       filterStatus === "all" || consultation.status === filterStatus;
     const matchesSearch = consultation.patientName
@@ -104,13 +132,10 @@ export default function DoctorAppointments() {
 
   // Stats
   const stats = {
-    all: recentConsultations.length,
-    completed: recentConsultations.filter((c) => c.status === "completed")
-      .length,
-    scheduled: recentConsultations.filter((c) => c.status === "scheduled")
-      .length,
-    inProgress: recentConsultations.filter((c) => c.status === "in-progress")
-      .length,
+    all: consultations.length,
+    completed: consultations.filter((c) => c.status === "completed").length,
+    scheduled: consultations.filter((c) => c.status === "scheduled").length,
+    inProgress: consultations.filter((c) => c.status === "in-progress").length,
   };
 
   const openDetails = (consultation: Consultation) => {
@@ -155,6 +180,59 @@ export default function DoctorAppointments() {
       notes: "",
     });
   };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <Text style={{ fontSize: 16, color: "#6B7280" }}>
+            კონსულტაციების ჩატვირთვა...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 20 }}>
+          <Text style={{ fontSize: 16, color: "#EF4444", marginBottom: 12 }}>
+            {error}
+          </Text>
+          <TouchableOpacity
+            onPress={async () => {
+              try {
+                setLoading(true);
+                setError(null);
+                const response = await apiService.getDoctorDashboardAppointments(100);
+                if (response.success) {
+                  setConsultations(response.data as any);
+                } else {
+                  setError("კონსულტაციების ჩატვირთვა ვერ მოხერხდა");
+                }
+              } catch (err) {
+                console.error("Error fetching consultations:", err);
+                setError("კონსულტაციების ჩატვირთვა ვერ მოხერხდა");
+              } finally {
+                setLoading(false);
+              }
+            }}
+            style={{
+              backgroundColor: "#06B6D4",
+              paddingHorizontal: 20,
+              paddingVertical: 10,
+              borderRadius: 8,
+            }}
+          >
+            <Text style={{ color: "#FFFFFF", fontWeight: "600" }}>
+              ხელახლა ცდა
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>

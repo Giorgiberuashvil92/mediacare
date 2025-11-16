@@ -15,6 +15,7 @@ async function bootstrap() {
     app.enableCors({
         origin: [
             'http://localhost:3000',
+            'http://localhost:3001',
             'http://localhost:19000',
             'http://localhost:19001',
             'http://localhost:19002',
@@ -22,6 +23,7 @@ async function bootstrap() {
             'exp://127.0.0.1:19001',
             'exp://127.0.0.1:19002',
             'http://192.168.100.6:3000',
+            'http://192.168.100.6:3001',
             'http://192.168.100.6:19000',
             'http://192.168.100.6:19001',
             'http://192.168.100.6:19002',
@@ -33,6 +35,26 @@ async function bootstrap() {
         forbidNonWhitelisted: true,
         transform: true,
     }));
+    app.use((req, res, next) => {
+        console.log('📥 Incoming Request:', {
+            method: req.method,
+            url: req.url,
+            headers: req.headers.authorization ? 'Bearer token present' : 'No token',
+        });
+        next();
+    });
+    app.use((err, req, res, next) => {
+        console.error('🚨 Global Error Handler:', {
+            error: err,
+            message: err.message,
+            status: err.status,
+            statusCode: err.statusCode,
+            url: req.url,
+            method: req.method,
+            stack: err.stack,
+        });
+        next(err);
+    });
     const config = new swagger_1.DocumentBuilder()
         .setTitle('Medicare API')
         .setDescription('Medicare App Backend API')
