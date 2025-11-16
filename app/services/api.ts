@@ -29,7 +29,7 @@ const getDefaultBaseUrl = () => {
   
   if (FORCE_RAILWAY) {
     console.log('🚂 Forcing Railway URL for testing');
-    return "https://mediacare.railway.app";
+    return "https://mediacare-production.up.railway.app";
   }
 
   const envUrl =
@@ -45,17 +45,17 @@ const getDefaultBaseUrl = () => {
 
   const expoHostIp = getExpoHostIp();
   if (expoHostIp) {
-    return `http://${expoHostIp}:4000`;
+    return `https://mediacare-production.up.railway.app`;
   }
 
   if (__DEV__) {
     if (Platform.OS === "android") {
-      return "http://10.0.2.2:4000";
+      return "https://mediacare-production.up.railway.app";
     }
-    return "http://127.0.0.1:4000";
+    return "https://mediacare-production.up.railway.app";
   }
 
-  return "https://mediacare.railway.app";
+  return "https://mediacare-production.up.railway.app";
 };
 
 const API_BASE_URL = getDefaultBaseUrl();
