@@ -15,6 +15,8 @@ if (__DEV__) {
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  console.log('🚀 RootLayout component loaded');
+  console.log('🔧 __DEV__ mode:', __DEV__);
   const [loaded, error] = useFonts({
     "Poppins-Regular": require("../assets/fonts/Poppins-Regular.ttf"),
     "Poppins-Medium": require("../assets/fonts/Poppins-Medium.ttf"),

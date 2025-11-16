@@ -42,9 +42,12 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  console.log('🔐 AuthProvider initialized');
   const [user, setUser] = useState<User | null>(null);
   const [userRole, setUserRoleState] = useState<UserRole>(null);
   const [isLoading, setIsLoading] = useState(true);
+  
+  console.log('🔍 AuthProvider state:', { user: !!user, userRole, isLoading });
 
   useEffect(() => {
     loadUserData();
@@ -77,9 +80,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const login = async (credentials: LoginRequest) => {
+    console.log('🔑 AuthProvider login called:', credentials.email);
     try {
       setIsLoading(true);
+      console.log('📞 Calling apiService.login...');
       const authResponse = await apiService.login(credentials);
+      console.log('✅ Login response received:', authResponse);
       setUser(authResponse.data.user);
       setUserRoleState(authResponse.data.user.role);
       await AsyncStorage.setItem(ROLE_STORAGE_KEY, authResponse.data.user.role);

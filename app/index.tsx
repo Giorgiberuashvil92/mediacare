@@ -5,8 +5,16 @@ import { ActivityIndicator, Image, StyleSheet, Text, View } from "react-native";
 import { useAuth } from "./contexts/AuthContext";
 
 export default function SplashScreen() {
+  console.log('🎬 SplashScreen component loaded');
   const [isLoading, setIsLoading] = useState(true);
   const { isAuthenticated, userRole, isLoading: authLoading } = useAuth();
+  
+  console.log('🔍 SplashScreen state:', {
+    isLoading,
+    isAuthenticated,
+    userRole,
+    authLoading
+  });
 
   useEffect(() => {
     checkInitialRoute();
