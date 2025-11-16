@@ -47,7 +47,7 @@ const getDefaultBaseUrl = () => {
     return "http://127.0.0.1:4000";
   }
 
-  return "https://your-production-api.example.com";
+  return "https://mediacare.railway.app";
 };
 
 const API_BASE_URL = getDefaultBaseUrl();

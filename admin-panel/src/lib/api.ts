@@ -1,5 +1,5 @@
 // API Service for Medicare Admin Panel
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://mediacare.railway.app';
 
 export interface ApiResponse<T> {
   success: boolean;

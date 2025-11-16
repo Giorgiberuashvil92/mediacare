@@ -27,6 +27,7 @@ async function bootstrap() {
             'http://192.168.100.6:19000',
             'http://192.168.100.6:19001',
             'http://192.168.100.6:19002',
+            '*',
         ],
         credentials: true,
     });

@@ -15,9 +15,10 @@ async function bootstrap() {
     prefix: '/uploads/',
   });
 
-  // Enable CORS - Allow all local origins for development
+  // Enable CORS - Allow development and production origins
   app.enableCors({
     origin: [
+      // Development origins
       'http://localhost:3000', // Next.js default
       'http://localhost:3001', // Admin panel alternative port
       'http://localhost:19000', // Expo
@@ -31,6 +32,8 @@ async function bootstrap() {
       'http://192.168.100.6:19000',
       'http://192.168.100.6:19001',
       'http://192.168.100.6:19002',
+      // Production origins (add your deployed frontend URLs here)
+      '*', // Allow all origins for now - restrict in production
     ],
     credentials: true,
   });
