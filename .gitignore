@@ -41,3 +41,13 @@ app-example
 # generated native folders
 /ios
 /android
+
+# Admin Panel
+admin-panel/.next/
+admin-panel/out/
+admin-panel/.env*.local
+
+# Backend
+backend/api/dist/
+backend/api/uploads/
+backend/api/.env
