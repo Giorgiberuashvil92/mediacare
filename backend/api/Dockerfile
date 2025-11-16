@@ -7,8 +7,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install ALL dependencies (including devDependencies for build)
+RUN npm ci
 
 # Copy source code
 COPY . .
@@ -16,12 +16,15 @@ COPY . .
 # Build the application
 RUN npm run build
 
+# Remove devDependencies to reduce image size (optional but recommended)
+RUN npm prune --production
+
 # Expose port
 EXPOSE 4000
 
-# Health check
+# Health check (using node to check health endpoint)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:4000/health || exit 1
+  CMD node -e "require('http').get('http://localhost:4000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
 # Start the application
 CMD ["npm", "run", "start:prod"]
