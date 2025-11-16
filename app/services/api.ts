@@ -24,6 +24,14 @@ const getExpoHostIp = () => {
 };
 
 const getDefaultBaseUrl = () => {
+  // Force Railway URL for testing (both dev and production)
+  const FORCE_RAILWAY = false; // Set to false to use local development
+  
+  if (FORCE_RAILWAY) {
+    console.log('🚂 Forcing Railway URL for testing');
+    return "https://mediacare.railway.app";
+  }
+
   const envUrl =
     process.env.EXPO_PUBLIC_API_URL ||
     (Constants.expoConfig?.extra as any)?.API_URL ||

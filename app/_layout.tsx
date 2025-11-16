@@ -7,10 +7,16 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { CartProvider } from "./contexts/CartContext";
 import { FavoritesProvider } from "./contexts/FavoritesContext";
 
-// Import Reactotron in development
-if (__DEV__) {
-  require("../ReactotronConfig");
-}
+// Reactotron disabled for debugging
+// if (__DEV__) {
+//   try {
+//     require("../ReactotronConfig");
+//     console.log('✅ Reactotron loaded successfully');
+//   } catch (error) {
+//     console.warn('⚠️ Reactotron failed to load:', error);
+//     // Continue without Reactotron
+//   }
+// }
 
 SplashScreen.preventAutoHideAsync();
 
