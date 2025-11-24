@@ -73,7 +73,7 @@ const TodayAppointment = () => {
           setTodayAppointments(todayScheduled);
         }
       } catch (error) {
-        console.error('🏠 TodayAppointment - Error loading appointments:', error);
+        console.log('🏠 TodayAppointment - Error loading appointments:', error);
       } finally {
         setLoading(false);
       }

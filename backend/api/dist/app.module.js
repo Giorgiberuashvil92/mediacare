@@ -19,6 +19,7 @@ const appointments_module_1 = require("./appointments/appointments.module");
 const auth_module_1 = require("./auth/auth.module");
 const doctors_module_1 = require("./doctors/doctors.module");
 const profile_module_1 = require("./profile/profile.module");
+const shop_module_1 = require("./shop/shop.module");
 const specializations_module_1 = require("./specializations/specializations.module");
 const upload_module_1 = require("./upload/upload.module");
 let AppModule = class AppModule {
@@ -52,6 +53,7 @@ exports.AppModule = AppModule = __decorate([
             specializations_module_1.SpecializationsModule,
             appointments_module_1.AppointmentsModule,
             admin_module_1.AdminModule,
+            shop_module_1.ShopModule,
         ],
         controllers: [app_controller_1.AppController],
         providers: [app_service_1.AppService],

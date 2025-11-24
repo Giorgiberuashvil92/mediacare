@@ -10,6 +10,7 @@ import { AppointmentsModule } from './appointments/appointments.module';
 import { AuthModule } from './auth/auth.module';
 import { DoctorsModule } from './doctors/doctors.module';
 import { ProfileModule } from './profile/profile.module';
+import { ShopModule } from './shop/shop.module';
 import { SpecializationsModule } from './specializations/specializations.module';
 import { UploadModule } from './upload/upload.module';
 
@@ -42,6 +43,7 @@ import { UploadModule } from './upload/upload.module';
     SpecializationsModule,
     AppointmentsModule,
     AdminModule,
+    ShopModule,
   ],
   controllers: [AppController],
   providers: [AppService],

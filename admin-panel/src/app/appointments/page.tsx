@@ -79,7 +79,7 @@ export default function AppointmentsPage() {
         setAppointments(mockAppointments);
       }
     } catch (err: any) {
-      console.error('Error loading appointments:', err);
+      console.log('Error loading appointments:', err);
       setError(err.message || 'ჯავშნების ჩატვირთვა ვერ მოხერხდა');
       
       // Show mock data on error

@@ -1,6 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
-import { Platform } from "react-native";
 import { logger } from "../utils/logger";
 
 const getExpoHostIp = () => {
@@ -25,11 +24,11 @@ const getExpoHostIp = () => {
 
 const getDefaultBaseUrl = () => {
   // Force Railway URL for testing (both dev and production)
-  const FORCE_RAILWAY = false; // Set to false to use local development
+  const FORCE_RAILWAY = true; // Set to false to use local development
   
   if (FORCE_RAILWAY) {
     console.log('🚂 Forcing Railway URL for testing');
-    return "https://mediacare-production.up.railway.app";
+    return "https://localhost:4000";
   }
 
   const envUrl =
@@ -44,18 +43,26 @@ const getDefaultBaseUrl = () => {
   }
 
   const expoHostIp = getExpoHostIp();
-  if (expoHostIp) {
-    return `https://mediacare-production.up.railway.app`;
+  // if (expoHostIp) {
+  //   return `https://mediacare-production.up.railway.app`;
+  // }
+
+  if(expoHostIp) {
+    return `https://${expoHostIp}:4000`;
   }
 
+  // if (__DEV__) {
+  //   if (Platform.OS === "android") {
+  //     return "https://mediacare-production.up.railway.app";
+  //   }
+  //   return "https://mediacare-production.up.railway.app";
+  // }
+
+  // return "https://mediacare-production.up.railway.app";
   if (__DEV__) {
-    if (Platform.OS === "android") {
-      return "https://mediacare-production.up.railway.app";
-    }
-    return "https://mediacare-production.up.railway.app";
+    return "http://localhost:4000";
   }
-
-  return "https://mediacare-production.up.railway.app";
+  return "http://localhost:4000";
 };
 
 const API_BASE_URL = getDefaultBaseUrl();
@@ -99,6 +106,45 @@ export interface Specialization {
   description?: string;
   isActive: boolean;
   symptoms?: string[];
+}
+
+export interface ShopProduct {
+  id: string;
+  name: string;
+  description?: string;
+  type: "laboratory" | "equipment";
+  category?: string | null;
+  price?: number;
+  currency?: string;
+  discountPercent?: number;
+  stock?: number;
+  unit?: string;
+  isActive: boolean;
+  isFeatured: boolean;
+  imageUrl?: string;
+  order?: number;
+  tags?: string[];
+  metadata?: Record<string, any>;
+}
+
+export interface ShopCategory {
+  id: string;
+  name: string;
+  slug: string;
+  type: "laboratory" | "equipment";
+  description?: string;
+  imageUrl?: string;
+  isActive: boolean;
+  parentCategory?: string | null;
+  order?: number;
+  tags?: string[];
+  metadata?: Record<string, any>;
+  products?: ShopProduct[];
+}
+
+export interface MedicineShopOverview {
+  laboratoryProducts: ShopProduct[];
+  equipmentCategories: ShopCategory[];
 }
 
 class ApiService {
@@ -738,6 +784,25 @@ class ApiService {
     }
 
     return this.apiCall('/doctors/patients', {
+      method: 'GET',
+    });
+  }
+
+  async getMedicineShopOverview(): Promise<{
+    success: boolean;
+    data: MedicineShopOverview;
+  }> {
+    if (USE_MOCK_API) {
+      return Promise.resolve({
+        success: true,
+        data: {
+          laboratoryProducts: [],
+          equipmentCategories: [],
+        },
+      });
+    }
+
+    return this.apiCall('/shop/overview', {
       method: 'GET',
     });
   }

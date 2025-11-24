@@ -14,21 +14,7 @@ async function bootstrap() {
     });
     const corsOrigins = process.env.CORS_ORIGINS
         ? process.env.CORS_ORIGINS.split(',')
-        : [
-            'http://localhost:3000',
-            'http://localhost:3001',
-            'http://localhost:19000',
-            'http://localhost:19001',
-            'http://localhost:19002',
-            'exp://127.0.0.1:19000',
-            'exp://127.0.0.1:19001',
-            'exp://127.0.0.1:19002',
-            'http://192.168.100.6:3000',
-            'http://192.168.100.6:3001',
-            'http://192.168.100.6:19000',
-            'http://192.168.100.6:19001',
-            'http://192.168.100.6:19002',
-        ];
+        : ['*'];
     app.enableCors({
         origin: corsOrigins.includes('*') ? true : corsOrigins,
         credentials: true,

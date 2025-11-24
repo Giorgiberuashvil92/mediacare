@@ -39,6 +39,12 @@ export const NAV_DATA = [
         items: [],
       },
       {
+        title: "Medicine Shop",
+        url: "/medicine-shop",
+        icon: Icons.FourCircle,
+        items: [],
+      },
+      {
         title: "Settings",
         url: "/settings",
         icon: Icons.Alphabet,

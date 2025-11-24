@@ -196,7 +196,7 @@ const Appointment = () => {
         setAppointments([]);
       }
     } catch (err: any) {
-      console.error("Error loading appointments:", err);
+      console.log("Error loading appointments:", err);
       setError(err.message || "ჯავშნების ჩატვირთვა ვერ მოხერხდა");
       setAppointments([]);
     } finally {
