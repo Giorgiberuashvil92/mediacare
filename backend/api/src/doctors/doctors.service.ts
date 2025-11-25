@@ -9,6 +9,8 @@ import mongoose, { FilterQuery } from 'mongoose';
 import {
   Appointment,
   AppointmentDocument,
+  AppointmentStatus,
+  PaymentStatus,
 } from '../appointments/schemas/appointment.schema';
 import {
   ApprovalStatus,
@@ -20,9 +22,13 @@ import {
   Specialization,
   SpecializationDocument,
 } from '../specializations/schemas/specialization.schema';
+import { UploadService } from '../upload/upload.service';
+import { CreateFollowUpDto } from './dto/create-follow-up.dto';
 import { DoctorStatusFilter, GetDoctorsDto } from './dto/get-doctors.dto';
+import { UpdateDoctorAppointmentDto } from './dto/update-appointment.dto';
 import { UpdateAvailabilityDto } from './dto/update-availability.dto';
 import { UpdateDoctorDto } from './dto/update-doctor.dto';
+import { UpdateForm100Dto } from './dto/update-form100.dto';
 import {
   Availability,
   AvailabilityDocument,
@@ -38,7 +44,131 @@ export class DoctorsService {
     private specializationModel: mongoose.Model<SpecializationDocument>,
     @InjectModel(Appointment.name)
     private appointmentModel: mongoose.Model<AppointmentDocument>,
+    private readonly uploadService: UploadService,
   ) {}
+
+  private async generateAppointmentNumber(): Promise<string> {
+    const prefix = 'APT';
+    const year = new Date().getFullYear();
+    const randomNum = Math.floor(Math.random() * 10000)
+      .toString()
+      .padStart(4, '0');
+    const appointmentNumber = `${prefix}${year}${randomNum}`;
+
+    const exists = await this.appointmentModel.findOne({
+      appointmentNumber,
+    });
+
+    if (exists) {
+      return this.generateAppointmentNumber();
+    }
+
+    return appointmentNumber;
+  }
+
+  private formatDashboardAppointment(apt: any) {
+    const patient = apt.patientId;
+
+    let patientAge = 0;
+    if (patient?.dateOfBirth) {
+      const birthDate = new Date(patient.dateOfBirth);
+      const today = new Date();
+      patientAge = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (
+        monthDiff < 0 ||
+        (monthDiff === 0 && today.getDate() < birthDate.getDate())
+      ) {
+        patientAge--;
+      }
+    }
+
+    const statusMap: { [key: string]: string } = {
+      pending: 'scheduled',
+      confirmed: 'scheduled',
+      'in-progress': 'in-progress',
+      completed: 'completed',
+      cancelled: 'cancelled',
+    };
+
+    const determineType = () => {
+      const notes = apt.notes?.toLowerCase() || '';
+      const problem = apt.patientDetails?.problem?.toLowerCase() || '';
+
+      if (notes.includes('emergency') || problem.includes('emergency')) {
+        return 'emergency';
+      }
+
+      if (notes.includes('followup') || notes.includes('follow-up')) {
+        return 'followup';
+      }
+
+      return 'consultation';
+    };
+
+    const consultationSummary = apt.consultationSummary || {};
+    const followUp = apt.followUp || { required: false };
+
+    return {
+      id: apt._id ? apt._id.toString() : apt.id,
+      patientName:
+        patient?.name || apt.patientDetails?.name || 'უცნობი პაციენტი',
+      patientAge:
+        patientAge ||
+        (apt.patientDetails?.dateOfBirth
+          ? new Date().getFullYear() -
+            new Date(apt.patientDetails.dateOfBirth).getFullYear()
+          : 0),
+      date: apt.appointmentDate
+        ? new Date(apt.appointmentDate).toISOString().split('T')[0]
+        : '',
+      time: apt.appointmentTime,
+      type: determineType(),
+      status: statusMap[apt.status] || apt.status,
+      fee: apt.consultationFee || apt.totalAmount || 0,
+      isPaid: apt.paymentStatus === 'paid',
+      diagnosis: consultationSummary.diagnosis,
+      symptoms:
+        consultationSummary.symptoms ||
+        apt.patientDetails?.problem ||
+        apt.notes ||
+        '',
+      consultationSummary: Object.keys(consultationSummary).length
+        ? {
+            diagnosis: consultationSummary.diagnosis,
+            symptoms: consultationSummary.symptoms,
+            medications: consultationSummary.medications,
+            notes: consultationSummary.notes,
+            vitals: consultationSummary.vitals || {},
+          }
+        : undefined,
+      followUp: followUp.required
+        ? {
+            required: true,
+            date: followUp.date
+              ? new Date(followUp.date).toISOString()
+              : undefined,
+            reason: followUp.reason,
+          }
+        : { required: false },
+      form100: apt.form100
+        ? {
+            id: apt.form100.id,
+            issueDate: apt.form100.issueDate
+              ? new Date(apt.form100.issueDate).toISOString()
+              : undefined,
+            validUntil: apt.form100.validUntil
+              ? new Date(apt.form100.validUntil).toISOString()
+              : undefined,
+            reason: apt.form100.reason,
+            diagnosis: apt.form100.diagnosis,
+            recommendations: apt.form100.recommendations,
+            pdfUrl: apt.form100.pdfUrl,
+            fileName: apt.form100.fileName,
+          }
+        : undefined,
+    };
+  }
 
   async getAllDoctors(query: GetDoctorsDto) {
     const {
@@ -818,94 +948,9 @@ export class DoctorsService {
 
     // Format appointments for frontend
 
-    const formattedAppointments = appointments.map((apt: any) => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-      const patient = apt.patientId;
-      // Calculate patient age
-      let patientAge = 0;
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      if (patient?.dateOfBirth) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
-        const birthDate = new Date(patient.dateOfBirth);
-        const today = new Date();
-        patientAge = today.getFullYear() - birthDate.getFullYear();
-        const monthDiff = today.getMonth() - birthDate.getMonth();
-        if (
-          monthDiff < 0 ||
-          (monthDiff === 0 && today.getDate() < birthDate.getDate())
-        ) {
-          patientAge--;
-        }
-      }
-
-      // Map appointment status to frontend format
-      const statusMap: { [key: string]: string } = {
-        pending: 'scheduled',
-        confirmed: 'scheduled',
-        completed: 'completed',
-        cancelled: 'cancelled',
-      };
-
-      // Determine consultation type based on appointment data
-      const getConsultationType = () => {
-        if (
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-          apt.notes?.toLowerCase().includes('emergency') ||
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-          apt.patientDetails?.problem?.toLowerCase().includes('emergency')
-        ) {
-          return 'emergency';
-        }
-
-        if (
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-          apt.notes?.toLowerCase().includes('followup') ||
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-          apt.notes?.toLowerCase().includes('follow-up')
-        ) {
-          return 'followup';
-        }
-        return 'consultation';
-      };
-
-      return {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-        id: apt._id.toString(),
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        patientName:
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-          patient?.name || apt.patientDetails?.name || 'უცნობი პაციენტი',
-
-        patientAge:
-          patientAge ||
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-          (apt.patientDetails?.dateOfBirth
-            ? new Date().getFullYear() -
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
-              new Date(apt.patientDetails.dateOfBirth).getFullYear()
-            : 0),
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-        date: apt.appointmentDate.toISOString().split('T')[0],
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-        time: apt.appointmentTime,
-
-        type: getConsultationType(),
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-        status: statusMap[apt.status] || apt.status,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-        fee: apt.consultationFee || apt.totalAmount || 0,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        isPaid: apt.paymentStatus === 'paid',
-
-        diagnosis:
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-          apt.status === 'completed' ? 'დიაგნოზი დასრულებულია' : undefined,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        symptoms:
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-          apt.patientDetails?.problem || apt.notes || '',
-      };
-    });
+    const formattedAppointments = appointments.map((apt: any) =>
+      this.formatDashboardAppointment(apt),
+    );
 
     console.log(
       '👨‍⚕️ DoctorsService.getDashboardAppointments - formatted appointments:',
@@ -915,6 +960,217 @@ export class DoctorsService {
     return {
       success: true,
       data: formattedAppointments,
+    };
+  }
+
+  async updateAppointmentByDoctor(
+    doctorId: string,
+    appointmentId: string,
+    dto: UpdateDoctorAppointmentDto,
+  ) {
+    if (
+      !mongoose.Types.ObjectId.isValid(doctorId) ||
+      !mongoose.Types.ObjectId.isValid(appointmentId)
+    ) {
+      throw new NotFoundException('Appointment not found');
+    }
+
+    const appointment = await this.appointmentModel
+      .findOne({
+        _id: new mongoose.Types.ObjectId(appointmentId),
+        doctorId: new mongoose.Types.ObjectId(doctorId),
+      })
+      .populate('patientId', 'name dateOfBirth gender email phone');
+
+    if (!appointment) {
+      throw new NotFoundException('Appointment not found');
+    }
+
+    if (dto.status) {
+      appointment.status = dto.status;
+    }
+
+    if (dto.consultationSummary) {
+      const summary = dto.consultationSummary;
+      appointment.consultationSummary = {
+        ...(appointment.consultationSummary || {}),
+        ...summary,
+        vitals: {
+          ...(appointment.consultationSummary?.vitals || {}),
+          ...(summary.vitals || {}),
+        },
+      };
+
+      if (summary.symptoms) {
+        appointment.patientDetails = appointment.patientDetails || {};
+        appointment.patientDetails.problem = summary.symptoms;
+      }
+
+      if (summary.notes) {
+        appointment.notes = summary.notes;
+      }
+    }
+
+    if (dto.followUp) {
+      appointment.followUp = {
+        required: dto.followUp.required,
+        date: dto.followUp.date ? new Date(dto.followUp.date) : undefined,
+        reason: dto.followUp.reason,
+      };
+    }
+
+    await appointment.save();
+    await appointment.populate(
+      'patientId',
+      'name dateOfBirth gender email phone',
+    );
+
+    return {
+      success: true,
+      data: this.formatDashboardAppointment(appointment),
+    };
+  }
+
+  async scheduleFollowUpAppointmentByDoctor(
+    doctorId: string,
+    appointmentId: string,
+    dto: CreateFollowUpDto,
+  ) {
+    if (
+      !mongoose.Types.ObjectId.isValid(doctorId) ||
+      !mongoose.Types.ObjectId.isValid(appointmentId)
+    ) {
+      throw new NotFoundException('Appointment not found');
+    }
+
+    const appointment = await this.appointmentModel.findOne({
+      _id: new mongoose.Types.ObjectId(appointmentId),
+      doctorId: new mongoose.Types.ObjectId(doctorId),
+    });
+
+    if (!appointment) {
+      throw new NotFoundException('Appointment not found');
+    }
+
+    if (!appointment.patientId) {
+      throw new BadRequestException('Appointment has no patient assigned');
+    }
+
+    if (!dto.date || !dto.time) {
+      throw new BadRequestException('Follow-up date and time are required');
+    }
+
+    const normalizedDate = new Date(dto.date);
+    if (Number.isNaN(normalizedDate.getTime())) {
+      throw new BadRequestException('Invalid follow-up date');
+    }
+    normalizedDate.setHours(0, 0, 0, 0);
+
+    const followUpDateTime = new Date(`${dto.date}T${dto.time}`);
+    if (Number.isNaN(followUpDateTime.getTime())) {
+      throw new BadRequestException('Invalid follow-up time');
+    }
+
+    const appointmentNumber = await this.generateAppointmentNumber();
+
+    const followUpAppointment = new this.appointmentModel({
+      appointmentNumber,
+      doctorId: appointment.doctorId,
+      patientId: appointment.patientId,
+      appointmentDate: normalizedDate,
+      appointmentTime: dto.time,
+      status: AppointmentStatus.CONFIRMED,
+      consultationFee: appointment.consultationFee,
+      totalAmount: appointment.totalAmount,
+      paymentMethod: appointment.paymentMethod,
+      paymentStatus: PaymentStatus.PENDING,
+      patientDetails: appointment.patientDetails,
+      notes:
+        dto.notes ||
+        dto.reason ||
+        `Follow-up for appointment ${appointment.appointmentNumber}`,
+    });
+
+    await followUpAppointment.save();
+    await followUpAppointment.populate(
+      'patientId',
+      'name dateOfBirth gender email phone',
+    );
+
+    appointment.followUp = {
+      required: true,
+      date: followUpDateTime,
+      reason: dto.reason,
+      appointmentId: followUpAppointment._id as mongoose.Types.ObjectId,
+    };
+
+    await appointment.save();
+
+    return {
+      success: true,
+      data: this.formatDashboardAppointment(followUpAppointment),
+    };
+  }
+
+  async updateForm100ByDoctor(
+    doctorId: string,
+    appointmentId: string,
+    dto: UpdateForm100Dto,
+    file?: Express.Multer.File,
+  ) {
+    if (
+      !mongoose.Types.ObjectId.isValid(doctorId) ||
+      !mongoose.Types.ObjectId.isValid(appointmentId)
+    ) {
+      throw new NotFoundException('Appointment not found');
+    }
+
+    const appointment = await this.appointmentModel
+      .findOne({
+        _id: new mongoose.Types.ObjectId(appointmentId),
+        doctorId: new mongoose.Types.ObjectId(doctorId),
+      })
+      .populate('patientId', 'name dateOfBirth gender email phone');
+
+    if (!appointment) {
+      throw new NotFoundException('Appointment not found');
+    }
+
+    let pdfPath = appointment.form100?.pdfUrl;
+    let fileName = appointment.form100?.fileName;
+
+    if (file) {
+      pdfPath = this.uploadService.saveFormDocument(file);
+      fileName = file.originalname;
+    }
+
+    const existing = appointment.form100 || {
+      id: `FORM-${appointment.appointmentNumber}`,
+    };
+
+    appointment.form100 = {
+      ...existing,
+      ...(dto.id ? { id: dto.id } : {}),
+      issueDate: dto.issueDate ? new Date(dto.issueDate) : existing.issueDate,
+      validUntil: dto.validUntil
+        ? new Date(dto.validUntil)
+        : existing.validUntil,
+      reason: dto.reason ?? existing.reason,
+      diagnosis: dto.diagnosis ?? existing.diagnosis,
+      recommendations: dto.recommendations ?? existing.recommendations,
+      pdfUrl: pdfPath || existing.pdfUrl,
+      fileName: fileName || existing.fileName,
+    };
+
+    await appointment.save();
+    await appointment.populate(
+      'patientId',
+      'name dateOfBirth gender email phone',
+    );
+
+    return {
+      success: true,
+      data: this.formatDashboardAppointment(appointment),
     };
   }
 

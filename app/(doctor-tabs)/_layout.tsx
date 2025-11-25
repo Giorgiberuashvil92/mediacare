@@ -22,7 +22,7 @@ export default function DoctorTabsLayout() {
         <Tabs.Screen
           name="index"
           options={{
-            title: "Dashboard",
+            title: "დეშბორდი",
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="home" size={size} color={color} />
             ),
@@ -31,7 +31,7 @@ export default function DoctorTabsLayout() {
         <Tabs.Screen
           name="appointments"
           options={{
-            title: "Appointments",
+            title: "ჯავშნები",
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="calendar-outline" size={size} color={color} />
             ),
@@ -40,7 +40,7 @@ export default function DoctorTabsLayout() {
         <Tabs.Screen
           name="patients"
           options={{
-            title: "Patients",
+            title: "პაციენტები",
             tabBarIcon: ({ color, size }) => (
               <FontAwesome6 name="users" size={size} color={color} />
             ),
@@ -49,7 +49,7 @@ export default function DoctorTabsLayout() {
         <Tabs.Screen
           name="schedule"
           options={{
-            title: "Schedule",
+            title: "გრაფიკი",
             tabBarIcon: ({ color, size }) => (
               <AntDesign name="calendar" size={size} color={color} />
             ),
@@ -58,7 +58,7 @@ export default function DoctorTabsLayout() {
         <Tabs.Screen
           name="profile"
           options={{
-            title: "Profile",
+            title: "პროფილი",
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="person" size={size} color={color} />
             ),

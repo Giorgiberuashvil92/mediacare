@@ -82,6 +82,7 @@ export default function DoctorsListScreen() {
         );
       }
 
+
       const response = await apiService.getDoctors({
         specialization: specialty,
         symptom: symptom,
@@ -216,7 +217,7 @@ export default function DoctorsListScreen() {
             />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search by Doctor here"
+              placeholder="მოძებნე ექიმი"
               placeholderTextColor="#9CA3AF"
               value={searchQuery}
               onChangeText={setSearchQuery}

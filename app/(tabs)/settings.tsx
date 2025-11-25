@@ -112,7 +112,7 @@ export default function SettingsScreen() {
             <View style={styles.menuIconContainer}>
               <Ionicons name="heart" size={20} color="#06B6D4" />
             </View>
-            <Text style={styles.menuText}>Favourites</Text>
+            <Text style={styles.menuText}>ფავორიტები</Text>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity>
 
@@ -120,7 +120,7 @@ export default function SettingsScreen() {
             <View style={styles.menuIconContainer}>
               <Ionicons name="book" size={20} color="#06B6D4" />
             </View>
-            <Text style={styles.menuText}>Address book</Text>
+            <Text style={styles.menuText}>მისამართების წიგნი</Text>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity>
 
@@ -131,7 +131,7 @@ export default function SettingsScreen() {
             <View style={styles.menuIconContainer}>
               <Ionicons name="wallet" size={20} color="#06B6D4" />
             </View>
-            <Text style={styles.menuText}>Payments</Text>
+            <Text style={styles.menuText}>გადახდები</Text>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity>
 
@@ -139,7 +139,7 @@ export default function SettingsScreen() {
             <View style={styles.menuIconContainer}>
               <Ionicons name="notifications" size={20} color="#06B6D4" />
             </View>
-            <Text style={styles.menuText}>Notifications</Text>
+            <Text style={styles.menuText}>შეტყობინებები</Text>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity>
 
@@ -147,7 +147,7 @@ export default function SettingsScreen() {
             <View style={styles.menuIconContainer}>
               <Ionicons name="shield-checkmark" size={20} color="#06B6D4" />
             </View>
-            <Text style={styles.menuText}>Security</Text>
+            <Text style={styles.menuText}>უსაფრთხოება</Text>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity>
 
@@ -158,7 +158,7 @@ export default function SettingsScreen() {
             <View style={styles.menuIconContainer}>
               <Ionicons name="language" size={20} color="#06B6D4" />
             </View>
-            <Text style={styles.menuText}>Language</Text>
+            <Text style={styles.menuText}>ენა</Text>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity>
 
@@ -169,7 +169,7 @@ export default function SettingsScreen() {
             <View style={styles.menuIconContainer}>
               <Ionicons name="help-circle" size={20} color="#06B6D4" />
             </View>
-            <Text style={styles.menuText}>Help Center</Text>
+            <Text style={styles.menuText}>დახმარების ცენტრი</Text>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity>
 
@@ -177,7 +177,7 @@ export default function SettingsScreen() {
             <View style={styles.menuIconContainer}>
               <Ionicons name="people" size={20} color="#06B6D4" />
             </View>
-            <Text style={styles.menuText}>Invite Friends</Text>
+            <Text style={styles.menuText}>მეგობრების მოწვევა</Text>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity>
 
@@ -201,7 +201,7 @@ export default function SettingsScreen() {
               <Ionicons name="refresh" size={20} color="#FF3B30" />
             </View>
             <Text style={[styles.menuText, { color: "#FF3B30" }]}>
-              Reset Onboarding
+              ონბორდინგის განულება
             </Text>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity>
@@ -209,7 +209,9 @@ export default function SettingsScreen() {
 
         {/* Testing Tools - Switch to Doctor */}
         <View style={styles.testingSection}>
-          <Text style={styles.testingSectionTitle}>🧪 Testing Tools (Dev)</Text>
+          <Text style={styles.testingSectionTitle}>
+            🧪 ტესტირების ხელსაწყოები (Dev)
+          </Text>
           <View style={styles.menuSection}>
             <TouchableOpacity
               style={styles.menuItem}
@@ -221,7 +223,7 @@ export default function SettingsScreen() {
               <View style={styles.menuIconContainer}>
                 <Ionicons name="swap-horizontal" size={20} color="#06B6D4" />
               </View>
-              <Text style={styles.menuText}>Switch to Doctor</Text>
+                <Text style={styles.menuText}>ექიმის რეჟიმზე გადასვლა</Text>
               <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
             </TouchableOpacity>
           </View>

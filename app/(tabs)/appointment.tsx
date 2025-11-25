@@ -237,8 +237,32 @@ const Appointment = () => {
     return diff > 0 && diff <= 30 * 60 * 1000; // 30 minutes
   };
 
+  const isUpcomingAppointment = (appointment: PatientAppointment) => {
+    if (!appointment.date) {
+      return false;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let appointmentDateTime = new Date(
+      `${appointment.date}T${appointment.time || "00:00"}`
+    );
+    if (Number.isNaN(appointmentDateTime.getTime())) {
+      appointmentDateTime = new Date(appointment.date);
+    }
+
+    if (Number.isNaN(appointmentDateTime.getTime())) {
+      return false;
+    }
+
+    return appointmentDateTime.getTime() >= today.getTime();
+  };
+
+  const upcomingAppointments = appointments.filter(isUpcomingAppointment);
+
   // Filter appointments
-  const filteredAppointments = appointments.filter((appointment) => {
+  const filteredAppointments = upcomingAppointments.filter((appointment) => {
     const matchesStatus =
       filterStatus === "all" || appointment.status === filterStatus;
     const matchesSearch = appointment.doctorName
@@ -249,12 +273,12 @@ const Appointment = () => {
 
   // Stats
   const stats = {
-    all: appointments.length,
-    completed: appointments.filter((a) => a.status === "completed")
+    all: upcomingAppointments.length,
+    completed: upcomingAppointments.filter((a) => a.status === "completed")
       .length,
-    scheduled: appointments.filter((a) => a.status === "scheduled")
+    scheduled: upcomingAppointments.filter((a) => a.status === "scheduled")
       .length,
-    cancelled: appointments.filter((a) => a.status === "cancelled")
+    cancelled: upcomingAppointments.filter((a) => a.status === "cancelled")
       .length,
   };
 

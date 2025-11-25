@@ -1,32 +1,82 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Modal,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { patientVisits } from "../../assets/data/patientRecords";
+import { useAuth } from "../contexts/AuthContext";
+import { apiService } from "../services/api";
 
 const History = () => {
-  const router = useRouter();
+  const { isAuthenticated, user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedVisit, setSelectedVisit] = useState<any>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [visits, setVisits] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Filter visits by search query
-  const filteredVisits = patientVisits.filter((visit) => {
-    const matchesSearch =
-      visit.doctorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      visit.doctorSpecialty.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      visit.diagnosis.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesSearch;
-  });
+  useEffect(() => {
+    if (isAuthenticated && user?.id) {
+      loadPastAppointments();
+    } else {
+      setLoading(false);
+    }
+  }, [isAuthenticated, user?.id]);
+
+  const loadPastAppointments = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      if (apiService.isMockMode()) {
+        setVisits([]);
+        return;
+      }
+
+      const response = await apiService.getPatientAppointments();
+      if (response.success && Array.isArray(response.data)) {
+        const mapped = response.data
+          .map(mapAppointmentToVisit)
+          .filter((visit) => visit && isPastAppointment(visit));
+        setVisits(mapped);
+      } else {
+        setVisits([]);
+      }
+    } catch (err: any) {
+      console.error("History load failed", err);
+      setError(err.message || "ვიზიტების ჩატვირთვა ვერ მოხერხდა");
+      setVisits([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadPastAppointments();
+  };
+
+  const filteredVisits = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) {
+      return visits;
+    }
+    return visits.filter((visit) => {
+      const searchable = `${visit.doctorName} ${visit.doctorSpecialty} ${visit.diagnosis}`.toLowerCase();
+      return searchable.includes(query);
+    });
+  }, [visits, searchQuery]);
 
   const openDetails = (visit: any) => {
     setSelectedVisit(visit);
@@ -35,10 +85,22 @@ const History = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#06B6D4"
+          />
+        }
+      >
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>ისტორია</Text>
+          <Text style={styles.subtitle}>
+            დასრულებული ან გასული ვიზიტები ავტომატურად გადმოდის აქ
+          </Text>
         </View>
 
         {/* Search */}
@@ -66,14 +128,26 @@ const History = () => {
             {filteredVisits.length} ვიზიტი
           </Text>
 
-          {filteredVisits.length === 0 ? (
+          {loading ? (
+            <View style={styles.loadingState}>
+              <ActivityIndicator size="large" color="#06B6D4" />
+              <Text style={styles.loadingText}>იტვირთება ვიზიტების ისტორია...</Text>
+            </View>
+          ) : error ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="alert-circle" size={64} color="#F87171" />
+              <Text style={styles.emptyStateTitle}>ვერ ჩაიტვირთა</Text>
+              <Text style={styles.emptyStateText}>{error}</Text>
+              <TouchableOpacity style={styles.retryButton} onPress={loadPastAppointments}>
+                <Text style={styles.retryButtonText}>თავიდან ცდა</Text>
+              </TouchableOpacity>
+            </View>
+          ) : filteredVisits.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="medical-outline" size={64} color="#D1D5DB" />
-              <Text style={styles.emptyStateTitle}>
-                ვიზიტები ვერ მოიძებნა
-              </Text>
+              <Text style={styles.emptyStateTitle}>ვიზიტები ვერ მოიძებნა</Text>
               <Text style={styles.emptyStateText}>
-                სცადეთ განსხვავებული ძიება
+                როგორც კი ვიზიტი დასრულდება, ავტომატურად გადმოვა აქ
               </Text>
             </View>
           ) : (
@@ -91,12 +165,15 @@ const History = () => {
                     <View style={styles.doctorDetails}>
                       <Text style={styles.doctorName}>{visit.doctorName}</Text>
                       <Text style={styles.doctorSpecialty}>
-                        {visit.doctorSpecialty}
+                        {visit.doctorSpecialty || "სპეციალისტი"}
                       </Text>
                     </View>
                   </View>
                   <View style={styles.dateBadge}>
                     <Text style={styles.dateText}>{visit.date}</Text>
+                    {visit.statusLabel ? (
+                      <Text style={styles.statusLabel}>{visit.statusLabel}</Text>
+                    ) : null}
                   </View>
                 </View>
 
@@ -107,14 +184,16 @@ const History = () => {
                       size={16}
                       color="#10B981"
                     />
-                    <Text style={styles.diagnosisText}>{visit.diagnosis}</Text>
+                    <Text style={styles.diagnosisText}>
+                      {visit.diagnosis || "დიაგნოზი არ არის მითითებული"}
+                    </Text>
                   </View>
 
                   {visit.symptoms && visit.symptoms.length > 0 && (
                     <View style={styles.symptomsContainer}>
                       <Text style={styles.symptomsLabel}>სიმპტომები:</Text>
                       <View style={styles.symptomsList}>
-                        {visit.symptoms.map((symptom, index) => (
+                        {visit.symptoms.map((symptom: string, index: number) => (
                           <View key={index} style={styles.symptomTag}>
                             <Text style={styles.symptomText}>{symptom}</Text>
                           </View>
@@ -129,10 +208,10 @@ const History = () => {
                         დანიშნული მედიკამენტები:
                       </Text>
                       <View style={styles.medicationsList}>
-                        {visit.medications.slice(0, 3).map((med, index) => (
+                        {visit.medications.slice(0, 3).map((med: any, index: number) => (
                           <View key={index} style={styles.medicationTag}>
                             <Ionicons
-                              name="pills"
+                              name="medkit-outline"
                               size={14}
                               color="#8B5CF6"
                             />
@@ -298,7 +377,7 @@ const History = () => {
                           <View key={index} style={styles.medicationCard}>
                             <View style={styles.medicationHeader}>
                               <Ionicons
-                                name="pills"
+                                name="medkit-outline"
                                 size={20}
                                 color="#8B5CF6"
                               />
@@ -451,6 +530,106 @@ const History = () => {
   );
 };
 
+const STATUS_LABELS: Record<string, string> = {
+  completed: "დასრულებული",
+  cancelled: "გაუქმებული",
+  "in-progress": "მიმდინარე",
+  scheduled: "დანიშნული",
+  pending: "მოლოდინში",
+};
+
+const mapAppointmentToVisit = (appointment: any) => {
+  if (!appointment) {
+    return null;
+  }
+
+  const doctor =
+    typeof appointment.doctorId === "object" ? appointment.doctorId : {};
+  const appointmentDate = appointment.appointmentDate
+    ? new Date(appointment.appointmentDate).toISOString().split("T")[0]
+    : "";
+
+  const rawSymptoms = appointment.symptoms || appointment.patientDetails?.problem;
+  let symptoms: string[] = [];
+  if (Array.isArray(rawSymptoms)) {
+    symptoms = rawSymptoms.filter(Boolean);
+  } else if (typeof rawSymptoms === "string" && rawSymptoms.trim().length) {
+    symptoms = rawSymptoms.split(",").map((item) => item.trim()).filter(Boolean);
+  } else if (rawSymptoms) {
+    symptoms = [String(rawSymptoms)];
+  }
+
+  const summary = appointment.consultationSummary || {};
+
+  if (summary.symptoms) {
+    const summarySymptoms = summary.symptoms
+      .split(",")
+      .map((item: string) => item.trim())
+      .filter(Boolean);
+    symptoms = Array.from(new Set([...symptoms, ...summarySymptoms]));
+  }
+
+  let medications = Array.isArray(appointment.medications)
+    ? appointment.medications
+    : [];
+
+  if ((!medications || medications.length === 0) && summary.medications) {
+    medications = summary.medications
+      .split("\n")
+      .map((line: string) => line.trim())
+      .filter(Boolean)
+      .map((name: string) => ({ name }));
+  }
+
+  const status = appointment.status || "scheduled";
+
+  return {
+    id: appointment._id || appointment.id || Math.random().toString(36).slice(2),
+    doctorName: doctor?.name || "უცნობი ექიმი",
+    doctorSpecialty: doctor?.specialization || doctor?.speciality || "",
+    date: appointmentDate,
+    appointmentDate,
+    appointmentTime: appointment.appointmentTime || appointment.time || "",
+    diagnosis:
+      summary.diagnosis ||
+      appointment.diagnosis ||
+      appointment.patientDetails?.problem ||
+      "",
+    symptoms,
+    medications,
+    notes: summary.notes || appointment.notes || "",
+    vitalSigns: appointment.vitalSigns || summary.vitals,
+    consultationSummary: summary,
+    followUp: appointment.followUp,
+    form100: appointment.form100,
+    status,
+    statusLabel: STATUS_LABELS[status],
+  };
+};
+
+const isPastAppointment = (visit: any) => {
+  if (!visit?.appointmentDate) {
+    return false;
+  }
+
+  const timePart = visit.appointmentTime || "00:00";
+  let appointmentDateTime = new Date(`${visit.appointmentDate}T${timePart}`);
+
+  if (Number.isNaN(appointmentDateTime.getTime())) {
+    appointmentDateTime = new Date(`${visit.appointmentDate} ${timePart}`);
+  }
+
+  if (Number.isNaN(appointmentDateTime.getTime())) {
+    appointmentDateTime = new Date(visit.appointmentDate);
+  }
+
+  if (Number.isNaN(appointmentDateTime.getTime())) {
+    return false;
+  }
+
+  return appointmentDateTime.getTime() < Date.now();
+};
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -555,11 +734,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
+    alignItems: "flex-end",
   },
   dateText: {
     fontSize: 12,
     fontFamily: "Poppins-SemiBold",
     color: "#06B6D4",
+  },
+  statusLabel: {
+    fontSize: 11,
+    fontFamily: "Poppins-Regular",
+    color: "#1F2937",
   },
   visitBody: {
     gap: 12,
@@ -667,6 +852,27 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins-Regular",
     color: "#9CA3AF",
     textAlign: "center",
+  },
+  loadingState: {
+    alignItems: "center",
+    paddingVertical: 60,
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+  },
+  retryButton: {
+    marginTop: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: "#06B6D4",
+  },
+  retryButtonText: {
+    color: "#FFFFFF",
+    fontFamily: "Poppins-SemiBold",
   },
   modalOverlay: {
     flex: 1,

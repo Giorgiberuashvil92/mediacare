@@ -2,7 +2,7 @@
   "expo": {
     "name": "medicare",
     "slug": "medicare",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
@@ -14,11 +14,13 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
+      "buildNumber": "2.0.0",
       "supportsTablet": true,
-      "bundleIdentifier": "com.medicare.app",
+      "bundleIdentifier": "ge.medcompass",
       "infoPlist": {
         "NSCameraUsageDescription": "აპლიკაციას სჭირდება კამერის წვდომა ვიდეო კონსულტაციებისთვის",
-        "NSMicrophoneUsageDescription": "აპლიკაციას სჭირდება მიკროფონის წვდომა ვიდეო კონსულტაციებისთვის"
+        "NSMicrophoneUsageDescription": "აპლიკაციას სჭირდება მიკროფონის წვდომა ვიდეო კონსულტაციებისთვის",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -58,6 +60,14 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "apiUrl": "https://mediacare-production.up.railway.app",
+      "eas": {
+        "projectId": "8e3315d4-a7cd-4d3a-a2d1-40988cd66b12"
+      }
+    },
+    "owner": "herrra"
   }
 }

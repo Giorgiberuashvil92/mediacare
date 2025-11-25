@@ -28,7 +28,7 @@ const getDefaultBaseUrl = () => {
   
   if (FORCE_RAILWAY) {
     console.log('🚂 Forcing Railway URL for testing');
-    return "https://localhost:4000";
+    return "https://mediacare-production.up.railway.app";
   }
 
   const envUrl =
@@ -43,12 +43,9 @@ const getDefaultBaseUrl = () => {
   }
 
   const expoHostIp = getExpoHostIp();
-  // if (expoHostIp) {
-  //   return `https://mediacare-production.up.railway.app`;
-  // }
-
-  if(expoHostIp) {
-    return `https://${expoHostIp}:4000`;
+  console.log('🔍 expoHostIp:', expoHostIp);
+  if (expoHostIp) {
+    return `http://${expoHostIp}:4000`;
   }
 
   // if (__DEV__) {
@@ -60,6 +57,7 @@ const getDefaultBaseUrl = () => {
 
   // return "https://mediacare-production.up.railway.app";
   if (__DEV__) {
+    console.log('🔍 __DEV__ mode:', __DEV__);
     return "http://localhost:4000";
   }
   return "http://localhost:4000";
@@ -144,6 +142,7 @@ export interface ShopCategory {
 
 export interface MedicineShopOverview {
   laboratoryProducts: ShopProduct[];
+  laboratoryCategories: ShopCategory[];
   equipmentCategories: ShopCategory[];
 }
 
@@ -638,6 +637,33 @@ class ApiService {
       isPaid: boolean;
       diagnosis?: string;
       symptoms?: string;
+      consultationSummary?: {
+        diagnosis?: string;
+        symptoms?: string;
+        medications?: string;
+        notes?: string;
+        vitals?: {
+          bloodPressure?: string;
+          heartRate?: string;
+          temperature?: string;
+          weight?: string;
+        };
+      };
+      followUp?: {
+        required: boolean;
+        date?: string;
+        reason?: string;
+      };
+      form100?: {
+        id?: string;
+        issueDate?: string;
+        validUntil?: string;
+        reason?: string;
+        diagnosis?: string;
+        recommendations?: string;
+        pdfUrl?: string;
+        fileName?: string;
+      };
     }[];
   }> {
     if (USE_MOCK_API) {
@@ -649,6 +675,129 @@ class ApiService {
 
     return this.apiCall(`/doctors/dashboard/appointments?limit=${limit}`, {
       method: 'GET',
+    });
+  }
+
+  async updateDoctorAppointment(
+    appointmentId: string,
+    payload: {
+      status?: 'scheduled' | 'completed' | 'in-progress' | 'cancelled';
+      consultationSummary?: {
+        diagnosis?: string;
+        symptoms?: string;
+        medications?: string;
+        notes?: string;
+        vitals?: {
+          bloodPressure?: string;
+          heartRate?: string;
+          temperature?: string;
+          weight?: string;
+        };
+      };
+      followUp?: {
+        required: boolean;
+        date?: string;
+        reason?: string;
+      };
+    },
+  ) {
+    if (USE_MOCK_API) {
+      return Promise.resolve({
+        success: true,
+        data: payload,
+      });
+    }
+
+    const statusMap: Record<string, string> = {
+      scheduled: 'confirmed',
+      'in-progress': 'in-progress',
+      completed: 'completed',
+      cancelled: 'cancelled',
+    };
+
+    const body: Record<string, unknown> = {
+      ...payload,
+    };
+
+    if (payload.status) {
+      body.status = statusMap[payload.status] ?? payload.status;
+    }
+
+    return this.apiCall(`/doctors/appointments/${appointmentId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    });
+  }
+
+  async uploadForm100Document(
+    appointmentId: string,
+    payload: {
+      diagnosis?: string;
+    },
+    file?: {
+      uri: string;
+      name?: string | null;
+      mimeType?: string | null;
+    },
+  ) {
+    if (USE_MOCK_API) {
+      return Promise.resolve({
+        success: true,
+        data: null,
+      } as any);
+    }
+
+    const formData = new FormData();
+    Object.entries(payload).forEach(([key, value]) => {
+      if (value) {
+        formData.append(key, value);
+      }
+    });
+
+    if (file) {
+      formData.append('file', {
+        uri: file.uri,
+        name: file.name || 'form-100.pdf',
+        type: file.mimeType || 'application/pdf',
+      } as any);
+    }
+
+    const token = await AsyncStorage.getItem("accessToken");
+    const headers: HeadersInit = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(
+      `${this.baseURL}/doctors/appointments/${appointmentId}/form100`,
+      {
+        method: "PATCH",
+        headers,
+        body: formData,
+      }
+    );
+
+    return this.handleResponse(response);
+  }
+
+  async scheduleFollowUpAppointment(
+    appointmentId: string,
+    payload: {
+      date: string;
+      time: string;
+      reason?: string;
+    },
+  ) {
+    if (USE_MOCK_API) {
+      return Promise.resolve({
+        success: true,
+        data: null,
+      } as any);
+    }
+
+    return this.apiCall(`/doctors/appointments/${appointmentId}/follow-up`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
     });
   }
 
@@ -797,6 +946,7 @@ class ApiService {
         success: true,
         data: {
           laboratoryProducts: [],
+          laboratoryCategories: [],
           equipmentCategories: [],
         },
       });

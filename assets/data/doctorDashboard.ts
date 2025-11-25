@@ -26,6 +26,39 @@ export interface DoctorStatistics {
   };
 }
 
+export interface ConsultationVitals {
+  bloodPressure?: string;
+  heartRate?: string;
+  temperature?: string;
+  weight?: string;
+}
+
+export interface ConsultationSummary {
+  diagnosis?: string;
+  symptoms?: string;
+  medications?: string;
+  notes?: string;
+  vitals?: ConsultationVitals;
+}
+
+export interface FollowUpInfo {
+  required: boolean;
+  date?: string;
+  reason?: string;
+  appointmentId?: string;
+}
+
+export interface Form100Info {
+  id?: string;
+  issueDate?: string;
+  validUntil?: string;
+  reason?: string;
+  diagnosis?: string;
+  recommendations?: string;
+  pdfUrl?: string;
+  fileName?: string;
+}
+
 export interface Consultation {
   id: string;
   patientName: string;
@@ -38,6 +71,9 @@ export interface Consultation {
   isPaid: boolean; // გადახდილია
   diagnosis?: string; // დიაგნოზი
   symptoms?: string; // სიმპტომები
+  consultationSummary?: ConsultationSummary;
+  followUp?: FollowUpInfo;
+  form100?: Form100Info;
 }
 
 export interface Schedule {
@@ -134,6 +170,24 @@ export const recentConsultations: Consultation[] = [
     isPaid: true,
     diagnosis: "მაღალი წნევა",
     symptoms: "თავის ტკივილი, თავბრუსხვევა",
+    consultationSummary: {
+      diagnosis: "მაღალი წნევა",
+      symptoms: "თავის ტკივილი, თავბრუსხვევა",
+      medications: "ანაპრილინი",
+      vitals: {
+        bloodPressure: "150/100",
+        heartRate: "78",
+      },
+    },
+    form100: {
+      id: "FORM-100-0001",
+      issueDate: "2024-10-26",
+      validUntil: "2024-11-10",
+      reason: "სამედიცინო შვებულება",
+      diagnosis: "ჰიპერტენზია",
+      recommendations: "სრული დასვენება 10 დღე",
+      pdfUrl: "uploads/forms/sample-form100.pdf",
+    },
   },
   {
     id: "C002",

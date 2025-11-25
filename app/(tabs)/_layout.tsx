@@ -26,7 +26,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Home",
+          title: "მთავარი",
           headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home" size={size} color={color} />
@@ -37,7 +37,7 @@ export default function TabLayout() {
         name="doctor"
         options={{
           headerShown: false,
-          title: "Doctor",
+          title: "ექიმები",
           tabBarIcon: ({ color, size }) => (
             <FontAwesome6 name="user-doctor" size={size} color={color} />
           ),
@@ -46,7 +46,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="medicine"
         options={{
-          title: "Medicine",
+          title: "მედიკამენტები",
           headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="medical" size={size} color={color} />
@@ -56,7 +56,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="appointment"
         options={{
-          title: "Appointment",
+          title: "ჯავშნები",
           headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="calendar-outline" size={size} color={color} />
@@ -66,7 +66,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="history"
         options={{
-          title: "History",
+          title: "ისტორია",
           headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <AntDesign name="calendar" size={size} color={color} />
@@ -76,7 +76,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: "Settings",
+          title: "პარამეტრები",
           headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="settings-outline" size={size} color={color} />

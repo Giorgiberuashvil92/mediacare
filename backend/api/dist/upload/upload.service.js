@@ -50,11 +50,15 @@ let UploadService = class UploadService {
     constructor() {
         this.uploadDir = path.join(process.cwd(), 'uploads', 'licenses');
         this.imagesDir = path.join(process.cwd(), 'uploads', 'images');
+        this.formsDir = path.join(process.cwd(), 'uploads', 'forms');
         if (!fs.existsSync(this.uploadDir)) {
             fs.mkdirSync(this.uploadDir, { recursive: true });
         }
         if (!fs.existsSync(this.imagesDir)) {
             fs.mkdirSync(this.imagesDir, { recursive: true });
+        }
+        if (!fs.existsSync(this.formsDir)) {
+            fs.mkdirSync(this.formsDir, { recursive: true });
         }
     }
     saveLicenseDocument(file) {
@@ -79,6 +83,22 @@ let UploadService = class UploadService {
         const filePath = path.join(this.imagesDir, fileName);
         fs.writeFileSync(filePath, file.buffer);
         return `uploads/images/${fileName}`;
+    }
+    saveFormDocument(file) {
+        if (!this.validateFormDocument(file)) {
+            throw new common_1.BadRequestException('Invalid file. Only PDF, JPG, JPEG, PNG files up to 5MB are allowed.');
+        }
+        const timestamp = Date.now();
+        const fileName = `${timestamp}-${file.originalname}`;
+        const filePath = path.join(this.formsDir, fileName);
+        fs.writeFileSync(filePath, file.buffer);
+        return `uploads/forms/${fileName}`;
+    }
+    deleteFormDocument(filePath) {
+        const fullPath = path.join(process.cwd(), filePath);
+        if (fs.existsSync(fullPath)) {
+            fs.unlinkSync(fullPath);
+        }
     }
     validateLicenseFile(file) {
         const allowedTypes = [
@@ -106,6 +126,9 @@ let UploadService = class UploadService {
             return false;
         }
         return true;
+    }
+    validateFormDocument(file) {
+        return this.validateLicenseFile(file);
     }
 };
 exports.UploadService = UploadService;

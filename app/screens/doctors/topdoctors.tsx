@@ -1,11 +1,14 @@
-import DoctorFilters from "@/app/components/shared/doctorFilters";
-import { doctors } from "@/assets/data/doctors";
+import DoctorFilters, {
+  DoctorFilterOption,
+} from "@/app/components/shared/doctorFilters";
+import { apiService } from "@/app/services/api";
 import Fontisto from "@expo/vector-icons/Fontisto";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,50 +16,177 @@ import {
   View,
 } from "react-native";
 
+const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
+  let imageSource;
+  if (doctor.profileImage) {
+    imageSource = doctor.profileImage.startsWith("http")
+      ? { uri: doctor.profileImage }
+      : { uri: `${apiBaseUrl}/${doctor.profileImage}` };
+  } else {
+    imageSource = require("@/assets/images/doctors/doctor1.png");
+  }
+
+  return {
+    id: doctor.id || doctor._id,
+    name: doctor.name || "",
+    specialization: doctor.specialization || "",
+    rating: doctor.rating || 0,
+    reviewCount: doctor.reviewCount || 0,
+    isActive:
+      doctor.isActive !== undefined ? Boolean(doctor.isActive) : true,
+    image: imageSource,
+    degrees: doctor.degrees || "",
+    consultationFee: doctor.consultationFee
+      ? `$${doctor.consultationFee}`
+      : undefined,
+  };
+};
+
 const TopDoctors = () => {
-  const [selectedFilter, setSelectedFilter] = useState(1);
+  const [selectedFilter, setSelectedFilter] = useState("all");
+  const [doctors, setDoctors] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [specializations, setSpecializations] = useState<Specialization[]>([]);
+  const [specLoading, setSpecLoading] = useState(true);
+
+  useEffect(() => {
+    loadDoctors();
+  }, []);
+
+useEffect(() => {
+  const loadSpecializations = async () => {
+    try {
+      setSpecLoading(true);
+
+      if (apiService.isMockMode()) {
+        setSpecializations([]);
+        return;
+      }
+
+      const response = await apiService.getSpecializations();
+      if (response.success) {
+        setSpecializations(response.data.filter((spec) => spec.isActive));
+      } else {
+        setSpecializations([]);
+      }
+    } catch (error) {
+      console.error("Failed to load specializations:", error);
+      setSpecializations([]);
+    } finally {
+      setSpecLoading(false);
+    }
+  };
+
+  loadSpecializations();
+}, []);
+
+  const loadDoctors = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      if (apiService.isMockMode()) {
+        setDoctors([]);
+        return;
+      }
+
+      const response = await apiService.getDoctors({ page: 1, limit: 200 });
+      if (response.success && response.data?.doctors) {
+        const apiBaseUrl = apiService.getBaseURL();
+        const mapped = response.data.doctors.map((doctor: any) =>
+          mapDoctorFromAPI(doctor, apiBaseUrl),
+        );
+        setDoctors(mapped);
+      } else {
+        setDoctors([]);
+      }
+    } catch (err: any) {
+      console.error("Failed to load doctors:", err);
+      setError(err.message || "ექიმების ჩატვირთვა ვერ მოხერხდა");
+      setDoctors([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+const fallbackFilters = useMemo<DoctorFilterOption[]>(() => {
+  const specializationSet = new Set<string>();
+  doctors.forEach((doctor) => {
+    const raw = doctor.specialization?.trim();
+    if (raw) {
+      raw.split(",").forEach((part) => {
+        const clean = part.trim();
+        if (clean) {
+          specializationSet.add(clean);
+        }
+      });
+    }
+  });
+
+  return Array.from(specializationSet).map((spec) => ({
+    id: spec,
+    name: spec,
+  }));
+}, [doctors]);
+
+const filterOptions = useMemo<DoctorFilterOption[]>(() => {
+  const specOptions = specializations.map((spec) => ({
+    id: spec.name,
+    name: spec.name,
+  }));
+
+  const options =
+    specOptions.length > 0 ? specOptions : fallbackFilters;
+
+  return [{ id: "all", name: "All Doctors" }, ...options];
+}, [specializations, fallbackFilters]);
+
+useEffect(() => {
+  if (
+    selectedFilter !== "all" &&
+    !filterOptions.some((option) => option.id === selectedFilter)
+  ) {
+    setSelectedFilter("all");
+  }
+}, [filterOptions, selectedFilter]);
 
   const filteredDoctors = useMemo(() => {
-    if (selectedFilter === 1) {
+    if (selectedFilter === "all") {
       return doctors;
-    } else {
-      // Filter by specialization
-      const filterMap: { [key: number]: string } = {
-        2: "Neurology",
-        3: "Cardiology",
-        4: "Gynecology",
-        5: "Pediatrics",
-        6: "Allergy",
-        7: "Dentist",
-        8: "Urology",
-        9: "Gastrology",
-      };
-
-      const filterSpecialization = filterMap[selectedFilter];
-      return doctors.filter((doctor) =>
-        doctor.specialization
-          .toLowerCase()
-          .includes(filterSpecialization.toLowerCase())
-      );
     }
-  }, [selectedFilter]);
 
-  // Group doctors by specialization
+    const target = selectedFilter.toLowerCase();
+    return doctors.filter((doctor) =>
+      doctor.specialization
+        ?.toLowerCase()
+        .split(",")
+        .map((spec) => spec.trim())
+        .some((spec) => spec.includes(target)),
+    );
+  }, [selectedFilter, doctors]);
+
   const groupedDoctors = useMemo(() => {
-    const groups: { [key: string]: typeof doctors } = {};
+    const groups: Record<string, any[]> = {};
 
     filteredDoctors.forEach((doctor) => {
-      const specialization = doctor.specialization.split(" ")[0];
-      if (!groups[specialization]) {
-        groups[specialization] = [];
-      }
-      groups[specialization].push(doctor);
+      const specializations = doctor.specialization
+        ?.split(",")
+        .map((spec) => spec.trim())
+        .filter(Boolean) || ["Other"];
+
+      specializations.forEach((spec) => {
+        if (!groups[spec]) {
+          groups[spec] = [];
+        }
+        groups[spec].push(doctor);
+      });
     });
 
     return groups;
   }, [filteredDoctors]);
 
-  const renderDoctorCard = (doctor: (typeof doctors)[0]) => (
+  const renderDoctorCard = (doctor: any) => (
     <TouchableOpacity
       key={doctor.id}
       style={styles.doctorCard}
@@ -111,40 +241,59 @@ const TopDoctors = () => {
         <DoctorFilters
           selectedFilter={selectedFilter}
           onFilterChange={setSelectedFilter}
+          filters={filterOptions}
         />
       </View>
 
-      {/* Doctors by Specialization */}
-      <ScrollView
-        style={styles.scrollContainer}
-        showsVerticalScrollIndicator={false}
-      >
-        {Object.entries(groupedDoctors).map(([specialization, doctorsList]) => (
-          <View key={specialization} style={styles.specializationSection}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>{specialization}</Text>
-              <TouchableOpacity
-                onPress={() =>
-                  router.push({
-                    pathname: "/screens/doctors/doctors-list",
-                    params: { specialty: specialization },
-                  })
-                }
-              >
-                <Text style={styles.seeAllText}>See All</Text>
-              </TouchableOpacity>
-            </View>
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#20BEB8" />
+        </View>
+      ) : error ? (
+        <View style={styles.loadingContainer}>
+          <Text style={styles.emptyText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={loadDoctors}>
+            <Text style={styles.retryText}>თავიდან ცდა</Text>
+          </TouchableOpacity>
+        </View>
+      ) : doctors.length === 0 ? (
+        <View style={styles.loadingContainer}>
+          <Text style={styles.emptyText}>ექიმები ჯერ არ არის დამატებული</Text>
+        </View>
+      ) : (
+        <ScrollView
+          style={styles.scrollContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          {Object.entries(groupedDoctors).map(
+            ([specialization, doctorsList]) => (
+              <View key={specialization} style={styles.specializationSection}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>{specialization}</Text>
+                  <TouchableOpacity
+                    onPress={() =>
+                      router.push({
+                        pathname: "/screens/doctors/doctors-list",
+                        params: { specialty: specialization },
+                      })
+                    }
+                  >
+                    <Text style={styles.seeAllText}>See All</Text>
+                  </TouchableOpacity>
+                </View>
 
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.doctorsScroll}
-            >
-              {doctorsList.map((doctor) => renderDoctorCard(doctor))}
-            </ScrollView>
-          </View>
-        ))}
-      </ScrollView>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.doctorsScroll}
+                >
+                  {doctorsList.map((doctor) => renderDoctorCard(doctor))}
+                </ScrollView>
+              </View>
+            ),
+          )}
+        </ScrollView>
+      )}
     </View>
   );
 };

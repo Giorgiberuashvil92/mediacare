@@ -3,16 +3,24 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
+  Post,
   Put,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { DoctorsService } from './doctors.service';
+import { CreateFollowUpDto } from './dto/create-follow-up.dto';
 import { GetDoctorsDto } from './dto/get-doctors.dto';
+import { UpdateDoctorAppointmentDto } from './dto/update-appointment.dto';
 import { UpdateAvailabilityDto } from './dto/update-availability.dto';
 import { UpdateDoctorDto } from './dto/update-doctor.dto';
+import { UpdateForm100Dto } from './dto/update-form100.dto';
 import { DoctorGuard } from './guards/doctor.guard';
 
 @Controller('doctors')
@@ -99,6 +107,51 @@ export class DoctorsController {
       });
       throw error;
     }
+  }
+
+  @Patch('appointments/:appointmentId')
+  @UseGuards(JwtAuthGuard, DoctorGuard)
+  async updateAppointment(
+    @CurrentUser() user: { sub: string },
+    @Param('appointmentId') appointmentId: string,
+    @Body() body: UpdateDoctorAppointmentDto,
+  ) {
+    return this.doctorsService.updateAppointmentByDoctor(
+      user.sub,
+      appointmentId,
+      body,
+    );
+  }
+
+  @Patch('appointments/:appointmentId/form100')
+  @UseGuards(JwtAuthGuard, DoctorGuard)
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadForm100(
+    @CurrentUser() user: { sub: string },
+    @Param('appointmentId') appointmentId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Body() body: UpdateForm100Dto,
+  ) {
+    return this.doctorsService.updateForm100ByDoctor(
+      user.sub,
+      appointmentId,
+      body,
+      file,
+    );
+  }
+
+  @Post('appointments/:appointmentId/follow-up')
+  @UseGuards(JwtAuthGuard, DoctorGuard)
+  async scheduleFollowUp(
+    @CurrentUser() user: { sub: string },
+    @Param('appointmentId') appointmentId: string,
+    @Body() body: CreateFollowUpDto,
+  ) {
+    return this.doctorsService.scheduleFollowUpAppointmentByDoctor(
+      user.sub,
+      appointmentId,
+      body,
+    );
   }
 
   // Parameterized routes must come after specific routes

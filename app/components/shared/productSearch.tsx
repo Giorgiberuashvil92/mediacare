@@ -22,7 +22,7 @@ const ProductSearch: React.FC<ProductSearchProps> = ({
         />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search by Product name or Category"
+          placeholder="მოძებნე ექიმი"
           placeholderTextColor="#8E8E93"
           value={searchText}
           onChangeText={onSearchChange}

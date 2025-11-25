@@ -10,6 +10,7 @@ import {
   Specialization,
   SpecializationSchema,
 } from '../specializations/schemas/specialization.schema';
+import { UploadModule } from '../upload/upload.module';
 import { DoctorsController } from './doctors.controller';
 import { DoctorsService } from './doctors.service';
 import { DoctorGuard } from './guards/doctor.guard';
@@ -26,6 +27,7 @@ import {
       { name: Specialization.name, schema: SpecializationSchema },
       { name: Appointment.name, schema: AppointmentSchema },
     ]),
+    UploadModule,
   ],
   controllers: [DoctorsController],
   providers: [DoctorsService, DoctorGuard, JwtAuthGuard],

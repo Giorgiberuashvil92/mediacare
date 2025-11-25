@@ -1,8 +1,10 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import * as DocumentPicker from "expo-document-picker";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
+  Alert,
   Image,
   Modal,
   ScrollView,
@@ -10,7 +12,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -23,23 +25,9 @@ import { apiService } from "../services/api";
 
 export default function DoctorAppointments() {
   const router = useRouter();
-  const [filterStatus, setFilterStatus] = useState<
-    "all" | "completed" | "scheduled" | "in-progress" | "cancelled"
-  >("all");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedConsultation, setSelectedConsultation] =
-    useState<Consultation | null>(null);
-  const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [showFollowUpModal, setShowFollowUpModal] = useState(false);
-  const [showAppointmentModal, setShowAppointmentModal] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date());
-  const [consultations, setConsultations] = useState<Consultation[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const FORM100_MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
-  // Appointment form state
-  const [appointmentData, setAppointmentData] = useState({
+  const createEmptyAppointmentData = () => ({
     diagnosis: "",
     symptoms: "",
     bloodPressure: "",
@@ -49,9 +37,35 @@ export default function DoctorAppointments() {
     medications: "",
     followUpRequired: false,
     followUpDate: "",
+    followUpTime: "",
     followUpReason: "",
     notes: "",
   });
+
+  const [filterStatus, setFilterStatus] = useState<
+    "all" | "completed" | "scheduled" | "in-progress" | "cancelled"
+  >("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedConsultation, setSelectedConsultation] =
+    useState<Consultation | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showAppointmentModal, setShowAppointmentModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [statusActionLoading, setStatusActionLoading] = useState<string | null>(null);
+  const [savingAppointment, setSavingAppointment] = useState(false);
+  const resetAppointmentForm = () => {
+    setAppointmentData(createEmptyAppointmentData());
+    setForm100File(null);
+  };
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [consultations, setConsultations] = useState<Consultation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Appointment form state
+  const [appointmentData, setAppointmentData] = useState(createEmptyAppointmentData);
+  const [form100File, setForm100File] =
+    useState<DocumentPicker.DocumentPickerAsset | null>(null);
 
   // Fetch consultations from API
   useEffect(() => {
@@ -138,47 +152,243 @@ export default function DoctorAppointments() {
     inProgress: consultations.filter((c) => c.status === "in-progress").length,
   };
 
+  const updateConsultationState = (updated: Consultation) => {
+    setConsultations((prev) =>
+      prev.map((item) => (item.id === updated.id ? updated : item))
+    );
+  };
+
+  const buildFileUrl = (filePath?: string | null) => {
+    if (!filePath) {
+      return null;
+    }
+    if (filePath.startsWith("http")) {
+      return filePath;
+    }
+    const base = apiService.getBaseURL();
+    const normalized = filePath.startsWith("/")
+      ? filePath.slice(1)
+      : filePath;
+    return `${base}/${normalized}`;
+  };
+
+  const openForm100File = (filePath?: string | null) => {
+    const url = buildFileUrl(filePath);
+    if (!url) {
+      Alert.alert("ფაილი ვერ მოიძებნა");
+      return;
+    }
+    Linking.openURL(url).catch(() =>
+      Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა")
+    );
+  };
+
+  const handlePickForm100File = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["application/pdf", "image/*"],
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled) {
+        return;
+      }
+
+      const asset = result.assets?.[0];
+      if (!asset) {
+        return;
+      }
+
+      if (asset.size && asset.size > FORM100_MAX_FILE_SIZE) {
+        Alert.alert(
+          "ფაილი ძალიან დიდია",
+          "მაქსიმუმ 5MB ზომის PDF ან გამოსახულება აირჩიეთ."
+        );
+        return;
+      }
+
+      setForm100File(asset);
+    } catch (error) {
+      console.error("Failed to pick Form 100 file", error);
+      Alert.alert("შეცდომა", "ფორმა 100-ის ატვირთვა ვერ მოხერხდა");
+    }
+  };
+
   const openDetails = (consultation: Consultation) => {
     setSelectedConsultation(consultation);
     setShowDetailsModal(true);
   };
 
-  const openFollowUp = (consultation: Consultation) => {
-    setSelectedConsultation(consultation);
-    setShowFollowUpModal(true);
-  };
-
   const openAppointment = (consultation: Consultation) => {
     setSelectedConsultation(consultation);
+    const summary = consultation.consultationSummary;
+    let followUpTime = "";
+    if (consultation.followUp?.date) {
+      const followUpDate = new Date(consultation.followUp.date);
+      if (!Number.isNaN(followUpDate.getTime())) {
+        followUpTime = followUpDate.toISOString().split("T")[1]?.slice(0, 5) || "";
+      }
+    }
+    setAppointmentData({
+      diagnosis:
+        summary?.diagnosis || consultation.diagnosis || "",
+      symptoms:
+        summary?.symptoms || consultation.symptoms || "",
+      bloodPressure: summary?.vitals?.bloodPressure || "",
+      heartRate: summary?.vitals?.heartRate || "",
+      temperature: summary?.vitals?.temperature || "",
+      weight: summary?.vitals?.weight || "",
+      medications: summary?.medications || "",
+      notes: summary?.notes || "",
+      followUpRequired: consultation.followUp?.required ?? false,
+      followUpDate: consultation.followUp?.date
+        ? consultation.followUp?.date.split("T")[0]
+        : "",
+      followUpTime,
+      followUpReason: consultation.followUp?.reason || "",
+    });
+    setForm100File(null);
     setShowAppointmentModal(true);
   };
 
-  const handleSaveAppointment = () => {
-    // Validate required fields
+  const handleSaveAppointment = async () => {
+    if (!selectedConsultation) {
+      return;
+    }
+
     if (!appointmentData.diagnosis.trim()) {
       alert("გთხოვთ შეიყვანოთ დიაგნოზი");
       return;
     }
 
-    console.log("Saving appointment data:", appointmentData);
-    // Here you would save to backend
-    setShowAppointmentModal(false);
-    setShowSuccessModal(true);
+    if (
+      appointmentData.followUpRequired &&
+      (!appointmentData.followUpDate.trim() ||
+        !appointmentData.followUpTime.trim())
+    ) {
+      alert("გთხოვთ მიუთითოთ განმეორებითი ვიზიტის თარიღი და დრო");
+      return;
+    }
 
-    // Reset form
-    setAppointmentData({
-      diagnosis: "",
-      symptoms: "",
-      bloodPressure: "",
-      heartRate: "",
-      temperature: "",
-      weight: "",
-      medications: "",
-      followUpRequired: false,
-      followUpDate: "",
-      followUpReason: "",
-      notes: "",
-    });
+    try {
+      setSavingAppointment(true);
+
+      const payload = {
+        status: "completed" as const,
+        consultationSummary: {
+          diagnosis: appointmentData.diagnosis.trim(),
+          symptoms: appointmentData.symptoms.trim() || undefined,
+          medications: appointmentData.medications.trim() || undefined,
+          notes: appointmentData.notes.trim() || undefined,
+          vitals: {
+            bloodPressure: appointmentData.bloodPressure.trim() || undefined,
+            heartRate: appointmentData.heartRate.trim() || undefined,
+            temperature: appointmentData.temperature.trim() || undefined,
+            weight: appointmentData.weight.trim() || undefined,
+          },
+        },
+        followUp: appointmentData.followUpRequired
+          ? {
+              required: true,
+              date: appointmentData.followUpDate
+                ? new Date(appointmentData.followUpDate).toISOString()
+                : undefined,
+              reason: appointmentData.followUpReason.trim() || undefined,
+            }
+          : { required: false },
+      };
+
+      let latestConsultation: Consultation | null = selectedConsultation;
+
+      const response = await apiService.updateDoctorAppointment(
+        selectedConsultation.id,
+        payload
+      );
+
+      if (response.success && response.data) {
+        latestConsultation = response.data as Consultation;
+        updateConsultationState(latestConsultation);
+      }
+
+      if (
+        appointmentData.followUpRequired &&
+        appointmentData.followUpDate.trim() &&
+        appointmentData.followUpTime.trim()
+      ) {
+        const followUpResponse = await apiService.scheduleFollowUpAppointment(
+          selectedConsultation.id,
+          {
+            date: appointmentData.followUpDate.trim(),
+            time: appointmentData.followUpTime.trim(),
+            reason: appointmentData.followUpReason.trim() || undefined,
+          }
+        );
+
+        if (followUpResponse.success && followUpResponse.data) {
+          setConsultations((prev) => [
+            followUpResponse.data as Consultation,
+            ...prev,
+          ]);
+        }
+      }
+
+      if (form100File) {
+        const formResponse = await apiService.uploadForm100Document(
+          selectedConsultation.id,
+          {
+            diagnosis: appointmentData.diagnosis.trim() || undefined,
+          },
+          form100File
+            ? {
+                uri: form100File.uri,
+                name: form100File.name,
+                mimeType: form100File.mimeType,
+              }
+            : undefined
+        );
+
+        if (formResponse.success && formResponse.data) {
+          latestConsultation = formResponse.data as Consultation;
+          updateConsultationState(latestConsultation);
+        }
+      }
+
+      if (latestConsultation) {
+        setSelectedConsultation(latestConsultation);
+      }
+
+      setShowAppointmentModal(false);
+      setShowSuccessModal(true);
+      resetAppointmentForm();
+    } catch (error: any) {
+      console.error("Failed to save appointment summary", error);
+      alert(
+        error?.message || "დანიშნულების შენახვა ვერ მოხერხდა, სცადეთ თავიდან"
+      );
+    } finally {
+      setSavingAppointment(false);
+    }
+  };
+
+  const handleStatusUpdate = async (
+    consultation: Consultation,
+    nextStatus: "in-progress" | "cancelled"
+  ) => {
+    try {
+      setStatusActionLoading(`${consultation.id}-${nextStatus}`);
+      const response = await apiService.updateDoctorAppointment(
+        consultation.id,
+        { status: nextStatus }
+      );
+      if (response.success && response.data) {
+        updateConsultationState(response.data as Consultation);
+      }
+    } catch (error: any) {
+      console.error("Failed to update appointment status", error);
+      alert(error?.message || "სტატუსის განახლება ვერ მოხერხდა");
+    } finally {
+      setStatusActionLoading(null);
+    }
   };
 
   if (loading) {
@@ -487,15 +697,18 @@ export default function DoctorAppointments() {
                       <Text style={styles.infoText}>{consultation.time}</Text>
                     </View>
                   </View>
-                  {consultation.symptoms && (
+                  {(consultation.consultationSummary?.symptoms ||
+                    consultation.symptoms) && (
                     <View style={styles.symptomsRow}>
                       <Ionicons name="medical" size={16} color="#6B7280" />
                       <Text style={styles.symptomsText}>
-                        {consultation.symptoms}
+                        {consultation.consultationSummary?.symptoms ||
+                          consultation.symptoms}
                       </Text>
                     </View>
                   )}
-                  {consultation.diagnosis && (
+                  {(consultation.consultationSummary?.diagnosis ||
+                    consultation.diagnosis) && (
                     <View style={styles.diagnosisRow}>
                       <MaterialCommunityIcons
                         name="file-document"
@@ -503,7 +716,8 @@ export default function DoctorAppointments() {
                         color="#10B981"
                       />
                       <Text style={styles.diagnosisText}>
-                        {consultation.diagnosis}
+                        {consultation.consultationSummary?.diagnosis ||
+                          consultation.diagnosis}
                       </Text>
                     </View>
                   )}
@@ -578,31 +792,69 @@ export default function DoctorAppointments() {
                   </View>
                 )}
 
-                {/* Completed Action Buttons */}
-                {consultation.status === "completed" && (
-                  <View style={styles.completedButtonsRow}>
+                {/* Status Actions */}
+                <View style={styles.statusActionsRow}>
+                  {consultation.status === "scheduled" && (
                     <TouchableOpacity
-                      style={styles.appointmentButton}
+                      style={styles.statusActionButton}
+                      onPress={() =>
+                        handleStatusUpdate(consultation, "in-progress")
+                      }
+                      disabled={
+                        statusActionLoading ===
+                        `${consultation.id}-in-progress`
+                      }
+                    >
+                      <Ionicons
+                        name="play"
+                        size={16}
+                        color="#2563EB"
+                      />
+                      <Text style={styles.statusActionText}>
+                        დაწყება
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+
+                  {consultation.status !== "cancelled" && (
+                    <TouchableOpacity
+                      style={styles.statusActionButtonPrimary}
                       onPress={() => openAppointment(consultation)}
+                      disabled={savingAppointment}
                     >
                       <Ionicons
                         name="document-text"
-                        size={18}
-                        color="#8B5CF6"
+                        size={16}
+                        color="#FFFFFF"
                       />
-                      <Text style={styles.appointmentText}>დანიშნულება</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.followUpButton}
-                      onPress={() => openFollowUp(consultation)}
-                    >
-                      <Ionicons name="add-circle" size={18} color="#06B6D4" />
-                      <Text style={styles.followUpText}>
-                        განმეორებითი კონსულტაცია
+                      <Text style={styles.statusActionPrimaryText}>
+                        {consultation.consultationSummary
+                          ? "რედაქტირება"
+                          : consultation.status === "completed"
+                            ? "რედაქტირება"
+                            : "დასრულება"}
                       </Text>
                     </TouchableOpacity>
-                  </View>
-                )}
+                  )}
+
+                  {consultation.status !== "cancelled" && (
+                    <TouchableOpacity
+                      style={styles.statusActionButton}
+                      onPress={() =>
+                        handleStatusUpdate(consultation, "cancelled")
+                      }
+                      disabled={
+                        statusActionLoading ===
+                        `${consultation.id}-cancelled`
+                      }
+                    >
+                      <Ionicons name="close" size={16} color="#DC2626" />
+                      <Text style={[styles.statusActionText, { color: "#DC2626" }]}>
+                        გაუქმება
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
 
                 <View style={styles.consultationFooter}>
                   <View style={styles.feeRow}>
@@ -702,6 +954,121 @@ export default function DoctorAppointments() {
                   </View>
                 )}
 
+                {selectedConsultation.consultationSummary?.medications && (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailLabel}>
+                      დანიშნული მედიკამენტები
+                    </Text>
+                    <Text style={styles.detailValue}>
+                      {selectedConsultation.consultationSummary.medications}
+                    </Text>
+                  </View>
+                )}
+
+                {selectedConsultation.consultationSummary?.notes && (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailLabel}>შენიშვნები</Text>
+                    <Text style={styles.detailValue}>
+                      {selectedConsultation.consultationSummary.notes}
+                    </Text>
+                  </View>
+                )}
+
+                {selectedConsultation.consultationSummary?.vitals && (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailLabel}>ვიტალური ნიშნები</Text>
+                    <View style={styles.vitalSignsGrid}>
+                      {selectedConsultation.consultationSummary.vitals
+                        .bloodPressure ? (
+                        <View style={styles.vitalSignCard}>
+                          <Text style={styles.vitalSignLabel}>
+                            არტერიული წნევა
+                          </Text>
+                          <Text style={styles.vitalSignValue}>
+                            {
+                              selectedConsultation.consultationSummary.vitals
+                                .bloodPressure
+                            }
+                          </Text>
+                        </View>
+                      ) : null}
+                      {selectedConsultation.consultationSummary.vitals
+                        .heartRate ? (
+                        <View style={styles.vitalSignCard}>
+                          <Text style={styles.vitalSignLabel}>პულსი</Text>
+                          <Text style={styles.vitalSignValue}>
+                            {
+                              selectedConsultation.consultationSummary.vitals
+                                .heartRate
+                            }
+                          </Text>
+                        </View>
+                      ) : null}
+                      {selectedConsultation.consultationSummary.vitals
+                        .temperature ? (
+                        <View style={styles.vitalSignCard}>
+                          <Text style={styles.vitalSignLabel}>ტემპერატურა</Text>
+                          <Text style={styles.vitalSignValue}>
+                            {
+                              selectedConsultation.consultationSummary.vitals
+                                .temperature
+                            }
+                          </Text>
+                        </View>
+                      ) : null}
+                      {selectedConsultation.consultationSummary.vitals.weight ? (
+                        <View style={styles.vitalSignCard}>
+                          <Text style={styles.vitalSignLabel}>წონა</Text>
+                          <Text style={styles.vitalSignValue}>
+                            {
+                              selectedConsultation.consultationSummary.vitals
+                                .weight
+                            }
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  </View>
+                )}
+
+                {selectedConsultation.followUp?.required && (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailLabel}>განმეორებითი ვიზიტი</Text>
+                    {selectedConsultation.followUp.date && (
+                      <Text style={styles.detailValue}>
+                        {selectedConsultation.followUp.date.split("T")[0]}
+                      </Text>
+                    )}
+                    {selectedConsultation.followUp.reason && (
+                      <Text style={styles.detailSubValue}>
+                        {selectedConsultation.followUp.reason}
+                      </Text>
+                    )}
+                  </View>
+                )}
+
+                {selectedConsultation.form100?.pdfUrl && (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailLabel}>ფორმა 100</Text>
+                    <TouchableOpacity
+                      style={styles.viewFileButton}
+                      onPress={() =>
+                        openForm100File(selectedConsultation.form100?.pdfUrl)
+                      }
+                    >
+                      <Ionicons
+                        name="document-text"
+                        size={18}
+                        color="#4C1D95"
+                      />
+                      <Text style={styles.viewFileButtonText}>
+                        {selectedConsultation.form100?.fileName ||
+                          "ფაილის ნახვა"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
                 <View style={styles.detailSection}>
                   <Text style={styles.detailLabel}>ანაზღაურება</Text>
                   <Text style={styles.detailValue}>
@@ -742,93 +1109,6 @@ export default function DoctorAppointments() {
                 onPress={() => setShowDetailsModal(false)}
               >
                 <Text style={styles.modalButtonText}>დახურვა</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Follow-up Modal */}
-      <Modal
-        visible={showFollowUpModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowFollowUpModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>განმეორებითი კონსულტაცია</Text>
-              <TouchableOpacity
-                onPress={() => setShowFollowUpModal(false)}
-                style={styles.closeButton}
-              >
-                <Ionicons name="close" size={24} color="#6B7280" />
-              </TouchableOpacity>
-            </View>
-
-            {selectedConsultation && (
-              <ScrollView style={styles.modalBody}>
-                <View style={styles.followUpInfo}>
-                  <Ionicons
-                    name="information-circle"
-                    size={24}
-                    color="#06B6D4"
-                  />
-                  <Text style={styles.followUpInfoText}>
-                    განმეორებითი კონსულტაციის დაჯავშნა პაციენტისთვის:{" "}
-                    <Text style={styles.followUpInfoBold}>
-                      {selectedConsultation.patientName}
-                    </Text>
-                  </Text>
-                </View>
-
-                <View style={styles.formSection}>
-                  <Text style={styles.formLabel}>აირჩიეთ თარიღი</Text>
-                  <TouchableOpacity style={styles.datePickerButton}>
-                    <Ionicons name="calendar" size={20} color="#6B7280" />
-                    <Text style={styles.datePickerText}>აირჩიეთ თარიღი</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.formSection}>
-                  <Text style={styles.formLabel}>აირჩიეთ დრო</Text>
-                  <TouchableOpacity style={styles.datePickerButton}>
-                    <Ionicons name="time" size={20} color="#6B7280" />
-                    <Text style={styles.datePickerText}>აირჩიეთ დრო</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.formSection}>
-                  <Text style={styles.formLabel}>
-                    შენიშვნები (არასავალდებულო)
-                  </Text>
-                  <TextInput
-                    style={styles.notesInput}
-                    placeholder="დამატებითი ინფორმაცია..."
-                    placeholderTextColor="#9CA3AF"
-                    multiline
-                    numberOfLines={4}
-                  />
-                </View>
-              </ScrollView>
-            )}
-
-            <View style={styles.modalFooter}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonSecondary]}
-                onPress={() => setShowFollowUpModal(false)}
-              >
-                <Text style={styles.modalButtonTextSecondary}>გაუქმება</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonPrimary]}
-                onPress={() => {
-                  setShowFollowUpModal(false);
-                  // TODO: Add booking logic
-                }}
-              >
-                <Text style={styles.modalButtonTextPrimary}>დაჯავშნა</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1004,20 +1284,37 @@ export default function DoctorAppointments() {
 
                 {appointmentData.followUpRequired && (
                   <>
-                    <View style={styles.formSection}>
-                      <Text style={styles.formLabel}>თარიღი</Text>
-                      <TextInput
-                        style={styles.textInput}
-                        placeholder="2024-11-20"
-                        placeholderTextColor="#9CA3AF"
-                        value={appointmentData.followUpDate}
-                        onChangeText={(text) =>
-                          setAppointmentData({
-                            ...appointmentData,
-                            followUpDate: text,
-                          })
-                        }
-                      />
+                    <View style={styles.formRow}>
+                      <View style={styles.formFieldHalf}>
+                        <Text style={styles.formLabel}>თარიღი</Text>
+                        <TextInput
+                          style={styles.textInput}
+                          placeholder="2024-11-20"
+                          placeholderTextColor="#9CA3AF"
+                          value={appointmentData.followUpDate}
+                          onChangeText={(text) =>
+                            setAppointmentData({
+                              ...appointmentData,
+                              followUpDate: text,
+                            })
+                          }
+                        />
+                      </View>
+                      <View style={styles.formFieldHalf}>
+                        <Text style={styles.formLabel}>დრო</Text>
+                        <TextInput
+                          style={styles.textInput}
+                          placeholder="14:30"
+                          placeholderTextColor="#9CA3AF"
+                          value={appointmentData.followUpTime}
+                          onChangeText={(text) =>
+                            setAppointmentData({
+                              ...appointmentData,
+                              followUpTime: text,
+                            })
+                          }
+                        />
+                      </View>
                     </View>
                     <View style={styles.formSection}>
                       <Text style={styles.formLabel}>მიზეზი</Text>
@@ -1054,6 +1351,59 @@ export default function DoctorAppointments() {
                     setAppointmentData({ ...appointmentData, notes: text })
                   }
                 />
+              </View>
+
+              <View style={styles.formSection}>
+                <Text style={styles.formLabel}>ფორმა 100 ფაილი</Text>
+                {selectedConsultation?.form100?.pdfUrl ? (
+                  <TouchableOpacity
+                    style={styles.existingFileButton}
+                    onPress={() =>
+                      openForm100File(selectedConsultation.form100?.pdfUrl)
+                    }
+                  >
+                    <Ionicons
+                      name="document-text"
+                      size={18}
+                      color="#4C1D95"
+                    />
+                    <Text style={styles.existingFileText}>
+                      {selectedConsultation.form100?.fileName ||
+                        "არსებული ფაილის ნახვა"}
+                    </Text>
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={styles.selectedFileHint}>
+                    ჯერ არ არის ატვირთული ფორმა 100
+                  </Text>
+                )}
+                <TouchableOpacity
+                  style={styles.uploadButton}
+                  onPress={handlePickForm100File}
+                >
+                  <Ionicons
+                    name="cloud-upload-outline"
+                    size={18}
+                    color="#06B6D4"
+                  />
+                  <Text style={styles.uploadButtonText}>
+                    {form100File?.name || "აირჩიეთ PDF ან გამოსახულება"}
+                  </Text>
+                </TouchableOpacity>
+                {form100File ? (
+                  <>
+                    <Text style={styles.selectedFileHint}>
+                      ახალი ფაილი აიტვირთება შენახვისას
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.removeFileButton}
+                      onPress={() => setForm100File(null)}
+                    >
+                      <Ionicons name="close-circle" size={16} color="#EF4444" />
+                      <Text style={styles.removeFileText}>ფაილის წაშლა</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : null}
               </View>
             </ScrollView>
 
@@ -1421,24 +1771,6 @@ const styles = StyleSheet.create({
   paymentTextPending: {
     color: "#F59E0B",
   },
-  followUpButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: "#E6FFFA",
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#06B6D4",
-  },
-  followUpText: {
-    fontSize: 14,
-    fontFamily: "Poppins-SemiBold",
-    color: "#06B6D4",
-    flexShrink: 1,
-    textAlign: "center",
-  },
   reminderSection: {
     marginTop: 12,
     gap: 10,
@@ -1600,26 +1932,31 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins-SemiBold",
     color: "#FFFFFF",
   },
-  followUpInfo: {
-    flexDirection: "row",
-    gap: 12,
-    padding: 16,
-    backgroundColor: "#F0FDFA",
-    borderRadius: 12,
+  formSection: {
     marginBottom: 20,
   },
-  followUpInfoText: {
+  vitalSignsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  vitalSignCard: {
     flex: 1,
-    fontSize: 14,
+    minWidth: "45%",
+    backgroundColor: "#F9FAFB",
+    borderRadius: 12,
+    padding: 12,
+  },
+  vitalSignLabel: {
+    fontSize: 12,
     fontFamily: "Poppins-Regular",
     color: "#6B7280",
   },
-  followUpInfoBold: {
+  vitalSignValue: {
+    fontSize: 16,
     fontFamily: "Poppins-SemiBold",
-    color: "#06B6D4",
-  },
-  formSection: {
-    marginBottom: 20,
+    color: "#1F2937",
+    marginTop: 4,
   },
   formLabel: {
     fontSize: 14,
@@ -1627,57 +1964,45 @@ const styles = StyleSheet.create({
     color: "#1F2937",
     marginBottom: 8,
   },
-  datePickerButton: {
+  statusActionsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  statusActionButton: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    backgroundColor: "#F9FAFB",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 12,
-    padding: 16,
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: "#F3F4F6",
   },
-  datePickerText: {
-    fontSize: 16,
-    fontFamily: "Poppins-Regular",
-    color: "#6B7280",
+  statusActionText: {
+    fontSize: 13,
+    fontFamily: "Poppins-Medium",
+    color: "#2563EB",
   },
-  notesInput: {
-    backgroundColor: "#F9FAFB",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    fontFamily: "Poppins-Regular",
-    color: "#1F2937",
-    textAlignVertical: "top",
-    minHeight: 100,
-  },
-  // New appointment form styles
-  completedButtonsRow: {
-    flexDirection: "column",
-    gap: 10,
-    width: "100%",
-    marginTop: 8,
-    marginBottom: 12,
-  },
-  appointmentButton: {
+  statusActionButtonPrimary: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    backgroundColor: "#F3E8FF",
-    borderRadius: 12,
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "#8B5CF6",
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: "#8B5CF6",
+    shadowColor: "#8B5CF6",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  appointmentText: {
-    fontSize: 15,
+  statusActionPrimaryText: {
+    fontSize: 13,
     fontFamily: "Poppins-SemiBold",
-    color: "#8B5CF6",
+    color: "#FFFFFF",
   },
   textInput: {
     backgroundColor: "#F9FAFB",
@@ -1688,6 +2013,72 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Poppins-Regular",
     color: "#1F2937",
+  },
+  uploadButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#BAE6FD",
+    backgroundColor: "#ECFEFF",
+  },
+  uploadButtonText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#0369A1",
+  },
+  selectedFileHint: {
+    marginTop: 8,
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+  },
+  removeFileButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 8,
+  },
+  removeFileText: {
+    fontSize: 13,
+    fontFamily: "Poppins-Medium",
+    color: "#EF4444",
+  },
+  existingFileButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    backgroundColor: "#F5F3FF",
+    borderWidth: 1,
+    borderColor: "#DDD6FE",
+    marginBottom: 8,
+  },
+  existingFileText: {
+    fontSize: 13,
+    fontFamily: "Poppins-Medium",
+    color: "#4C1D95",
+  },
+  viewFileButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: "#F5F3FF",
+    alignSelf: "flex-start",
+    marginTop: 8,
+  },
+  viewFileButtonText: {
+    fontSize: 13,
+    fontFamily: "Poppins-Medium",
+    color: "#4C1D95",
   },
   formRow: {
     flexDirection: "row",

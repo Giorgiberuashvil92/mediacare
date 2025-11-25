@@ -37,21 +37,21 @@ const Cart = () => {
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
           <Ionicons name="arrow-back" size={24} color="#333333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Cart</Text>
+        <Text style={styles.headerTitle}>კალათა</Text>
         <View style={styles.placeholder} />
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Cart Items Count */}
-        <Text style={styles.itemsCount}>{getTotalItems()} items in cart</Text>
+        <Text style={styles.itemsCount}>{getTotalItems()} პროდუქტი კალათაში</Text>
 
         {/* Cart Items */}
         {cartItems.length === 0 ? (
           <View style={styles.emptyCart}>
             <Ionicons name="cart-outline" size={80} color="#CCCCCC" />
-            <Text style={styles.emptyCartText}>Your cart is empty</Text>
+            <Text style={styles.emptyCartText}>შენი კალათა ცარიელია</Text>
             <Text style={styles.emptyCartSubtext}>
-              Add some products to get started
+              დაამატე პროდუქტები დასაწყებად
             </Text>
           </View>
         ) : (
@@ -118,21 +118,21 @@ const Cart = () => {
         {/* Order Summary */}
         {cartItems.length > 0 && (
           <View style={styles.orderSummary}>
-            <Text style={styles.orderSummaryTitle}>Order Summary</Text>
+            <Text style={styles.orderSummaryTitle}>შემდეგი რომელიც უნდა გავაგრძელოთ</Text>
 
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Sub total</Text>
+              <Text style={styles.summaryLabel}>თანხა სრულად</Text>
               <Text style={styles.summaryValue}>${getTotalPrice()}</Text>
             </View>
 
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Delivery charge</Text>
-              <Text style={styles.summaryValue}>$0</Text>
+              <Text style={styles.summaryLabel}>მიტანის საკომისიო</Text>
+              <Text style={styles.summaryValue}>0</Text>
             </View>
 
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Tax (if applicable)</Text>
-              <Text style={styles.summaryValue}>$0</Text>
+              <Text style={styles.summaryLabel}>Tax</Text>
+              <Text style={styles.summaryValue}>0</Text>
             </View>
 
             <View style={styles.divider} />

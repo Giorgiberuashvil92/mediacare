@@ -382,37 +382,52 @@ export class ShopService {
   }
 
   async getOverview() {
-    const [rawLaboratory, rawEquipmentCategories] = await Promise.all([
-      this.productModel
-        .find({
-          type: ShopProductType.LABORATORY,
-          isActive: true,
-        })
-        .sort({ order: 1, createdAt: -1 })
-        .limit(20)
-        .lean(),
-      this.categoryModel
-        .find({
-          type: ShopCategoryType.EQUIPMENT,
-          isActive: true,
-        })
-        .sort({ order: 1, createdAt: -1 })
-        .lean(),
-    ]);
+    const [rawLaboratory, rawEquipmentCategories, rawLaboratoryCategories] =
+      await Promise.all([
+        this.productModel
+          .find({
+            type: ShopProductType.LABORATORY,
+            isActive: true,
+          })
+          .sort({ order: 1, createdAt: -1 })
+          .limit(20)
+          .lean(),
+        this.categoryModel
+          .find({
+            type: ShopCategoryType.EQUIPMENT,
+            isActive: true,
+          })
+          .sort({ order: 1, createdAt: -1 })
+          .lean(),
+        this.categoryModel
+          .find({
+            type: ShopCategoryType.LABORATORY,
+            isActive: true,
+          })
+          .sort({ order: 1, createdAt: -1 })
+          .lean(),
+      ]);
     const laboratoryProducts =
       rawLaboratory as unknown as ProductLeanDocument[];
     const equipmentCategories =
       rawEquipmentCategories as unknown as CategoryLeanDocument[];
+    const laboratoryCategories =
+      rawLaboratoryCategories as unknown as CategoryLeanDocument[];
 
-    const categoryIds = equipmentCategories.map((category) => category._id);
+    const equipmentCategoryIds = equipmentCategories.map(
+      (category) => category._id,
+    );
+    const laboratoryCategoryIds = laboratoryCategories.map(
+      (category) => category._id,
+    );
 
     let equipmentProductsByCategory: Record<string, FormattedProduct[]> = {};
-    if (categoryIds.length) {
+    if (equipmentCategoryIds.length) {
       const equipmentProducts = (await this.productModel
         .find({
           type: ShopProductType.EQUIPMENT,
           isActive: true,
-          category: { $in: categoryIds },
+          category: { $in: equipmentCategoryIds },
         })
         .sort({ order: 1, createdAt: -1 })
         .lean()) as unknown as ProductLeanDocument[];
@@ -431,12 +446,46 @@ export class ShopService {
       );
     }
 
-    const formattedCategories = equipmentCategories.map((category) => {
+    let laboratoryProductsByCategory: Record<string, FormattedProduct[]> = {};
+    if (laboratoryCategoryIds.length) {
+      const labProducts = (await this.productModel
+        .find({
+          type: ShopProductType.LABORATORY,
+          isActive: true,
+          category: { $in: laboratoryCategoryIds },
+        })
+        .sort({ order: 1, createdAt: -1 })
+        .lean()) as unknown as ProductLeanDocument[];
+
+      laboratoryProductsByCategory = labProducts.reduce(
+        (acc: Record<string, FormattedProduct[]>, product) => {
+          const key =
+            this.normalizeObjectIdToString(product.category) || 'uncategorized';
+          if (!acc[key]) {
+            acc[key] = [];
+          }
+          acc[key].push(this.formatProduct(product));
+          return acc;
+        },
+        {} as Record<string, FormattedProduct[]>,
+      );
+    }
+
+    const formattedEquipmentCategories = equipmentCategories.map((category) => {
       const formattedCategory = this.formatCategory(category);
       formattedCategory.products =
         equipmentProductsByCategory[formattedCategory.id] || [];
       return formattedCategory;
     });
+
+    const formattedLaboratoryCategories = laboratoryCategories.map(
+      (category) => {
+        const formattedCategory = this.formatCategory(category);
+        formattedCategory.products =
+          laboratoryProductsByCategory[formattedCategory.id] || [];
+        return formattedCategory;
+      },
+    );
 
     return {
       success: true,
@@ -444,7 +493,8 @@ export class ShopService {
         laboratoryProducts: laboratoryProducts.map((product) =>
           this.formatProduct(product),
         ),
-        equipmentCategories: formattedCategories,
+        laboratoryCategories: formattedLaboratoryCategories,
+        equipmentCategories: formattedEquipmentCategories,
       },
     };
   }

@@ -16,7 +16,7 @@ const Search = () => {
         />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search by Doctor name or department"
+          placeholder="მოძებნე ექიმი"
           placeholderTextColor="#8E8E93"
           value={searchText}
           onChangeText={setSearchText}

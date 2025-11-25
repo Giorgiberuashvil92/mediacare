@@ -7,53 +7,22 @@ import {
   View,
 } from "react-native";
 
-interface DoctorFiltersProps {
-  selectedFilter: number;
-  onFilterChange: (filterId: number) => void;
+export interface DoctorFilterOption {
+  id: string;
+  name: string;
+  fallback?: boolean;
 }
 
-const doctorFilters = [
-  {
-    id: 1,
-    name: "All Doctors",
-  },
-  {
-    id: 2,
-    name: "Neurology",
-  },
-  {
-    id: 3,
-    name: "Cardiology",
-  },
-  {
-    id: 4,
-    name: "Gynecology",
-  },
-  {
-    id: 5,
-    name: "Pediatrics",
-  },
-  {
-    id: 6,
-    name: "Allergy",
-  },
-  {
-    id: 7,
-    name: "Dentist",
-  },
-  {
-    id: 8,
-    name: "Urology",
-  },
-  {
-    id: 9,
-    name: "Gastrology",
-  },
-];
+interface DoctorFiltersProps {
+  selectedFilter: string;
+  onFilterChange: (filterId: string) => void;
+  filters?: DoctorFilterOption[];
+}
 
 const DoctorFilters: React.FC<DoctorFiltersProps> = ({
   selectedFilter,
   onFilterChange,
+  filters = [{ id: "all", name: "All Doctors" }],
 }) => {
   return (
     <View style={styles.container}>
@@ -62,7 +31,7 @@ const DoctorFilters: React.FC<DoctorFiltersProps> = ({
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {doctorFilters.map((filter) => (
+        {filters.map((filter) => (
           <TouchableOpacity
             key={filter.id}
             style={[

@@ -6,6 +6,7 @@ import * as path from 'path';
 export class UploadService {
   private readonly uploadDir = path.join(process.cwd(), 'uploads', 'licenses');
   private readonly imagesDir = path.join(process.cwd(), 'uploads', 'images');
+  private readonly formsDir = path.join(process.cwd(), 'uploads', 'forms');
 
   constructor() {
     // Ensure upload directories exist
@@ -14,6 +15,9 @@ export class UploadService {
     }
     if (!fs.existsSync(this.imagesDir)) {
       fs.mkdirSync(this.imagesDir, { recursive: true });
+    }
+    if (!fs.existsSync(this.formsDir)) {
+      fs.mkdirSync(this.formsDir, { recursive: true });
     }
   }
 
@@ -55,6 +59,27 @@ export class UploadService {
     return `uploads/images/${fileName}`;
   }
 
+  saveFormDocument(file: Express.Multer.File): string {
+    if (!this.validateFormDocument(file)) {
+      throw new BadRequestException(
+        'Invalid file. Only PDF, JPG, JPEG, PNG files up to 5MB are allowed.',
+      );
+    }
+
+    const timestamp = Date.now();
+    const fileName = `${timestamp}-${file.originalname}`;
+    const filePath = path.join(this.formsDir, fileName);
+    fs.writeFileSync(filePath, file.buffer);
+    return `uploads/forms/${fileName}`;
+  }
+
+  deleteFormDocument(filePath: string): void {
+    const fullPath = path.join(process.cwd(), filePath);
+    if (fs.existsSync(fullPath)) {
+      fs.unlinkSync(fullPath);
+    }
+  }
+
   validateLicenseFile(file: Express.Multer.File): boolean {
     // Allowed mime types
     const allowedTypes = [
@@ -94,5 +119,9 @@ export class UploadService {
     }
 
     return true;
+  }
+
+  validateFormDocument(file: Express.Multer.File): boolean {
+    return this.validateLicenseFile(file);
   }
 }

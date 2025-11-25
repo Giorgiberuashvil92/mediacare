@@ -6,6 +6,7 @@ export type AppointmentDocument = Appointment & Document;
 export enum AppointmentStatus {
   PENDING = 'pending',
   CONFIRMED = 'confirmed',
+  IN_PROGRESS = 'in-progress',
   COMPLETED = 'completed',
   CANCELLED = 'cancelled',
   BLOCKED = 'blocked', // დროებით დაბლოკილი time slot
@@ -70,6 +71,77 @@ export class Appointment {
 
   @Prop()
   notes?: string;
+
+  @Prop({
+    type: {
+      diagnosis: String,
+      symptoms: String,
+      vitals: {
+        bloodPressure: String,
+        heartRate: String,
+        temperature: String,
+        weight: String,
+      },
+      medications: String,
+      notes: String,
+    },
+    _id: false,
+  })
+  consultationSummary?: {
+    diagnosis?: string;
+    symptoms?: string;
+    vitals?: {
+      bloodPressure?: string;
+      heartRate?: string;
+      temperature?: string;
+      weight?: string;
+    };
+    medications?: string;
+    notes?: string;
+  };
+
+  @Prop({
+    type: {
+      required: { type: Boolean, default: false },
+      date: Date,
+      reason: String,
+      appointmentId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Appointment',
+      },
+    },
+    _id: false,
+  })
+  followUp?: {
+    required: boolean;
+    date?: Date;
+    reason?: string;
+    appointmentId?: mongoose.Types.ObjectId;
+  };
+
+  @Prop({
+    type: {
+      id: String,
+      issueDate: Date,
+      validUntil: Date,
+      reason: String,
+      diagnosis: String,
+      recommendations: String,
+      pdfUrl: String,
+      fileName: String,
+    },
+    _id: false,
+  })
+  form100?: {
+    id?: string;
+    issueDate?: Date;
+    validUntil?: Date;
+    reason?: string;
+    diagnosis?: string;
+    recommendations?: string;
+    pdfUrl?: string;
+    fileName?: string;
+  };
 
   @Prop()
   expiresAt?: Date; // დროებით blocked appointments-ებისთვის

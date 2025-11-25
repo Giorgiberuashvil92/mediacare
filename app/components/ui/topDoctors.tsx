@@ -1,5 +1,5 @@
 import { useFavorites } from "@/app/contexts/FavoritesContext";
-import { apiService } from "@/app/services/api";
+import { apiService, Specialization } from "@/app/services/api";
 import Fontisto from "@expo/vector-icons/Fontisto";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
@@ -14,7 +14,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import DoctorFilters from "../shared/doctorFilters";
+import DoctorFilters, {
+  DoctorFilterOption,
+} from "../shared/doctorFilters";
 import SeeAll from "../shared/seeAll";
 
 const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
@@ -54,16 +56,47 @@ const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
 };
 
 const TopDoctors = () => {
-  const [selectedFilter, setSelectedFilter] = useState(1);
+  const [selectedFilter, setSelectedFilter] = useState("all");
   const { isFavorite, toggleFavorite } = useFavorites();
   const [selectedDoctor, setSelectedDoctor] = useState<any>(null);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [doctors, setDoctors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [specializations, setSpecializations] = useState<Specialization[]>([]);
+  const [specLoading, setSpecLoading] = useState(true);
 
   useEffect(() => {
     loadDoctors();
-  }, [selectedFilter]);
+  }, []);
+
+  useEffect(() => {
+    const loadSpecializations = async () => {
+      try {
+        setSpecLoading(true);
+
+        if (apiService.isMockMode()) {
+          setSpecializations([]);
+          return;
+        }
+
+        const response = await apiService.getSpecializations();
+        if (response.success) {
+          setSpecializations(
+            response.data.filter((spec) => spec.isActive).slice(0, 8),
+          );
+        } else {
+          setSpecializations([]);
+        }
+      } catch (error) {
+        console.error("Failed to load specializations:", error);
+        setSpecializations([]);
+      } finally {
+        setSpecLoading(false);
+      }
+    };
+
+    loadSpecializations();
+  }, []);
 
   const loadDoctors = async () => {
     try {
@@ -101,31 +134,60 @@ const TopDoctors = () => {
     }
   };
 
-  const filteredDoctors = useMemo(() => {
-    if (selectedFilter === 1) {
-      return doctors;
-    } else {
-      // Filter by specialization
-      const filterMap: { [key: number]: string } = {
-        2: "ნევროლოგია",
-        3: "კარდიოლოგია",
-        4: "გინეკოლოგია",
-        5: "პედიატრია",
-        6: "ალერგოლოგია",
-        7: "სტომატოლოგია",
-        8: "უროლოგია",
-        9: "გასტროენტეროლოგია",
-      };
+  const fallbackFilters = useMemo<DoctorFilterOption[]>(() => {
+    const specializationSet = new Set<string>();
+    doctors.forEach((doctor) => {
+      const raw = doctor.specialization?.trim();
+      if (raw) {
+        raw.split(",").forEach((part) => {
+          const clean = part.trim();
+          if (clean) {
+            specializationSet.add(clean);
+          }
+        });
+      }
+    });
 
-      const filterSpecialization = filterMap[selectedFilter];
-      if (!filterSpecialization) return doctors;
-      
-      return doctors.filter((doctor) =>
-        doctor.specialization
-          .toLowerCase()
-          .includes(filterSpecialization.toLowerCase())
-      );
+    return Array.from(specializationSet).map((spec) => ({
+      id: spec,
+      name: spec,
+    }));
+  }, [doctors]);
+
+  const filterOptions = useMemo<DoctorFilterOption[]>(() => {
+    const specializationOptions = specializations.map((spec) => ({
+      id: spec.name,
+      name: spec.name,
+    }));
+
+    const options =
+      specializationOptions.length > 0 ? specializationOptions : fallbackFilters;
+
+    return [{ id: "all", name: "ყველა ექიმი", fallback: true }, ...options];
+  }, [specializations, fallbackFilters]);
+
+  useEffect(() => {
+    if (
+      selectedFilter !== "all" &&
+      !filterOptions.some((option) => option.id === selectedFilter)
+    ) {
+      setSelectedFilter("all");
     }
+  }, [filterOptions, selectedFilter]);
+
+  const filteredDoctors = useMemo(() => {
+    if (selectedFilter === "all") {
+      return doctors;
+    }
+
+    const target = selectedFilter.toLowerCase();
+    return doctors.filter((doctor) =>
+      doctor.specialization
+        ?.toLowerCase()
+        .split(",")
+        .map((spec) => spec.trim())
+        .some((spec) => spec.includes(target)),
+    );
   }, [selectedFilter, doctors]);
 
   const handleToggleFavorite = (doctor: any, e: any) => {
@@ -159,6 +221,7 @@ const TopDoctors = () => {
       <DoctorFilters
         selectedFilter={selectedFilter}
         onFilterChange={setSelectedFilter}
+        filters={filterOptions}
       />
       {loading ? (
         <View style={styles.loadingContainer}>
