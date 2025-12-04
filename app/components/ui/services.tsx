@@ -10,7 +10,7 @@ const QUICK_SERVICES = [
     description: "ონლაინ ექიმი 15 წთ-ში",
     image:
       "https://images.unsplash.com/photo-1584982751601-97dcc096659c?w=600&h=600&fit=crop&crop=center",
-    onPress: () => router.push("/screens/video-call"),
+    onPress: () => router.push("/(tabs)/doctor"),
   },
   // {
   //   id: "lab",
@@ -34,7 +34,7 @@ const QUICK_SERVICES = [
     description: "ექიმი შენს მისამართზე",
     image:
       "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=600&h=600&fit=crop&crop=center&sat=-20",
-    onPress: () => router.push("/screens/appointment/make-appointment"),
+    onPress: () => router.push("/screens/doctors/home-visit-doctors"),
   },
   {
     id: "advisor",

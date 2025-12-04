@@ -85,8 +85,17 @@ export default function AdvisorScreen() {
             imageSource = require("@/assets/images/doctors/doctor1.png");
           }
 
+          // Ensure doctor ID is correctly extracted
+          const doctorId = doctor._id 
+            ? String(doctor._id) 
+            : doctor.id 
+            ? String(doctor.id) 
+            : advisor.doctorId && typeof advisor.doctorId === 'string'
+            ? advisor.doctorId
+            : '';
+
           return {
-            id: doctor._id || doctor.id,
+            id: doctorId,
             name: advisor.name || doctor.name || "",
             specialization: advisor.specialization || doctor.specialization || "",
             rating: doctor.rating || 0,
@@ -150,8 +159,8 @@ export default function AdvisorScreen() {
 
   const handleDoctorPress = (doctorId: string) => {
     router.push({
-      pathname: "/screens/doctors/doctor/[id]",
-      params: { id: doctorId },
+      pathname: "/screens/chat/[doctorId]",
+      params: { doctorId },
     });
   };
 

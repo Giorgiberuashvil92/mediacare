@@ -28,7 +28,7 @@ const getDefaultBaseUrl = () => {
   
   if (FORCE_RAILWAY) {
     console.log('🚂 Forcing Railway URL for testing');
-    return "https://localhost:4000";
+    return "https://mediacare-production.up.railway.app";  
   }
 
   const envUrl =
@@ -58,9 +58,9 @@ const getDefaultBaseUrl = () => {
   // return "https://mediacare-production.up.railway.app";
   if (__DEV__) {
     console.log('🔍 __DEV__ mode:', __DEV__);
-    return "http://localhost:4000";
+    return "https://mediacare-production.up.railway.app";
   }
-  return "http://localhost:4000";
+  return "https://mediacare-production.up.railway.app";
 };
 
 const API_BASE_URL = getDefaultBaseUrl();
@@ -642,7 +642,6 @@ class ApiService {
       patientAge: number;
       date: string;
       time: string;
-      // ბექი აბრუნებს როგორც ძველ ტიპებს, ისე რეალურ ვიზიტის ტიპებს
       type: 'consultation' | 'followup' | 'emergency' | 'video' | 'home-visit';
       status: 'completed' | 'scheduled' | 'in-progress' | 'cancelled';
       fee: number;

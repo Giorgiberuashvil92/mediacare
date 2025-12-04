@@ -1,12 +1,13 @@
 'use client';
 
+
 import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 import { apiService, User } from '@/lib/api';
 import { useEffect, useState } from 'react';
 
 interface Advisor {
   _id: string;
-  doctorId: User;
+  doctorId: User | string;
   name: string;
   specialization?: string;
   bio?: string;
@@ -251,99 +252,93 @@ export default function AdvisorsPage() {
           )}
 
           {!loading && !error && (
-            <div className="rounded-lg border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-stroke dark:border-strokedark">
-                      <th className="px-6 py-3 text-left text-sm font-medium text-dark dark:text-white">
-                        ექიმი
-                      </th>
-                      <th className="px-6 py-3 text-left text-sm font-medium text-dark dark:text-white">
-                        სპეციალიზაცია
-                      </th>
-                      <th className="px-6 py-3 text-left text-sm font-medium text-dark dark:text-white">
-                        რიგი
-                      </th>
-                      <th className="px-6 py-3 text-left text-sm font-medium text-dark dark:text-white">
-                        სტატუსი
-                      </th>
-                      <th className="px-6 py-3 text-right text-sm font-medium text-dark dark:text-white">
-                        მოქმედებები
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {advisors.length === 0 ? (
-                      <tr>
-                        <td
-                          colSpan={5}
-                          className="px-6 py-8 text-center text-dark dark:text-white"
-                        >
-                          მრჩეველები არ მოიძებნა
-                        </td>
-                      </tr>
-                    ) : (
-                      advisors.map((advisor) => {
-                        const doctor =
-                          typeof advisor.doctorId === 'object'
-                            ? advisor.doctorId
-                            : doctors.find((d) => d.id === advisor.doctorId);
-                        return (
-                          <tr
-                            key={advisor._id}
-                            className="border-b border-stroke dark:border-strokedark"
-                          >
-                            <td className="px-6 py-4 text-sm text-dark dark:text-white">
+            <>
+              {advisors.length === 0 ? (
+                <div className="rounded-lg border border-stroke bg-white p-12 text-center shadow-default dark:border-strokedark dark:bg-boxdark">
+                  <p className="text-lg text-dark dark:text-white">
+                    მრჩეველები არ მოიძებნა
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  {advisors.map((advisor) => {
+                    const doctorIdStr = typeof advisor.doctorId === 'string' 
+                      ? advisor.doctorId 
+                      : (advisor.doctorId as User).id;
+                    const doctor =
+                      typeof advisor.doctorId === 'object' && advisor.doctorId !== null && 'id' in advisor.doctorId
+                        ? advisor.doctorId as User
+                        : doctors.find((d: User) => d.id === doctorIdStr);
+                    return (
+                      <div
+                        key={advisor._id}
+                        className="rounded-lg border border-stroke bg-white p-6 shadow-default transition-shadow hover:shadow-lg dark:border-strokedark dark:bg-boxdark"
+                      >
+                        <div className="mb-4 flex items-start justify-between">
+                          <div className="flex-1">
+                            <h3 className="text-lg font-semibold text-dark dark:text-white">
                               {doctor?.name || advisor.name}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-dark dark:text-white">
-                              {doctor?.specialization || advisor.specialization || '-'}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-dark dark:text-white">
-                              {advisor.order}
-                            </td>
-                            <td className="px-6 py-4 text-sm">
-                              <span
-                                className={`rounded-full px-3 py-1 text-xs font-medium ${
-                                  advisor.isActive
-                                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                                    : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-                                }`}
-                              >
-                                {advisor.isActive ? 'აქტიური' : 'არააქტიური'}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 text-right">
-                              <div className="flex justify-end gap-2">
-                                <button
-                                  onClick={() =>
-                                    handleToggleActive(advisor._id, advisor.isActive)
-                                  }
-                                  className={`rounded-lg px-3 py-1 text-xs font-medium ${
-                                    advisor.isActive
-                                      ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
-                                      : 'bg-green-100 text-green-800 hover:bg-green-200'
-                                  }`}
-                                >
-                                  {advisor.isActive ? 'დეაქტივაცია' : 'აქტივაცია'}
-                                </button>
-                                <button
-                                  onClick={() => handleDelete(advisor._id)}
-                                  className="rounded-lg bg-red-100 px-3 py-1 text-xs font-medium text-red-800 hover:bg-red-200"
-                                >
-                                  წაშლა
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                            </h3>
+                            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                              {doctor?.specialization || advisor.specialization || 'სპეციალიზაცია არ არის მითითებული'}
+                            </p>
+                          </div>
+                          <span
+                            className={`ml-2 rounded-full px-3 py-1 text-xs font-medium ${
+                              advisor.isActive
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+                            }`}
+                          >
+                            {advisor.isActive ? 'აქტიური' : 'არააქტიური'}
+                          </span>
+                        </div>
+
+                        {advisor.bio && (
+                          <p className="mb-4 text-sm text-gray-700 dark:text-gray-300 line-clamp-3">
+                            {advisor.bio}
+                          </p>
+                        )}
+
+                        <div className="mb-4 flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+                          <div className="flex items-center gap-1">
+                            <span className="font-medium">რიგი:</span>
+                            <span>{advisor.order}</span>
+                          </div>
+                          {doctor?.rating && (
+                            <div className="flex items-center gap-1">
+                              <span className="font-medium">რეიტინგი:</span>
+                              <span>{doctor.rating.toFixed(1)}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() =>
+                              handleToggleActive(advisor._id, advisor.isActive)
+                            }
+                            className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                              advisor.isActive
+                                ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200 dark:bg-yellow-900 dark:text-yellow-200'
+                                : 'bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900 dark:text-green-200'
+                            }`}
+                          >
+                            {advisor.isActive ? 'დეაქტივაცია' : 'აქტივაცია'}
+                          </button>
+                          <button
+                            onClick={() => handleDelete(advisor._id)}
+                            className="rounded-lg bg-red-100 px-4 py-2 text-sm font-medium text-red-800 transition-colors hover:bg-red-200 dark:bg-red-900 dark:text-red-200"
+                          >
+                            წაშლა
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
           )}
         </>
       )}
