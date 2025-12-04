@@ -30,6 +30,7 @@ export default function DoctorSchedule() {
   const { schedules, selectedDates, setSchedules, setSelectedDates } =
     useSchedule();
   const { user } = useAuth();
+  const [mode, setMode] = useState<"video" | "home-visit">("video");
   const [showTimeModal, setShowTimeModal] = useState(false);
   const [currentEditDate, setCurrentEditDate] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -203,6 +204,7 @@ export default function DoctorSchedule() {
         date: dateStr,
         timeSlots: schedules[dateStr] || [],
         isAvailable: (schedules[dateStr] || []).length > 0,
+        type: mode,
       }));
 
       // Save to backend
@@ -267,11 +269,63 @@ export default function DoctorSchedule() {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
-          <View>
+          <View style={styles.headerCard}>
             <Text style={styles.title}>განრიგის დაგეგმვა</Text>
             <Text style={styles.subtitle}>
-              აირჩიეთ დღეები და საათები თქვენი ხელმისაწვდომობისთვის
+              აირჩიეთ რომელ დღეებში და საათებში გინდათ მუშაობა
             </Text>
+            <View style={styles.modePill}>
+              <Text style={styles.modePillText}>
+                {mode === "video"
+                  ? "ვიდეო კონსულტაციის გრაფიკი"
+                  : "ბინაზე ვიზიტების გრაფიკი"}
+              </Text>
+            </View>
+
+            {/* Mode selector cards */}
+            <View style={styles.modeRow}>
+              <TouchableOpacity
+                style={[
+                  styles.modeCard,
+                  mode === "video" && styles.modeCardActiveVideo,
+                ]}
+                onPress={() => setMode("video")}
+                activeOpacity={0.9}
+              >
+                <View style={styles.modeIconCircle}>
+                  <Ionicons
+                    name="videocam-outline"
+                    size={20}
+                    color={mode === "video" ? "#0EA5E9" : "#2563EB"}
+                  />
+                </View>
+                <Text style={styles.modeTitle}>ვიდეო კონსულტაციები</Text>
+                <Text style={styles.modeSubtitleCard}>
+                  ონლაინ ვიზიტებისთვის ხელმისაწვდომი დროები
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.modeCard,
+                  mode === "home-visit" && styles.modeCardActiveHome,
+                ]}
+                onPress={() => setMode("home-visit")}
+                activeOpacity={0.9}
+              >
+                <View style={styles.modeIconCircle}>
+                  <Ionicons
+                    name="home-outline"
+                    size={20}
+                    color={mode === "home-visit" ? "#22C55E" : "#16A34A"}
+                  />
+                </View>
+                <Text style={styles.modeTitle}>ბინაზე ვიზიტები</Text>
+                <Text style={styles.modeSubtitleCard}>
+                  პაციენტის მისამართზე წასვლის დღეები
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 
@@ -371,7 +425,10 @@ export default function DoctorSchedule() {
                     <TouchableOpacity
                       style={[
                         styles.dateCard,
-                        isSelected && styles.dateCardSelected,
+                        isSelected &&
+                          (mode === "video"
+                            ? styles.dateCardSelectedVideo
+                            : styles.dateCardSelectedHome),
                         today && styles.dateCardToday,
                       ]}
                       onPress={() => toggleDateSelection(date)}
@@ -454,7 +511,10 @@ export default function DoctorSchedule() {
                     <TouchableOpacity
                       style={[
                         styles.dateCard,
-                        isSelected && styles.dateCardSelected,
+                        isSelected &&
+                          (mode === "video"
+                            ? styles.dateCardSelectedVideo
+                            : styles.dateCardSelectedHome),
                       ]}
                       onPress={() => toggleDateSelection(date)}
                     >
@@ -620,20 +680,21 @@ export default function DoctorSchedule() {
                     <TouchableOpacity
                       key={time}
                       style={[
-                        styles.timeSlot,
-                        isSelected && styles.timeSlotSelected,
+                        styles.timeChip,
+                        isSelected &&
+                          (mode === "video"
+                            ? styles.timeChipSelectedVideo
+                            : styles.timeChipSelectedHome),
                       ]}
                       onPress={() => toggleTimeSlot(time)}
                     >
-                      <Ionicons
-                        name={isSelected ? "checkmark-circle" : "time-outline"}
-                        size={24}
-                        color={isSelected ? "#FFFFFF" : "#06B6D4"}
-                      />
                       <Text
                         style={[
-                          styles.timeSlotText,
-                          isSelected && styles.timeSlotTextSelected,
+                          styles.timeChipText,
+                          isSelected &&
+                            (mode === "video"
+                              ? styles.timeChipTextSelectedVideo
+                              : styles.timeChipTextSelectedHome),
                         ]}
                       >
                         {time}
@@ -690,12 +751,23 @@ export default function DoctorSchedule() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8F9FA",
+    backgroundColor: "#F3F4F6",
   },
   header: {
     paddingHorizontal: 20,
     paddingTop: 10,
     paddingBottom: 20,
+  },
+  headerCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
   },
   title: {
     fontSize: 28,
@@ -707,16 +779,73 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Poppins-Regular",
     color: "#6B7280",
+    marginBottom: 10,
+  },
+  modePill: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "#E5F3FF",
+    marginBottom: 14,
+  },
+  modePillText: {
+    fontSize: 11,
+    fontFamily: "Poppins-Medium",
+    color: "#0369A1",
+  },
+  modeRow: {
+    flexDirection: "row",
+    marginTop: 4,
+    gap: 12,
+  },
+  modeCard: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  modeCardActiveVideo: {
+    backgroundColor: "#E0F2FE",
+    shadowOpacity: 0.12,
+  },
+  modeCardActiveHome: {
+    backgroundColor: "#DCFCE7",
+    shadowOpacity: 0.12,
+  },
+  modeIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#EFF6FF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  modeTitle: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#111827",
+    marginBottom: 4,
+  },
+  modeSubtitleCard: {
+    fontSize: 11,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
   },
   instructionsCard: {
     flexDirection: "row",
-    backgroundColor: "#F0FDFA",
+    backgroundColor: "#ECFEFF",
     marginHorizontal: 20,
-    marginBottom: 24,
-    padding: 16,
-    borderRadius: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: "#06B6D4",
+    marginBottom: 20,
+    padding: 14,
+    borderRadius: 14,
   },
   instructionIconContainer: {
     marginRight: 12,
@@ -739,14 +868,11 @@ const styles = StyleSheet.create({
   summaryCard: {
     backgroundColor: "#FFFFFF",
     marginHorizontal: 20,
-    marginBottom: 24,
-    padding: 16,
+    marginBottom: 20,
+    padding: 14,
     borderRadius: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
   },
   summaryHeader: {
     flexDirection: "row",
@@ -824,25 +950,30 @@ const styles = StyleSheet.create({
   },
   dateWrapper: {
     width: "31%",
-    marginBottom: 8,
+    marginBottom: 10,
   },
   dateCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 12,
-    padding: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
     alignItems: "center",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+    elevation: 2,
     borderWidth: 2,
     borderColor: "#F3F4F6",
     position: "relative",
   },
-  dateCardSelected: {
+  dateCardSelectedVideo: {
     backgroundColor: "#06B6D4",
     borderColor: "#06B6D4",
+  },
+  dateCardSelectedHome: {
+    backgroundColor: "#22C55E",
+    borderColor: "#22C55E",
   },
   dateCardToday: {
     borderColor: "#F59E0B",
@@ -914,14 +1045,14 @@ const styles = StyleSheet.create({
     left: 20,
     right: 20,
     backgroundColor: "#06B6D4",
-    borderRadius: 24,
-    paddingVertical: 18,
+    borderRadius: 999,
+    paddingVertical: 16,
     paddingHorizontal: 24,
     shadowColor: "#06B6D4",
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 18,
+    elevation: 6,
     borderWidth: 2,
     borderColor: "rgba(255, 255, 255, 0.2)",
   },
@@ -1013,10 +1144,10 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingTop: 20,
-    paddingBottom: 40,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: 16,
+    paddingBottom: 32,
     maxHeight: "80%",
   },
   modalHeader: {
@@ -1063,27 +1194,33 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 12,
   },
-  timeSlot: {
-    width: "47%",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#F9FAFB",
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 2,
+  timeChip: {
+    minWidth: "30%",
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    borderWidth: 1,
     borderColor: "#E5E7EB",
+    backgroundColor: "#F9FAFB",
+    alignItems: "center",
   },
-  timeSlotSelected: {
-    backgroundColor: "#06B6D4",
-    borderColor: "#06B6D4",
+  timeChipSelectedVideo: {
+    backgroundColor: "#0EA5E9",
+    borderColor: "#0EA5E9",
   },
-  timeSlotText: {
-    fontSize: 16,
-    fontFamily: "Poppins-SemiBold",
-    color: "#1F2937",
+  timeChipSelectedHome: {
+    backgroundColor: "#22C55E",
+    borderColor: "#22C55E",
   },
-  timeSlotTextSelected: {
+  timeChipText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#374151",
+  },
+  timeChipTextSelectedVideo: {
+    color: "#FFFFFF",
+  },
+  timeChipTextSelectedHome: {
     color: "#FFFFFF",
   },
   modalFooter: {

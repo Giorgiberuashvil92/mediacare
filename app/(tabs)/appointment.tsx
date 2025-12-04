@@ -30,6 +30,7 @@ interface PatientAppointment {
   symptoms?: string;
   diagnosis?: string;
   doctorImage?: any;
+  visitAddress?: string;
 }
 
 const getStatusLabel = (status: string) => {
@@ -64,6 +65,10 @@ const getStatusColor = (status: string) => {
 
 const getConsultationTypeLabel = (type: string) => {
   switch (type) {
+    case "video":
+      return "ვიდეო კონსულტაცია";
+    case "home-visit":
+      return "ბინაზე ვიზიტი";
     case "consultation":
       return "კონსულტაცია";
     case "followup":
@@ -117,7 +122,7 @@ const mapAppointmentFromAPI = (appointment: any, apiBaseUrl: string): PatientApp
   const mappedStatus = statusMap[appointment.status] || appointment.status || "scheduled";
 
   // Determine consultation type (default to consultation)
-  const consultationType = "consultation";
+  const consultationType = appointment.type || "video";
 
   // Format fee
   const fee = appointment.totalAmount || appointment.consultationFee || 0;
@@ -134,6 +139,7 @@ const mapAppointmentFromAPI = (appointment: any, apiBaseUrl: string): PatientApp
     isPaid: appointment.paymentStatus === "paid" || appointment.paymentStatus === "completed",
     symptoms: appointment.patientDetails?.problem || appointment.notes || "",
     diagnosis: appointment.diagnosis || "",
+    visitAddress: appointment.visitAddress,
     doctorImage: doctorImage,
   };
 };
@@ -763,6 +769,16 @@ const Appointment = () => {
                     {getConsultationTypeLabel(selectedAppointment.type)}
                   </Text>
                 </View>
+
+                {selectedAppointment.type === "home-visit" &&
+                  selectedAppointment.visitAddress && (
+                    <View style={styles.detailSection}>
+                      <Text style={styles.detailLabel}>მისამართი</Text>
+                      <Text style={styles.detailValue}>
+                        {selectedAppointment.visitAddress}
+                      </Text>
+                    </View>
+                  )}
 
                 {selectedAppointment.symptoms && (
                   <View style={styles.detailSection}>

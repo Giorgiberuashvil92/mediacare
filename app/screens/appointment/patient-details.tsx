@@ -14,7 +14,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { apiService } from "../../services/api";
+import { apiService, AppointmentType } from "../../services/api";
 
 const PatientDetails = () => {
   const {
@@ -35,6 +35,11 @@ const PatientDetails = () => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [loading, setLoading] = useState(false);
+
+  const { appointmentType: appointmentTypeParam, visitAddress } =
+    useLocalSearchParams();
+  const appointmentType: AppointmentType =
+    (appointmentTypeParam as AppointmentType) || "video";
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({
@@ -268,6 +273,7 @@ const PatientDetails = () => {
         doctorId: doctorId as string,
         appointmentDate: appointmentDate as string,
         appointmentTime: selectedTime as string,
+        type: appointmentType,
         consultationFee: fee,
         totalAmount: total,
         paymentMethod: "pending", // Payment will be handled later
@@ -280,6 +286,10 @@ const PatientDetails = () => {
         },
         documents: uploadedDocuments,
         notes: formData.problem,
+        visitAddress:
+          appointmentType === "home-visit" && visitAddress
+            ? (visitAddress as string)
+            : undefined,
       });
 
       if (response.success) {

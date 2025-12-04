@@ -94,20 +94,7 @@ export default function RevenueDetails() {
                   </Text>
                 </View>
               </View>
-              <View style={styles.revenueItem}>
-                <View
-                  style={[
-                    styles.revenueIndicator,
-                    styles.revenueIndicatorPending,
-                  ]}
-                />
-                <View>
-                  <Text style={styles.revenueItemLabel}>მოსალოდნელი</Text>
-                  <Text style={styles.revenueItemValue}>
-                    ${stats.earnings.pending.toLocaleString()}
-                  </Text>
-                </View>
-              </View>
+             
             </View>
           </View>
         </View>

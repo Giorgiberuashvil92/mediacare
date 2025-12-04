@@ -16,10 +16,12 @@ export class Availability {
 
   @Prop({ default: true })
   isAvailable: boolean;
+
+  @Prop({ enum: ['video', 'home-visit'], default: 'video' })
+  type: 'video' | 'home-visit';
 }
 
 export const AvailabilitySchema = SchemaFactory.createForClass(Availability);
 
 // Create index for efficient queries
-AvailabilitySchema.index({ doctorId: 1, date: 1 }, { unique: true });
-
+AvailabilitySchema.index({ doctorId: 1, date: 1, type: 1 }, { unique: true });

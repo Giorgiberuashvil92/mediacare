@@ -18,6 +18,11 @@ export enum PaymentStatus {
   FAILED = 'failed',
 }
 
+export enum AppointmentType {
+  VIDEO = 'video',
+  HOME_VISIT = 'home-visit',
+}
+
 @Schema({ timestamps: true })
 export class Appointment {
   @Prop({ required: true })
@@ -34,6 +39,9 @@ export class Appointment {
 
   @Prop({ required: true })
   appointmentTime: string;
+
+  @Prop({ enum: AppointmentType, required: true })
+  type: AppointmentType;
 
   @Prop({ enum: AppointmentStatus, default: AppointmentStatus.PENDING })
   status: AppointmentStatus;
@@ -71,6 +79,9 @@ export class Appointment {
 
   @Prop()
   notes?: string;
+
+  @Prop()
+  visitAddress?: string; // Used when type === 'home-visit'
 
   @Prop({
     type: {

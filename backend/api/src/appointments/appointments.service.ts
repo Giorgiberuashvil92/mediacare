@@ -104,6 +104,7 @@ export class AppointmentsService {
       doctorId: new mongoose.Types.ObjectId(createAppointmentDto.doctorId),
       appointmentDate: normalizedDate,
       appointmentTime: createAppointmentDto.appointmentTime,
+      type: createAppointmentDto.type,
       status: { $in: [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED] },
     });
 
@@ -131,6 +132,7 @@ export class AppointmentsService {
       patientDetails: createAppointmentDto.patientDetails,
       documents: createAppointmentDto.documents || [],
       notes: createAppointmentDto.notes,
+      visitAddress: createAppointmentDto.visitAddress,
     });
 
     await appointment.save();

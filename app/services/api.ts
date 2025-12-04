@@ -147,6 +147,8 @@ export interface MedicineShopOverview {
   equipmentCategories: ShopCategory[];
 }
 
+export type AppointmentType = "video" | "home-visit";
+
 class ApiService {
   private baseURL: string;
 
@@ -495,6 +497,7 @@ class ApiService {
     date: string;
     timeSlots: string[];
     isAvailable: boolean;
+    type: 'video' | 'home-visit';
   }[]): Promise<{
     success: boolean;
     message?: string;
@@ -835,6 +838,7 @@ class ApiService {
     doctorId: string;
     appointmentDate: string;
     appointmentTime: string;
+    type: AppointmentType;
     consultationFee: number;
     totalAmount: number;
     paymentMethod?: string;
@@ -847,6 +851,7 @@ class ApiService {
     };
     documents?: string[];
     notes?: string;
+    visitAddress?: string;
   }): Promise<{
     success: boolean;
     data: any;

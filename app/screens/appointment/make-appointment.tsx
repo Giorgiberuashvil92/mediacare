@@ -1,5 +1,5 @@
 import { useAuth } from "@/app/contexts/AuthContext";
-import { apiService } from "@/app/services/api";
+import { apiService, AppointmentType } from "@/app/services/api";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
@@ -51,6 +51,9 @@ const MakeAppointment = () => {
   const [selectedPatient, setSelectedPatient] = useState<"self" | "other">("self");
   const [promoCode, setPromoCode] = useState("");
   const [selectedPaymentMethod] = useState((paymentMethod as string) || "visa");
+  const [appointmentType, setAppointmentType] =
+    useState<AppointmentType>("video");
+  const [visitAddress, setVisitAddress] = useState("");
   const [patientProfile, setPatientProfile] = useState<any>(null);
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [creatingAppointment, setCreatingAppointment] = useState(false);
@@ -188,6 +191,12 @@ const MakeAppointment = () => {
   )} | ${selectedTime}`;
 
   const handleMakeAppointment = async () => {
+    // Validate home visit address if needed
+    if (appointmentType === "home-visit" && !visitAddress.trim()) {
+      Alert.alert("შეცდომა", "გთხოვთ მიუთითოთ ბინაზე ვიზიტის მისამართი");
+      return;
+    }
+
     // If "self" is selected and we have complete profile info, create appointment directly
     if (selectedPatient === "self" && patientProfile) {
       // Check if we have all required fields
@@ -235,6 +244,7 @@ const MakeAppointment = () => {
             doctorId: doctorId as string,
             appointmentDate: selectedDate as string,
             appointmentTime: selectedTime as string,
+            type: appointmentType,
             consultationFee: consultationFee,
             totalAmount: netAmount,
             paymentMethod: "pending", // Payment will be handled later
@@ -247,6 +257,10 @@ const MakeAppointment = () => {
             },
             documents: [],
             notes: "",
+            visitAddress:
+              appointmentType === "home-visit"
+                ? visitAddress.trim()
+                : undefined,
           });
 
           if (response.success) {
@@ -289,6 +303,8 @@ const MakeAppointment = () => {
         paymentMethod: selectedPaymentMethod,
         amount: netAmount.toString(),
         consultationFee: consultationFee.toString(),
+        appointmentType,
+        visitAddress,
       },
     });
   };
@@ -301,13 +317,20 @@ const MakeAppointment = () => {
           style={styles.backButton}
           onPress={() => router.back()}
         >
-          <Ionicons name="arrow-back" size={24} color="#333333" />
+          <Ionicons name="arrow-back" size={22} color="#0F172A" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>ჯავშნის გაკეთება</Text>
+        <View style={styles.headerTitles}>
+          <Text style={styles.headerTitle}>ახალი ჯავშანი</Text>
+          <Text style={styles.headerSubtitle}>აირჩიე ტიპი და დაადასტურე ვიზიტი</Text>
+        </View>
         <View style={styles.placeholder} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Doctor Information */}
         <View style={styles.section}>
           <View style={styles.doctorCard}>
@@ -330,11 +353,83 @@ const MakeAppointment = () => {
               </View>
               <Text style={styles.specialty}>{doctor.specialization}</Text>
               <Text style={styles.degrees}>{doctor.degrees}</Text>
-              <Text style={styles.appointmentDateTime}>
-                {appointmentDateTime}
-              </Text>
+              <View style={styles.dateTimeRow}>
+                <Ionicons
+                  name="calendar-outline"
+                  size={14}
+                  color="#6B7280"
+                  style={{ marginRight: 4 }}
+                />
+                <Text style={styles.appointmentDateTime}>
+                  {appointmentDateTime}
+                </Text>
+              </View>
             </View>
           </View>
+        </View>
+
+        {/* Appointment Type */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>კონსულტაციის ტიპი</Text>
+          <View style={styles.typeSelectorContainer}>
+            <TouchableOpacity
+              style={[
+                styles.typeChip,
+                appointmentType === "video" && styles.typeChipActive,
+              ]}
+              onPress={() => setAppointmentType("video")}
+            >
+              <Ionicons
+                name="videocam-outline"
+                size={18}
+                color={appointmentType === "video" ? "#FFFFFF" : "#4B5563"}
+              />
+              <Text
+                style={[
+                  styles.typeChipText,
+                  appointmentType === "video" && styles.typeChipTextActive,
+                ]}
+              >
+                ვიდეო კონსულტაცია
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.typeChip,
+                appointmentType === "home-visit" && styles.typeChipActive,
+              ]}
+              onPress={() => setAppointmentType("home-visit")}
+            >
+              <Ionicons
+                name="home-outline"
+                size={18}
+                color={appointmentType === "home-visit" ? "#FFFFFF" : "#4B5563"}
+              />
+              <Text
+                style={[
+                  styles.typeChipText,
+                  appointmentType === "home-visit" && styles.typeChipTextActive,
+                ]}
+              >
+                ბინაზე ვიზიტი
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {appointmentType === "home-visit" && (
+            <View style={{ marginTop: 16 }}>
+              <Text style={styles.fieldLabel}>ვიზიტის მისამართი</Text>
+              <TextInput
+                style={styles.addressInput}
+                placeholder="მაგ: თბილისი, ჭავჭავაძის გამზირი 15, ბინა 12"
+                placeholderTextColor="#9CA3AF"
+                value={visitAddress}
+                onChangeText={setVisitAddress}
+                multiline
+              />
+            </View>
+          )}
         </View>
 
         {/* Patient Information */}
@@ -486,58 +581,75 @@ const MakeAppointment = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#F3F4F6",
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E5EA",
+    paddingTop: 16,
+    paddingBottom: 12,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#F5F5F5",
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
     justifyContent: "center",
     alignItems: "center",
   },
   headerTitle: {
-    fontSize: 18,
-    fontFamily: "Poppins-Bold",
-    color: "#333333",
+    fontSize: 20,
+    fontFamily: "Poppins-SemiBold",
+    color: "#0F172A",
+  },
+  headerTitles: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  headerSubtitle: {
+    marginTop: 2,
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
   },
   placeholder: {
-    width: 40,
+    width: 36,
   },
   content: {
     flex: 1,
+  },
+  contentContainer: {
     paddingHorizontal: 20,
+    paddingBottom: 24,
   },
   section: {
-    marginVertical: 16,
+    marginTop: 16,
   },
   sectionTitle: {
     fontSize: 18,
     fontFamily: "Poppins-Bold",
-    color: "#333333",
+    color: "#0F172A",
     marginBottom: 16,
   },
   doctorCard: {
     flexDirection: "row",
-    backgroundColor: "#F8F9FA",
-    borderRadius: 12,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
     padding: 16,
     alignItems: "center",
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
+    elevation: 4,
   },
   doctorImagePlaceholder: {
     width: 90,
     height: 90,
-    borderRadius: 8,
-    backgroundColor: "#E5E5EA",
+    borderRadius: 18,
+    backgroundColor: "#E5E7EB",
     marginRight: 16,
     overflow: "hidden",
   },
@@ -556,33 +668,90 @@ const styles = StyleSheet.create({
   doctorName: {
     fontSize: 18,
     fontFamily: "Poppins-Bold",
-    color: "#333333",
+    color: "#111827",
     flex: 1,
   },
   specialty: {
     fontSize: 14,
     fontFamily: "Poppins-SemiBold",
-    color: "#20BEB8",
+    color: "#0EA5E9",
   },
   degrees: {
     fontSize: 12,
     fontFamily: "Poppins-Regular",
-    color: "#999999",
+    color: "#9CA3AF",
   },
   ratingContainer: {
     flexDirection: "row",
     alignItems: "center",
     marginLeft: 8,
   },
+  typeSelectorContainer: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  typeChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: "#F3F4F6",
+  },
+  typeChipActive: {
+    backgroundColor: "#0EA5E9",
+  },
+  typeChipText: {
+    marginLeft: 8,
+    fontSize: 13,
+    fontFamily: "Poppins-Medium",
+    color: "#4B5563",
+  },
+  typeChipTextActive: {
+    color: "#FFFFFF",
+  },
+  dateTimeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+  },
   appointmentDateTime: {
     fontSize: 14,
-    fontFamily: "Poppins-SemiBold",
-    color: "#333333",
+    fontFamily: "Poppins-Medium",
+    color: "#4B5563",
+  },
+  fieldLabel: {
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#374151",
+    marginBottom: 6,
+  },
+  addressInput: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    minHeight: 70,
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#111827",
+    backgroundColor: "#FFFFFF",
+    textAlignVertical: "top",
   },
   patientOption: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 12,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    elevation: 1,
   },
   radioButton: {
     width: 20,
@@ -606,29 +775,29 @@ const styles = StyleSheet.create({
   patientName: {
     fontSize: 16,
     fontFamily: "Poppins-SemiBold",
-    color: "#333333",
+    color: "#0F172A",
     marginBottom: 2,
   },
   patientDetails: {
     fontSize: 14,
     fontFamily: "Poppins-Regular",
-    color: "#999999",
+    color: "#6B7280",
   },
   paymentRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 10,
   },
   paymentLabel: {
     fontSize: 16,
     fontFamily: "Poppins-Regular",
-    color: "#333333",
+    color: "#4B5563",
   },
   paymentAmount: {
     fontSize: 16,
     fontFamily: "Poppins-SemiBold",
-    color: "#333333",
+    color: "#0F172A",
   },
   divider: {
     height: 1,
@@ -640,12 +809,12 @@ const styles = StyleSheet.create({
   netAmountLabel: {
     fontSize: 18,
     fontFamily: "Poppins-Bold",
-    color: "#333333",
+    color: "#0F172A",
   },
   netAmountValue: {
     fontSize: 18,
     fontFamily: "Poppins-Bold",
-    color: "#333333",
+    color: "#0369A1",
   },
   promoCodeContainer: {
     flexDirection: "row",
@@ -655,7 +824,7 @@ const styles = StyleSheet.create({
   promoCodeInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#E5E5EA",
+    borderColor: "#E5E7EB",
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 12,
@@ -665,7 +834,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   applyButton: {
-    backgroundColor: "#20BEB8",
+    backgroundColor: "#0EA5E9",
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,
@@ -700,16 +869,22 @@ const styles = StyleSheet.create({
     color: "#333333",
   },
   buttonContainer: {
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     backgroundColor: "#FFFFFF",
     borderTopWidth: 1,
-    borderTopColor: "#E5E5EA",
+    borderTopColor: "#E5E7EB",
   },
   makeAppointmentButton: {
-    backgroundColor: "#20BEB8",
-    borderRadius: 12,
+    backgroundColor: "#22C55E",
+    borderRadius: 999,
     paddingVertical: 16,
     alignItems: "center",
+    shadowColor: "#22C55E",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 18,
+    elevation: 4,
   },
   makeAppointmentButtonText: {
     fontSize: 16,
@@ -749,7 +924,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   retryButton: {
-    backgroundColor: "#20BEB8",
+    backgroundColor: "#0EA5E9",
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,

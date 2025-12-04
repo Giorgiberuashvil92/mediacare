@@ -3,7 +3,9 @@ import {
   IsArray,
   IsBoolean,
   IsDateString,
+  IsIn,
   IsNotEmpty,
+  IsString,
   ValidateNested,
 } from 'class-validator';
 
@@ -19,6 +21,10 @@ class AvailabilitySlotDto {
   @IsBoolean()
   @IsNotEmpty()
   isAvailable: boolean;
+
+  @IsString()
+  @IsIn(['video', 'home-visit'])
+  type: 'video' | 'home-visit';
 }
 
 export class UpdateAvailabilityDto {

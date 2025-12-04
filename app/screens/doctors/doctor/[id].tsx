@@ -104,7 +104,7 @@ const DoctorDetail = () => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#FFFFFF" />
+          <ActivityIndicator size="large" color="#20BEB8" />
           <Text style={styles.loadingText}>ექიმის ჩატვირთვა...</Text>
         </View>
       </SafeAreaView>
@@ -129,6 +129,43 @@ const DoctorDetail = () => {
     );
   }
 
+  // Step 2: full-screen appointment scheduler
+  if (showAppointmentScheduler) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.schedulerHeader}>
+          <TouchableOpacity
+            style={styles.schedulerBackButton}
+            onPress={() => setShowAppointmentScheduler(false)}
+          >
+            <Ionicons name="arrow-back" size={24} color="#0F172A" />
+          </TouchableOpacity>
+          <View style={styles.schedulerHeaderInfo}>
+            <Text style={styles.schedulerTitle}>ჯავშნის გაკეთება</Text>
+            <Text style={styles.schedulerSubtitle}>{doctor.name}</Text>
+          </View>
+          <View style={{ width: 36 }} />
+        </View>
+
+        <ScrollView
+          style={styles.schedulerContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.appointmentSection}>
+            <AppointmentScheduler
+              workingHours={doctor.workingHours}
+              availability={doctor.availability || []}
+              totalReviews={doctor.totalReviews || 0}
+              reviews={Array.isArray(doctor.reviews) ? doctor.reviews : []}
+              doctorId={doctor.id}
+              onTimeSlotBlocked={loadDoctor} // Reload doctor data after blocking
+            />
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -136,7 +173,7 @@ const DoctorDetail = () => {
           style={styles.backButton}
           onPress={() => router.back()}
         >
-          <Ionicons name="arrow-back" size={24} color="#64748B" />
+          <Ionicons name="arrow-back" size={24} color="#0F172A" />
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.favoriteButton}
@@ -166,41 +203,47 @@ const DoctorDetail = () => {
           <Text style={styles.location}>{doctor.location}</Text>
         </View>
 
-        {/* Statistics */}
-        <View style={styles.statistics}>
-          <View style={styles.statItem}>
-            <Ionicons name="people" size={24} color="#333333" />
-            <Text style={styles.statNumber}>{doctor.patients}</Text>
-            <Text style={styles.statLabel}>პაციენტები</Text>
+        {/* Compact Stats */}
+        <View style={styles.metaRow}>
+          <View style={styles.metaChip}>
+            <Ionicons name="star" size={16} color="#FACC15" />
+            <Text style={styles.metaValue}>
+              {doctor.rating || 0}
+            </Text>
+            <Text style={styles.metaLabel}>რეიტინგი</Text>
           </View>
-          <View style={styles.statItem}>
-            <Ionicons name="briefcase" size={24} color="#333333" />
-            <Text style={styles.statNumber}>{doctor.experience}</Text>
-            <Text style={styles.statLabel}>გამოცდილება</Text>
+          <View style={styles.metaChip}>
+            <Ionicons name="chatbubbles-outline" size={16} color="#4B5563" />
+            <Text style={styles.metaValue}>
+              {doctor.reviewCount || 0}+
+            </Text>
+            <Text style={styles.metaLabel}>შეფასებები</Text>
           </View>
-          <View style={styles.statItem}>
-            <Ionicons name="star" size={24} color="#333333" />
-            <Text style={styles.statNumber}>{doctor.rating}</Text>
-            <Text style={styles.statLabel}>რეიტინგი</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Ionicons name="chatbubbles" size={24} color="#333333" />
-            <Text style={styles.statNumber}>{doctor.reviewCount}+</Text>
-            <Text style={styles.statLabel}>შეფასებები</Text>
+          <View style={styles.metaChip}>
+            <Ionicons name="briefcase-outline" size={16} color="#4B5563" />
+            <Text style={styles.metaValue}>
+              {doctor.experience || "-"}
+            </Text>
+            <Text style={styles.metaLabel}>სტაჟი</Text>
           </View>
         </View>
 
-        {/* Fees Section */}
-        <View style={styles.feesSection}>
-          <View style={styles.feeItem}>
-            <Text style={styles.feeLabel}>კონსულტაციის საფასური</Text>
-            <Text style={styles.feeAmount}>{doctor.consultationFee}</Text>
-            <Text style={styles.feeNote}>/ კონსულტაცია</Text>
+        {/* Price Card */}
+        <View style={styles.priceCard}>
+          <View>
+            <Text style={styles.priceLabel}>კონსულტაციის საფასური</Text>
+            <Text style={styles.priceValue}>
+              {doctor.consultationFee || "—"}
+            </Text>
+            {doctor.followUpFee && (
+              <Text style={styles.priceSub}>
+                განმეორებითი ვიზიტი: {doctor.followUpFee}
+              </Text>
+            )}
           </View>
-          <View style={styles.feeItem}>
-            <Text style={styles.feeLabel}>განმეორებითი ვიზიტის საფასური</Text>
-            <Text style={styles.feeAmount}>{doctor.followUpFee}</Text>
-            <Text style={styles.feeNote}>(15 დღის განმავლობაში)</Text>
+          <View style={styles.priceTag}>
+            <Ionicons name="time-outline" size={16} color="#0369A1" />
+            <Text style={styles.priceTagText}>30-45 წთ</Text>
           </View>
         </View>
 
@@ -208,36 +251,18 @@ const DoctorDetail = () => {
         <View style={styles.aboutSection}>
           <Text style={styles.aboutTitle}>ექიმის შესახებ</Text>
           <Text style={styles.aboutText}>{doctor.about}</Text>
-          <TouchableOpacity>
-            <Text style={styles.readMore}>მეტის წაკითხვა</Text>
-          </TouchableOpacity>
         </View>
 
-        {showAppointmentScheduler && (
-          <View style={styles.appointmentSection}>
-            <Text style={styles.appointmentTitle}>ჯავშნის გაკეთება</Text>
-            <AppointmentScheduler
-              workingHours={doctor.workingHours}
-              availability={doctor.availability || []}
-              totalReviews={doctor.totalReviews || 0}
-              reviews={Array.isArray(doctor.reviews) ? doctor.reviews : []}
-              doctorId={doctor.id}
-              onTimeSlotBlocked={loadDoctor} // Reload doctor data after blocking
-            />
-          </View>
-        )}
       </ScrollView>
 
-      {!showAppointmentScheduler && (
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={styles.appointmentButton}
-            onPress={() => setShowAppointmentScheduler(true)}
-          >
-            <Text style={styles.buttonText}>ჯავშნის გაკეთება</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity
+          style={styles.appointmentButton}
+          onPress={() => setShowAppointmentScheduler(true)}
+        >
+          <Text style={styles.buttonText}>ჯავშნის გაკეთება</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 };
@@ -247,7 +272,7 @@ export default DoctorDetail;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#20BEB8",
+    backgroundColor: "#F3F4F6",
   },
   header: {
     height: 200,
@@ -312,7 +337,7 @@ const styles = StyleSheet.create({
   },
   basicInfo: {
     alignItems: "center",
-    marginBottom: 30,
+    marginBottom: 20,
   },
   doctorName: {
     fontSize: 24,
@@ -337,59 +362,75 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins-Regular",
     color: "#999999",
   },
-  statistics: {
+  metaRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 30,
+    marginBottom: 20,
   },
-  statItem: {
-    alignItems: "center",
+  metaChip: {
     flex: 1,
-  },
-  statNumber: {
-    fontSize: 16,
-    fontFamily: "Poppins-Bold",
-    color: "#333333",
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    fontFamily: "Poppins-Regular",
-    color: "#666666",
-  },
-  feesSection: {
     flexDirection: "row",
-    backgroundColor: "#F8F9FA",
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 30,
-    borderWidth: 1,
-    borderColor: "#E5E5EA",
-  },
-  feeItem: {
-    flex: 1,
     alignItems: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    backgroundColor: "#F3F4F6",
+    marginHorizontal: 4,
   },
-  feeLabel: {
+  metaValue: {
+    marginLeft: 6,
     fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#0F172A",
+  },
+  metaLabel: {
+    marginLeft: 4,
+    fontSize: 11,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+  },
+  priceCard: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: "#EFF6FF",
+    marginBottom: 24,
+  },
+  priceLabel: {
+    fontSize: 13,
     fontFamily: "Poppins-Medium",
-    color: "#333333",
-    marginBottom: 8,
+    color: "#1E3A8A",
   },
-  feeAmount: {
-    fontSize: 24,
+  priceValue: {
+    marginTop: 4,
+    fontSize: 22,
     fontFamily: "Poppins-Bold",
-    color: "#333333",
-    marginBottom: 4,
+    color: "#0F172A",
   },
-  feeNote: {
+  priceSub: {
+    marginTop: 2,
     fontSize: 12,
     fontFamily: "Poppins-Regular",
-    color: "#999999",
+    color: "#4B5563",
+  },
+  priceTag: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: "#DBEAFE",
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  priceTagText: {
+    marginLeft: 6,
+    fontSize: 12,
+    fontFamily: "Poppins-Medium",
+    color: "#0369A1",
   },
   aboutSection: {
-    marginBottom: 100,
+    marginBottom: 80,
   },
   aboutTitle: {
     fontSize: 18,
@@ -410,20 +451,22 @@ const styles = StyleSheet.create({
     color: "#20BEB8",
   },
   buttonContainer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     backgroundColor: "#FFFFFF",
     borderTopWidth: 1,
     borderTopColor: "#E5E5EA",
   },
   appointmentButton: {
-    backgroundColor: "#20BEB8",
-    borderRadius: 12,
+    backgroundColor: "#22C55E",
+    borderRadius: 999,
     paddingVertical: 16,
     alignItems: "center",
+    shadowColor: "#22C55E",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 3,
   },
   buttonText: {
     fontSize: 16,
@@ -434,19 +477,43 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E5EA",
+    paddingTop: 16,
+    paddingBottom: 12,
+    backgroundColor: "#F3F4F6",
+    justifyContent: "space-between",
   },
   schedulerTitle: {
     fontSize: 18,
     fontFamily: "Poppins-SemiBold",
     color: "#333333",
-    marginLeft: 16,
+  },
+  schedulerHeaderInfo: {
+    flex: 1,
+    marginLeft: 12,
+    alignItems: "center",
+  },
+  schedulerSubtitle: {
+    marginTop: 2,
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+  },
+  schedulerContent: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 20,
+  },
+  schedulerBackButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    justifyContent: "center",
+    alignItems: "center",
   },
   appointmentSection: {
-    marginTop: -50,
+    marginTop: 8,
     marginBottom: 20,
   },
   appointmentTitle: {
@@ -465,7 +532,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 14,
     fontFamily: "Poppins-Regular",
-    color: "#FFFFFF",
+    color: "#333333",
   },
   errorContainer: {
     flex: 1,
@@ -476,7 +543,7 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 14,
     fontFamily: "Poppins-Regular",
-    color: "#FFFFFF",
+    color: "#333333",
     marginBottom: 16,
     textAlign: "center",
   },

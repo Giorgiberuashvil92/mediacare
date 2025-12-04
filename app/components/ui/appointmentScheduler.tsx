@@ -14,6 +14,8 @@ interface DayAvailability {
   date: string;
   dayOfWeek: string;
   timeSlots: string[];
+  videoSlots?: string[];
+  homeVisitSlots?: string[];
   bookedSlots?: string[]; // დაჯავშნული დროები
   isAvailable: boolean;
 }
@@ -58,6 +60,7 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
   doctorId,
   onTimeSlotBlocked,
 }) => {
+  const [mode, setMode] = useState<"video" | "home-visit">("video");
   const [selectedDate, setSelectedDate] = useState<string>(
     availability[0]?.date || ""
   );
@@ -99,6 +102,17 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
     (day) => day.date === selectedDate
   );
 
+  const getVisibleTimeSlots = () => {
+    if (!selectedDayAvailability) return [];
+    if (mode === "video" && selectedDayAvailability.videoSlots) {
+      return selectedDayAvailability.videoSlots;
+    }
+    if (mode === "home-visit" && selectedDayAvailability.homeVisitSlots) {
+      return selectedDayAvailability.homeVisitSlots;
+    }
+    return selectedDayAvailability.timeSlots || [];
+  };
+
   return (
     <View style={styles.container}>
       {/* Working Time Section */}
@@ -110,6 +124,59 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
       {/* Schedule Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>განრიგი</Text>
+
+        {/* Mode selector pills */}
+        <View style={styles.modeRow}>
+          <TouchableOpacity
+            style={[
+              styles.modePill,
+              mode === "video" && styles.modePillActiveVideo,
+            ]}
+            onPress={() => {
+              setMode("video");
+              setSelectedTime("");
+            }}
+          >
+            <Ionicons
+              name="videocam-outline"
+              size={16}
+              color={mode === "video" ? "#0EA5E9" : "#4B5563"}
+            />
+            <Text
+              style={[
+                styles.modePillText,
+                mode === "video" && styles.modePillTextActive,
+              ]}
+            >
+              ვიდეო
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.modePill,
+              mode === "home-visit" && styles.modePillActiveHome,
+            ]}
+            onPress={() => {
+              setMode("home-visit");
+              setSelectedTime("");
+            }}
+          >
+            <Ionicons
+              name="home-outline"
+              size={16}
+              color={mode === "home-visit" ? "#22C55E" : "#4B5563"}
+            />
+            <Text
+              style={[
+                styles.modePillText,
+                mode === "home-visit" && styles.modePillTextActive,
+              ]}
+            >
+              ბინაზე
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Month/Year Selector */}
         <View style={styles.monthSelector}>
@@ -158,8 +225,9 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>დრო</Text>
         <View style={styles.timeGrid}>
-          {selectedDayAvailability?.timeSlots.map((time) => {
-            const isBooked = selectedDayAvailability?.bookedSlots?.includes(time) || false;
+          {getVisibleTimeSlots().map((time) => {
+            const isBooked =
+              selectedDayAvailability?.bookedSlots?.includes(time) || false;
             return (
               <TouchableOpacity
                 key={time}
@@ -278,6 +346,34 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  modeRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 12,
+  },
+  modePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "#F3F4F6",
+    gap: 6,
+  },
+  modePillActiveVideo: {
+    backgroundColor: "#E0F2FE",
+  },
+  modePillActiveHome: {
+    backgroundColor: "#DCFCE7",
+  },
+  modePillText: {
+    fontSize: 12,
+    fontFamily: "Poppins-Medium",
+    color: "#4B5563",
+  },
+  modePillTextActive: {
+    color: "#0F172A",
   },
   sectionTitle: {
     fontSize: 18,

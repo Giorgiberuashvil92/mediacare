@@ -397,25 +397,54 @@ export class DoctorsService {
       'პარასკევი',
       'შაბათი',
     ];
-    const formattedAvailability = availability.map((avail) => {
+
+    // Group availability by date and type
+    const availabilityByDate: Record<
+      string,
+      { videoSlots: string[]; homeVisitSlots: string[] }
+    > = {};
+
+    availability.forEach((avail) => {
       const date = new Date(avail.date);
       const dateStr = date.toISOString().split('T')[0];
-      const bookedSlots = bookedSlotsByDate[dateStr] || new Set();
+      if (!availabilityByDate[dateStr]) {
+        availabilityByDate[dateStr] = {
+          videoSlots: [],
+          homeVisitSlots: [],
+        };
+      }
+      const target =
+        avail.type === 'home-visit'
+          ? availabilityByDate[dateStr].homeVisitSlots
+          : availabilityByDate[dateStr].videoSlots;
 
-      // Keep all time slots, don't filter out booked ones
-      const allTimeSlots = avail.timeSlots || [];
-      const availableTimeSlots = allTimeSlots.filter(
-        (slot: string) => !bookedSlots.has(slot),
-      );
-
-      return {
-        date: dateStr,
-        dayOfWeek: dayNames[date.getDay()],
-        timeSlots: allTimeSlots, // ყველა time slot (available + booked)
-        bookedSlots: Array.from(bookedSlots),
-        isAvailable: availableTimeSlots.length > 0,
-      };
+      (avail.timeSlots || []).forEach((slot: string) => {
+        if (!target.includes(slot)) {
+          target.push(slot);
+        }
+      });
     });
+
+    const formattedAvailability = Object.entries(availabilityByDate).map(
+      ([dateStr, slots]) => {
+        const date = new Date(dateStr);
+        const bookedSlots = bookedSlotsByDate[dateStr] || new Set();
+        const allTimeSlots = [...slots.videoSlots, ...slots.homeVisitSlots];
+        const availableTimeSlots = allTimeSlots.filter(
+          (slot) => !bookedSlots.has(slot),
+        );
+
+        return {
+          date: dateStr,
+          dayOfWeek: dayNames[date.getDay()],
+          timeSlots: allTimeSlots,
+          videoSlots: slots.videoSlots,
+          homeVisitSlots: slots.homeVisitSlots,
+          bookedSlots: Array.from(bookedSlots),
+          isAvailable: availableTimeSlots.length > 0,
+        };
+      },
+    );
 
     const reviews: any[] = [];
 
@@ -484,8 +513,9 @@ export class DoctorsService {
         $lte: new Date(endDate),
       };
     } else {
-      // Default to next 30 days
+      // Default to today (start of day) + next 30 days
       const start = new Date();
+      start.setHours(0, 0, 0, 0);
       const end = new Date();
       end.setDate(end.getDate() + 30);
       filter.date = { $gte: start, $lte: end };
@@ -502,6 +532,7 @@ export class DoctorsService {
       };
     } else {
       const start = new Date();
+      start.setHours(0, 0, 0, 0);
       const end = new Date();
       end.setDate(end.getDate() + 30);
       dateFilter.appointmentDate = { $gte: start, $lte: end };
@@ -586,16 +617,39 @@ export class DoctorsService {
       const date = new Date(slot.date);
       date.setHours(0, 0, 0, 0);
 
+      // Check for conflicting time slots with other types (video vs home-visit)
+      const otherType = slot.type === 'video' ? 'home-visit' : 'video';
+      const otherAvailability = await this.availabilityModel.findOne({
+        doctorId: new mongoose.Types.ObjectId(doctorId),
+        date,
+        type: otherType,
+      });
+
+      if (otherAvailability && otherAvailability.timeSlots?.length) {
+        const conflicts = slot.timeSlots.filter((t) =>
+          otherAvailability.timeSlots.includes(t),
+        );
+        if (conflicts.length > 0) {
+          throw new BadRequestException(
+            `Conflicting time slots with ${otherType} availability: ${conflicts.join(
+              ', ',
+            )}`,
+          );
+        }
+      }
+
       const availability = await this.availabilityModel.findOneAndUpdate(
         {
           doctorId: new mongoose.Types.ObjectId(doctorId),
           date,
+          type: slot.type,
         },
         {
           doctorId: new mongoose.Types.ObjectId(doctorId),
           date,
           timeSlots: slot.timeSlots,
           isAvailable: slot.isAvailable,
+          type: slot.type,
         },
         { upsert: true, new: true },
       );

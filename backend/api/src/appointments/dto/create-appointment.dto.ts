@@ -7,7 +7,7 @@ import {
   IsString,
   ValidateNested,
 } from 'class-validator';
-import { PaymentStatus } from '../schemas/appointment.schema';
+import { AppointmentType, PaymentStatus } from '../schemas/appointment.schema';
 
 class PatientDetailsDto {
   @IsOptional()
@@ -41,6 +41,10 @@ export class CreateAppointmentDto {
   appointmentTime: string;
 
   @IsNotEmpty()
+  @IsEnum(AppointmentType)
+  type: AppointmentType;
+
+  @IsNotEmpty()
   @IsNumber()
   consultationFee: number;
 
@@ -68,4 +72,8 @@ export class CreateAppointmentDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsString()
+  visitAddress?: string;
 }
