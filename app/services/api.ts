@@ -24,11 +24,11 @@ const getExpoHostIp = () => {
 
 const getDefaultBaseUrl = () => {
   // Force Railway URL for testing (both dev and production)
-  const FORCE_RAILWAY = true; // Set to false to use local development
+  const FORCE_RAILWAY = false; // Set to false to use local development
   
   if (FORCE_RAILWAY) {
     console.log('🚂 Forcing Railway URL for testing');
-    return "https://mediacare-production.up.railway.app";
+    return "https://localhost:4000";
   }
 
   const envUrl =
@@ -477,6 +477,7 @@ class ApiService {
 
   async getDoctorAvailability(
     doctorId: string,
+    type?: 'video' | 'home-visit',
   ): Promise<{
     success: boolean;
     data: any;
@@ -488,7 +489,13 @@ class ApiService {
       });
     }
 
-    return this.apiCall(`/doctors/${doctorId}/availability`, {
+    const queryParams = new URLSearchParams();
+    if (type) {
+      queryParams.append('type', type);
+    }
+
+    const queryString = queryParams.toString();
+    return this.apiCall(`/doctors/${doctorId}/availability${queryString ? `?${queryString}` : ''}`, {
       method: 'GET',
     });
   }
@@ -635,12 +642,14 @@ class ApiService {
       patientAge: number;
       date: string;
       time: string;
-      type: 'consultation' | 'followup' | 'emergency';
+      // ბექი აბრუნებს როგორც ძველ ტიპებს, ისე რეალურ ვიზიტის ტიპებს
+      type: 'consultation' | 'followup' | 'emergency' | 'video' | 'home-visit';
       status: 'completed' | 'scheduled' | 'in-progress' | 'cancelled';
       fee: number;
       isPaid: boolean;
       diagnosis?: string;
       symptoms?: string;
+      visitAddress?: string;
       consultationSummary?: {
         diagnosis?: string;
         symptoms?: string;
@@ -789,6 +798,8 @@ class ApiService {
     payload: {
       date: string;
       time: string;
+      type?: 'video' | 'home-visit';
+      visitAddress?: string;
       reason?: string;
     },
   ) {
@@ -1001,6 +1012,63 @@ class ApiService {
     });
 
     return this.handleResponse<T>(response);
+  }
+
+  // Advisors endpoints
+  async getAdvisors(): Promise<{
+    success: boolean;
+    data: any[];
+  }> {
+    try {
+      const response = await fetch(`${this.getBaseURL()}/advisors`, {
+        method: "GET",
+        headers: await this.getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return {
+        success: data.success || false,
+        data: data.data || [],
+      };
+    } catch (error: any) {
+      logger.error("Error fetching advisors:", error);
+      return {
+        success: false,
+        data: [],
+      };
+    }
+  }
+
+  async getActiveAdvisors(): Promise<{
+    success: boolean;
+    data: any[];
+  }> {
+    try {
+      const response = await fetch(`${this.getBaseURL()}/advisors/active`, {
+        method: "GET",
+        headers: await this.getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return {
+        success: data.success || false,
+        data: data.data || [],
+      };
+    } catch (error: any) {
+      logger.error("Error fetching active advisors:", error);
+      return {
+        success: false,
+        data: [],
+      };
+    }
   }
 }
 

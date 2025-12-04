@@ -1,9 +1,11 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import {
+  Modal,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -33,41 +35,106 @@ export default function DoctorDashboard() {
     Consultation[]
   >([]);
   const [todaySchedule, setTodaySchedule] = useState<any>(null);
+  const [availability, setAvailability] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [scheduleFilter, setScheduleFilter] = useState<
+    "all" | "video" | "home-visit"
+  >("all");
+  const [slotsModalVisible, setSlotsModalVisible] = useState(false);
+  const [slotsModalDate, setSlotsModalDate] = useState<string | null>(null);
+  const [slotsModalTimes, setSlotsModalTimes] = useState<string[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+  // Group upcoming available hours (doctor's schedule) by date for the selected type
+  const groupedUpcomingByDate = (() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-        const [statsResponse, appointmentsResponse, scheduleResponse] =
-          await Promise.all([
-            apiService.getDoctorDashboardStats(),
-            apiService.getDoctorDashboardAppointments(5),
-            apiService.getDoctorDashboardSchedule(),
-          ]);
+    const acc: Record<string, { date: string; slots: string[] }[]> = {};
 
-        if (statsResponse.success) {
-          setStats(statsResponse.data as any);
-        }
-        if (appointmentsResponse.success) {
-          setRecentConsultations(appointmentsResponse.data as any);
-        }
-        if (scheduleResponse.success) {
-          setTodaySchedule(scheduleResponse.data);
-        }
-      } catch (err) {
-        console.error("Error fetching dashboard data:", err);
-        setError("დეშბორდის მონაცემების ჩატვირთვა ვერ მოხერხდა");
-      } finally {
-        setLoading(false);
+    availability.forEach((a: any) => {
+      if (!a?.date || !Array.isArray(a.timeSlots) || !a.timeSlots.length) {
+        return;
       }
-    };
 
-    fetchDashboardData();
-  }, []);
+      // Filter by type tab
+      if (scheduleFilter !== "all" && a.type !== scheduleFilter) {
+        return;
+      }
+
+      const dateOnly = new Date(a.date);
+      dateOnly.setHours(0, 0, 0, 0);
+      // Only today and future
+      if (dateOnly < today) return;
+
+      const key = a.date;
+      if (!acc[key]) acc[key] = [];
+      acc[key].push({
+        date: a.date,
+        slots: a.timeSlots || [],
+      });
+    });
+
+    return acc;
+  })();
+
+  const upcomingDateKeys = Object.keys(groupedUpcomingByDate).sort();
+
+  const loadDashboardData = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      setError(null);
+      const [
+        statsResponse,
+        appointmentsResponse,
+        scheduleResponse,
+        availabilityResponse,
+      ] = await Promise.all([
+        apiService.getDoctorDashboardStats(),
+        apiService.getDoctorDashboardAppointments(5),
+        apiService.getDoctorDashboardSchedule(),
+        apiService.getDoctorAvailability(user.id),
+      ]);
+
+      if (statsResponse.success) {
+        setStats(statsResponse.data as any);
+      }
+      if (appointmentsResponse.success) {
+        setRecentConsultations(appointmentsResponse.data as any);
+      }
+      if (scheduleResponse.success) {
+        setTodaySchedule(scheduleResponse.data);
+      }
+      if (availabilityResponse.success && Array.isArray(availabilityResponse.data)) {
+        setAvailability(availabilityResponse.data as any[]);
+      }
+    } catch (err) {
+      console.error("Error fetching dashboard data:", err);
+      setError("დეშბორდის მონაცემების ჩატვირთვა ვერ მოხერხდა");
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id]);
+
+  // Initial load
+  useEffect(() => {
+    setLoading(true);
+    void loadDashboardData();
+  }, [loadDashboardData]);
+
+  // Reload when tab/screen gains focus (e.g. back from schedule)
+  useFocusEffect(
+    useCallback(() => {
+      void loadDashboardData();
+    }, [loadDashboardData]),
+  );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadDashboardData();
+    setRefreshing(false);
+  }, [loadDashboardData]);
 
   // Calculate percentages
   const appointmentCompletionRate = stats
@@ -156,7 +223,12 @@ export default function DoctorDashboard() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         {/* Header */}
         <View style={styles.header}>
           <View>
@@ -298,7 +370,7 @@ export default function DoctorDashboard() {
                       (sum, slots) => sum + slots.length,
                       0
                     )}{" "}
-                    ხელმისაწვდომი საათი
+                    ხელმისაწვდომი საათი (სულ)
                   </Text>
                 </View>
               </View>
@@ -407,17 +479,71 @@ export default function DoctorDashboard() {
                     {todaySchedule.dayOfWeek}
                   </Text>
                   <Text style={styles.scheduleCount}>
-                    {todaySchedule.consultations?.length || 0} კონსულტაცია დაგეგმილია
-                  </Text>
-                </View>
-                <View style={styles.scheduleBadge}>
-                  <Text style={styles.scheduleBadgeText}>
-                    {todaySchedule.availableSlots?.length || 0} ხელმისაწვდომი
+                    {(todaySchedule.consultations?.length || 0)} ჯამში
                   </Text>
                 </View>
               </View>
+
+              {/* Video vs Home-visit summary */}
+              <View style={styles.scheduleTypeRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.scheduleTypeCard,
+                    scheduleFilter === "video" && styles.scheduleTypeCardActive,
+                  ]}
+                  activeOpacity={0.8}
+                  onPress={() =>
+                    setScheduleFilter(
+                      scheduleFilter === "video" ? "all" : "video",
+                    )
+                  }
+                >
+                  <View style={styles.scheduleTypeIconVideo}>
+                    <Ionicons name="videocam-outline" size={18} color="#0EA5E9" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.scheduleTypeTitle}>ვიდეო კონსულტაციები</Text>
+                    <Text style={styles.scheduleTypeSubtitle}>
+                      {(todaySchedule.video?.appointments || 0)} ჯავშანი •{" "}
+                      {(todaySchedule.video?.availableSlots?.length || 0)} თავისუფალი
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.scheduleTypeCard,
+                    scheduleFilter === "home-visit" &&
+                      styles.scheduleTypeCardActive,
+                  ]}
+                  activeOpacity={0.8}
+                  onPress={() =>
+                    setScheduleFilter(
+                      scheduleFilter === "home-visit" ? "all" : "home-visit",
+                    )
+                  }
+                >
+                  <View style={styles.scheduleTypeIconHome}>
+                    <Ionicons name="home-outline" size={18} color="#16A34A" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.scheduleTypeTitle}>ბინაზე ვიზიტები</Text>
+                    <Text style={styles.scheduleTypeSubtitle}>
+                      {(todaySchedule.homeVisit?.appointments || 0)} ჯავშანი •{" "}
+                      {(todaySchedule.homeVisit?.availableSlots?.length || 0)} თავისუფალი
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+
               {todaySchedule.consultations &&
-                todaySchedule.consultations.slice(0, 3).map((consultation: any) => (
+                todaySchedule.consultations
+                  .filter((consultation: any) => {
+                    if (scheduleFilter === "all") return true;
+                    return consultation.type === scheduleFilter;
+                  })
+                  .slice(0, 3)
+                  .map((consultation: any) => (
               <View key={consultation.id} style={styles.consultationItem}>
                 <View style={styles.consultationTime}>
                   <Ionicons name="time-outline" size={16} color="#6B7280" />
@@ -460,6 +586,71 @@ export default function DoctorDashboard() {
                 </View>
               </View>
                 ))}
+              
+              {/* Upcoming days list for selected type */}
+              {upcomingDateKeys.length > 0 && (
+                <View style={styles.upcomingDaysSection}>
+                  <Text style={styles.upcomingDaysTitle}>
+                    მომავალი დღეები ({scheduleFilter === "all" ? "ყველა ტიპი" : scheduleFilter === "video" ? "ვიდეო" : "ბინაზე"})
+                  </Text>
+                  {upcomingDateKeys.slice(0, 5).map((dateKey) => {
+                    const items = groupedUpcomingByDate[dateKey] || [];
+                    const allSlots = items.flatMap((it) => it.slots || []);
+                    const uniqueSlots = Array.from(new Set(allSlots));
+                    const totalSlots = uniqueSlots.length;
+                    const d = new Date(dateKey);
+                    return (
+                      <View key={dateKey} style={styles.upcomingDayRow}>
+                        <View style={styles.upcomingDayLeft}>
+                          <Text style={styles.upcomingDayDate}>
+                            {d.toLocaleDateString("ka-GE", {
+                              day: "numeric",
+                              month: "short",
+                            })}
+                          </Text>
+                          <Text style={styles.upcomingDayWeekday}>
+                            {d.toLocaleDateString("ka-GE", {
+                              weekday: "short",
+                            })}
+                          </Text>
+                        </View>
+                        <View style={styles.upcomingDayRight}>
+                          <Text style={styles.upcomingDayCount}>
+                            {totalSlots === 1
+                              ? "1 ხელმისაწვდომი საათი"
+                              : `${totalSlots} ხელმისაწვდომი საათი`}
+                          </Text>
+                          <View style={styles.upcomingDayTimes}>
+                            {uniqueSlots.slice(0, 3).map((time) => (
+                              <View key={time} style={styles.upcomingTimeChip}>
+                                <Text style={styles.upcomingTimeChipText}>
+                                  {time}
+                                </Text>
+                              </View>
+                            ))}
+                            {totalSlots > 3 && (
+                              <View>
+                                <TouchableOpacity
+                                  style={styles.upcomingMoreChip}
+                                  onPress={() => {
+                                    setSlotsModalDate(dateKey);
+                                    setSlotsModalTimes(uniqueSlots);
+                                    setSlotsModalVisible(true);
+                                  }}
+                                >
+                                  <Text style={styles.upcomingMoreChipText}>
+                                    +{totalSlots - 3}
+                                  </Text>
+                                </TouchableOpacity>
+                              </View>
+                            )}
+                          </View>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
               {todaySchedule.consultations &&
                 todaySchedule.consultations.length > 0 && (
                   <TouchableOpacity
@@ -571,6 +762,54 @@ export default function DoctorDashboard() {
           </View>
         </View>
       </ScrollView>
+      {/* Full list of hours modal */}
+      <Modal
+        visible={slotsModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSlotsModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                ხელმისაწვდომი საათები
+              </Text>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setSlotsModalVisible(false)}
+              >
+                <Ionicons name="close" size={22} color="#4B5563" />
+              </TouchableOpacity>
+            </View>
+
+            {slotsModalDate && (
+              <Text style={styles.modalDateText}>
+                {new Date(slotsModalDate).toLocaleDateString("ka-GE", {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "long",
+                })}
+              </Text>
+            )}
+
+            <View style={styles.modalTimesGrid}>
+              {slotsModalTimes.map((time) => (
+                <View key={time} style={styles.modalTimeChip}>
+                  <Text style={styles.modalTimeChipText}>{time}</Text>
+                </View>
+              ))}
+            </View>
+
+            <TouchableOpacity
+              style={styles.modalOkButton}
+              onPress={() => setSlotsModalVisible(false)}
+            >
+              <Text style={styles.modalOkButtonText}>კარგი</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -860,6 +1099,195 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Poppins-Medium",
     color: "#06B6D4",
+  },
+  // Today's schedule - type summary (video vs home-visit)
+  scheduleTypeRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 12,
+  },
+  scheduleTypeCard: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    backgroundColor: "#F9FAFB",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  scheduleTypeCardActive: {
+    backgroundColor: "#ECFEFF",
+    borderColor: "#06B6D4",
+  },
+  scheduleTypeIconVideo: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#E0F2FE",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 10,
+  },
+  scheduleTypeIconHome: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#DCFCE7",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 10,
+  },
+  scheduleTypeTitle: {
+    fontSize: 13,
+    fontFamily: "Poppins-SemiBold",
+    color: "#111827",
+    marginBottom: 2,
+  },
+  scheduleTypeSubtitle: {
+    fontSize: 11,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+  },
+  upcomingDaysSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
+    gap: 8,
+  },
+  upcomingDaysTitle: {
+    fontSize: 13,
+    fontFamily: "Poppins-SemiBold",
+    color: "#374151",
+    marginBottom: 4,
+  },
+  upcomingDayRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 6,
+  },
+  upcomingDayLeft: {
+    minWidth: 70,
+  },
+  upcomingDayDate: {
+    fontSize: 13,
+    fontFamily: "Poppins-SemiBold",
+    color: "#111827",
+  },
+  upcomingDayWeekday: {
+    fontSize: 11,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+  },
+  upcomingDayRight: {
+    flex: 1,
+    alignItems: "flex-end",
+  },
+  upcomingDayCount: {
+    fontSize: 11,
+    fontFamily: "Poppins-Medium",
+    color: "#4B5563",
+    marginBottom: 2,
+  },
+  upcomingDayTimes: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
+    justifyContent: "flex-end",
+  },
+  upcomingTimeChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: "#E5E7EB",
+  },
+  upcomingTimeChipText: {
+    fontSize: 11,
+    fontFamily: "Poppins-Medium",
+    color: "#374151",
+  },
+  upcomingMoreChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: "#06B6D420",
+  },
+  upcomingMoreChipText: {
+    fontSize: 11,
+    fontFamily: "Poppins-SemiBold",
+    color: "#06B6D4",
+  },
+  // Modal for full list of hours
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    width: "88%",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontFamily: "Poppins-SemiBold",
+    color: "#111827",
+  },
+  modalCloseButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#F3F4F6",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalDateText: {
+    fontSize: 13,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+    marginBottom: 12,
+  },
+  modalTimesGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 16,
+  },
+  modalTimeChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "#E5E7EB",
+  },
+  modalTimeChipText: {
+    fontSize: 13,
+    fontFamily: "Poppins-Medium",
+    color: "#111827",
+  },
+  modalOkButton: {
+    alignSelf: "center",
+    marginTop: 4,
+    paddingHorizontal: 26,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: "#06B6D4",
+  },
+  modalOkButtonText: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#FFFFFF",
   },
   consultationItem: {
     paddingVertical: 12,

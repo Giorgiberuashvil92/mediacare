@@ -168,8 +168,14 @@ export class DoctorsController {
     @Param('id') id: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('type') type?: 'video' | 'home-visit',
   ) {
-    return this.doctorsService.getDoctorAvailability(id, startDate, endDate);
+    return this.doctorsService.getDoctorAvailability(
+      id,
+      startDate,
+      endDate,
+      type,
+    );
   }
 
   @Put('availability')

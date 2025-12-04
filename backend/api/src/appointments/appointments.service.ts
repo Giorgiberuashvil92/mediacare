@@ -12,6 +12,7 @@ import {
   Appointment,
   AppointmentDocument,
   AppointmentStatus,
+  AppointmentType,
   PaymentStatus,
 } from './schemas/appointment.schema';
 
@@ -80,23 +81,22 @@ export class AppointmentsService {
     const normalizedDate = new Date(appointmentDate);
     normalizedDate.setHours(0, 0, 0, 0);
 
+    // Check doctor's availability for the specific appointment type (video/home-visit)
     const availability = await this.availabilityModel.findOne({
       doctorId: new mongoose.Types.ObjectId(createAppointmentDto.doctorId),
       date: normalizedDate,
+      type: createAppointmentDto.type, // Check availability for specific type
       isAvailable: true,
     });
 
     if (!availability) {
-      throw new BadRequestException('Doctor is not available on this date');
-    }
-
-    const availabilityDoc = availability;
-    const timeSlots = availabilityDoc.timeSlots as string[] | undefined;
-    if (
-      !timeSlots ||
-      !timeSlots.includes(createAppointmentDto.appointmentTime)
-    ) {
-      throw new BadRequestException('Selected time slot is not available');
+      const typeLabel =
+        createAppointmentDto.type === AppointmentType.VIDEO
+          ? 'ვიდეო კონსულტაციის'
+          : 'ბინაზე ვიზიტის';
+      throw new BadRequestException(
+        `ექიმი არ არის ხელმისაწვდომი ამ თარიღზე ${typeLabel} ტიპის ჯავშნისთვის`,
+      );
     }
 
     // Check if the time slot is already booked
@@ -123,6 +123,7 @@ export class AppointmentsService {
       patientId: new mongoose.Types.ObjectId(patientId),
       appointmentDate: normalizedDate,
       appointmentTime: createAppointmentDto.appointmentTime,
+      type: createAppointmentDto.type, // Include appointment type (video/home-visit)
       status: AppointmentStatus.PENDING,
       consultationFee: createAppointmentDto.consultationFee,
       totalAmount: createAppointmentDto.totalAmount,

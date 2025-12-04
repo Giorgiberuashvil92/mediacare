@@ -42,8 +42,13 @@ const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
 };
 
 const MakeAppointment = () => {
-  const { doctorId, selectedDate, selectedTime, paymentMethod } =
-    useLocalSearchParams();
+  const {
+    doctorId,
+    selectedDate,
+    selectedTime,
+    paymentMethod,
+    appointmentType: appointmentTypeParam,
+  } = useLocalSearchParams();
   const { user } = useAuth();
   const [doctor, setDoctor] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -51,12 +56,14 @@ const MakeAppointment = () => {
   const [selectedPatient, setSelectedPatient] = useState<"self" | "other">("self");
   const [promoCode, setPromoCode] = useState("");
   const [selectedPaymentMethod] = useState((paymentMethod as string) || "visa");
-  const [appointmentType, setAppointmentType] =
-    useState<AppointmentType>("video");
+  const [appointmentType, setAppointmentType] = useState<AppointmentType>(
+    (appointmentTypeParam as AppointmentType) || "video",
+  );
   const [visitAddress, setVisitAddress] = useState("");
   const [patientProfile, setPatientProfile] = useState<any>(null);
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [creatingAppointment, setCreatingAppointment] = useState(false);
+  const isLockedType = !!appointmentTypeParam;
 
   useEffect(() => {
     loadDoctor();
@@ -197,100 +204,105 @@ const MakeAppointment = () => {
       return;
     }
 
-    // If "self" is selected and we have complete profile info, create appointment directly
+    // თუ პაციენტად შენთავს ირჩევ და პროფილის მონაცემები გვაქვს,
+    // საერთოდ აღარ გაგიშვეს დამატებითი ფორმაზე – პირდაპირ შეიქმნას ჯავშანი
     if (selectedPatient === "self" && patientProfile) {
-      // Check if we have all required fields
-      const hasCompleteInfo = 
-        patientProfile.name && 
-        patientProfile.dateOfBirth && 
-        patientProfile.gender;
+      try {
+        setCreatingAppointment(true);
 
-      if (hasCompleteInfo) {
-        // Create appointment directly without going to patient-details page
-        try {
-          setCreatingAppointment(true);
-          
-          // Format dateOfBirth for API
-          // Backend returns dateOfBirth in ISO format (YYYY-MM-DD), so use it directly
-          let dateOfBirthForAPI = patientProfile.dateOfBirth;
-          
-          // If it's not in ISO format (e.g., Georgian format), try to parse it
-          if (!dateOfBirthForAPI.includes("-")) {
-            // Try to parse Georgian date format (e.g., "15 იანვარი 1990")
-            const dateMatch = dateOfBirthForAPI.match(/(\d+)\s+(\w+)\s+(\d+)/);
-            if (dateMatch) {
-              const months = [
-                "იანვარი", "თებერვალი", "მარტი", "აპრილი", "მაისი", "ივნისი",
-                "ივლისი", "აგვისტო", "სექტემბერი", "ოქტომბერი", "ნოემბერი", "დეკემბერი"
-              ];
-              const monthIndex = months.indexOf(dateMatch[2]);
-              if (monthIndex !== -1) {
-                const date = new Date(parseInt(dateMatch[3]), monthIndex, parseInt(dateMatch[1]));
-                dateOfBirthForAPI = date.toISOString().split("T")[0];
-              }
+        // გამოცდილებისთვის ვცდილობთ DOB გამოვიტანოთ, მაგრამ თუ არაა – უბრალოდ არ გავგზავნით
+        let dateOfBirthForAPI: string | undefined = patientProfile.dateOfBirth;
+
+        if (dateOfBirthForAPI && !dateOfBirthForAPI.includes("-")) {
+          const dateMatch = dateOfBirthForAPI.match(/(\d+)\s+(\w+)\s+(\d+)/);
+          if (dateMatch) {
+            const months = [
+              "იანვარი",
+              "თებერვალი",
+              "მარტი",
+              "აპრილი",
+              "მაისი",
+              "ივნისი",
+              "ივლისი",
+              "აგვისტო",
+              "სექტემბერი",
+              "ოქტომბერი",
+              "ნოემბერი",
+              "დეკემბერი",
+            ];
+            const monthIndex = months.indexOf(dateMatch[2]);
+            if (monthIndex !== -1) {
+              const date = new Date(
+                parseInt(dateMatch[3]),
+                monthIndex,
+                parseInt(dateMatch[1]),
+              );
+              dateOfBirthForAPI = date.toISOString().split("T")[0];
             }
           }
-          
-          // Ensure it's in ISO format (YYYY-MM-DD)
-          if (!dateOfBirthForAPI || !dateOfBirthForAPI.includes("-")) {
-            // Fallback: try to parse as Date object
-            const parsedDate = new Date(patientProfile.dateOfBirth);
-            if (!isNaN(parsedDate.getTime())) {
-              dateOfBirthForAPI = parsedDate.toISOString().split("T")[0];
-            }
-          }
+        }
 
-          const response = await apiService.createAppointment({
-            doctorId: doctorId as string,
-            appointmentDate: selectedDate as string,
-            appointmentTime: selectedTime as string,
-            type: appointmentType,
-            consultationFee: consultationFee,
-            totalAmount: netAmount,
-            paymentMethod: "pending", // Payment will be handled later
-            paymentStatus: "pending", // Payment status is pending until payment is made
-            patientDetails: {
-              name: patientProfile.name,
-              dateOfBirth: dateOfBirthForAPI,
-              gender: patientProfile.gender,
-              problem: "", // Can be empty if user didn't specify
+        if (dateOfBirthForAPI && !dateOfBirthForAPI.includes("-")) {
+          const parsedDate = new Date(patientProfile.dateOfBirth);
+          if (!Number.isNaN(parsedDate.getTime())) {
+            dateOfBirthForAPI = parsedDate.toISOString().split("T")[0];
+          }
+        }
+
+        const response = await apiService.createAppointment({
+          doctorId: doctorId as string,
+          appointmentDate: selectedDate as string,
+          appointmentTime: selectedTime as string,
+          type: appointmentType,
+          consultationFee: consultationFee,
+          totalAmount: netAmount,
+          paymentMethod: "pending",
+          paymentStatus: "pending",
+          patientDetails: {
+            name: patientProfile.name || user?.name,
+            dateOfBirth: dateOfBirthForAPI,
+            gender: patientProfile.gender,
+            problem: "",
+          },
+          documents: [],
+          notes: "",
+          visitAddress:
+            appointmentType === "home-visit"
+              ? visitAddress.trim()
+              : undefined,
+        });
+
+        if (response.success) {
+          router.push({
+            pathname: "/screens/appointment/appointment-success",
+            params: {
+              doctorId: doctorId as string,
+              appointmentId: response.data?._id || response.data?.id || "",
+              selectedDate: selectedDate as string,
+              selectedTime: selectedTime as string,
+              paymentMethod: selectedPaymentMethod,
+              patientName: patientProfile.name || user?.name || "",
+              problem: "",
+              appointmentNumber: response.data?.appointmentNumber || "",
             },
-            documents: [],
-            notes: "",
-            visitAddress:
-              appointmentType === "home-visit"
-                ? visitAddress.trim()
-                : undefined,
           });
-
-          if (response.success) {
-            router.push({
-              pathname: "/screens/appointment/appointment-success",
-              params: {
-                doctorId: doctorId as string,
-                appointmentId: response.data?._id || response.data?.id || "",
-                selectedDate: selectedDate as string,
-                selectedTime: selectedTime as string,
-                paymentMethod: selectedPaymentMethod,
-                patientName: patientProfile.name,
-                problem: "",
-                appointmentNumber: response.data?.appointmentNumber || "",
-              },
-            });
-          } else {
-            Alert.alert("შეცდომა", response.message || "ჯავშნის შექმნა ვერ მოხერხდა");
-          }
-        } catch (error: any) {
-          console.error("Error creating appointment:", error);
+        } else {
           Alert.alert(
             "შეცდომა",
-            error.message || "ჯავშნის შექმნა ვერ მოხერხდა. გთხოვთ სცადოთ თავიდან."
+            response.message || "ჯავშნის შექმნა ვერ მოხერხდა",
           );
-        } finally {
-          setCreatingAppointment(false);
         }
-        return;
+      } catch (error: any) {
+        console.error("Error creating appointment:", error);
+        Alert.alert(
+          "შეცდომა",
+          error.message ||
+            "ჯავშნის შექმნა ვერ მოხერხდა. გთხოვთ სცადოთ თავიდან.",
+        );
+      } finally {
+        setCreatingAppointment(false);
       }
+      return;
     }
 
     // Otherwise, navigate to Patient Details page
@@ -371,51 +383,77 @@ const MakeAppointment = () => {
         {/* Appointment Type */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>კონსულტაციის ტიპი</Text>
-          <View style={styles.typeSelectorContainer}>
-            <TouchableOpacity
-              style={[
-                styles.typeChip,
-                appointmentType === "video" && styles.typeChipActive,
-              ]}
-              onPress={() => setAppointmentType("video")}
-            >
-              <Ionicons
-                name="videocam-outline"
-                size={18}
-                color={appointmentType === "video" ? "#FFFFFF" : "#4B5563"}
-              />
-              <Text
-                style={[
-                  styles.typeChipText,
-                  appointmentType === "video" && styles.typeChipTextActive,
-                ]}
-              >
-                ვიდეო კონსულტაცია
-              </Text>
-            </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[
-                styles.typeChip,
-                appointmentType === "home-visit" && styles.typeChipActive,
-              ]}
-              onPress={() => setAppointmentType("home-visit")}
-            >
-              <Ionicons
-                name="home-outline"
-                size={18}
-                color={appointmentType === "home-visit" ? "#FFFFFF" : "#4B5563"}
-              />
-              <Text
+          {isLockedType ? (
+            // თუ ექიმის გვერდიდან მოვიდა ტიპი, ვაჩვენოთ მხოლოდ არჩეული ტიპი, ჩიპების გარეშე
+            <View style={styles.typeSelectorContainer}>
+              <View style={[styles.typeChip, styles.typeChipActive]}>
+                <Ionicons
+                  name={
+                    appointmentType === "home-visit"
+                      ? "home-outline"
+                      : "videocam-outline"
+                  }
+                  size={18}
+                  color="#FFFFFF"
+                />
+                <Text style={[styles.typeChipText, styles.typeChipTextActive]}>
+                  {appointmentType === "home-visit"
+                    ? "ბინაზე ვიზიტი"
+                    : "ვიდეო კონსულტაცია"}
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.typeSelectorContainer}>
+              <TouchableOpacity
                 style={[
-                  styles.typeChipText,
-                  appointmentType === "home-visit" && styles.typeChipTextActive,
+                  styles.typeChip,
+                  appointmentType === "video" && styles.typeChipActive,
                 ]}
+                onPress={() => setAppointmentType("video")}
               >
-                ბინაზე ვიზიტი
-              </Text>
-            </TouchableOpacity>
-          </View>
+                <Ionicons
+                  name="videocam-outline"
+                  size={18}
+                  color={appointmentType === "video" ? "#FFFFFF" : "#4B5563"}
+                />
+                <Text
+                  style={[
+                    styles.typeChipText,
+                    appointmentType === "video" && styles.typeChipTextActive,
+                  ]}
+                >
+                  ვიდეო კონსულტაცია
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.typeChip,
+                  appointmentType === "home-visit" && styles.typeChipActive,
+                ]}
+                onPress={() => setAppointmentType("home-visit")}
+              >
+                <Ionicons
+                  name="home-outline"
+                  size={18}
+                  color={
+                    appointmentType === "home-visit" ? "#FFFFFF" : "#4B5563"
+                  }
+                />
+                <Text
+                  style={[
+                    styles.typeChipText,
+                    appointmentType === "home-visit" &&
+                      styles.typeChipTextActive,
+                  ]}
+                >
+                  ბინაზე ვიზიტი
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {appointmentType === "home-visit" && (
             <View style={{ marginTop: 16 }}>

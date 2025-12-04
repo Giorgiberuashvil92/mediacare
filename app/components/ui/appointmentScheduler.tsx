@@ -3,6 +3,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -34,23 +35,7 @@ interface AppointmentSchedulerProps {
   totalReviews: number;
   reviews: Review[];
   doctorId?: string;
-  onTimeSlotBlocked?: () => void; // Callback after blocking time slot
 }
-
-// Function to temporarily block a time slot
-const blockTimeSlot = async (doctorId: string, date: string, time: string) => {
-  try {
-    const response = await apiService.blockTimeSlot({
-      doctorId,
-      date,
-      time,
-    });
-    return response;
-  } catch (error) {
-    console.error('Error blocking time slot:', error);
-    throw error;
-  }
-};
 
 const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
   workingHours,
@@ -58,11 +43,10 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
   totalReviews,
   reviews,
   doctorId,
-  onTimeSlotBlocked,
 }) => {
   const [mode, setMode] = useState<"video" | "home-visit">("video");
   const [selectedDate, setSelectedDate] = useState<string>(
-    availability[0]?.date || ""
+    availability[0]?.date || "",
   );
   const [selectedTime, setSelectedTime] = useState<string>("");
 
@@ -89,6 +73,25 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
 
   const currentMonth = getCurrentMonth();
 
+  // Filter availability by current mode so რომ თითო ტაბში მხოლოდ შესაბამისი ტიპის დღეები ჩანდეს
+  const filteredAvailability: DayAvailability[] = availability.filter((day) => {
+    if (mode === "video") {
+      return (day.videoSlots && day.videoSlots.length > 0) || day.timeSlots.length > 0;
+    }
+    // home-visit
+    return day.homeVisitSlots && day.homeVisitSlots.length > 0;
+  });
+
+  // Ensure selected date always belongs to current filtered list
+  if (
+    filteredAvailability.length > 0 &&
+    !filteredAvailability.find((d) => d.date === selectedDate)
+  ) {
+    // Default to first available date for this mode
+     
+    setSelectedDate(filteredAvailability[0].date);
+  }
+
   const handleDateSelect = (date: string) => {
     setSelectedDate(date);
     setSelectedTime(""); // Reset time selection when date changes
@@ -98,7 +101,7 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
     setSelectedTime(time);
   };
 
-  const selectedDayAvailability = availability.find(
+  const selectedDayAvailability = filteredAvailability.find(
     (day) => day.date === selectedDate
   );
 
@@ -191,7 +194,7 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
           style={styles.dayScroll}
           contentContainerStyle={styles.dayContainer}
         >
-          {availability.map((day) => (
+          {filteredAvailability.map((day) => (
             <TouchableOpacity
               key={day.date}
               style={[
@@ -289,36 +292,61 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
         ]}
         disabled={!selectedDate || !selectedTime}
         onPress={async () => {
-          if (selectedDate && selectedTime && doctorId) {
-            try {
-              // Block the time slot temporarily before navigating
-              await blockTimeSlot(doctorId, selectedDate, selectedTime);
-              
-              // Call callback to refresh doctor data
-              if (onTimeSlotBlocked) {
-                onTimeSlotBlocked();
-              }
-              
-              router.push({
-                pathname: "/screens/appointment/make-appointment",
-                params: {
-                  doctorId: doctorId,
-                  selectedDate: selectedDate,
-                  selectedTime: selectedTime,
-                },
-              });
-            } catch (error) {
-              console.error('Failed to block time slot:', error);
-              // Still navigate even if blocking fails
-              router.push({
-                pathname: "/screens/appointment/make-appointment",
-                params: {
-                  doctorId: doctorId,
-                  selectedDate: selectedDate,
-                  selectedTime: selectedTime,
-                },
-              });
+          if (!selectedDate || !selectedTime || !doctorId) return;
+
+          try {
+            // გადამოწმება: ისევ თავისუფალია ეს დრო ამ ტიპისთვის?
+            const response = await apiService.getDoctorAvailability(doctorId);
+
+            if (!response.success || !response.data) {
+              Alert.alert(
+                "შეცდომა",
+                "ექიმის განრიგის გადამოწმება ვერ მოხერხდა. გთხოვთ სცადოთ თავიდან.",
+              );
+              return;
             }
+
+            const daysForType = (response.data as any[]).filter(
+              (d) => d.date === selectedDate && d.type === mode && d.isAvailable,
+            );
+
+            const availableSlots: string[] = daysForType.flatMap(
+              (d) => d.timeSlots || [],
+            );
+
+            // Debug log რომ ზუსტად ვნახოთ რა სტატუსია
+            console.log("[AppointmentScheduler] availability check", {
+              mode,
+              selectedDate,
+              selectedTime,
+              rawData: response.data,
+              daysForType,
+              availableSlots,
+            });
+
+            if (!availableSlots.includes(selectedTime)) {
+              Alert.alert(
+                "დრო დაკავებულია",
+                "არჩეული დრო ძალაში აღარ არის. გთხოვთ აირჩიოთ სხვა დრო.",
+              );
+              return;
+            }
+
+            router.push({
+              pathname: "/screens/appointment/make-appointment",
+              params: {
+                doctorId,
+                selectedDate,
+                selectedTime,
+                appointmentType: mode,
+              },
+            });
+          } catch (error) {
+            console.error("Failed to validate availability before booking", error);
+            Alert.alert(
+              "შეცდომა",
+              "ვერ მოხერხდა დროის გადამოწმება. გთხოვთ სცადოთ თავიდან.",
+            );
           }
         }}
       >

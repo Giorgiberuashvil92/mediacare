@@ -1,4 +1,5 @@
-import { IsDateString, IsOptional, IsString } from 'class-validator';
+import { IsDateString, IsEnum, IsOptional, IsString } from 'class-validator';
+import { AppointmentType } from '../../appointments/schemas/appointment.schema';
 
 export class CreateFollowUpDto {
   @IsDateString()
@@ -6,6 +7,14 @@ export class CreateFollowUpDto {
 
   @IsString()
   time: string;
+
+  @IsEnum(AppointmentType)
+  @IsOptional()
+  type?: AppointmentType;
+
+  @IsOptional()
+  @IsString()
+  visitAddress?: string;
 
   @IsOptional()
   @IsString()

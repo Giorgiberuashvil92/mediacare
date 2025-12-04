@@ -65,7 +65,13 @@ export interface Consultation {
   patientAge: number;
   date: string;
   time: string;
-  type: "consultation" | "followup" | "emergency"; // კონსულტაცია | განმეორებითი | სასწრაფო
+  // ტიპი ახლა მოიცავს როგორც ძველ მნიშვნელობებს, ისე რეალურ ვიზიტის ტიპებს
+  type:
+    | "consultation"
+    | "followup"
+    | "emergency"
+    | "video"
+    | "home-visit";
   status: "completed" | "scheduled" | "cancelled" | "in-progress"; // შესრულებული | დანიშნული | გაუქმებული | მიმდინარე
   fee: number; // ანაზღაურება
   isPaid: boolean; // გადახდილია
@@ -454,6 +460,10 @@ export const getConsultationTypeLabel = (
   type: Consultation["type"]
 ): string => {
   switch (type) {
+    case "video":
+      return "ვიდეო კონსულტაცია";
+    case "home-visit":
+      return "ბინაზე ვიზიტი";
     case "consultation":
       return "კონსულტაცია";
     case "followup":

@@ -4,8 +4,10 @@ import * as DocumentPicker from "expo-document-picker";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Image,
+  Linking,
   Modal,
   ScrollView,
   StyleSheet,
@@ -21,23 +23,31 @@ import {
   getStatusColor,
   getStatusLabel,
 } from "../../assets/data/doctorDashboard";
+import { useAuth } from "../contexts/AuthContext";
 import { apiService } from "../services/api";
+
+interface Medication {
+  name: string;
+  dosage: string;
+  frequency: string;
+  duration: string;
+  instructions?: string;
+}
 
 export default function DoctorAppointments() {
   const router = useRouter();
+  const { user } = useAuth();
   const FORM100_MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
   const createEmptyAppointmentData = () => ({
     diagnosis: "",
     symptoms: "",
-    bloodPressure: "",
-    heartRate: "",
-    temperature: "",
-    weight: "",
-    medications: "",
+    medications: [] as Medication[],
     followUpRequired: false,
     followUpDate: "",
     followUpTime: "",
+    followUpType: "video" as "video" | "home-visit",
+    followUpVisitAddress: "",
     followUpReason: "",
     notes: "",
   });
@@ -53,6 +63,9 @@ export default function DoctorAppointments() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [statusActionLoading, setStatusActionLoading] = useState<string | null>(null);
   const [savingAppointment, setSavingAppointment] = useState(false);
+  const [showFollowUpScheduleModal, setShowFollowUpScheduleModal] = useState(false);
+  const [followUpAvailability, setFollowUpAvailability] = useState<any[]>([]);
+  const [loadingFollowUpAvailability, setLoadingFollowUpAvailability] = useState(false);
   const resetAppointmentForm = () => {
     setAppointmentData(createEmptyAppointmentData());
     setForm100File(null);
@@ -74,7 +87,12 @@ export default function DoctorAppointments() {
         setLoading(true);
         setError(null);
 
-        const response = await apiService.getDoctorDashboardAppointments(100);
+        const response = (await apiService.getDoctorDashboardAppointments(
+          100,
+        )) as {
+          success: boolean;
+          data: Consultation[];
+        };
 
         if (response.success) {
           setConsultations(response.data as any);
@@ -100,6 +118,12 @@ export default function DoctorAppointments() {
 
     return () => clearInterval(interval);
   }, []);
+
+  // Debug modal state
+  useEffect(() => {
+    console.log("🔍 Modal state changed - showFollowUpScheduleModal:", showFollowUpScheduleModal);
+    console.log("🔍 Availability length:", followUpAvailability.length);
+  }, [showFollowUpScheduleModal, followUpAvailability]);
 
   // Function to calculate time until consultation
   const getTimeUntilConsultation = (consultation: Consultation) => {
@@ -229,22 +253,31 @@ export default function DoctorAppointments() {
         followUpTime = followUpDate.toISOString().split("T")[1]?.slice(0, 5) || "";
       }
     }
+    // Parse medications from JSON string to array
+    let medications: Medication[] = [];
+    if (summary?.medications) {
+      try {
+        medications = JSON.parse(summary.medications);
+      } catch {
+        // Fallback: if not JSON, treat as empty array
+        medications = [];
+      }
+    }
+
     setAppointmentData({
       diagnosis:
         summary?.diagnosis || consultation.diagnosis || "",
       symptoms:
         summary?.symptoms || consultation.symptoms || "",
-      bloodPressure: summary?.vitals?.bloodPressure || "",
-      heartRate: summary?.vitals?.heartRate || "",
-      temperature: summary?.vitals?.temperature || "",
-      weight: summary?.vitals?.weight || "",
-      medications: summary?.medications || "",
+      medications,
       notes: summary?.notes || "",
       followUpRequired: consultation.followUp?.required ?? false,
       followUpDate: consultation.followUp?.date
         ? consultation.followUp?.date.split("T")[0]
         : "",
       followUpTime,
+      followUpType: (consultation as any).followUpType || "video",
+      followUpVisitAddress: (consultation as any).followUpVisitAddress || "",
       followUpReason: consultation.followUp?.reason || "",
     });
     setForm100File(null);
@@ -273,19 +306,19 @@ export default function DoctorAppointments() {
     try {
       setSavingAppointment(true);
 
+      // Convert medications array to JSON string for backend
+      const medicationsString =
+        appointmentData.medications.length > 0
+          ? JSON.stringify(appointmentData.medications)
+          : undefined;
+
       const payload = {
         status: "completed" as const,
         consultationSummary: {
           diagnosis: appointmentData.diagnosis.trim(),
           symptoms: appointmentData.symptoms.trim() || undefined,
-          medications: appointmentData.medications.trim() || undefined,
+          medications: medicationsString,
           notes: appointmentData.notes.trim() || undefined,
-          vitals: {
-            bloodPressure: appointmentData.bloodPressure.trim() || undefined,
-            heartRate: appointmentData.heartRate.trim() || undefined,
-            temperature: appointmentData.temperature.trim() || undefined,
-            weight: appointmentData.weight.trim() || undefined,
-          },
         },
         followUp: appointmentData.followUpRequired
           ? {
@@ -300,13 +333,13 @@ export default function DoctorAppointments() {
 
       let latestConsultation: Consultation | null = selectedConsultation;
 
-      const response = await apiService.updateDoctorAppointment(
+      const response = (await apiService.updateDoctorAppointment(
         selectedConsultation.id,
         payload
-      );
+      )) as { success: boolean; data?: Consultation };
 
       if (response.success && response.data) {
-        latestConsultation = response.data as Consultation;
+        latestConsultation = response.data;
         updateConsultationState(latestConsultation);
       }
 
@@ -315,11 +348,25 @@ export default function DoctorAppointments() {
         appointmentData.followUpDate.trim() &&
         appointmentData.followUpTime.trim()
       ) {
+        // Validate visit address for home-visit
+        if (
+          appointmentData.followUpType === "home-visit" &&
+          !appointmentData.followUpVisitAddress.trim()
+        ) {
+          alert("გთხოვთ მიუთითოთ ბინაზე ვიზიტის მისამართი");
+          return;
+        }
+
         const followUpResponse = await apiService.scheduleFollowUpAppointment(
           selectedConsultation.id,
           {
             date: appointmentData.followUpDate.trim(),
             time: appointmentData.followUpTime.trim(),
+            type: appointmentData.followUpType,
+            visitAddress:
+              appointmentData.followUpType === "home-visit"
+                ? appointmentData.followUpVisitAddress.trim()
+                : undefined,
             reason: appointmentData.followUpReason.trim() || undefined,
           }
         );
@@ -357,6 +404,13 @@ export default function DoctorAppointments() {
         setSelectedConsultation(latestConsultation);
       }
 
+      // Close follow-up schedule modal if open
+      if (showFollowUpScheduleModal) {
+        setShowFollowUpScheduleModal(false);
+        // Wait a bit for modal to close before showing success modal
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+
       setShowAppointmentModal(false);
       setShowSuccessModal(true);
       resetAppointmentForm();
@@ -376,12 +430,12 @@ export default function DoctorAppointments() {
   ) => {
     try {
       setStatusActionLoading(`${consultation.id}-${nextStatus}`);
-      const response = await apiService.updateDoctorAppointment(
+      const response = (await apiService.updateDoctorAppointment(
         consultation.id,
         { status: nextStatus }
-      );
+      )) as { success: boolean; data?: Consultation };
       if (response.success && response.data) {
-        updateConsultationState(response.data as Consultation);
+        updateConsultationState(response.data);
       }
     } catch (error: any) {
       console.error("Failed to update appointment status", error);
@@ -415,7 +469,11 @@ export default function DoctorAppointments() {
               try {
                 setLoading(true);
                 setError(null);
-                const response = await apiService.getDoctorDashboardAppointments(100);
+                const response =
+                  (await apiService.getDoctorDashboardAppointments(100)) as {
+                    success: boolean;
+                    data: Consultation[];
+                  };
                 if (response.success) {
                   setConsultations(response.data as any);
                 } else {
@@ -697,6 +755,15 @@ export default function DoctorAppointments() {
                       <Text style={styles.infoText}>{consultation.time}</Text>
                     </View>
                   </View>
+                  {(consultation.type === "home-visit" &&
+                    (consultation as any).visitAddress) && (
+                    <View style={styles.symptomsRow}>
+                      <Ionicons name="home-outline" size={16} color="#6B7280" />
+                      <Text style={styles.symptomsText}>
+                        {(consultation as any).visitAddress}
+                      </Text>
+                    </View>
+                  )}
                   {(consultation.consultationSummary?.symptoms ||
                     consultation.symptoms) && (
                     <View style={styles.symptomsRow}>
@@ -889,7 +956,7 @@ export default function DoctorAppointments() {
 
       {/* Details Modal */}
       <Modal
-        visible={showDetailsModal}
+        visible={showDetailsModal && !showFollowUpScheduleModal}
         animationType="slide"
         transparent={true}
         onRequestClose={() => setShowDetailsModal(false)}
@@ -936,6 +1003,16 @@ export default function DoctorAppointments() {
                   </Text>
                 </View>
 
+                {selectedConsultation.type === "home-visit" &&
+                  (selectedConsultation as any).visitAddress && (
+                    <View style={styles.detailSection}>
+                      <Text style={styles.detailLabel}>ვიზიტის მისამართი</Text>
+                      <Text style={styles.detailValue}>
+                        {(selectedConsultation as any).visitAddress}
+                      </Text>
+                    </View>
+                  )}
+
                 {selectedConsultation.symptoms && (
                   <View style={styles.detailSection}>
                     <Text style={styles.detailLabel}>სიმპტომები</Text>
@@ -974,62 +1051,6 @@ export default function DoctorAppointments() {
                   </View>
                 )}
 
-                {selectedConsultation.consultationSummary?.vitals && (
-                  <View style={styles.detailSection}>
-                    <Text style={styles.detailLabel}>ვიტალური ნიშნები</Text>
-                    <View style={styles.vitalSignsGrid}>
-                      {selectedConsultation.consultationSummary.vitals
-                        .bloodPressure ? (
-                        <View style={styles.vitalSignCard}>
-                          <Text style={styles.vitalSignLabel}>
-                            არტერიული წნევა
-                          </Text>
-                          <Text style={styles.vitalSignValue}>
-                            {
-                              selectedConsultation.consultationSummary.vitals
-                                .bloodPressure
-                            }
-                          </Text>
-                        </View>
-                      ) : null}
-                      {selectedConsultation.consultationSummary.vitals
-                        .heartRate ? (
-                        <View style={styles.vitalSignCard}>
-                          <Text style={styles.vitalSignLabel}>პულსი</Text>
-                          <Text style={styles.vitalSignValue}>
-                            {
-                              selectedConsultation.consultationSummary.vitals
-                                .heartRate
-                            }
-                          </Text>
-                        </View>
-                      ) : null}
-                      {selectedConsultation.consultationSummary.vitals
-                        .temperature ? (
-                        <View style={styles.vitalSignCard}>
-                          <Text style={styles.vitalSignLabel}>ტემპერატურა</Text>
-                          <Text style={styles.vitalSignValue}>
-                            {
-                              selectedConsultation.consultationSummary.vitals
-                                .temperature
-                            }
-                          </Text>
-                        </View>
-                      ) : null}
-                      {selectedConsultation.consultationSummary.vitals.weight ? (
-                        <View style={styles.vitalSignCard}>
-                          <Text style={styles.vitalSignLabel}>წონა</Text>
-                          <Text style={styles.vitalSignValue}>
-                            {
-                              selectedConsultation.consultationSummary.vitals
-                                .weight
-                            }
-                          </Text>
-                        </View>
-                      ) : null}
-                    </View>
-                  </View>
-                )}
 
                 {selectedConsultation.followUp?.required && (
                   <View style={styles.detailSection}>
@@ -1040,7 +1061,7 @@ export default function DoctorAppointments() {
                       </Text>
                     )}
                     {selectedConsultation.followUp.reason && (
-                      <Text style={styles.detailSubValue}>
+                      <Text style={styles.detailValue}>
                         {selectedConsultation.followUp.reason}
                       </Text>
                     )}
@@ -1117,7 +1138,7 @@ export default function DoctorAppointments() {
 
       {/* Appointment Form Modal */}
       <Modal
-        visible={showAppointmentModal}
+        visible={showAppointmentModal && !showFollowUpScheduleModal}
         animationType="slide"
         transparent={true}
         onRequestClose={() => setShowAppointmentModal(false)}
@@ -1172,87 +1193,146 @@ export default function DoctorAppointments() {
                 />
               </View>
 
-              {/* Vital Signs */}
-              <Text style={styles.sectionTitle}>ვიტალური ნიშნები</Text>
-              <View style={styles.formRow}>
-                <View style={styles.formFieldHalf}>
-                  <Text style={styles.formLabel}>არტერიული წნევა</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="120/80"
-                    placeholderTextColor="#9CA3AF"
-                    value={appointmentData.bloodPressure}
-                    onChangeText={(text) =>
-                      setAppointmentData({
-                        ...appointmentData,
-                        bloodPressure: text,
-                      })
-                    }
-                  />
-                </View>
-                <View style={styles.formFieldHalf}>
-                  <Text style={styles.formLabel}>გულის გახეთქვა</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="72 bpm"
-                    placeholderTextColor="#9CA3AF"
-                    value={appointmentData.heartRate}
-                    onChangeText={(text) =>
-                      setAppointmentData({
-                        ...appointmentData,
-                        heartRate: text,
-                      })
-                    }
-                  />
-                </View>
-              </View>
-              <View style={styles.formRow}>
-                <View style={styles.formFieldHalf}>
-                  <Text style={styles.formLabel}>ტემპერატურა</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="36.6°C"
-                    placeholderTextColor="#9CA3AF"
-                    value={appointmentData.temperature}
-                    onChangeText={(text) =>
-                      setAppointmentData({
-                        ...appointmentData,
-                        temperature: text,
-                      })
-                    }
-                  />
-                </View>
-                <View style={styles.formFieldHalf}>
-                  <Text style={styles.formLabel}>წონა</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="70 კგ"
-                    placeholderTextColor="#9CA3AF"
-                    value={appointmentData.weight}
-                    onChangeText={(text) =>
-                      setAppointmentData({ ...appointmentData, weight: text })
-                    }
-                  />
-                </View>
-              </View>
-
               {/* Medications */}
               <View style={styles.formSection}>
-                <Text style={styles.formLabel}>დანიშნული მედიკამენტები</Text>
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="მაგ: ენალაპრილი 10მგ დღეში 1-ჯერ"
-                  placeholderTextColor="#9CA3AF"
-                  multiline
-                  numberOfLines={4}
-                  value={appointmentData.medications}
-                  onChangeText={(text) =>
-                    setAppointmentData({
-                      ...appointmentData,
-                      medications: text,
-                    })
-                  }
-                />
+                <View style={styles.medicationsHeader}>
+                  <Text style={styles.formLabel}>დანიშნული მედიკამენტები</Text>
+                  <TouchableOpacity
+                    style={styles.addMedicationButton}
+                    onPress={() => {
+                      setAppointmentData({
+                        ...appointmentData,
+                        medications: [
+                          ...appointmentData.medications,
+                          {
+                            name: "",
+                            dosage: "",
+                            frequency: "",
+                            duration: "",
+                            instructions: "",
+                          },
+                        ],
+                      });
+                    }}
+                  >
+                    <Ionicons name="add-circle" size={20} color="#06B6D4" />
+                    <Text style={styles.addMedicationText}>დამატება</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {appointmentData.medications.map((med, index) => (
+                  <View key={index} style={styles.medicationCard}>
+                    <View style={styles.medicationCardHeader}>
+                      <Ionicons
+                        name="medkit-outline"
+                        size={20}
+                        color="#8B5CF6"
+                      />
+                      <TextInput
+                        style={styles.medicationNameInput}
+                        placeholder="მედიკამენტის სახელი"
+                        placeholderTextColor="#9CA3AF"
+                        value={med.name}
+                        onChangeText={(text) => {
+                          const newMedications = [...appointmentData.medications];
+                          newMedications[index].name = text;
+                          setAppointmentData({
+                            ...appointmentData,
+                            medications: newMedications,
+                          });
+                        }}
+                      />
+                      {appointmentData.medications.length > 0 && (
+                        <TouchableOpacity
+                          onPress={() => {
+                            const newMedications = appointmentData.medications.filter(
+                              (_, i) => i !== index
+                            );
+                            setAppointmentData({
+                              ...appointmentData,
+                              medications: newMedications,
+                            });
+                          }}
+                        >
+                          <Ionicons name="close-circle" size={20} color="#EF4444" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+
+                    <View style={styles.medicationDetails}>
+                      <View style={styles.medicationDetailRow}>
+                        <Text style={styles.medicationDetailLabel}>დოზა:</Text>
+                        <TextInput
+                          style={styles.medicationDetailInput}
+                          placeholder="მაგ: 10მგ"
+                          placeholderTextColor="#9CA3AF"
+                          value={med.dosage}
+                          onChangeText={(text) => {
+                            const newMedications = [...appointmentData.medications];
+                            newMedications[index].dosage = text;
+                            setAppointmentData({
+                              ...appointmentData,
+                              medications: newMedications,
+                            });
+                          }}
+                        />
+                      </View>
+                      <View style={styles.medicationDetailRow}>
+                        <Text style={styles.medicationDetailLabel}>სიხშირე:</Text>
+                        <TextInput
+                          style={styles.medicationDetailInput}
+                          placeholder="მაგ: დღეში 1-ჯერ"
+                          placeholderTextColor="#9CA3AF"
+                          value={med.frequency}
+                          onChangeText={(text) => {
+                            const newMedications = [...appointmentData.medications];
+                            newMedications[index].frequency = text;
+                            setAppointmentData({
+                              ...appointmentData,
+                              medications: newMedications,
+                            });
+                          }}
+                        />
+                      </View>
+                      <View style={styles.medicationDetailRow}>
+                        <Text style={styles.medicationDetailLabel}>ხანგრძლივობა:</Text>
+                        <TextInput
+                          style={styles.medicationDetailInput}
+                          placeholder="მაგ: 7 დღე"
+                          placeholderTextColor="#9CA3AF"
+                          value={med.duration}
+                          onChangeText={(text) => {
+                            const newMedications = [...appointmentData.medications];
+                            newMedications[index].duration = text;
+                            setAppointmentData({
+                              ...appointmentData,
+                              medications: newMedications,
+                            });
+                          }}
+                        />
+                      </View>
+                      <View style={styles.medicationInstructionsRow}>
+                        <Text style={styles.medicationDetailLabel}>ინსტრუქცია:</Text>
+                        <TextInput
+                          style={styles.medicationInstructionsInput}
+                          placeholder="დამატებითი ინსტრუქცია (არასავალდებულო)"
+                          placeholderTextColor="#9CA3AF"
+                          multiline
+                          numberOfLines={2}
+                          value={med.instructions || ""}
+                          onChangeText={(text) => {
+                            const newMedications = [...appointmentData.medications];
+                            newMedications[index].instructions = text;
+                            setAppointmentData({
+                              ...appointmentData,
+                              medications: newMedications,
+                            });
+                          }}
+                        />
+                      </View>
+                    </View>
+                  </View>
+                ))}
               </View>
 
               {/* Follow Up */}
@@ -1284,38 +1364,150 @@ export default function DoctorAppointments() {
 
                 {appointmentData.followUpRequired && (
                   <>
-                    <View style={styles.formRow}>
-                      <View style={styles.formFieldHalf}>
-                        <Text style={styles.formLabel}>თარიღი</Text>
-                        <TextInput
-                          style={styles.textInput}
-                          placeholder="2024-11-20"
-                          placeholderTextColor="#9CA3AF"
-                          value={appointmentData.followUpDate}
-                          onChangeText={(text) =>
+                    {/* Follow-up Type Selection */}
+                    <View style={styles.formSection}>
+                      <Text style={styles.formLabel}>კონსულტაციის ტიპი</Text>
+                      <View style={styles.typeSelectorContainer}>
+                        <TouchableOpacity
+                          style={[
+                            styles.typeChip,
+                            appointmentData.followUpType === "video" && styles.typeChipActive,
+                          ]}
+                          onPress={() =>
                             setAppointmentData({
                               ...appointmentData,
-                              followUpDate: text,
+                              followUpType: "video",
+                              followUpVisitAddress: "",
                             })
                           }
-                        />
-                      </View>
-                      <View style={styles.formFieldHalf}>
-                        <Text style={styles.formLabel}>დრო</Text>
-                        <TextInput
-                          style={styles.textInput}
-                          placeholder="14:30"
-                          placeholderTextColor="#9CA3AF"
-                          value={appointmentData.followUpTime}
-                          onChangeText={(text) =>
+                        >
+                          <Ionicons
+                            name="videocam-outline"
+                            size={18}
+                            color={appointmentData.followUpType === "video" ? "#FFFFFF" : "#4B5563"}
+                          />
+                          <Text
+                            style={[
+                              styles.typeChipText,
+                              appointmentData.followUpType === "video" && styles.typeChipTextActive,
+                            ]}
+                          >
+                            ვიდეო კონსულტაცია
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[
+                            styles.typeChip,
+                            appointmentData.followUpType === "home-visit" && styles.typeChipActive,
+                          ]}
+                          onPress={() =>
                             setAppointmentData({
                               ...appointmentData,
-                              followUpTime: text,
+                              followUpType: "home-visit",
                             })
                           }
-                        />
+                        >
+                          <Ionicons
+                            name="home-outline"
+                            size={18}
+                            color={appointmentData.followUpType === "home-visit" ? "#FFFFFF" : "#4B5563"}
+                          />
+                          <Text
+                            style={[
+                              styles.typeChipText,
+                              appointmentData.followUpType === "home-visit" && styles.typeChipTextActive,
+                            ]}
+                          >
+                            ბინაზე ვიზიტი
+                          </Text>
+                        </TouchableOpacity>
                       </View>
                     </View>
+
+                    {/* Visit Address for Home Visit */}
+                    {appointmentData.followUpType === "home-visit" && (
+                      <View style={styles.formSection}>
+                        <Text style={styles.formLabel}>ვიზიტის მისამართი *</Text>
+                        <TextInput
+                          style={styles.textInput}
+                          placeholder="მიუთითეთ ზუსტი მისამართი"
+                          placeholderTextColor="#9CA3AF"
+                          value={appointmentData.followUpVisitAddress}
+                          onChangeText={(text) =>
+                            setAppointmentData({
+                              ...appointmentData,
+                              followUpVisitAddress: text,
+                            })
+                          }
+                        />
+                      </View>
+                    )}
+
+                    {/* Date and Time Selection */}
+                    <View style={styles.formSection}>
+                      <Text style={styles.formLabel}>თარიღი და დრო</Text>
+                      <TouchableOpacity
+                        style={styles.scheduleButton}
+                        onPress={async () => {
+                          console.log("📅 Follow-up schedule button pressed");
+                          console.log("👤 User:", user?.id);
+                          console.log("📋 Follow-up type:", appointmentData.followUpType);
+
+                          if (!user?.id) {
+                            Alert.alert("შეცდომა", "ექიმის ID ვერ მოიძებნა");
+                            return;
+                          }
+
+                          setLoadingFollowUpAvailability(true);
+                          try {
+                            console.log("🔄 Fetching availability...");
+                            const response = await apiService.getDoctorAvailability(
+                              user.id,
+                              appointmentData.followUpType,
+                            );
+                            console.log("✅ Availability response:", response);
+                            
+                            if (response.success && response.data) {
+                              console.log("📊 Availability data:", response.data);
+                              console.log("📊 Availability data length:", response.data?.length);
+                              
+                              // Filter availability by selected type
+                              const filteredAvailability = (response.data || []).filter(
+                                (day: any) => day.type === appointmentData.followUpType
+                              );
+                              
+                              console.log("🔍 Filtered availability:", filteredAvailability);
+                              console.log("🔍 Filtered availability length:", filteredAvailability.length);
+                              
+                              setFollowUpAvailability(filteredAvailability);
+                              console.log("🔓 Opening modal...");
+                              setShowFollowUpScheduleModal(true);
+                              console.log("✅ Modal should be open now");
+                            } else {
+                              console.error("❌ Response not successful:", response);
+                              Alert.alert("შეცდომა", "განრიგის ჩატვირთვა ვერ მოხერხდა");
+                            }
+                          } catch (error) {
+                            console.error("❌ Error loading availability:", error);
+                            Alert.alert("შეცდომა", "განრიგის ჩატვირთვა ვერ მოხერხდა");
+                          } finally {
+                            setLoadingFollowUpAvailability(false);
+                          }
+                        }}
+                      >
+                        <Ionicons name="calendar-outline" size={20} color="#06B6D4" />
+                        <Text style={styles.scheduleButtonText}>
+                          {appointmentData.followUpDate && appointmentData.followUpTime
+                            ? `${appointmentData.followUpDate} • ${appointmentData.followUpTime}`
+                            : "აირჩიე თარიღი და დრო"}
+                        </Text>
+                        {loadingFollowUpAvailability && (
+                          <ActivityIndicator size="small" color="#06B6D4" />
+                        )}
+                      </TouchableOpacity>
+                    </View>
+
                     <View style={styles.formSection}>
                       <Text style={styles.formLabel}>მიზეზი</Text>
                       <TextInput
@@ -1427,7 +1619,7 @@ export default function DoctorAppointments() {
 
       {/* Success Modal */}
       <Modal
-        visible={showSuccessModal}
+        visible={showSuccessModal && !showFollowUpScheduleModal}
         transparent
         animationType="fade"
         onRequestClose={() => setShowSuccessModal(false)}
@@ -1447,6 +1639,89 @@ export default function DoctorAppointments() {
             >
               <Text style={styles.successModalButtonText}>კარგი</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Follow-up Schedule Modal - Must be last to appear on top */}
+      <Modal
+        visible={showFollowUpScheduleModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          console.log("🔒 Modal close requested");
+          setShowFollowUpScheduleModal(false);
+        }}
+      >
+        <View style={styles.followUpModalOverlay}>
+          <View style={styles.followUpScheduleModalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>აირჩიე თარიღი და დრო</Text>
+              <TouchableOpacity
+                onPress={() => setShowFollowUpScheduleModal(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalBody}>
+              {followUpAvailability.length === 0 ? (
+                <View style={styles.followUpEmptyState}>
+                  <Ionicons name="calendar-outline" size={48} color="#9CA3AF" />
+                  <Text style={styles.followUpEmptyStateText}>
+                    ამ ტიპის კონსულტაციისთვის თავისუფალი დრო არ არის
+                  </Text>
+                </View>
+              ) : (
+                followUpAvailability.map((day: any, index: number) => {
+                  if (!day.isAvailable || !day.timeSlots || day.timeSlots.length === 0) {
+                    return null;
+                  }
+
+                  return (
+                    <View key={`${day.date}-${day.type || 'video'}-${index}`} style={styles.availabilityDayCard}>
+                      <View style={styles.availabilityDayHeader}>
+                        <Text style={styles.availabilityDayName}>{day.dayOfWeek}</Text>
+                        <Text style={styles.availabilityDayDate}>{day.date}</Text>
+                      </View>
+                      <View style={styles.timeSlotsContainer}>
+                        {day.timeSlots.map((time: string, timeIndex: number) => (
+                          <TouchableOpacity
+                            key={`${day.date}-${time}-${timeIndex}`}
+                            style={[
+                              styles.timeSlotChip,
+                              appointmentData.followUpDate === day.date &&
+                              appointmentData.followUpTime === time &&
+                              styles.timeSlotChipActive,
+                            ]}
+                            onPress={() => {
+                              setAppointmentData({
+                                ...appointmentData,
+                                followUpDate: day.date,
+                                followUpTime: time,
+                              });
+                              setShowFollowUpScheduleModal(false);
+                            }}
+                          >
+                            <Text
+                              style={[
+                                styles.timeSlotText,
+                                appointmentData.followUpDate === day.date &&
+                                appointmentData.followUpTime === time &&
+                                styles.timeSlotTextActive,
+                              ]}
+                            >
+                              {time}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -1882,6 +2157,7 @@ const styles = StyleSheet.create({
   },
   modalBody: {
     padding: 20,
+    maxHeight: "100%",
   },
   detailSection: {
     marginBottom: 20,
@@ -2160,5 +2436,220 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Poppins-SemiBold",
     color: "#FFFFFF",
+  },
+  medicationsHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  addMedicationButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: "#ECFEFF",
+    borderWidth: 1,
+    borderColor: "#BAE6FD",
+  },
+  addMedicationText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#0369A1",
+  },
+  medicationCard: {
+    backgroundColor: "#F9FAFB",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  medicationCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+  },
+  medicationNameInput: {
+    flex: 1,
+    fontSize: 16,
+    fontFamily: "Poppins-Bold",
+    color: "#1F2937",
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 8,
+    padding: 10,
+  },
+  medicationDetails: {
+    gap: 8,
+  },
+  medicationDetailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  medicationDetailLabel: {
+    fontSize: 12,
+    fontFamily: "Poppins-Medium",
+    color: "#6B7280",
+    minWidth: 80,
+  },
+  medicationDetailInput: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#1F2937",
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 8,
+    padding: 10,
+  },
+  medicationInstructionsRow: {
+    marginTop: 4,
+  },
+  medicationInstructionsInput: {
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#1F2937",
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 4,
+    minHeight: 60,
+  },
+  typeSelectorContainer: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 8,
+  },
+  typeChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: "#F3F4F6",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  typeChipActive: {
+    backgroundColor: "#06B6D4",
+    borderColor: "#06B6D4",
+  },
+  typeChipText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#4B5563",
+  },
+  typeChipTextActive: {
+    color: "#FFFFFF",
+  },
+  scheduleButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: "#ECFEFF",
+    borderWidth: 1,
+    borderColor: "#BAE6FD",
+  },
+  scheduleButtonText: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#0369A1",
+  },
+  followUpModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  followUpScheduleModalContent: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    width: "90%",
+    maxHeight: 600,
+    minHeight: 200,
+    padding: 0,
+    alignSelf: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+    overflow: "hidden",
+  },
+  availabilityDayCard: {
+    backgroundColor: "#F9FAFB",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  availabilityDayHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  availabilityDayName: {
+    fontSize: 16,
+    fontFamily: "Poppins-Bold",
+    color: "#1F2937",
+  },
+  availabilityDayDate: {
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+  },
+  timeSlotsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  timeSlotChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  timeSlotChipActive: {
+    backgroundColor: "#06B6D4",
+    borderColor: "#06B6D4",
+  },
+  timeSlotText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#4B5563",
+  },
+  timeSlotTextActive: {
+    color: "#FFFFFF",
+  },
+  followUpEmptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 48,
+  },
+  followUpEmptyStateText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+    marginTop: 12,
+    textAlign: "center",
   },
 });

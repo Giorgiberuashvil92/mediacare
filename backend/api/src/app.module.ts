@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AdminModule } from './admin/admin.module';
+import { AdvisorsModule } from './advisors/advisors.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AppointmentsModule } from './appointments/appointments.module';
@@ -44,6 +45,7 @@ import { UploadModule } from './upload/upload.module';
     AppointmentsModule,
     AdminModule,
     ShopModule,
+    AdvisorsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

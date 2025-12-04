@@ -11,7 +11,6 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../contexts/AuthContext";
-import { useSchedule } from "../contexts/ScheduleContext";
 import { apiService } from "../services/api";
 
 const AVAILABLE_HOURS = [
@@ -27,9 +26,14 @@ const AVAILABLE_HOURS = [
 ];
 
 export default function DoctorSchedule() {
-  const { schedules, selectedDates, setSchedules, setSelectedDates } =
-    useSchedule();
   const { user } = useAuth();
+
+  // ორი ცალკე განრიგი და თარიღები: ვიდეო და ბინაზე ვიზიტები
+  const [videoSchedules, setVideoSchedules] = useState<{ [key: string]: string[] }>({});
+  const [homeVisitSchedules, setHomeVisitSchedules] = useState<{ [key: string]: string[] }>({});
+  const [videoSelectedDates, setVideoSelectedDates] = useState<string[]>([]);
+  const [homeVisitSelectedDates, setHomeVisitSelectedDates] = useState<string[]>([]);
+
   const [mode, setMode] = useState<"video" | "home-visit">("video");
   const [showTimeModal, setShowTimeModal] = useState(false);
   const [currentEditDate, setCurrentEditDate] = useState<string | null>(null);
@@ -37,6 +41,12 @@ export default function DoctorSchedule() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [hasSaved, setHasSaved] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const getCurrentModeSchedules = () =>
+    mode === "video" ? videoSchedules : homeVisitSchedules;
+
+  const getCurrentModeSelectedDates = () =>
+    mode === "video" ? videoSelectedDates : homeVisitSelectedDates;
 
   // Load existing availability on mount
   useEffect(() => {
@@ -51,19 +61,37 @@ export default function DoctorSchedule() {
         const response = await apiService.getDoctorAvailability(user.id);
 
         if (response.success && response.data) {
-          // Convert availability to schedules format
-          const loadedSchedules: { [key: string]: string[] } = {};
-          const loadedDates: string[] = [];
+          const loadedVideoSchedules: { [key: string]: string[] } = {};
+          const loadedHomeVisitSchedules: { [key: string]: string[] } = {};
+          const videoDates: string[] = [];
+          const homeVisitDates: string[] = [];
 
           response.data.forEach((avail: any) => {
-            if (avail.isAvailable && avail.timeSlots && avail.timeSlots.length > 0) {
-              loadedSchedules[avail.date] = avail.timeSlots;
-              loadedDates.push(avail.date);
+            if (
+              avail.isAvailable &&
+              avail.timeSlots &&
+              avail.timeSlots.length > 0
+            ) {
+              const type = avail.type === "home-visit" ? "home-visit" : "video";
+
+              if (type === "video") {
+                loadedVideoSchedules[avail.date] = avail.timeSlots;
+                if (!videoDates.includes(avail.date)) {
+                  videoDates.push(avail.date);
+                }
+              } else {
+                loadedHomeVisitSchedules[avail.date] = avail.timeSlots;
+                if (!homeVisitDates.includes(avail.date)) {
+                  homeVisitDates.push(avail.date);
+                }
+              }
             }
           });
 
-          setSchedules(loadedSchedules);
-          setSelectedDates(loadedDates);
+          setVideoSchedules(loadedVideoSchedules);
+          setHomeVisitSchedules(loadedHomeVisitSchedules);
+          setVideoSelectedDates(videoDates);
+          setHomeVisitSelectedDates(homeVisitDates);
         }
       } catch (error) {
         console.error("Error loading availability:", error);
@@ -74,7 +102,7 @@ export default function DoctorSchedule() {
     };
 
     loadAvailability();
-  }, [user?.id, setSchedules, setSelectedDates]);
+  }, [user?.id]);
 
   // Generate calendar by months
   const generateCalendarByMonths = () => {
@@ -144,19 +172,33 @@ export default function DoctorSchedule() {
   };
 
   const isDateSelected = (date: Date) => {
-    return selectedDates.includes(formatDate(date));
+    const currentSelected = getCurrentModeSelectedDates();
+    return currentSelected.includes(formatDate(date));
   };
 
   const toggleDateSelection = (date: Date) => {
     const dateStr = formatDate(date);
-    if (selectedDates.includes(dateStr)) {
-      setSelectedDates(selectedDates.filter((d) => d !== dateStr));
-      // Remove schedule for this date
-      const newSchedules = { ...schedules };
-      delete newSchedules[dateStr];
-      setSchedules(newSchedules);
+    const currentSelected = getCurrentModeSelectedDates();
+
+    if (currentSelected.includes(dateStr)) {
+      // ამოიღე თარიღი მხოლოდ მიმდინარე რეჟიმიდან
+      const updater =
+        mode === "video" ? setVideoSelectedDates : setHomeVisitSelectedDates;
+      updater(currentSelected.filter((d) => d !== dateStr));
+
+      const currentSchedules = getCurrentModeSchedules();
+      const updatedSchedules = { ...currentSchedules };
+      delete updatedSchedules[dateStr];
+
+      if (mode === "video") {
+        setVideoSchedules(updatedSchedules);
+      } else {
+        setHomeVisitSchedules(updatedSchedules);
+      }
     } else {
-      setSelectedDates([...selectedDates, dateStr]);
+      const updater =
+        mode === "video" ? setVideoSelectedDates : setHomeVisitSelectedDates;
+      updater([...currentSelected, dateStr]);
       setHasSaved(false); // Reset hasSaved when new date is selected
     }
   };
@@ -169,7 +211,8 @@ export default function DoctorSchedule() {
   const toggleTimeSlot = (time: string) => {
     if (!currentEditDate) return;
 
-    const currentSlots = schedules[currentEditDate] || [];
+    const currentSchedules = getCurrentModeSchedules();
+    const currentSlots = currentSchedules[currentEditDate] || [];
     let newSlots;
 
     if (currentSlots.includes(time)) {
@@ -178,32 +221,47 @@ export default function DoctorSchedule() {
       newSlots = [...currentSlots, time].sort();
     }
 
-    setSchedules({
-      ...schedules,
+    const updatedSchedules = {
+      ...currentSchedules,
       [currentEditDate]: newSlots,
-    });
+    };
+
+    if (mode === "video") {
+      setVideoSchedules(updatedSchedules);
+    } else {
+      setHomeVisitSchedules(updatedSchedules);
+    }
 
     // Reset hasSaved when slots are modified
     setHasSaved(false);
   };
 
   const saveSchedule = async () => {
-    if (!allDatesHaveSlots()) {
-      Alert.alert(
-        "შეცდომა",
-        "გთხოვთ დაამატოთ საათები ყველა არჩეულ დღეს"
-      );
-      return;
-    }
-
     try {
       setIsSaving(true);
 
-      // Prepare availability data for API
-      const availabilityData = selectedDates.map((dateStr) => ({
+      const currentSchedules = getCurrentModeSchedules();
+      const currentSelected = getCurrentModeSelectedDates();
+
+      // მხოლოდ ის თარიღები, რომლებსაც ამ რეჟიმში აქვთ საათები
+      const datesWithSlots = currentSelected.filter((dateStr) => {
+        const slots = currentSchedules[dateStr];
+        return slots && slots.length > 0;
+      });
+
+      if (datesWithSlots.length === 0) {
+        Alert.alert(
+          "შეცდომა",
+          "გთხოვთ აირჩიოთ მინიმუმ ერთი დრო, სანამ განრიგს შეინახავთ"
+        );
+        return;
+      }
+
+      // Prepare availability data for API (მხოლოდ არაცარიელი დღეები ამ რეჟიმისთვის)
+      const availabilityData = datesWithSlots.map((dateStr) => ({
         date: dateStr,
-        timeSlots: schedules[dateStr] || [],
-        isAvailable: (schedules[dateStr] || []).length > 0,
+        timeSlots: currentSchedules[dateStr] || [],
+        isAvailable: (currentSchedules[dateStr] || []).length > 0,
         type: mode,
       }));
 
@@ -213,6 +271,28 @@ export default function DoctorSchedule() {
       if (response.success) {
         setSaveSuccess(true);
         setHasSaved(true); // Mark as saved
+
+        // მოვაშოროთ ცარიელი დღეები ამ რეჟიმისთვის და განვაახლოთ თარიღების სიები
+        const newCurrentSchedules: { [key: string]: string[] } = {};
+        datesWithSlots.forEach((dateStr) => {
+          newCurrentSchedules[dateStr] = currentSchedules[dateStr] || [];
+        });
+
+        if (mode === "video") {
+          setVideoSchedules(newCurrentSchedules);
+          setVideoSelectedDates(
+            Object.keys(newCurrentSchedules).filter(
+              (d) => (newCurrentSchedules[d] || []).length > 0
+            )
+          );
+        } else {
+          setHomeVisitSchedules(newCurrentSchedules);
+          setHomeVisitSelectedDates(
+            Object.keys(newCurrentSchedules).filter(
+              (d) => (newCurrentSchedules[d] || []).length > 0
+            )
+          );
+        }
 
         // Hide success message after 2 seconds
         setTimeout(() => {
@@ -246,8 +326,10 @@ export default function DoctorSchedule() {
 
   // Check if all selected dates have at least one time slot
   const allDatesHaveSlots = () => {
-    return selectedDates.every((dateStr) => {
-      const slots = schedules[dateStr];
+    const currentSchedules = getCurrentModeSchedules();
+    const currentSelected = getCurrentModeSelectedDates();
+    return currentSelected.every((dateStr) => {
+      const slots = currentSchedules[dateStr];
       return slots && slots.length > 0;
     });
   };
@@ -344,16 +426,21 @@ export default function DoctorSchedule() {
         </View>
 
         {/* Selected Days Summary */}
-        {selectedDates.length > 0 && (
+        {([...videoSelectedDates, ...homeVisitSelectedDates].length > 0) && (
           <View style={styles.summaryCard}>
             <View style={styles.summaryHeader}>
               <Text style={styles.summaryTitle}>
-                არჩეული დღეები: {selectedDates.length}
+                არჩეული დღეები:{" "}
+                {Array.from(
+                  new Set([...videoSelectedDates, ...homeVisitSelectedDates])
+                ).length}
               </Text>
               <TouchableOpacity
                 onPress={() => {
-                  setSelectedDates([]);
-                  setSchedules({});
+                  setVideoSelectedDates([]);
+                  setHomeVisitSelectedDates([]);
+                  setVideoSchedules({});
+                  setHomeVisitSchedules({});
                 }}
               >
                 <Text style={styles.clearText}>გასუფთავება</Text>
@@ -364,8 +451,9 @@ export default function DoctorSchedule() {
                 <Ionicons name="checkmark-circle" size={20} color="#10B981" />
                 <Text style={styles.statText}>
                   {
-                    Object.values(schedules).filter((slots) => slots.length > 0)
-                      .length
+                    Object.values(getCurrentModeSchedules()).filter(
+                      (slots) => slots.length > 0
+                    ).length
                   }{" "}
                   კონფიგურირებული
                 </Text>
@@ -387,9 +475,10 @@ export default function DoctorSchedule() {
                   ]}
                 >
                   {
-                    selectedDates.filter(
-                      (d) => !schedules[d] || schedules[d].length === 0
-                    ).length
+                    getCurrentModeSelectedDates().filter((d) => {
+                      const slots = getCurrentModeSchedules()[d];
+                      return !slots || slots.length === 0;
+                    }).length
                   }{" "}
                   {allDatesHaveSlots() ? "მზადაა შესანახად" : "საათების გარეშე"}
                 </Text>
@@ -417,7 +506,8 @@ export default function DoctorSchedule() {
               {calendar.currentMonth.days.map((date, index) => {
                 const isSelected = isDateSelected(date);
                 const dateStr = formatDate(date);
-                const hasSchedule = schedules[dateStr]?.length > 0;
+                const currentSchedules = getCurrentModeSchedules();
+                const hasSchedule = currentSchedules[dateStr]?.length > 0;
                 const today = isToday(date);
 
                 return (
@@ -476,7 +566,7 @@ export default function DoctorSchedule() {
                         />
                         <Text style={styles.configureButtonText}>
                           {hasSchedule
-                            ? `${schedules[dateStr].length} საათი`
+                            ? `${currentSchedules[dateStr].length} საათი`
                             : "საათის არჩევა"}
                         </Text>
                       </TouchableOpacity>
@@ -504,7 +594,8 @@ export default function DoctorSchedule() {
               {calendar.nextMonth.days.map((date, index) => {
                 const isSelected = isDateSelected(date);
                 const dateStr = formatDate(date);
-                const hasSchedule = schedules[dateStr]?.length > 0;
+                const currentSchedules = getCurrentModeSchedules();
+                const hasSchedule = currentSchedules[dateStr]?.length > 0;
 
                 return (
                   <View key={index} style={styles.dateWrapper}>
@@ -556,7 +647,7 @@ export default function DoctorSchedule() {
                         />
                         <Text style={styles.configureButtonText}>
                           {hasSchedule
-                            ? `${schedules[dateStr].length} საათი`
+                            ? `${currentSchedules[dateStr].length} საათი`
                             : "საათის არჩევა"}
                         </Text>
                       </TouchableOpacity>
@@ -570,10 +661,7 @@ export default function DoctorSchedule() {
       </ScrollView>
 
       {/* Floating Save Button */}
-      {selectedDates.length > 0 &&
-        allDatesHaveSlots() &&
-        !saveSuccess &&
-        !hasSaved && (
+      {getCurrentModeSelectedDates().length > 0 && !saveSuccess && !hasSaved && (
           <TouchableOpacity
             style={[
               styles.floatingButton,
@@ -605,8 +693,8 @@ export default function DoctorSchedule() {
                     განრიგის შენახვა
                   </Text>
                   <Text style={styles.floatingButtonSubtext}>
-                    {selectedDates.length} დღე •{" "}
-                    {Object.values(schedules).reduce(
+                    {getCurrentModeSelectedDates().length} დღე •{" "}
+                    {Object.values(getCurrentModeSchedules()).reduce(
                       (sum, slots) => sum + slots.length,
                       0
                     )}{" "}
@@ -672,9 +760,10 @@ export default function DoctorSchedule() {
             <ScrollView style={styles.timeSlotsList}>
               <View style={styles.timeGrid}>
                 {AVAILABLE_HOURS.map((time) => {
+                  const currentSchedules = getCurrentModeSchedules();
                   const isSelected =
                     currentEditDate &&
-                    schedules[currentEditDate]?.includes(time);
+                    currentSchedules[currentEditDate]?.includes(time);
 
                   return (
                     <TouchableOpacity
@@ -710,26 +799,37 @@ export default function DoctorSchedule() {
                 style={styles.selectAllButton}
                 onPress={() => {
                   if (currentEditDate) {
-                    const currentSlots = schedules[currentEditDate] || [];
+                    const currentSchedules = getCurrentModeSchedules();
+                    const currentSlots = currentSchedules[currentEditDate] || [];
+
+                    let updatedSchedules: { [key: string]: string[] };
+
                     if (currentSlots.length === AVAILABLE_HOURS.length) {
-                      // Deselect all
-                      setSchedules({
-                        ...schedules,
+                      // ყველა მოხსნა
+                      updatedSchedules = {
+                        ...currentSchedules,
                         [currentEditDate]: [],
-                      });
+                      };
                     } else {
-                      // Select all
-                      setSchedules({
-                        ...schedules,
+                      // ყველას არჩევა
+                      updatedSchedules = {
+                        ...currentSchedules,
                         [currentEditDate]: [...AVAILABLE_HOURS],
-                      });
+                      };
+                    }
+
+                    if (mode === "video") {
+                      setVideoSchedules(updatedSchedules);
+                    } else {
+                      setHomeVisitSchedules(updatedSchedules);
                     }
                   }
                 }}
               >
                 <Text style={styles.selectAllText}>
                   {currentEditDate &&
-                  schedules[currentEditDate]?.length === AVAILABLE_HOURS.length
+                  getCurrentModeSchedules()[currentEditDate]?.length ===
+                    AVAILABLE_HOURS.length
                     ? "ყველას მოხსნა"
                     : "ყველას არჩევა"}
                 </Text>

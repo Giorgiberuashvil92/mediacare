@@ -13,6 +13,7 @@ const jwt_1 = require("@nestjs/jwt");
 const mongoose_1 = require("@nestjs/mongoose");
 const throttler_1 = require("@nestjs/throttler");
 const admin_module_1 = require("./admin/admin.module");
+const advisors_module_1 = require("./advisors/advisors.module");
 const app_controller_1 = require("./app.controller");
 const app_service_1 = require("./app.service");
 const appointments_module_1 = require("./appointments/appointments.module");
@@ -54,6 +55,7 @@ exports.AppModule = AppModule = __decorate([
             appointments_module_1.AppointmentsModule,
             admin_module_1.AdminModule,
             shop_module_1.ShopModule,
+            advisors_module_1.AdvisorsModule,
         ],
         controllers: [app_controller_1.AppController],
         providers: [app_service_1.AppService],

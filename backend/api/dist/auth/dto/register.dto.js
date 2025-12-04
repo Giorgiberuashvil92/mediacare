@@ -41,6 +41,11 @@ __decorate([
     __metadata("design:type", String)
 ], RegisterDto.prototype, "phone", void 0);
 __decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    __metadata("design:type", String)
+], RegisterDto.prototype, "idNumber", void 0);
+__decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], RegisterDto.prototype, "dateOfBirth", void 0);

@@ -569,16 +569,22 @@ const mapAppointmentToVisit = (appointment: any) => {
     symptoms = Array.from(new Set([...symptoms, ...summarySymptoms]));
   }
 
-  let medications = Array.isArray(appointment.medications)
+  let medications: any[] = Array.isArray(appointment.medications)
     ? appointment.medications
     : [];
 
   if ((!medications || medications.length === 0) && summary.medications) {
-    medications = summary.medications
-      .split("\n")
-      .map((line: string) => line.trim())
-      .filter(Boolean)
-      .map((name: string) => ({ name }));
+    try {
+      // Try to parse as JSON first (new format)
+      medications = JSON.parse(summary.medications);
+    } catch {
+      // Fallback to old format (split by newlines)
+      medications = summary.medications
+        .split("\n")
+        .map((line: string) => line.trim())
+        .filter(Boolean)
+        .map((name: string) => ({ name }));
+    }
   }
 
   const status = appointment.status || "scheduled";

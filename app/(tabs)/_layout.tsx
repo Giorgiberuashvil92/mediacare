@@ -43,7 +43,7 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
+      {/* <Tabs.Screen
         name="medicine"
         options={{
           title: "მედიკამენტები",
@@ -52,7 +52,7 @@ export default function TabLayout() {
             <Ionicons name="medical" size={size} color={color} />
           ),
         }}
-      />
+      /> */}
       <Tabs.Screen
         name="appointment"
         options={{

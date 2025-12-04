@@ -454,6 +454,62 @@ class ApiService {
     return this.handleResponse<ApiResponse<any>>(response);
   }
 
+  // Advisors endpoints
+  async getAdvisors(): Promise<ApiResponse<any[]>> {
+    const response = await fetch(`${this.baseURL}/advisors`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+
+    return this.handleResponse<ApiResponse<any[]>>(response);
+  }
+
+  async getActiveAdvisors(): Promise<ApiResponse<any[]>> {
+    const response = await fetch(`${this.baseURL}/advisors/active`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+
+    return this.handleResponse<ApiResponse<any[]>>(response);
+  }
+
+  async createAdvisor(data: {
+    doctorId: string;
+    bio?: string;
+    order?: number;
+    isActive?: boolean;
+  }): Promise<ApiResponse<any>> {
+    const response = await fetch(`${this.baseURL}/advisors`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data),
+    });
+
+    return this.handleResponse<ApiResponse<any>>(response);
+  }
+
+  async updateAdvisor(
+    id: string,
+    data: { bio?: string; order?: number; isActive?: boolean },
+  ): Promise<ApiResponse<any>> {
+    const response = await fetch(`${this.baseURL}/advisors/${id}`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data),
+    });
+
+    return this.handleResponse<ApiResponse<any>>(response);
+  }
+
+  async deleteAdvisor(id: string): Promise<ApiResponse<any>> {
+    const response = await fetch(`${this.baseURL}/advisors/${id}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+    });
+
+    return this.handleResponse<ApiResponse<any>>(response);
+  }
+
   // Generic API call
   async apiCall<T>(
     endpoint: string,

@@ -10,6 +10,7 @@ import {
   Appointment,
   AppointmentDocument,
   AppointmentStatus,
+  AppointmentType,
   PaymentStatus,
 } from '../appointments/schemas/appointment.schema';
 import {
@@ -488,6 +489,7 @@ export class DoctorsService {
     doctorId: string,
     startDate?: string,
     endDate?: string,
+    type?: 'video' | 'home-visit',
   ) {
     // Validate ObjectId format
     if (!mongoose.Types.ObjectId.isValid(doctorId)) {
@@ -506,6 +508,11 @@ export class DoctorsService {
     const filter: FilterQuery<AvailabilityDocument> = {
       doctorId: new mongoose.Types.ObjectId(doctorId),
     };
+
+    // Filter by type if provided
+    if (type) {
+      filter.type = type;
+    }
 
     if (startDate && endDate) {
       filter.date = {
@@ -587,6 +594,8 @@ export class DoctorsService {
           dayOfWeek: dayNames[date.getDay()],
           timeSlots: availableTimeSlots,
           isAvailable: availableTimeSlots.length > 0,
+          // expose type so frontend can distinguish video vs home-visit
+          type: avail.type ?? 'video',
         };
       }),
     };
@@ -1125,6 +1134,58 @@ export class DoctorsService {
       throw new BadRequestException('Invalid follow-up time');
     }
 
+    // Determine appointment type (default to original appointment type or 'video')
+    const appointmentType =
+      dto.type || appointment.type || AppointmentType.VIDEO;
+
+    // Validate visit address for home-visit type
+    if (
+      appointmentType === AppointmentType.HOME_VISIT &&
+      !dto.visitAddress?.trim()
+    ) {
+      throw new BadRequestException(
+        'Visit address is required for home-visit appointments',
+      );
+    }
+
+    // Check doctor's availability for the selected type and time slot
+    const availability = await this.availabilityModel.findOne({
+      doctorId: appointment.doctorId,
+      date: normalizedDate,
+      type: appointmentType,
+      isAvailable: true,
+    });
+
+    if (!availability) {
+      const typeLabel =
+        appointmentType === AppointmentType.VIDEO
+          ? 'ვიდეო კონსულტაციის'
+          : 'ბინაზე ვიზიტის';
+      throw new BadRequestException(
+        `ექიმი არ არის ხელმისაწვდომი ამ თარიღზე ${typeLabel} ტიპის განმეორებითი ვიზიტისთვის`,
+      );
+    }
+
+    const timeSlots = availability.timeSlots;
+    if (!timeSlots || !timeSlots.includes(dto.time)) {
+      throw new BadRequestException(
+        'არჩეული დრო არ არის ხელმისაწვდომი ექიმის განრიგში',
+      );
+    }
+
+    // Check if the time slot is already booked
+    const existingAppointment = await this.appointmentModel.findOne({
+      doctorId: appointment.doctorId,
+      appointmentDate: normalizedDate,
+      appointmentTime: dto.time,
+      type: appointmentType,
+      status: { $in: [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED] },
+    });
+
+    if (existingAppointment) {
+      throw new BadRequestException('არჩეული დრო უკვე დაკავებულია');
+    }
+
     const appointmentNumber = await this.generateAppointmentNumber();
 
     const followUpAppointment = new this.appointmentModel({
@@ -1133,6 +1194,13 @@ export class DoctorsService {
       patientId: appointment.patientId,
       appointmentDate: normalizedDate,
       appointmentTime: dto.time,
+      type: appointmentType,
+      meetingLink:
+        appointmentType === AppointmentType.VIDEO ? undefined : undefined, // Can be set later
+      visitAddress:
+        appointmentType === AppointmentType.HOME_VISIT
+          ? dto.visitAddress?.trim()
+          : undefined,
       status: AppointmentStatus.CONFIRMED,
       consultationFee: appointment.consultationFee,
       totalAmount: appointment.totalAmount,
@@ -1251,9 +1319,9 @@ export class DoctorsService {
     const todayEndUTC = new Date(todayUTC);
     todayEndUTC.setHours(23, 59, 59, 999);
 
-    // Get today's availability (using Georgia date for matching)
-    const todayAvailability = await this.availabilityModel
-      .findOne({
+    // Get today's availability for both types (using Georgia date for matching)
+    const todayAvailabilityDocs = await this.availabilityModel
+      .find({
         doctorId: new mongoose.Types.ObjectId(doctorId),
         date: {
           $gte: new Date(
@@ -1282,19 +1350,39 @@ export class DoctorsService {
       .sort({ appointmentTime: 1 })
       .lean();
 
-    // Get all available slots from availability
-    const allAvailableSlots = todayAvailability?.timeSlots || [];
+    const videoAvailability = todayAvailabilityDocs.find(
+      (a: any) => a.type === 'video',
+    );
+    const homeVisitAvailability = todayAvailabilityDocs.find(
+      (a: any) => a.type === 'home-visit',
+    );
 
-    // Get booked slots from appointments
+    // Split appointments by type
+    const videoAppointments = todayAppointments.filter(
+      (apt: any) => apt.type === 'video',
+    );
+    const homeVisitAppointments = todayAppointments.filter(
+      (apt: any) => apt.type === 'home-visit',
+    );
 
-    const bookedSlots = todayAppointments.map(
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access
-      (apt: any) => apt.appointmentTime,
+    // Get all available slots from availability per type
+    const videoAllSlots = videoAvailability?.timeSlots || [];
+    const homeVisitAllSlots = homeVisitAvailability?.timeSlots || [];
+
+    // Get booked slots from appointments per type
+    const videoBookedSlots = videoAppointments.map(
+      (apt: any) => apt.appointmentTime as string,
+    );
+    const homeVisitBookedSlots = homeVisitAppointments.map(
+      (apt: any) => apt.appointmentTime as string,
     );
 
     // Filter out booked slots to get truly available slots
-    const availableSlots = allAvailableSlots.filter(
-      (slot) => !bookedSlots.includes(slot),
+    const videoAvailableSlots = videoAllSlots.filter(
+      (slot) => !videoBookedSlots.includes(slot),
+    );
+    const homeVisitAvailableSlots = homeVisitAllSlots.filter(
+      (slot) => !homeVisitBookedSlots.includes(slot),
     );
 
     // Format consultations
@@ -1326,7 +1414,8 @@ export class DoctorsService {
           patient?.name || apt.patientDetails?.name || 'უცნობი პაციენტი',
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         patientAge: patientAge || apt.patientDetails?.age || 0,
-        type: 'consultation',
+        // Use real type from appointment (video / home-visit)
+        type: apt.type || 'consultation',
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
         status: apt.status || 'scheduled',
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -1355,8 +1444,20 @@ export class DoctorsService {
       date: todayStr,
       dayOfWeek,
       consultations,
-      availableSlots,
-      totalSlots: allAvailableSlots.length,
+      // Backwards-compatible aggregate info
+      availableSlots: [...videoAvailableSlots, ...homeVisitAvailableSlots],
+      totalSlots: videoAllSlots.length + homeVisitAllSlots.length,
+      // Detailed per-type info
+      video: {
+        appointments: videoAppointments.length,
+        allSlots: videoAllSlots,
+        availableSlots: videoAvailableSlots,
+      },
+      homeVisit: {
+        appointments: homeVisitAppointments.length,
+        allSlots: homeVisitAllSlots,
+        availableSlots: homeVisitAvailableSlots,
+      },
     };
 
     return {

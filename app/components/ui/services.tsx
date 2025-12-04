@@ -12,14 +12,14 @@ const QUICK_SERVICES = [
       "https://images.unsplash.com/photo-1584982751601-97dcc096659c?w=600&h=600&fit=crop&crop=center",
     onPress: () => router.push("/screens/video-call"),
   },
-  {
-    id: "lab",
-    title: "ლაბორატორია",
-    description: "ანალიზები და ტესტები",
-    image:
-      "https://images.unsplash.com/photo-1581092580491-e0d23cbdf1dc?w=600&h=600&fit=crop&crop=center",
-    onPress: () => router.push("/(tabs)/medicine"),
-  },
+  // {
+  //   id: "lab",
+  //   title: "ლაბორატორია",
+  //   description: "ანალიზები და ტესტები",
+  //   image:
+  //     "https://images.unsplash.com/photo-1581092580491-e0d23cbdf1dc?w=600&h=600&fit=crop&crop=center",
+  //   onPress: () => router.push("/(tabs)/medicine"),
+  // },
   {
     id: "pharmacy",
     title: "წამლები",
@@ -42,7 +42,7 @@ const QUICK_SERVICES = [
     description: "შეგირჩევთ სწორ ექიმს",
     image:
       "https://images.unsplash.com/photo-1535916707207-35f97e715e1b?w=600&h=600&fit=crop&crop=center",
-    onPress: () => router.push("/screens/doctors/doctors-list"),
+    onPress: () => router.push("/screens/advisor"),
   },
 ];
 

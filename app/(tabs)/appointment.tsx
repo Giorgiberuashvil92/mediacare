@@ -153,6 +153,9 @@ const Appointment = () => {
   const [filterStatus, setFilterStatus] = useState<
     "all" | "completed" | "scheduled" | "cancelled"
   >("all");
+  const [filterType, setFilterType] = useState<"all" | "video" | "home-visit">(
+    "all",
+  );
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedAppointment, setSelectedAppointment] =
     useState<PatientAppointment | null>(null);
@@ -271,10 +274,12 @@ const Appointment = () => {
   const filteredAppointments = upcomingAppointments.filter((appointment) => {
     const matchesStatus =
       filterStatus === "all" || appointment.status === filterStatus;
+    const matchesType =
+      filterType === "all" || appointment.type === filterType;
     const matchesSearch = appointment.doctorName
       .toLowerCase()
       .includes(searchQuery.toLowerCase());
-    return matchesStatus && matchesSearch;
+    return matchesStatus && matchesType && matchesSearch;
   });
 
   // Stats
@@ -379,7 +384,7 @@ const Appointment = () => {
           </View>
         </View>
 
-        {/* Statistics */}
+        {/* Statistics by status */}
         <View style={styles.statsSection}>
           <TouchableOpacity
             style={[
@@ -498,6 +503,57 @@ const Appointment = () => {
               ]}
             >
               გაუქმებული
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Filter by consultation type (video / home-visit) */}
+        <View style={styles.typeFilterSection}>
+          <TouchableOpacity
+            style={[
+              styles.typeFilterChip,
+              filterType === "video" && styles.typeFilterChipActive,
+            ]}
+            onPress={() =>
+              setFilterType(filterType === "video" ? "all" : "video")
+            }
+          >
+            <Ionicons
+              name="videocam-outline"
+              size={16}
+              color={filterType === "video" ? "#0EA5E9" : "#6B7280"}
+            />
+            <Text
+              style={[
+                styles.typeFilterText,
+                filterType === "video" && styles.typeFilterTextActive,
+              ]}
+            >
+              ვიდეო
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.typeFilterChip,
+              filterType === "home-visit" && styles.typeFilterChipActive,
+            ]}
+            onPress={() =>
+              setFilterType(filterType === "home-visit" ? "all" : "home-visit")
+            }
+          >
+            <Ionicons
+              name="home-outline"
+              size={16}
+              color={filterType === "home-visit" ? "#22C55E" : "#6B7280"}
+            />
+            <Text
+              style={[
+                styles.typeFilterText,
+                filterType === "home-visit" && styles.typeFilterTextActive,
+              ]}
+            >
+              ბინაზე
             </Text>
           </TouchableOpacity>
         </View>
@@ -912,8 +968,34 @@ const styles = StyleSheet.create({
   statsSection: {
     flexDirection: "row",
     paddingHorizontal: 20,
-    marginBottom: 24,
+    marginBottom: 12,
     gap: 12,
+  },
+  typeFilterSection: {
+    flexDirection: "row",
+    paddingHorizontal: 20,
+    marginBottom: 20,
+    gap: 8,
+  },
+  typeFilterChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "#E5E7EB",
+  },
+  typeFilterChipActive: {
+    backgroundColor: "#E0F2FE",
+  },
+  typeFilterText: {
+    fontSize: 12,
+    fontFamily: "Poppins-Medium",
+    color: "#4B5563",
+  },
+  typeFilterTextActive: {
+    color: "#0F172A",
   },
   statCard: {
     flex: 1,
