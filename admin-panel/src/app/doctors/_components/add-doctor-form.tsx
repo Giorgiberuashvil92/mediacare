@@ -295,7 +295,7 @@ export function AddDoctorForm({ onSuccess, onCancel }: AddDoctorFormProps) {
               type="date"
               name="dateOfBirth"
               label="დაბადების თარიღი"
-              placeholder="აირჩიე დაბადების თარიღი"
+              placeholder="DD/MM/YYYY"
               value={formData.dateOfBirth}
               handleChange={handleChange}
               height="sm"

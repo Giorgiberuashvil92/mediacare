@@ -29,6 +29,10 @@ export class RegisterDto {
   @IsOptional()
   phone?: string;
 
+  @IsString()
+  @IsNotEmpty()
+  idNumber: string;
+
   @IsOptional()
   dateOfBirth?: string;
 

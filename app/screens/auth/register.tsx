@@ -6,6 +6,7 @@ import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   ScrollView,
@@ -18,17 +19,17 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../../contexts/AuthContext";
+import { useLanguage } from "../../contexts/LanguageContext";
 import { apiService, Specialization } from "../../services/api";
 import { showToast } from "../../utils/toast";
 
 export default function RegisterScreen() {
-  const { userRole, register, setUserRole } = useAuth();
+  const { userRole, register } = useAuth();
+  const { t } = useLanguage();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const [selectedRole] = useState<"doctor" | "patient">(
-    userRole || "patient",
-  );
+  const selectedRole: "doctor" | "patient" = (userRole || "patient");
 
   // Common fields 
   const [name, setName] = useState("");
@@ -51,6 +52,7 @@ export default function RegisterScreen() {
   
   // Additional doctor fields (matching admin panel)
   const [phone, setPhone] = useState("");
+  const [idNumber, setIdNumber] = useState("");
   const [degrees, setDegrees] = useState("");
   const [experience, setExperience] = useState("");
   const [about, setAbout] = useState("");
@@ -59,10 +61,8 @@ export default function RegisterScreen() {
   const [gender, setGender] = useState<"male" | "female" | "other">("male");
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
-
-  useEffect(() => {
-    setUserRole(selectedRole);
-  }, [selectedRole, setUserRole]);
+  const [tosModalVisible, setTosModalVisible] = useState(false);
+  const [hasAcceptedTos, setHasAcceptedTos] = useState(false);
 
   useEffect(() => {
     const loadSpecializations = async () => {
@@ -213,21 +213,36 @@ export default function RegisterScreen() {
 
   const handleSignup = async () => {
     // Basic validation
-    if (!name.trim() || !email.trim() || !password.trim()) {
-      showToast.error("გთხოვთ შეავსოთ ყველა სავალდებულო ველი", "შეცდომა");
+    if (!name.trim() || !email.trim() || !password.trim() || !idNumber.trim()) {
+      showToast.error(
+        t("auth.register.validation.fillAll"),
+        t("auth.register.error.default"),
+      );
+      return;
+    }
+
+    if (!hasAcceptedTos) {
+      showToast.error(
+        t("auth.register.tos.validationRequired"),
+        t("auth.register.error.default"),
+      );
+      setTosModalVisible(true);
       return;
     }
 
     if (selectedRole === "doctor" && selectedSpecializations.length === 0) {
       showToast.error(
-        "გთხოვთ აირჩიოთ ექიმის სპეციალიზაცია",
-        "შეცდომა"
+        t("auth.register.validation.specialization"),
+        t("auth.register.error.default"),
       );
       return;
     }
 
     if (password.length < 6) {
-      showToast.error("პაროლი უნდა იყოს მინიმუმ 6 სიმბოლო", "შეცდომა");
+      showToast.error(
+        t("auth.register.validation.passwordLength"),
+        t("auth.register.error.default"),
+      );
       return;
     }
 
@@ -238,6 +253,7 @@ export default function RegisterScreen() {
         name: name.trim(),
         email: email.trim(),
         password,
+        idNumber: idNumber.trim(),
         role: selectedRole,
       };
 
@@ -254,6 +270,7 @@ export default function RegisterScreen() {
         if (about.trim()) registerData.about = about.trim();
         if (location.trim()) registerData.location = location.trim();
         if (dateOfBirth.trim()) registerData.dateOfBirth = dateOfBirth.trim();
+        
         registerData.gender = gender;
       }
 
@@ -270,7 +287,9 @@ export default function RegisterScreen() {
       }
     } catch (error) {
       const errorMessage =
-        error instanceof Error ? error.message : "შეცდომა რეგისტრაციისას";
+        error instanceof Error
+          ? error.message
+          : t("auth.register.error.default");
       showToast.auth.registerError(errorMessage);
     } finally {
       setIsLoading(false);
@@ -286,12 +305,19 @@ export default function RegisterScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      <SafeAreaView style={styles.safeArea}>
-        <ScrollView
-          style={styles.scrollView}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.content}>
+      <KeyboardAvoidingView
+        style={styles.safeArea}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+      >
+        <SafeAreaView style={styles.safeArea}>
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.content}>
             {/* Logo */}
             <View style={styles.logoContainer}>
               <View style={styles.logo}>
@@ -302,15 +328,18 @@ export default function RegisterScreen() {
                 />
               </View>
             </View>
+            </View>
 
             {/* Title */}
             <Text style={styles.title}>
-              {isDoctor ? "დარეგისტრირდი როგორც ექიმი" : "დაამზადე ანგარიში"}
+              {isDoctor
+                ? t("auth.register.title.doctor")
+                : t("auth.register.title.patient")}
             </Text>
             <Text style={styles.subtitle}>
               {isDoctor
-                ? " შემოგვიერთდი როგორც სამედიცინო მომსახურების მიმწოდებელი"
-                : "დაიწყე გამოყენება უფასოდ"}
+                ? t("auth.register.subtitle.doctor")
+                : t("auth.register.subtitle.patient")}
             </Text>
 
             {/* Role Switcher */}
@@ -320,7 +349,9 @@ export default function RegisterScreen() {
             <View style={styles.form}>
               {/* Name Input */}
               <View style={styles.inputContainer}>
-                <Text style={styles.label}>სრული სახელი *</Text>
+                <Text style={styles.label}>
+                  {t("auth.register.name.label")}
+                </Text>
                 <View style={styles.inputWrapper}>
                   <Ionicons
                     name="person-outline"
@@ -330,7 +361,7 @@ export default function RegisterScreen() {
                   />
                   <TextInput
                     style={styles.input}
-                    placeholder="შეიყვანე სრული სახელი"
+                    placeholder={t("auth.register.name.placeholder")}
                     placeholderTextColor="#9CA3AF"
                     value={name}
                     onChangeText={setName}
@@ -340,7 +371,9 @@ export default function RegisterScreen() {
 
               {/* Email Input */}
               <View style={styles.inputContainer}>
-                <Text style={styles.label}>ელ. ფოსტა *</Text>
+                <Text style={styles.label}>
+                  {t("auth.register.email.label")}
+                </Text>
                 <View style={styles.inputWrapper}>
                   <Ionicons
                     name="mail-outline"
@@ -350,7 +383,7 @@ export default function RegisterScreen() {
                   />
                   <TextInput
                     style={styles.input}
-                    placeholder="შეიყვანე ელ. ფოსტა"
+                    placeholder={t("auth.register.email.placeholder")}
                     placeholderTextColor="#9CA3AF"
                     value={email}
                     onChangeText={setEmail}
@@ -360,9 +393,34 @@ export default function RegisterScreen() {
                 </View>
               </View>
 
+              {/* ID Number Input */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>
+                  {t("auth.register.idNumber.label")}
+                </Text>
+                <View style={styles.inputWrapper}>
+                  <Ionicons
+                    name="card-outline"
+                    size={20}
+                    color="#9CA3AF"
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder={t("auth.register.idNumber.placeholder")}
+                    placeholderTextColor="#9CA3AF"
+                    value={idNumber}
+                    onChangeText={setIdNumber}
+                    keyboardType="number-pad"
+                  />
+                </View>
+              </View>
+
               {/* Phone Input */}
               <View style={styles.inputContainer}>
-                <Text style={styles.label}>ტელეფონი</Text>
+                <Text style={styles.label}>
+                  {t("auth.register.phone.label")}
+                </Text>
                 <View style={styles.inputWrapper}>
                   <Ionicons
                     name="call-outline"
@@ -372,7 +430,7 @@ export default function RegisterScreen() {
                   />
                   <TextInput
                     style={styles.input}
-                    placeholder="+995 555 123 456"
+                    placeholder={t("auth.register.phone.placeholder")}
                     placeholderTextColor="#9CA3AF"
                     value={phone}
                     onChangeText={setPhone}
@@ -385,12 +443,14 @@ export default function RegisterScreen() {
               {isDoctor && (
                 <>
                   <View style={styles.inputContainer}>
-                    <Text style={styles.label}>სპეციალიზაცია *</Text>
+                    <Text style={styles.label}>
+                      {t("doctor.specialization.label")}
+                    </Text>
                     {loadingSpecializations ? (
                       <View style={styles.specializationsLoading}>
                         <ActivityIndicator size="small" color="#06B6D4" />
                         <Text style={styles.specializationsLoadingText}>
-                          სპეციალიზაციები იტვირთება...
+                          {t("doctor.specialization.loading")}
                         </Text>
                       </View>
                     ) : specializations.length > 0 ? (
@@ -407,7 +467,7 @@ export default function RegisterScreen() {
                           />
                           <View style={styles.multiSelectTextContainer}>
                             <Text style={styles.multiSelectLabel}>
-                              აირჩიე სპეციალიზაციები
+                              {t("doctor.specialization.selectPlaceholder")}
                             </Text>
                             <Text
                               style={[
@@ -419,7 +479,7 @@ export default function RegisterScreen() {
                             >
                               {selectedSpecializations.length > 0
                                 ? selectedSpecializations.join(", ")
-                                : "მინიმუმ ერთი სპეციალიზაცია აირჩიე"}
+                                : t("doctor.specialization.valuePlaceholder")}
                             </Text>
                           </View>
                           <Ionicons
@@ -429,19 +489,21 @@ export default function RegisterScreen() {
                           />
                         </TouchableOpacity>
                         <Text style={styles.multiSelectHelper}>
-                          შეგიძლია მონიშნო რამდენიმე სპეციალიზაცია
+                          {t("doctor.specialization.helper")}
                         </Text>
                       </>
                     ) : (
                       <Text style={styles.specializationsEmpty}>
-                        ჯერ სპეციალიზაციები არ არის დამატებული.
+                        {t("doctor.specialization.empty")}
                       </Text>
                     )}
                   </View>
 
                   {/* Degrees Input */}
                   <View style={styles.inputContainer}>
-                    <Text style={styles.label}>ხარისხი</Text>
+                    <Text style={styles.label}>
+                      {t("doctor.degrees.label")}
+                    </Text>
                     <View style={styles.inputWrapper}>
                       <Ionicons
                         name="school-outline"
@@ -451,7 +513,7 @@ export default function RegisterScreen() {
                       />
                       <TextInput
                         style={styles.input}
-                        placeholder="MD, PhD"
+                        placeholder={t("doctor.degrees.placeholder")}
                         placeholderTextColor="#9CA3AF"
                         value={degrees}
                         onChangeText={setDegrees}
@@ -461,7 +523,9 @@ export default function RegisterScreen() {
 
                   {/* Experience Input */}
                   <View style={styles.inputContainer}>
-                    <Text style={styles.label}>გამოცდილება</Text>
+                    <Text style={styles.label}>
+                      {t("doctor.experience.label")}
+                    </Text>
                     <View style={styles.inputWrapper}>
                       <Ionicons
                         name="briefcase-outline"
@@ -471,7 +535,7 @@ export default function RegisterScreen() {
                       />
                       <TextInput
                         style={styles.input}
-                        placeholder="10 წელი"
+                        placeholder={t("doctor.experience.placeholder")}
                         placeholderTextColor="#9CA3AF"
                         value={experience}
                         onChangeText={setExperience}
@@ -481,7 +545,9 @@ export default function RegisterScreen() {
 
                   {/* Location Input */}
                   <View style={styles.inputContainer}>
-                    <Text style={styles.label}>მდებარეობა</Text>
+                    <Text style={styles.label}>
+                      {t("doctor.location.label")}
+                    </Text>
                     <View style={styles.inputWrapper}>
                       <Ionicons
                         name="location-outline"
@@ -491,7 +557,7 @@ export default function RegisterScreen() {
                       />
                       <TextInput
                         style={styles.input}
-                        placeholder="თბილისი, საქართველო"
+                        placeholder={t("doctor.location.placeholder")}
                         placeholderTextColor="#9CA3AF"
                         value={location}
                         onChangeText={setLocation}
@@ -501,7 +567,9 @@ export default function RegisterScreen() {
 
                   {/* Date of Birth */}
                   <View style={styles.inputContainer}>
-                    <Text style={styles.label}>დაბადების თარიღი</Text>
+                    <Text style={styles.label}>
+                      {t("doctor.dob.label")}
+                    </Text>
                     <TouchableOpacity
                       style={styles.inputWrapper}
                       onPress={openDatePicker}
@@ -518,14 +586,16 @@ export default function RegisterScreen() {
                           !dateOfBirth && styles.inputPlaceholder,
                         ]}
                       >
-                        {dateOfBirth || "აირჩიე დაბადების თარიღი"}
+                        {dateOfBirth || t("doctor.dob.placeholder")}
                       </Text>
                     </TouchableOpacity>
                   </View>
 
                   {/* Gender Selection */}
                   <View style={styles.inputContainer}>
-                    <Text style={styles.label}>სქესი</Text>
+                    <Text style={styles.label}>
+                      {t("doctor.gender.label")}
+                    </Text>
                     <View style={styles.genderContainer}>
                       <TouchableOpacity
                         style={[
@@ -545,7 +615,7 @@ export default function RegisterScreen() {
                             gender === "male" && styles.genderTextSelected,
                           ]}
                         >
-                          კაცი
+                          {t("doctor.gender.male")}
                         </Text>
                       </TouchableOpacity>
                       <TouchableOpacity
@@ -566,7 +636,7 @@ export default function RegisterScreen() {
                             gender === "female" && styles.genderTextSelected,
                           ]}
                         >
-                          ქალი
+                          {t("doctor.gender.female")}
                         </Text>
                       </TouchableOpacity>
                       <TouchableOpacity
@@ -587,7 +657,7 @@ export default function RegisterScreen() {
                             gender === "other" && styles.genderTextSelected,
                           ]}
                         >
-                          სხვა
+                          {t("doctor.gender.other")}
                         </Text>
                       </TouchableOpacity>
                     </View>
@@ -595,11 +665,13 @@ export default function RegisterScreen() {
 
                   {/* About TextArea */}
                   <View style={styles.inputContainer}>
-                    <Text style={styles.label}>შესახებ</Text>
+                    <Text style={styles.label}>
+                      {t("doctor.about.label")}
+                    </Text>
                     <View style={styles.textAreaWrapper}>
                       <TextInput
                         style={styles.textArea}
-                        placeholder="დაწერე ექიმის შესახებ..."
+                        placeholder={t("doctor.about.placeholder")}
                         placeholderTextColor="#9CA3AF"
                         value={about}
                         onChangeText={setAbout}
@@ -613,7 +685,7 @@ export default function RegisterScreen() {
                   {/* License Document */}
                   <View style={styles.inputContainer}>
                     <Text style={styles.label}>
-                      ლიცენზიის ფაილი (PDF) (არჩევითი)
+                      {t("doctor.license.label")}
                     </Text>
                     <TouchableOpacity
                       style={[
@@ -636,7 +708,9 @@ export default function RegisterScreen() {
                       {uploadingFile ? (
                         <View style={styles.uploadingContainer}>
                           <ActivityIndicator size="small" color="#06B6D4" />
-                          <Text style={styles.uploadingText}>ატვირთვა...</Text>
+                          <Text style={styles.uploadingText}>
+                            {t("doctor.license.uploading")}
+                          </Text>
                         </View>
                       ) : (
                         <Text
@@ -647,7 +721,7 @@ export default function RegisterScreen() {
                         >
                           {licenseDocument
                             ? licenseDocument.name
-                            : "ატვირთეთ სამედიცინო ლიცენზია"}
+                            : t("doctor.license.placeholder")}
                         </Text>
                       )}
                       <Ionicons
@@ -658,7 +732,7 @@ export default function RegisterScreen() {
                     </TouchableOpacity>
                     {licenseDocument && (
                       <Text style={styles.fileHelper}>
-                        ✓ ფაილი წარმატებით აიტვირთა
+                        {t("doctor.license.success")}
                       </Text>
                     )}
                   </View>
@@ -667,7 +741,9 @@ export default function RegisterScreen() {
 
               {/* Password Input */}
               <View style={styles.inputContainer}>
-                <Text style={styles.label}>Password *</Text>
+                <Text style={styles.label}>
+                  {t("auth.register.password.label")}
+                </Text>
                 <View style={styles.inputWrapper}>
                   <Ionicons
                     name="lock-closed-outline"
@@ -678,7 +754,7 @@ export default function RegisterScreen() {
                   <TextInput
                     style={styles.input}
                     secureTextEntry={!showPassword}
-                    placeholder="••••••••••"
+                    placeholder={t("auth.register.password.placeholder")}
                     placeholderTextColor="#9CA3AF"
                     value={password}
                     onChangeText={setPassword}
@@ -696,6 +772,43 @@ export default function RegisterScreen() {
                 </View>
               </View>
 
+              {/* Terms of Service / Privacy Policy notice + checkbox */}
+              <View style={styles.tosInlineContainer}>
+                <Text style={styles.tosInlineText}>
+                  {t("auth.register.tos.inlineText") + " "}
+                  <Text
+                    style={styles.tosInlineLink}
+                    onPress={() => setTosModalVisible(true)}
+                  >
+                    {t("auth.register.tos.readMore")}
+                  </Text>
+                </Text>
+                <TouchableOpacity
+                  style={styles.tosCheckboxRow}
+                  onPress={() => {
+                    const next = !hasAcceptedTos;
+                    setHasAcceptedTos(next);
+                    if (next) {
+                      setTosModalVisible(true);
+                    }
+                  }}
+                >
+                  <View
+                    style={[
+                      styles.tosCheckbox,
+                      hasAcceptedTos && styles.tosCheckboxChecked,
+                    ]}
+                  >
+                    {hasAcceptedTos && (
+                      <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                    )}
+                  </View>
+                  <Text style={styles.tosCheckboxLabel}>
+                    {t("auth.register.tos.checkboxLabel")}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
               {/* Signup Button */}
               <TouchableOpacity
                 style={[
@@ -706,21 +819,58 @@ export default function RegisterScreen() {
                 disabled={isLoading}
               >
                 <Text style={styles.signupButtonText}>
-                  {isLoading ? "რეგისტრაცია..." : "დარეგისტრირდი"}
+                {isLoading
+                  ? t("auth.register.submitting")
+                  : t("auth.register.submit")}
                 </Text>
               </TouchableOpacity>
 
               {/* Signin Link */}
               <View style={styles.signinContainer}>
-                <Text style={styles.signinText}>ანგარიში უკვე გაქვს? </Text>
+              <Text style={styles.signinText}>
+                {t("auth.register.signin.question")}
+              </Text>
                 <TouchableOpacity onPress={handleSignin}>
-                  <Text style={styles.signinLink}>შესვლა</Text>
+                <Text style={styles.signinLink}>
+                  {t("auth.register.signin.action")}
+                </Text>
                 </TouchableOpacity>
               </View>
             </View>
+          </ScrollView>
+        </SafeAreaView>
+      </KeyboardAvoidingView>
+
+      {/* Terms of Service / Privacy Policy modal */}
+      <Modal
+        visible={tosModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setTosModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {t("auth.register.tos.title")}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setTosModalVisible(false)}
+                style={styles.modalCloseButton}
+              >
+                <Ionicons name="close" size={20} color="#1F2937" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalList}>
+              <Text style={styles.tosModalDescription}>
+                {t("auth.register.tos.description")}
+              </Text>
+              {/* აქ შეგიძლია შემდეგში ჩაანაცვლო რეალური ტექსტით ან HTML-rendered დოკუმენტით */}
+            </ScrollView>
           </View>
-        </ScrollView>
-      </SafeAreaView>
+        </View>
+      </Modal>
 
       <Modal
         visible={specializationModalVisible}
@@ -731,7 +881,9 @@ export default function RegisterScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>აირჩიე სპეციალიზაციები</Text>
+              <Text style={styles.modalTitle}>
+                {t("doctor.specialization.modalTitle")}
+              </Text>
               <TouchableOpacity
                 onPress={() => setSpecializationModalVisible(false)}
                 style={styles.modalCloseButton}
@@ -797,7 +949,9 @@ export default function RegisterScreen() {
               onPress={() => setSpecializationModalVisible(false)}
               disabled={selectedSpecializations.length === 0}
             >
-              <Text style={styles.modalPrimaryButtonText}>არჩევა დასრულებულია</Text>
+              <Text style={styles.modalPrimaryButtonText}>
+                {t("doctor.specialization.modalDone")}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -818,16 +972,20 @@ export default function RegisterScreen() {
                   onPress={() => setShowDatePicker(false)}
                   style={styles.datePickerCancelButton}
                 >
-                  <Text style={styles.datePickerCancelText}>გაუქმება</Text>
+                  <Text style={styles.datePickerCancelText}>
+                    {t("doctor.dob.modalCancel")}
+                  </Text>
                 </TouchableOpacity>
                 <Text style={styles.datePickerModalTitle}>
-                  აირჩიე დაბადების თარიღი
+                  {t("doctor.dob.modalTitle")}
                 </Text>
                 <TouchableOpacity
                   onPress={() => setShowDatePicker(false)}
                   style={styles.datePickerDoneButton}
                 >
-                  <Text style={styles.datePickerDoneText}>დასრულება</Text>
+                  <Text style={styles.datePickerDoneText}>
+                    {t("doctor.dob.modalDone")}
+                  </Text>
                 </TouchableOpacity>
               </View>
               <DateTimePicker
@@ -861,12 +1019,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FFFFFF",
+    paddingHorizontal: 24
   },
   safeArea: {
     flex: 1,
   },
   scrollView: {
     flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 32,
   },
   content: {
     paddingHorizontal: 24,
@@ -1070,6 +1232,21 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins-SemiBold",
     color: "#06B6D4",
   },
+  tosInlineContainer: {
+    marginBottom: 12,
+  },
+  tosInlineText: {
+    fontSize: 10,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+    lineHeight: 14,
+  },
+  tosInlineLink: {
+    fontSize: 10,
+    fontFamily: "Poppins-SemiBold",
+    color: "#06B6D4",
+    textDecorationLine: "underline",
+  },
   logoImage: {
     width: 50,
     height: 50,
@@ -1157,11 +1334,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   modalTitle: {
+    flex: 1,
     fontSize: 18,
     fontFamily: "Poppins-SemiBold",
     color: "#0F172A",
   },
   modalCloseButton: {
+    marginRight: 20,
     width: 36,
     height: 36,
     borderRadius: 18,
@@ -1230,6 +1409,59 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Poppins-SemiBold",
     color: "#FFFFFF",
+  },
+  tosModalDescription: {
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: "#4B5563",
+    lineHeight: 16,
+  },
+  tosCheckboxRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 16,
+  },
+  tosCheckbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: "#CBD5F5",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+    marginTop: 2,
+  },
+  tosCheckboxChecked: {
+    backgroundColor: "#06B6D4",
+    borderColor: "#06B6D4",
+  },
+  tosCheckboxLabel: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: "Poppins-Regular",
+    color: "#4B5563",
+    lineHeight: 14,
+  },
+  tosModalActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+  },
+  tosModalSecondaryButton: {
+    flex: 1,
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    backgroundColor: "#F9FAFB",
+  },
+  tosModalSecondaryButtonText: {
+    fontSize: 16,
+    fontFamily: "Poppins-Medium",
+    color: "#4B5563",
   },
   genderContainer: {
     flexDirection: "row",

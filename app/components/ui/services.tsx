@@ -1,62 +1,215 @@
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import React from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useState } from "react";
+import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+
+const QUICK_SERVICES = [
+  {
+    id: "video",
+    title: "ვიდეო კონსულტაცია",
+    description: "ონლაინ ექიმი 15 წთ-ში",
+    image:
+      "https://images.unsplash.com/photo-1584982751601-97dcc096659c?w=600&h=600&fit=crop&crop=center",
+    onPress: () => router.push("/screens/video-call"),
+  },
+  {
+    id: "lab",
+    title: "ლაბორატორია",
+    description: "ანალიზები და ტესტები",
+    image:
+      "https://images.unsplash.com/photo-1581092580491-e0d23cbdf1dc?w=600&h=600&fit=crop&crop=center",
+    onPress: () => router.push("/(tabs)/medicine"),
+  },
+  {
+    id: "pharmacy",
+    title: "წამლები",
+    description: "მედიკამენტების მაღაზია",
+    image:
+      "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=600&h=600&fit=crop&crop=center",
+    onPress: () => router.push("/(tabs)/medicine"),
+  },
+  {
+    id: "home-visit",
+    title: "ბინაზე გამოძახება",
+    description: "ექიმი შენს მისამართზე",
+    image:
+      "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=600&h=600&fit=crop&crop=center&sat=-20",
+    onPress: () => router.push("/screens/appointment/make-appointment"),
+  },
+  {
+    id: "advisor",
+    title: "მრჩეველი",
+    description: "შეგირჩევთ სწორ ექიმს",
+    image:
+      "https://images.unsplash.com/photo-1535916707207-35f97e715e1b?w=600&h=600&fit=crop&crop=center",
+    onPress: () => router.push("/screens/doctors/doctors-list"),
+  },
+];
 
 const Services = () => {
+  const [pharmacyModalVisible, setPharmacyModalVisible] = useState(false);
+
+  const handlePress = (serviceId: string, onPress: () => void) => {
+    if (serviceId === "pharmacy") {
+      setPharmacyModalVisible(true);
+      return;
+    }
+    onPress();
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>სერვისები რომელსაც გთავაზობთ</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <TouchableOpacity
-          style={{ flexDirection: "row", gap: 12 }}
-          onPress={() => router.push("/screens/doctors/topdoctors")}
-          activeOpacity={0.8}
-        >
-          <View style={styles.serviceCard}>
-            <Image
-              style={{ width: 97, height: 97, borderRadius: 8 }}
-              source={{
-                uri: "https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=400&h=400&fit=crop&crop=center",
-              }}
-              contentFit="cover"
-            />
-            <Text style={styles.serviceTitle}>სწრაფი კონსულტაცია</Text>
-            <Text style={styles.serviceDescription}>დაწყება 50₾-დან</Text>
+      <Text style={styles.title}>სწრაფი სერვისები</Text>
+      <View style={styles.grid}>
+        {QUICK_SERVICES.map((service) => (
+          <TouchableOpacity
+            key={service.id}
+            onPress={() => handlePress(service.id, service.onPress)}
+            activeOpacity={0.9}
+            style={styles.serviceCard}
+          >
+            <View style={styles.iconWrapper}>
+              <Image
+                style={styles.serviceImage}
+                source={{ uri: service.image }}
+                contentFit="cover"
+              />
+            </View>
+            <Text style={styles.serviceTitle} numberOfLines={2}>
+              {service.title}
+            </Text>
+            <Text style={styles.serviceDescription} numberOfLines={2}>
+              {service.description}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Pharmacy WIP modal */}
+      <Modal
+        visible={pharmacyModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPharmacyModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>წამლების სერვისი მალე იქნება</Text>
+            <Text style={styles.modalText}>
+              ამ ეტაპზე მედიკამენტების შეკვეთის სერვისი მუშავდება. ძალიან მალე
+              შეძლებ წამლების მოძებნას და შეძენას აპიდანვე.
+            </Text>
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={() => setPharmacyModalVisible(false)}
+            >
+              <Text style={styles.modalButtonText}>კარგი</Text>
+            </TouchableOpacity>
           </View>
-        </TouchableOpacity>
-      </ScrollView>
+        </View>
+      </Modal>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: "#F2F2F7",
   },
   title: {
-    fontSize: 18,
-    marginBottom: 12,
+    fontSize: 16,
+    marginBottom: 8,
     fontFamily: "Poppins-SemiBold",
     color: "#333333",
   },
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+  },
   serviceCard: {
-    padding: 8,
+    width: "30%",
+    paddingVertical: 10,
+    paddingHorizontal: 8,
     backgroundColor: "#FFFFFF",
-    borderRadius: 8,
+    borderRadius: 14,
     alignItems: "center",
-    gap: 8,
+    marginBottom: 12,
+    gap: 6,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  iconWrapper: {
+    width: 52,
+    height: 52,
+    borderRadius: 999,
+    overflow: "hidden",
+    marginBottom: 4,
+  },
+  serviceImage: {
+    width: "100%",
+    height: "100%",
   },
   serviceTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: "Poppins-SemiBold",
     color: "#0F172A",
+    textAlign: "center",
   },
   serviceDescription: {
-    fontSize: 12,
-    fontFamily: "Poppins-SemiBold",
+    fontSize: 11,
+    fontFamily: "Poppins-Regular",
     color: "#64748B",
+    textAlign: "center",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.55)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 24,
+  },
+  modalCard: {
+    width: "100%",
+    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 18,
+    elevation: 8,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontFamily: "Poppins-SemiBold",
+    color: "#0F172A",
+    marginBottom: 8,
+  },
+  modalText: {
+    fontSize: 13,
+    fontFamily: "Poppins-Regular",
+    color: "#4B5563",
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  modalButton: {
+    alignSelf: "flex-end",
+    paddingVertical: 8,
+    paddingHorizontal: 18,
+    borderRadius: 999,
+    backgroundColor: "#06B6D4",
+  },
+  modalButtonText: {
+    fontSize: 13,
+    fontFamily: "Poppins-SemiBold",
+    color: "#FFFFFF",
   },
 });
 

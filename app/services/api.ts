@@ -84,6 +84,7 @@ export interface RegisterRequest {
   password: string;
   name: string;
   role: "doctor" | "patient";
+  idNumber: string;
   specialization?: string;
   licenseDocument?: string;
 }

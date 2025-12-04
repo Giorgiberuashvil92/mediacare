@@ -10,16 +10,18 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../../contexts/AuthContext";
+import { useLanguage } from "../../contexts/LanguageContext";
 
 type UserRole = "doctor" | "patient";
 
 export default function RoleSelectionScreen() {
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
   const { setUserRole, isAuthenticated } = useAuth();
+  const { t } = useLanguage();
 
   const handleContinue = async () => {
     if (!selectedRole) {
-      alert("Please select a role");
+      alert(t("roleSelection.alert.selectRole"));
       return;
     }
 
@@ -43,11 +45,11 @@ export default function RoleSelectionScreen() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>აირჩიე შენი როლი</Text>
+          <Text style={styles.title}>{t("roleSelection.title")}</Text>
           <Text style={styles.subtitle}>
             {isAuthenticated
-              ? "აირჩიე რომელი ნაწილი გინდა გამოიყენო"
-              : "არჩევე რომელი პროფილით დავიწყოთ"}
+              ? t("roleSelection.subtitle.authenticated")
+              : t("roleSelection.subtitle.guest")}
           </Text>
         </View>
 
@@ -78,9 +80,11 @@ export default function RoleSelectionScreen() {
                 <Ionicons name="checkmark-circle" size={28} color="#20BEB8" />
               )}
             </View>
-            <Text style={styles.roleTitle}>მე ვარ ექიმი</Text>
+            <Text style={styles.roleTitle}>
+              {t("roleSelection.doctor.title")}
+            </Text>
             <Text style={styles.roleDescription}>
-              შემოუერთდი როგორც სამედიცინო მომსახურების მიმწოდებელი
+              {t("roleSelection.doctor.description")}
             </Text>
           </TouchableOpacity>
 
@@ -109,9 +113,11 @@ export default function RoleSelectionScreen() {
                 <Ionicons name="checkmark-circle" size={28} color="#20BEB8" />
               )}
             </View>
-            <Text style={styles.roleTitle}>მე ვარ პაციენტი</Text>
+            <Text style={styles.roleTitle}>
+              {t("roleSelection.patient.title")}
+            </Text>
             <Text style={styles.roleDescription}>
-              მოძებნე ექიმი და დაჯავშნე ვიზიტი
+              {t("roleSelection.patient.description")}
             </Text>
           </TouchableOpacity>
         </View>
@@ -125,17 +131,23 @@ export default function RoleSelectionScreen() {
           onPress={handleContinue}
           disabled={!selectedRole}
         >
-          <Text style={styles.continueButtonText}>გასაგრძელებლად</Text>
+          <Text style={styles.continueButtonText}>
+            {t("roleSelection.continue")}
+          </Text>
         </TouchableOpacity>
 
         {/* Login Link - only show if not authenticated */}
         {!isAuthenticated && (
           <View style={styles.loginContainer}>
-            <Text style={styles.loginText}>უკვე გაქვს ანგარიში? </Text>
+            <Text style={styles.loginText}>
+              {t("roleSelection.login.question")}
+            </Text>
             <TouchableOpacity
               onPress={() => router.push("/screens/auth/login")}
             >
-              <Text style={styles.loginLink}>შესვლა</Text>
+              <Text style={styles.loginLink}>
+                {t("roleSelection.login.action")}
+              </Text>
             </TouchableOpacity>
           </View>
         )}

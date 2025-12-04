@@ -18,9 +18,10 @@ export default function SplashScreen() {
 
   useEffect(() => {
     checkInitialRoute();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, userRole, authLoading]);
+  }, [isAuthenticated, userRole, authLoading,]);
 
+
+  AsyncStorage.removeItem("hasCompletedOnboarding");
   const checkInitialRoute = async () => {
     try {
       // დაველოდოთ AuthContext-ის ჩატვირთვას
@@ -41,7 +42,6 @@ export default function SplashScreen() {
         }
       }
 
-      // თუ არ არის ავტორიზებული, შევამოწმოთ onboarding
       const hasCompletedOnboarding = await AsyncStorage.getItem(
         "hasCompletedOnboarding"
       );
@@ -51,8 +51,7 @@ export default function SplashScreen() {
         return;
       }
 
-      // თუ onboarding დასრულებულია, მაგრამ არ არის ავტორიზებული, გადავიყვანოთ role selection-ზე
-      router.replace("/screens/auth/roleSelection");
+      router.replace("/screens/auth/login");
     } catch (error) {
       console.error("Error:", error);
       router.replace("/screens/auth/onboarding");

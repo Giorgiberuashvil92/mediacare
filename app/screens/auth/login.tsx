@@ -3,15 +3,20 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../../contexts/AuthContext";
+import { useLanguage } from "../../contexts/LanguageContext";
 import { showToast } from "../../utils/toast";
 
 export default function LoginScreen() {
@@ -20,12 +25,31 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [languageModalVisible, setLanguageModalVisible] = useState(false);
 
   const { login } = useAuth();
+  const { language, setLanguage, t } = useLanguage();
+
+  const languages = [
+    { code: "ka" as const, labelKey: "common.language.georgian" },
+    { code: "en" as const, labelKey: "common.language.english" },
+  ];
+
+  const selectedLanguageLabel =
+    languages.find((lang) => lang.code === language)?.labelKey ??
+    "common.language.georgian";
+
+  const handleSelectLanguage = async (code: "ka" | "en") => {
+    await setLanguage(code);
+    setLanguageModalVisible(false);
+  };
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      showToast.error("გთხოვთ შეავსოთ ყველა ველი", "შეცდომა");
+      showToast.error(
+        t("auth.login.validation.fillAll"),
+        t("auth.login.error.default"),
+      );
       return;
     }
 
@@ -46,15 +70,15 @@ export default function LoginScreen() {
         router.replace("/(tabs)");
       }
     } catch (error) {
-      let errorMessage = "შეცდომა შესვლისას";
+      let errorMessage = t("auth.login.error.default");
       
       if (error instanceof Error) {
         if (error.message.includes("Invalid credentials")) {
-          errorMessage = "არასწორი ელ-ფოსტა ან პაროლი";
+          errorMessage = t("auth.login.error.invalidCredentials");
         } else if (error.message.includes("User not found")) {
-          errorMessage = "მომხმარებელი არ მოიძებნა";
+          errorMessage = t("auth.login.error.userNotFound");
         } else if (error.message.includes("Invalid email")) {
-          errorMessage = "არასწორი ელ-ფოსტის ფორმატი";
+          errorMessage = t("auth.login.error.invalidEmail");
         } else {
           errorMessage = error.message;
         }
@@ -73,133 +97,226 @@ export default function LoginScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.content}>
-          <View style={styles.logoContainer}>
-            <View style={styles.logo}>
-              <Image
-                source={require("../../../assets/images/logo/logo.png")}
-                style={styles.logoImage}
-                contentFit="contain"
-              />
-            </View>
-          </View>
-
-          {/* Title */}
-          <Text style={styles.title}>კეთილი იყოს შენი დაბრუნება!</Text>
-          <Text style={styles.subtitle}>მოგვენატრე, შევიდეთ?</Text>
-
-          {/* Form */}
-          <View style={styles.form}>
-            {/* Email Input */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>ელ. ფოსტა</Text>
-              <View style={styles.inputWrapper}>
-                <Ionicons
-                  name="mail-outline"
-                  size={20}
-                  color="#9CA3AF"
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="შეიყვანე ელ. ფოსტა"
-                  placeholderTextColor="#9CA3AF"
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </View>
-            </View>
-
-            {/* Password Input */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>პაროლი</Text>
-              <View style={styles.inputWrapper}>
-                <Ionicons
-                  name="lock-closed-outline"
-                  size={20}
-                  color="#9CA3AF"
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.input}
-                  secureTextEntry={!showPassword}
-                  placeholder="••••••••••"
-                  placeholderTextColor="#9CA3AF"
-                  value={password}
-                  onChangeText={setPassword}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
+      <KeyboardAvoidingView
+        style={styles.safeArea}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+      >
+        <SafeAreaView style={styles.safeArea}>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.content}>
+              <View style={styles.languageSelectorContainer}>
                 <TouchableOpacity
-                  onPress={() => setShowPassword(!showPassword)}
-                  style={styles.eyeIcon}
+                  style={styles.languageButton}
+                  onPress={() => setLanguageModalVisible(true)}
                 >
                   <Ionicons
-                    name={showPassword ? "eye-off-outline" : "eye-outline"}
-                    size={20}
-                    color="#9CA3AF"
+                    name="language-outline"
+                    size={18}
+                    color="#06B6D4"
+                    style={styles.languageButtonIcon}
+                  />
+                  <Text style={styles.languageButtonText}>
+                    {t(selectedLanguageLabel)}
+                  </Text>
+                  <Ionicons
+                    name="chevron-down"
+                    size={16}
+                    color="#06B6D4"
+                    style={styles.languageButtonChevron}
                   />
                 </TouchableOpacity>
               </View>
-            </View>
-
-            {/* Remember Me & Forgot Password */}
-            <View style={styles.optionsContainer}>
-              <TouchableOpacity
-                style={styles.checkboxContainer}
-                onPress={() => setRememberMe(!rememberMe)}
-              >
-                <View
-                  style={[
-                    styles.checkbox,
-                    rememberMe && styles.checkboxChecked,
-                  ]}
-                >
-                  {rememberMe && (
-                    <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                  )}
+              <View style={styles.logoContainer}>
+                <View style={styles.logo}>
+                  <Image
+                    source={require("../../../assets/images/logo/logo.png")}
+                    style={styles.logoImage}
+                    contentFit="contain"
+                  />
                 </View>
-                <Text style={styles.checkboxLabel}>Remember me</Text>
-              </TouchableOpacity>
-              <TouchableOpacity>
-                <Text style={styles.forgotPassword}>Forgot Password?</Text>
-              </TouchableOpacity>
-            </View>
+              </View>
 
-            {/* Login Button */}
-            <TouchableOpacity 
-              style={[styles.loginButton, isLoading && styles.loginButtonDisabled]} 
-              onPress={handleLogin}
-              disabled={isLoading}
+              {/* Title */}
+              <Text style={styles.title}>{t("auth.login.title")}</Text>
+
+              {/* Form */}
+              <View style={styles.form}>
+                {/* Email Input */}
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>
+                    {t("auth.login.email.label")}
+                  </Text>
+                  <View style={styles.inputWrapper}>
+                    <Ionicons
+                      name="mail-outline"
+                      size={20}
+                      color="#9CA3AF"
+                      style={styles.inputIcon}
+                    />
+                    <TextInput
+                      style={styles.input}
+                      placeholder={t("auth.login.email.placeholder")}
+                      placeholderTextColor="#9CA3AF"
+                      value={email}
+                      onChangeText={setEmail}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      returnKeyType="next"
+                    />
+                  </View>
+                </View>
+
+                {/* Password Input */}
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>
+                    {t("auth.login.password.label")}
+                  </Text>
+                  <View style={styles.inputWrapper}>
+                    <Ionicons
+                      name="lock-closed-outline"
+                      size={20}
+                      color="#9CA3AF"
+                      style={styles.inputIcon}
+                    />
+                    <TextInput
+                      style={styles.input}
+                      secureTextEntry={!showPassword}
+                      placeholder={t("auth.login.password.placeholder")}
+                      placeholderTextColor="#9CA3AF"
+                      value={password}
+                      onChangeText={setPassword}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      returnKeyType="done"
+                      onSubmitEditing={handleLogin}
+                    />
+                    <TouchableOpacity
+                      onPress={() => setShowPassword(!showPassword)}
+                      style={styles.eyeIcon}
+                    >
+                      <Ionicons
+                        name={showPassword ? "eye-off-outline" : "eye-outline"}
+                        size={20}
+                        color="#9CA3AF"
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Remember Me & Forgot Password */}
+                <View style={styles.optionsContainer}>
+                  <TouchableOpacity
+                    style={styles.checkboxContainer}
+                    onPress={() => setRememberMe(!rememberMe)}
+                  >
+                    <View
+                      style={[
+                        styles.checkbox,
+                        rememberMe && styles.checkboxChecked,
+                      ]}
+                    >
+                      {rememberMe && (
+                        <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                      )}
+                    </View>
+                    <Text style={styles.checkboxLabel}>
+                      {t("auth.login.rememberMe")}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity>
+                    <Text style={styles.forgotPassword}>
+                      {t("auth.login.forgotPassword")}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Login Button */}
+                <TouchableOpacity
+                  style={[
+                    styles.loginButton,
+                    isLoading && styles.loginButtonDisabled,
+                  ]}
+                  onPress={handleLogin}
+                  disabled={isLoading}
+                >
+                  <Text style={styles.loginButtonText}>
+                    {isLoading
+                      ? t("auth.login.submitting")
+                      : t("auth.login.submit")}
+                  </Text>
+                </TouchableOpacity>
+
+                <View style={styles.signupContainerInline}>
+                  <Text style={styles.signupText}>
+                    {t("auth.login.signup.question")}
+                  </Text>
+                  <TouchableOpacity onPress={handleSignup}>
+                    <Text style={styles.signupLink}>
+                      {t("auth.login.signup.action")}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </KeyboardAvoidingView>
+
+      {/* Language selection modal */}
+      <Modal
+        visible={languageModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setLanguageModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>
+              {t("auth.login.language.title")}
+            </Text>
+            {languages.map((lang) => {
+              const isActive = language === lang.code;
+              return (
+                <TouchableOpacity
+                  key={lang.code}
+                  style={[
+                    styles.modalOption,
+                    isActive && styles.modalOptionActive,
+                  ]}
+                  onPress={() => handleSelectLanguage(lang.code)}
+                >
+                  <Text
+                    style={[
+                      styles.modalOptionText,
+                      isActive && styles.modalOptionTextActive,
+                    ]}
+                  >
+                    {t(lang.labelKey)}
+                  </Text>
+                  {isActive && (
+                    <Ionicons name="checkmark" size={18} color="#06B6D4" />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={() => setLanguageModalVisible(false)}
             >
-              <Text style={styles.loginButtonText}>
-                {isLoading ? "შესვლა..." : "შესვლა"}
+              <Text style={styles.modalCloseButtonText}>
+                {t("common.actions.close")}
               </Text>
             </TouchableOpacity>
-
-            <View style={styles.signupContainerInline}>
-              <Text style={styles.signupText}>ანგარიში არ გაქვს? </Text>
-              <TouchableOpacity onPress={handleSignup}>
-                <Text style={styles.signupLink}>დარეგისტრირდი</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Divider */}
-            {/* <View style={styles.dividerContainer}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>ან შესვლა სხვა გზით</Text>
-              <View style={styles.dividerLine} />
-            </View> */}
-
-            {/* Social Login Buttons */}
-         
           </View>
         </View>
-      </SafeAreaView>
+      </Modal>
     </View>
   );
 }
@@ -217,6 +334,39 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 30,
   },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+  },
+  languageSelectorContainer: {
+    alignItems: "flex-end",
+    marginBottom: 8,
+  },
+  languageButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 0,
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: "#ECFEFF",
+    shadowColor: "#0EA5E9",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  languageButtonIcon: {
+    marginRight: 4,
+  },
+  languageButtonText: {
+    fontSize: 13,
+    fontFamily: "Poppins-Medium",
+    color: "#0369A1",
+  },
+  languageButtonChevron: {
+    marginLeft: 4,
+  },
   logoContainer: {
     alignItems: "center",
     marginBottom: 20,
@@ -230,11 +380,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   title: {
-    fontSize: 32,
+    fontSize: 24,
     fontFamily: "Poppins-Bold",
     color: "#1F2937",
     textAlign: "center",
-    marginBottom: 8,
+    marginBottom: 16,
   },
   subtitle: {
     fontSize: 16,
@@ -397,5 +547,76 @@ const styles = StyleSheet.create({
   logoImage: {
     width: 50,
     height: 50,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.5)",
+    justifyContent: "flex-end",
+    paddingHorizontal: 0,
+  },
+  modalCard: {
+    width: "100%",
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 12,
+  },
+  modalHandle: {
+    alignSelf: "center",
+    width: 40,
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: "#E5E7EB",
+    marginBottom: 12,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontFamily: "Poppins-SemiBold",
+    color: "#0F172A",
+    marginBottom: 16,
+    textAlign: "center",
+  },
+  modalOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    marginBottom: 12,
+  },
+  modalOptionActive: {
+    borderColor: "#06B6D4",
+    backgroundColor: "#F0FDFA",
+  },
+  modalOptionText: {
+    fontSize: 16,
+    fontFamily: "Poppins-Regular",
+    color: "#0F172A",
+  },
+  modalOptionTextActive: {
+    fontFamily: "Poppins-SemiBold",
+    color: "#06B6D4",
+  },
+  modalCloseButton: {
+    marginTop: 4,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: "#06B6D4",
+    alignItems: "center",
+  },
+  modalCloseButtonText: {
+    fontSize: 16,
+    fontFamily: "Poppins-SemiBold",
+    color: "#FFFFFF",
   },
 });

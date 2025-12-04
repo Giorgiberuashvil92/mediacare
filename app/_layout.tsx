@@ -6,6 +6,7 @@ import Toast from "react-native-toast-message";
 import { AuthProvider } from "./contexts/AuthContext";
 import { CartProvider } from "./contexts/CartContext";
 import { FavoritesProvider } from "./contexts/FavoritesContext";
+import { LanguageProvider } from "./contexts/LanguageContext";
 
 // Reactotron disabled for debugging
 // if (__DEV__) {
@@ -46,22 +47,24 @@ export default function RootLayout() {
   }
 
   return (
-    <AuthProvider>
-      <FavoritesProvider>
-        <CartProvider>
-          <Stack
-            screenOptions={{
-              headerShown: false,
-            }}
-          >
-            <Stack.Screen name="index" />
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="(doctor-tabs)" />
-            <Stack.Screen name="screens" />
-          </Stack>
-          <Toast />
-        </CartProvider>
-      </FavoritesProvider>
-    </AuthProvider>
+    <LanguageProvider>
+      <AuthProvider>
+        <FavoritesProvider>
+          <CartProvider>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+              }}
+            >
+              <Stack.Screen name="index" />
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="(doctor-tabs)" />
+              <Stack.Screen name="screens" />
+            </Stack>
+            <Toast />
+          </CartProvider>
+        </FavoritesProvider>
+      </AuthProvider>
+    </LanguageProvider>
   );
 }
