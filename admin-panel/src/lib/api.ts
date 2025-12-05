@@ -430,6 +430,15 @@ class ApiService {
     }>>(response);
   }
 
+  async getAppointmentById(appointmentId: string): Promise<ApiResponse<any>> {
+    const response = await fetch(`${this.baseURL}/appointments/${appointmentId}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+
+    return this.handleResponse<ApiResponse<any>>(response);
+  }
+
   async updateAppointmentStatus(appointmentId: string, status: string): Promise<ApiResponse<any>> {
     const response = await fetch(`${this.baseURL}/admin/appointments/${appointmentId}/status`, {
       method: 'PUT',

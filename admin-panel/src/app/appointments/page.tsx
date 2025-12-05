@@ -3,13 +3,16 @@
 import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 import { apiService } from '@/lib/api';
 import { useEffect, useState } from 'react';
+import { AppointmentDetailsModal } from './_components/appointment-details-modal';
 
 interface Appointment {
   id: string;
+  appointmentNumber?: string;
   patientName: string;
   doctorName: string;
   appointmentDate: string;
   appointmentTime: string;
+  type?: 'video' | 'home-visit';
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
   consultationFee: number;
   paymentStatus: 'pending' | 'paid' | 'failed';
@@ -22,6 +25,8 @@ export default function AppointmentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'confirmed' | 'completed' | 'cancelled'>('all');
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'pending' | 'paid' | 'failed'>('all');
+  const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     loadAppointments();
@@ -187,6 +192,9 @@ export default function AppointmentsPage() {
               <thead>
                 <tr className="border-b border-stroke dark:border-dark-3">
                   <th className="p-4 text-left font-medium text-dark dark:text-white">
+                    ნომერი
+                  </th>
+                  <th className="p-4 text-left font-medium text-dark dark:text-white">
                     პაციენტი
                   </th>
                   <th className="p-4 text-left font-medium text-dark dark:text-white">
@@ -194,6 +202,9 @@ export default function AppointmentsPage() {
                   </th>
                   <th className="p-4 text-left font-medium text-dark dark:text-white">
                     თარიღი/დრო
+                  </th>
+                  <th className="p-4 text-left font-medium text-dark dark:text-white">
+                    ტიპი
                   </th>
                   <th className="p-4 text-left font-medium text-dark dark:text-white">
                     სტატუსი
@@ -209,7 +220,7 @@ export default function AppointmentsPage() {
               <tbody>
                 {appointments.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-4 text-center text-dark-4">
+                    <td colSpan={8} className="p-4 text-center text-dark-4">
                       ჯავშნები არ მოიძებნა
                     </td>
                   </tr>
@@ -217,8 +228,17 @@ export default function AppointmentsPage() {
                   appointments.map((appointment) => (
                     <tr
                       key={appointment.id}
-                      className="border-b border-stroke dark:border-dark-3 hover:bg-gray-50 dark:hover:bg-dark-3"
+                      onClick={() => {
+                        setSelectedAppointmentId(appointment.id);
+                        setIsModalOpen(true);
+                      }}
+                      className="cursor-pointer border-b border-stroke dark:border-dark-3 hover:bg-gray-50 dark:hover:bg-dark-3 transition-colors"
                     >
+                      <td className="p-4">
+                        <div className="text-sm font-mono text-dark-4 dark:text-dark-6">
+                          {appointment.appointmentNumber || `#${appointment.id.slice(-6)}`}
+                        </div>
+                      </td>
                       <td className="p-4">
                         <div>
                           <div className="font-medium text-dark dark:text-white">
@@ -243,6 +263,11 @@ export default function AppointmentsPage() {
                         </div>
                       </td>
                       <td className="p-4">
+                        <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                          {appointment.type === 'home-visit' ? 'ბინაზე' : 'ვიდეო'}
+                        </span>
+                      </td>
+                      <td className="p-4">
                         <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusColor(appointment.status)}`}>
                           {appointment.status === 'pending' && 'მოლოდინში'}
                           {appointment.status === 'confirmed' && 'დადასტურებული'}
@@ -257,7 +282,7 @@ export default function AppointmentsPage() {
                           {appointment.paymentStatus === 'failed' && 'ვერ გადაიხადა'}
                         </span>
                       </td>
-                      <td className="p-4 text-dark dark:text-white">
+                      <td className="p-4 text-dark dark:text-white font-medium">
                         ₾{appointment.consultationFee}
                       </td>
                     </tr>
@@ -268,6 +293,15 @@ export default function AppointmentsPage() {
           </div>
         </div>
       </div>
+
+      <AppointmentDetailsModal
+        appointmentId={selectedAppointmentId}
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setSelectedAppointmentId(null);
+        }}
+      />
     </>
   );
 }
