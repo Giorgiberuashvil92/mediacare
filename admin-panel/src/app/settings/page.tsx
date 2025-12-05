@@ -26,7 +26,7 @@ export default function SettingsPage() {
       
       setMessage({ type: 'success', text: 'პარამეტრები წარმატებით შენახულია' });
       setTimeout(() => setMessage(null), 3000);
-    } catch (error) {
+    } catch {
       setMessage({ type: 'error', text: 'პარამეტრების შენახვა ვერ მოხერხდა' });
       setTimeout(() => setMessage(null), 3000);
     } finally {

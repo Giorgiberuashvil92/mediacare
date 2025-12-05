@@ -10,7 +10,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../../contexts/AuthContext";
@@ -39,10 +39,15 @@ export default function MedicalCabinetScreen() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [patientVisits, setPatientVisits] = useState<VisitRecord[]>([]);
   const [loadingRecords, setLoadingRecords] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
 
   useEffect(() => {
     if (activeTab === "records" && user?.id) {
       loadMedicalRecords();
+    }
+    if (activeTab === "personal-info" && user?.id) {
+      loadProfile();
     }
   }, [activeTab, user?.id]);
 
@@ -58,7 +63,6 @@ export default function MedicalCabinetScreen() {
       const response = await apiService.getPatientAppointments();
 
       if (response.success && response.data) {
-        // Map appointments to visit records
         const visits: VisitRecord[] = response.data.map((apt: any) => {
           const doctor = apt.doctorId || {};
           return {
@@ -150,24 +154,40 @@ export default function MedicalCabinetScreen() {
   };
 
   const handleSave = () => {
+    if (savingProfile) return;
     // Validate that blood group is selected
     if (!selectedBloodGroup) {
       alert("გთხოვთ აირჩიოთ სისხლის ჯგუფი");
       return;
     }
 
-    // Here you would save the data to your backend/state management
-    console.log("Saving personal information:", {
-      selectedGender,
+    const payload = {
+      gender: selectedGender,
       birthDate,
       birthPlace,
-      selectedBloodGroup,
-      chronicDisease: hasChronicDisease ? chronicDiseaseText : null,
-      allergy: hasAllergy ? allergyText : null,
-    });
+      bloodGroup: selectedBloodGroup,
+      chronicDisease: hasChronicDisease ? chronicDiseaseText : "",
+      allergy: hasAllergy ? allergyText : "",
+    };
 
-    // Show success modal
-    setShowSuccessModal(true);
+    const saveProfile = async () => {
+      try {
+        setSavingProfile(true);
+        const response = await apiService.updateProfile(payload);
+        if (!response.success) {
+          Alert.alert("შეცდომა", "ინფორმაციის შენახვა ვერ მოხერხდა");
+          return;
+        }
+        setShowSuccessModal(true);
+      } catch (err) {
+        console.error("Failed to save profile", err);
+        Alert.alert("შეცდომა", "ინფორმაციის შენახვა ვერ მოხერხდა");
+      } finally {
+        setSavingProfile(false);
+      }
+    };
+
+    saveProfile();
   };
 
   return (
@@ -193,25 +213,12 @@ export default function MedicalCabinetScreen() {
               activeTab === "personal-info" && styles.activeTabText,
             ]}
           >
-            ანკეტა
+            სამედიცინო ისტორია
           </Text>
           {activeTab === "personal-info" && <View style={styles.tabIndicator} />}
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.tab, activeTab === "records" && styles.activeTab]}
-          onPress={() => handleTabChange("records")}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "records" && styles.activeTabText,
-            ]}
-          >
-            ისტორია
-          </Text>
-          {activeTab === "records" && <View style={styles.tabIndicator} />}
-        </TouchableOpacity>
+        
       </View>
 
       {/* Content */}

@@ -2,6 +2,7 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const QUICK_SERVICES = [
   {
@@ -10,23 +11,28 @@ const QUICK_SERVICES = [
     description: "ონლაინ ექიმი 15 წთ-ში",
     image:
       "https://images.unsplash.com/photo-1584982751601-97dcc096659c?w=600&h=600&fit=crop&crop=center",
-    onPress: () => router.push("/(tabs)/doctor"),
+    onPress: () =>
+      router.push({
+        pathname: "/(tabs)/doctor",
+        params: { appointmentType: "video", lockAppointmentType: "true" },
+      }),
   },
-  // {
-  //   id: "lab",
-  //   title: "ლაბორატორია",
-  //   description: "ანალიზები და ტესტები",
-  //   image:
-  //     "https://images.unsplash.com/photo-1581092580491-e0d23cbdf1dc?w=600&h=600&fit=crop&crop=center",
-  //   onPress: () => router.push("/(tabs)/medicine"),
-  // },
+  {
+    id: "lab",
+    title: "ლაბორატორია",
+    description: "ანალიზები და ტესტები",
+    image:
+      "https://images.unsplash.com/photo-1581092580491-e0d23cbdf1dc?w=600&h=600&fit=crop&crop=center",
+    onPress: () => router.push("/(tabs)/medicine"),
+  },
   {
     id: "pharmacy",
     title: "წამლები",
     description: "მედიკამენტების მაღაზია",
     image:
       "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=600&h=600&fit=crop&crop=center",
-    onPress: () => router.push("/(tabs)/medicine"),
+    // Route not yet in main tabs; keep navigation typed loosely
+    onPress: () => router.push("/(tabs)/medicine" as any),
   },
   {
     id: "home-visit",
@@ -48,7 +54,7 @@ const QUICK_SERVICES = [
 
 const Services = () => {
   const [pharmacyModalVisible, setPharmacyModalVisible] = useState(false);
-
+  const insets = useSafeAreaInsets();
   const handlePress = (serviceId: string, onPress: () => void) => {
     if (serviceId === "pharmacy") {
       setPharmacyModalVisible(true);
@@ -58,7 +64,7 @@ const Services = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingBottom: insets.bottom + 16 }]}>
       <Text style={styles.title}>სწრაფი სერვისები</Text>
       <View style={styles.grid}>
         {QUICK_SERVICES.map((service) => (
@@ -117,6 +123,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: "#F2F2F7",
+    paddingBottom: 16,
+    scrollView: {
+      flex: 1,
+    },
+    contentContainer: {
+      paddingBottom: 16,
+    },
   },
   title: {
     fontSize: 16,

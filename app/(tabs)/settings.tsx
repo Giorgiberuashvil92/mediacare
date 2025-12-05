@@ -115,15 +115,15 @@ export default function SettingsScreen() {
             <Text style={styles.menuText}>ფავორიტები</Text>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity>
-
+{/* 
           <TouchableOpacity style={styles.menuItem}>
             <View style={styles.menuIconContainer}>
               <Ionicons name="book" size={20} color="#06B6D4" />
             </View>
             <Text style={styles.menuText}>მისამართების წიგნი</Text>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
-          </TouchableOpacity>
-
+          </TouchableOpacity> */}
+{/* 
           <TouchableOpacity
             onPress={() => router.push("/screens/profile/payment")}
             style={styles.menuItem}
@@ -133,7 +133,7 @@ export default function SettingsScreen() {
             </View>
             <Text style={styles.menuText}>გადახდები</Text>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
 
           <TouchableOpacity style={styles.menuItem}>
             <View style={styles.menuIconContainer}>
@@ -143,7 +143,10 @@ export default function SettingsScreen() {
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => router.push("/screens/profile/security")}
+          >
             <View style={styles.menuIconContainer}>
               <Ionicons name="shield-checkmark" size={20} color="#06B6D4" />
             </View>
@@ -173,11 +176,41 @@ export default function SettingsScreen() {
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
+          {/* <TouchableOpacity style={styles.menuItem}>
             <View style={styles.menuIconContainer}>
               <Ionicons name="people" size={20} color="#06B6D4" />
             </View>
             <Text style={styles.menuText}>მეგობრების მოწვევა</Text>
+            <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
+          </TouchableOpacity> */}
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => router.push("/screens/profile/terms/cancellation")}
+          >
+            <View style={styles.menuIconContainer}>
+              <Ionicons name="close-circle-outline" size={20} color="#06B6D4" />
+            </View>
+            <Text style={styles.menuText}>ჯავშნების გაუქმების პირობები</Text>
+            <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => router.push("/screens/profile/terms/service")}
+          >
+            <View style={styles.menuIconContainer}>
+              <Ionicons name="document-text-outline" size={20} color="#06B6D4" />
+            </View>
+            <Text style={styles.menuText}>სერვისის პირობები</Text>
+            <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => router.push("/screens/profile/terms/privacy")}
+          >
+            <View style={styles.menuIconContainer}>
+              <Ionicons name="lock-closed-outline" size={20} color="#06B6D4" />
+            </View>
+            <Text style={styles.menuText}>კონფიდენციალურობა</Text>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity>
 

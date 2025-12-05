@@ -49,14 +49,18 @@ const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
       : undefined,
     followUpFee: doctor.followUpFee ? `${doctor.followUpFee} ₾` : undefined,
     about: doctor.about || "",
-    workingHours: doctor.workingHours || undefined,
+    workingHours: doctor.workingHours || "24/7",
     availability: doctor.availability || [],
     totalReviews: doctor.reviewCount || 0,
   };
 };
 
 const DoctorDetail = () => {
-  const { id } = useLocalSearchParams();
+  const { id, appointmentType, lockAppointmentType } = useLocalSearchParams<{
+    id: string;
+    appointmentType?: string;
+    lockAppointmentType?: string;
+  }>();
   const [doctor, setDoctor] = useState<any>(null);
   console.log('🏥 Frontend doctor object:', doctor);
   console.log('🏥 Frontend doctor availability:', doctor?.availability);
@@ -158,7 +162,10 @@ const DoctorDetail = () => {
               totalReviews={doctor.totalReviews || 0}
               reviews={Array.isArray(doctor.reviews) ? doctor.reviews : []}
               doctorId={doctor.id}
-              onTimeSlotBlocked={loadDoctor} // Reload doctor data after blocking
+              initialMode={
+                (appointmentType as "video" | "home-visit") || "video"
+              }
+              lockMode={lockAppointmentType === "true"}
             />
           </View>
         </ScrollView>

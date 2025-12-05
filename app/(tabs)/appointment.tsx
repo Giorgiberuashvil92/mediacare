@@ -1,5 +1,6 @@
 import { apiService } from "@/app/services/api";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -10,9 +11,8 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../contexts/AuthContext";
@@ -156,10 +156,14 @@ const Appointment = () => {
   const [filterType, setFilterType] = useState<"all" | "video" | "home-visit">(
     "all",
   );
-  const [searchQuery, setSearchQuery] = useState("");
   const [selectedAppointment, setSelectedAppointment] =
     useState<PatientAppointment | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [filterStartDate, setFilterStartDate] = useState("");
+  const [filterEndDate, setFilterEndDate] = useState("");
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [refreshing, setRefreshing] = useState(false);
 
@@ -276,10 +280,11 @@ const Appointment = () => {
       filterStatus === "all" || appointment.status === filterStatus;
     const matchesType =
       filterType === "all" || appointment.type === filterType;
-    const matchesSearch = appointment.doctorName
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase());
-    return matchesStatus && matchesType && matchesSearch;
+    const matchesStart =
+      !filterStartDate || appointment.date >= filterStartDate.trim();
+    const matchesEnd =
+      !filterEndDate || appointment.date <= filterEndDate.trim();
+    return matchesStatus && matchesType && matchesStart && matchesEnd;
   });
 
   // Stats
@@ -366,22 +371,54 @@ const Appointment = () => {
         </View>
 
         {/* Search */}
-        <View style={styles.searchSection}>
-          <View style={styles.searchContainer}>
-            <Ionicons name="search" size={20} color="#9CA3AF" />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="ძებნა ექიმის სახელით..."
-              placeholderTextColor="#9CA3AF"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
+        <View style={styles.typeFilterSection}>
+          <TouchableOpacity
+            style={[
+              styles.typeFilterChip,
+              filterType === "video" && styles.typeFilterChipActive,
+            ]}
+            onPress={() =>
+              setFilterType(filterType === "video" ? "all" : "video")
+            }
+          >
+            <Ionicons
+              name="videocam-outline"
+              size={16}
+              color={filterType === "video" ? "#0EA5E9" : "#6B7280"}
             />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery("")}>
-                <Ionicons name="close-circle" size={20} color="#9CA3AF" />
-              </TouchableOpacity>
-            )}
-          </View>
+            <Text
+              style={[
+                styles.typeFilterText,
+                filterType === "video" && styles.typeFilterTextActive,
+              ]}
+            >
+              ვიდეო
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.typeFilterChip,
+              filterType === "home-visit" && styles.typeFilterChipActive,
+            ]}
+            onPress={() =>
+              setFilterType(filterType === "home-visit" ? "all" : "home-visit")
+            }
+          >
+            <Ionicons
+              name="home-outline"
+              size={16}
+              color={filterType === "home-visit" ? "#22C55E" : "#6B7280"}
+            />
+            <Text
+              style={[
+                styles.typeFilterText,
+                filterType === "home-visit" && styles.typeFilterTextActive,
+              ]}
+            >
+              ბინაზე
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Statistics by status */}
@@ -416,35 +453,7 @@ const Appointment = () => {
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[
-              styles.statCard,
-              filterStatus === "completed" && styles.statCardActive,
-            ]}
-            onPress={() => setFilterStatus("completed")}
-          >
-            <Ionicons
-              name="checkmark-circle"
-              size={24}
-              color={filterStatus === "completed" ? "#10B981" : "#6B7280"}
-            />
-            <Text
-              style={[
-                styles.statValue,
-                filterStatus === "completed" && styles.statValueActive,
-              ]}
-            >
-              {stats.completed}
-            </Text>
-            <Text
-              style={[
-                styles.statLabel,
-                filterStatus === "completed" && styles.statLabelActive,
-              ]}
-            >
-              დასრულებული
-            </Text>
-          </TouchableOpacity>
+      
 
           <TouchableOpacity
             style={[
@@ -508,55 +517,7 @@ const Appointment = () => {
         </View>
 
         {/* Filter by consultation type (video / home-visit) */}
-        <View style={styles.typeFilterSection}>
-          <TouchableOpacity
-            style={[
-              styles.typeFilterChip,
-              filterType === "video" && styles.typeFilterChipActive,
-            ]}
-            onPress={() =>
-              setFilterType(filterType === "video" ? "all" : "video")
-            }
-          >
-            <Ionicons
-              name="videocam-outline"
-              size={16}
-              color={filterType === "video" ? "#0EA5E9" : "#6B7280"}
-            />
-            <Text
-              style={[
-                styles.typeFilterText,
-                filterType === "video" && styles.typeFilterTextActive,
-              ]}
-            >
-              ვიდეო
-            </Text>
-          </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[
-              styles.typeFilterChip,
-              filterType === "home-visit" && styles.typeFilterChipActive,
-            ]}
-            onPress={() =>
-              setFilterType(filterType === "home-visit" ? "all" : "home-visit")
-            }
-          >
-            <Ionicons
-              name="home-outline"
-              size={16}
-              color={filterType === "home-visit" ? "#22C55E" : "#6B7280"}
-            />
-            <Text
-              style={[
-                styles.typeFilterText,
-                filterType === "home-visit" && styles.typeFilterTextActive,
-              ]}
-            >
-              ბინაზე
-            </Text>
-          </TouchableOpacity>
-        </View>
 
         {/* Appointments List */}
         <View style={styles.listSection}>
@@ -566,7 +527,12 @@ const Appointment = () => {
             </Text>
             <TouchableOpacity style={styles.sortButton}>
               <Ionicons name="funnel-outline" size={18} color="#6B7280" />
-              <Text style={styles.sortText}>ფილტრი</Text>
+              <Text
+                style={styles.sortText}
+                onPress={() => setShowFilterModal(true)}
+              >
+                ფილტრი
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -899,6 +865,143 @@ const Appointment = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Filter modal */}
+      <Modal
+        visible={showFilterModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowFilterModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.filterModalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>ფილტრი</Text>
+              <TouchableOpacity
+                onPress={() => setShowFilterModal(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+              <View style={styles.detailSection}>
+                <Text style={styles.detailLabel}>საწყისი თარიღი</Text>
+                <TouchableOpacity
+                  style={styles.dateInput}
+                  onPress={() => setShowStartPicker(true)}
+                >
+                  <Ionicons name="calendar-outline" size={20} color="#06B6D4" />
+                  <Text style={[
+                    styles.dateInputText,
+                    !filterStartDate && styles.dateInputTextPlaceholder
+                  ]}>
+                    {filterStartDate || "აირჩიე თარიღი"}
+                  </Text>
+                  {filterStartDate && (
+                    <TouchableOpacity
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        setFilterStartDate("");
+                      }}
+                      style={styles.clearDateButton}
+                    >
+                      <Ionicons name="close-circle" size={18} color="#94A3B8" />
+                    </TouchableOpacity>
+                  )}
+                </TouchableOpacity>
+                {showStartPicker && (
+                  <View style={styles.pickerContainer}>
+                    <DateTimePicker
+                      value={
+                        filterStartDate
+                          ? new Date(filterStartDate)
+                          : new Date()
+                      }
+                      mode="date"
+                      display="default"
+                      onChange={(event: any, selectedDate?: Date) => {
+                        setShowStartPicker(false);
+                        if (event.type === "dismissed") return;
+                        if (selectedDate) {
+                          setFilterStartDate(selectedDate.toISOString().split("T")[0]);
+                        }
+                      }}
+                    />
+                  </View>
+                )}
+              </View>
+
+              <View style={styles.detailSection}>
+                <Text style={styles.detailLabel}>ბოლო თარიღი</Text>
+                <TouchableOpacity
+                  style={styles.dateInput}
+                  onPress={() => setShowEndPicker(true)}
+                >
+                  <Ionicons name="calendar-outline" size={20} color="#06B6D4" />
+                  <Text style={[
+                    styles.dateInputText,
+                    !filterEndDate && styles.dateInputTextPlaceholder
+                  ]}>
+                    {filterEndDate || "აირჩიე თარიღი"}
+                  </Text>
+                  {filterEndDate && (
+                    <TouchableOpacity
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        setFilterEndDate("");
+                      }}
+                      style={styles.clearDateButton}
+                    >
+                      <Ionicons name="close-circle" size={18} color="#94A3B8" />
+                    </TouchableOpacity>
+                  )}
+                </TouchableOpacity>
+                {showEndPicker && (
+                  <View style={styles.pickerContainer}>
+                    <DateTimePicker
+                      value={
+                        filterEndDate
+                          ? new Date(filterEndDate)
+                          : new Date()
+                      }
+                      mode="date"
+                      display="default"
+                      onChange={(event: any, selectedDate?: Date) => {
+                        setShowEndPicker(false);
+                        if (event.type === "dismissed") return;
+                        if (selectedDate) {
+                          setFilterEndDate(selectedDate.toISOString().split("T")[0]);
+                        }
+                      }}
+                    />
+                  </View>
+                )}
+              </View>
+            </ScrollView>
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={() => {
+                  setFilterStartDate("");
+                  setFilterEndDate("");
+                  setShowFilterModal(false);
+                }}
+              >
+                <Text style={styles.modalButtonText}>გასუფთავება</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonPrimary]}
+                onPress={() => setShowFilterModal(false)}
+              >
+                <Text style={[styles.modalButtonText, styles.modalButtonTextPrimary]}>
+                  ფილტრი
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -978,6 +1081,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   typeFilterChip: {
+    width: "50%",
+    height: 40,
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
@@ -1308,6 +1413,12 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     maxHeight: "90%",
   },
+  filterModalContent: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: "80%",
+  },
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1362,10 +1473,50 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "#F3F4F6",
   },
+  modalButtonPrimary: {
+    backgroundColor: "#06B6D4",
+  },
   modalButtonText: {
     fontSize: 16,
     fontFamily: "Poppins-SemiBold",
     color: "#6B7280",
+  },
+  modalButtonTextPrimary: {
+    color: "#FFFFFF",
+  },
+  dateInput: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: "#E2E8F0",
+    minHeight: 52,
+  },
+  dateInputText: {
+    flex: 1,
+    fontSize: 15,
+    fontFamily: "Poppins-Medium",
+    color: "#1F2937",
+  },
+  dateInputTextPlaceholder: {
+    color: "#94A3B8",
+    fontFamily: "Poppins-Regular",
+  },
+  clearDateButton: {
+    padding: 4,
+  },
+  pickerContainer: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    alignItems: "center",
   },
   content: {
     flex: 1,

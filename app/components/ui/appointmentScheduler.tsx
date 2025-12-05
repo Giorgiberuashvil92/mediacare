@@ -1,7 +1,7 @@
 import { apiService } from "@/app/services/api";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
   ScrollView,
@@ -17,7 +17,7 @@ interface DayAvailability {
   timeSlots: string[];
   videoSlots?: string[];
   homeVisitSlots?: string[];
-  bookedSlots?: string[]; // დაჯავშნული დროები
+  bookedSlots?: string[];
   isAvailable: boolean;
 }
 
@@ -35,6 +35,8 @@ interface AppointmentSchedulerProps {
   totalReviews: number;
   reviews: Review[];
   doctorId?: string;
+  initialMode?: "video" | "home-visit";
+  lockMode?: boolean;
 }
 
 const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
@@ -43,14 +45,35 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
   totalReviews,
   reviews,
   doctorId,
+  initialMode = "video",
+  lockMode = false,
 }) => {
-  const [mode, setMode] = useState<"video" | "home-visit">("video");
+  const isTwentyFourSeven = workingHours?.includes("24");
+  const [mode, setMode] = useState<"video" | "home-visit">(initialMode);
   const [selectedDate, setSelectedDate] = useState<string>(
     availability[0]?.date || "",
   );
   const [selectedTime, setSelectedTime] = useState<string>("");
 
-  // Dynamic month/year based on selected date
+  const generateFullDaySlots = () => {
+    return Array.from({ length: 24 }, (_, hour) =>
+      `${hour.toString().padStart(2, "0")}:00`,
+    );
+  };
+
+  useEffect(() => {
+    setMode(initialMode);
+    setSelectedTime("");
+  }, [initialMode]);
+
+  const handleModeChange = (nextMode: "video" | "home-visit") => {
+    if (lockMode && nextMode !== initialMode) {
+      return;
+    }
+    setMode(nextMode);
+    setSelectedTime("");
+  };
+
   const getCurrentMonth = () => {
     if (!selectedDate) return "";
     const date = new Date(selectedDate);
@@ -75,6 +98,9 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
 
   // Filter availability by current mode so რომ თითო ტაბში მხოლოდ შესაბამისი ტიპის დღეები ჩანდეს
   const filteredAvailability: DayAvailability[] = availability.filter((day) => {
+    if (isTwentyFourSeven) {
+      return day.isAvailable !== false;
+    }
     if (mode === "video") {
       return (day.videoSlots && day.videoSlots.length > 0) || day.timeSlots.length > 0;
     }
@@ -107,13 +133,32 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
 
   const getVisibleTimeSlots = () => {
     if (!selectedDayAvailability) return [];
-    if (mode === "video" && selectedDayAvailability.videoSlots) {
-      return selectedDayAvailability.videoSlots;
+
+    // Full-day override if declared 24/7
+    if (isTwentyFourSeven) {
+      return generateFullDaySlots();
     }
-    if (mode === "home-visit" && selectedDayAvailability.homeVisitSlots) {
-      return selectedDayAvailability.homeVisitSlots;
+
+    const videoSlots = selectedDayAvailability.videoSlots || [];
+    const homeVisitSlots = selectedDayAvailability.homeVisitSlots || [];
+    const genericSlots = selectedDayAvailability.timeSlots || [];
+
+    // Choose slots by mode
+    const slotsByMode =
+      mode === "video"
+        ? videoSlots.length > 0
+          ? videoSlots
+          : genericSlots
+        : homeVisitSlots.length > 0
+          ? homeVisitSlots
+          : genericSlots;
+
+    // If fewer than 24 (or empty), show full-day hours so user can pick any time
+    if (slotsByMode.length < 24) {
+      return generateFullDaySlots();
     }
-    return selectedDayAvailability.timeSlots || [];
+
+    return slotsByMode;
   };
 
   return (
@@ -135,10 +180,8 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
               styles.modePill,
               mode === "video" && styles.modePillActiveVideo,
             ]}
-            onPress={() => {
-              setMode("video");
-              setSelectedTime("");
-            }}
+            onPress={() => handleModeChange("video")}
+            disabled={lockMode && initialMode !== "video"}
           >
             <Ionicons
               name="videocam-outline"
@@ -160,10 +203,8 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
               styles.modePill,
               mode === "home-visit" && styles.modePillActiveHome,
             ]}
-            onPress={() => {
-              setMode("home-visit");
-              setSelectedTime("");
-            }}
+            onPress={() => handleModeChange("home-visit")}
+            disabled={lockMode && initialMode !== "home-visit"}
           >
             <Ionicons
               name="home-outline"
@@ -227,39 +268,45 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
       {/* Time Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>დრო</Text>
-        <View style={styles.timeGrid}>
-          {getVisibleTimeSlots().map((time) => {
-            const isBooked =
-              selectedDayAvailability?.bookedSlots?.includes(time) || false;
-            return (
-              <TouchableOpacity
-                key={time}
-                style={[
-                  styles.timeSlot,
-                  selectedTime === time && styles.selectedTimeSlot,
-                  isBooked && styles.bookedTimeSlot,
-                ]}
-                onPress={() => !isBooked && handleTimeSelect(time)}
-                disabled={isBooked}
-              >
-                <Text
+        <ScrollView
+          style={styles.timeGridScroll}
+          contentContainerStyle={styles.timeGridContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.timeGrid}>
+            {getVisibleTimeSlots().map((time) => {
+              const isBooked =
+                selectedDayAvailability?.bookedSlots?.includes(time) || false;
+              return (
+                <TouchableOpacity
+                  key={time}
                   style={[
-                    styles.timeText,
-                    selectedTime === time && styles.selectedTimeText,
-                    isBooked && styles.bookedTimeText,
+                    styles.timeSlot,
+                    selectedTime === time && styles.selectedTimeSlot,
+                    isBooked && styles.bookedTimeSlot,
                   ]}
+                  onPress={() => !isBooked && handleTimeSelect(time)}
+                  disabled={isBooked}
                 >
-                  {time}
-                </Text>
-                {isBooked && (
-                  <View style={styles.bookedIndicator}>
-                    <Ionicons name="lock-closed" size={12} color="#EF4444" />
-                  </View>
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+                  <Text
+                    style={[
+                      styles.timeText,
+                      selectedTime === time && styles.selectedTimeText,
+                      isBooked && styles.bookedTimeText,
+                    ]}
+                  >
+                    {time}
+                  </Text>
+                  {isBooked && (
+                    <View style={styles.bookedIndicator}>
+                      <Ionicons name="lock-closed" size={12} color="#EF4444" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </ScrollView>
       </View>
 
       {/* Reviews Section */}
@@ -310,9 +357,17 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
               (d) => d.date === selectedDate && d.type === mode && d.isAvailable,
             );
 
-            const availableSlots: string[] = daysForType.flatMap(
+            let availableSlots: string[] = daysForType.flatMap(
               (d) => d.timeSlots || [],
             );
+
+            // If backend has no slots but working hours are 24/7, allow full-day selection
+            if (
+              availableSlots.length === 0 &&
+              workingHours?.includes("24")
+            ) {
+              availableSlots = generateFullDaySlots();
+            }
 
             // Debug log რომ ზუსტად ვნახოთ რა სტატუსია
             console.log("[AppointmentScheduler] availability check", {
@@ -463,6 +518,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 12,
+  },
+  timeGridScroll: {
+    maxHeight: 320,
+  },
+  timeGridContainer: {
+    paddingBottom: 8,
   },
   timeSlot: {
     backgroundColor: "#F5F5F5",

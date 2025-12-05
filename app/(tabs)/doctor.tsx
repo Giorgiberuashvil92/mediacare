@@ -2,8 +2,8 @@ import { useFavorites } from "@/app/contexts/FavoritesContext";
 import { apiService } from "@/app/services/api";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
-import { useRouter } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -49,6 +49,13 @@ const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
 
 const Doctor = () => {
   const router = useRouter();
+  const { appointmentType, lockAppointmentType } = useLocalSearchParams<{
+    appointmentType?: string;
+    lockAppointmentType?: string;
+  }>();
+  const shouldLockAppointmentType =
+    lockAppointmentType === "true" && !!appointmentType;
+  const hasUsedLockedNavigation = useRef(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFilter, setSelectedFilter] = useState<string>("all");
   const { isFavorite, toggleFavorite } = useFavorites();
@@ -153,11 +160,30 @@ const Doctor = () => {
   };
 
   const handleDoctorPress = (doctorId: string) => {
+    if (shouldLockAppointmentType) {
+      hasUsedLockedNavigation.current = true;
+    }
     router.push({
       pathname: "/screens/doctors/doctor/[id]",
-      params: { id: doctorId },
+      params: {
+        id: doctorId,
+        ...(shouldLockAppointmentType
+          ? { appointmentType, lockAppointmentType: "true" }
+          : {}),
+      },
     });
   };
+
+  useFocusEffect(
+    useCallback(() => {
+      // If we just returned from a locked navigation (video/home-visit shortcut),
+      // clear params so the tab shows both appointment types again.
+      if (hasUsedLockedNavigation.current && lockAppointmentType === "true") {
+        hasUsedLockedNavigation.current = false;
+        router.replace("/(tabs)/doctor");
+      }
+    }, [lockAppointmentType, router]),
+  );
 
   const renderDoctorCard = ({
     item: doctor,
@@ -229,6 +255,7 @@ const Doctor = () => {
             </TouchableOpacity>
           )}
         </View>
+
       </View>
 
       {/* Filter Chips */}
@@ -412,6 +439,50 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Poppins-Regular",
     color: "#1F2937",
+  },
+  lockedFilterBanner: {
+    marginTop: 10,
+    backgroundColor: "#E0F2FE",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderColor: "#BAE6FD",
+    gap: 10,
+  },
+  lockedFilterTextWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    gap: 8,
+  },
+  lockedFilterTextContent: {
+    flex: 1,
+  },
+  lockedFilterTitle: {
+    color: "#0F172A",
+    fontFamily: "Poppins-SemiBold",
+    fontSize: 13,
+  },
+  lockedFilterSubtitle: {
+    color: "#475569",
+    fontFamily: "Poppins-Regular",
+    fontSize: 12,
+    marginTop: 2,
+  },
+  lockedFilterReset: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: "#0284C7",
+  },
+  lockedFilterResetText: {
+    color: "#FFFFFF",
+    fontFamily: "Poppins-SemiBold",
+    fontSize: 12,
   },
   filterContainer: {
     paddingVertical: 12,

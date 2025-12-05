@@ -117,7 +117,11 @@ export default function HomeVisitDoctorsScreen() {
   const handleDoctorPress = (doctorId: string) => {
     router.push({
       pathname: "/screens/doctors/doctor/[id]",
-      params: { id: doctorId },
+      params: {
+        id: doctorId,
+        appointmentType: "home-visit",
+        lockAppointmentType: "true",
+      },
     });
   };
 

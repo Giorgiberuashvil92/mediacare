@@ -51,6 +51,12 @@ export const NAV_DATA = [
         items: [],
       },
       {
+        title: "ტერმინები",
+        url: "/terms",
+        icon: Icons.DocumentText,
+        items: [],
+      },
+      {
         title: "Settings",
         url: "/settings",
         icon: Icons.Alphabet,

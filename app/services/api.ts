@@ -1069,6 +1069,46 @@ class ApiService {
       };
     }
   }
+
+  // Terms endpoints
+  async getTerms(type: "cancellation" | "service" | "privacy"): Promise<{
+    success: boolean;
+    data: { content: string; type: string; updatedAt?: string };
+  }> {
+    if (USE_MOCK_API) {
+      return Promise.resolve({
+        success: true,
+        data: {
+          content: `ეს არის მოკლე ტექსტი ${type} პირობების შესახებ.`,
+          type,
+        },
+      });
+    }
+
+    return this.apiCall(`/terms/${type}`, {
+      method: "GET",
+    });
+  }
+
+  async updateTerms(
+    type: "cancellation" | "service" | "privacy",
+    content: string
+  ): Promise<{
+    success: boolean;
+    data: { content: string; type: string };
+  }> {
+    if (USE_MOCK_API) {
+      return Promise.resolve({
+        success: true,
+        data: { content, type },
+      });
+    }
+
+    return this.apiCall(`/terms/${type}`, {
+      method: "PUT",
+      body: JSON.stringify({ content }),
+    });
+  }
 }
 
 export const apiService = new ApiService();

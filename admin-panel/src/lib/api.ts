@@ -510,6 +510,35 @@ class ApiService {
     return this.handleResponse<ApiResponse<any>>(response);
   }
 
+  // Terms endpoints
+  async getTerms(type: 'cancellation' | 'service' | 'privacy'): Promise<ApiResponse<{ type: string; content: string; updatedAt?: string }>> {
+    const response = await fetch(`${this.baseURL}/terms/${type}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+
+    return this.handleResponse<ApiResponse<{ type: string; content: string; updatedAt?: string }>>(response);
+  }
+
+  async updateTerms(type: 'cancellation' | 'service' | 'privacy', content: string): Promise<ApiResponse<{ type: string; content: string }>> {
+    const response = await fetch(`${this.baseURL}/terms/${type}`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ content }),
+    });
+
+    return this.handleResponse<ApiResponse<{ type: string; content: string }>>(response);
+  }
+
+  async getAllTerms(): Promise<ApiResponse<{ type: string; content: string; updatedAt?: string }[]>> {
+    const response = await fetch(`${this.baseURL}/terms`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+
+    return this.handleResponse<ApiResponse<{ type: string; content: string; updatedAt?: string }[]>>(response);
+  }
+
   // Generic API call
   async apiCall<T>(
     endpoint: string,

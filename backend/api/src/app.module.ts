@@ -13,6 +13,7 @@ import { DoctorsModule } from './doctors/doctors.module';
 import { ProfileModule } from './profile/profile.module';
 import { ShopModule } from './shop/shop.module';
 import { SpecializationsModule } from './specializations/specializations.module';
+import { TermsModule } from './terms/terms.module';
 import { UploadModule } from './upload/upload.module';
 
 @Module({
@@ -42,6 +43,7 @@ import { UploadModule } from './upload/upload.module';
     ProfileModule,
     DoctorsModule,
     SpecializationsModule,
+    TermsModule,
     AppointmentsModule,
     AdminModule,
     ShopModule,

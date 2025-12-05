@@ -186,3 +186,23 @@ export function ArrowLeftIcon(props: PropsType) {
     </svg>
   );
 }
+
+export function DocumentText(props: PropsType) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={24}
+      height={24}
+      viewBox="0 0 24 24"
+      fill="none"
+      {...props}
+    >
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M4.5 3.75c0-.966.784-1.75 1.75-1.75h5.586c.464 0 .909.184 1.237.513l5.914 5.914a1.75 1.75 0 01.513 1.237V19.25a1.75 1.75 0 01-1.75 1.75h-11.5a1.75 1.75 0 01-1.75-1.75V3.75zm1.75-.25a.25.25 0 00-.25.25v15.5c0 .138.112.25.25.25h11.5a.25.25 0 00.25-.25V10h-5.25a1.75 1.75 0 01-1.75-1.75V3H6.25zm6.75 1.06l3.44 3.44h-3.44V4.56zM7.25 12a.75.75 0 000 1.5h9.5a.75.75 0 000-1.5h-9.5zm0 3a.75.75 0 000 1.5h9.5a.75.75 0 000-1.5h-9.5zm0 3a.75.75 0 000 1.5h6.5a.75.75 0 000-1.5h-6.5z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}

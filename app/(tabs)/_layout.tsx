@@ -43,16 +43,16 @@ export default function TabLayout() {
           ),
         }}
       />
-      {/* <Tabs.Screen
-        name="medicine"
+      <Tabs.Screen
+        name="lab"
         options={{
-          title: "მედიკამენტები",
+          title: "ლაბორატორია",
           headerShown: false,
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="medical" size={size} color={color} />
+            <Ionicons name="flask-outline" size={size} color={color} />
           ),
         }}
-      /> */}
+      />
       <Tabs.Screen
         name="appointment"
         options={{
