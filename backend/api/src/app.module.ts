@@ -24,7 +24,10 @@ const moduleImports: Array<
   ConfigModule.forRoot({
     isGlobal: true,
   }),
-  MongooseModule.forRoot(process.env.Mongodb),
+  MongooseModule.forRoot(
+    process.env.DATABASE_URL ||
+      'mongodb+srv://gioberuashvili:Berobero12!@cluster0.g31ptrc.mongodb.net/?appName=Cluster0',
+  ),
   JwtModule.registerAsync({
     global: true,
     useFactory: () => ({
