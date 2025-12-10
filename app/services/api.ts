@@ -28,7 +28,7 @@ const getDefaultBaseUrl = () => {
   
   if (FORCE_RAILWAY) {
     console.log('🚂 Forcing Railway URL for testing');
-    return "http://localhost:4000";  
+    return "https://mediacare-production.up.railway.app";  
   }
 
   const envUrl =
