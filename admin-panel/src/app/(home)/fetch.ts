@@ -1,6 +1,6 @@
 import { cookies, headers } from 'next/headers';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+const API_BASE_URL = 'https://mediacare-production.up.railway.app'; // || 'http://localhost:4000';
 
 export async function getOverviewData() {
   try {

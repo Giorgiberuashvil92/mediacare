@@ -13,17 +13,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../contexts/AuthContext";
 import { apiService } from "../services/api";
 
-const AVAILABLE_HOURS = [
-  "09:00",
-  "10:00",
-  "11:00",
-  "12:00",
-  "14:00",
-  "15:00",
-  "16:00",
-  "17:00",
-  "18:00",
-];
+// 24-საათიანი სლოტები (საათობრივი ინტერვალით)
+const AVAILABLE_HOURS = Array.from({ length: 24 }, (_, h) =>
+  `${String(h).padStart(2, "0")}:00`
+);
 
 export default function DoctorSchedule() {
   const { user } = useAuth();
@@ -167,8 +160,12 @@ export default function DoctorSchedule() {
     return days[date.getDay()];
   };
 
+  // Avoid timezone shift: build YYYY-MM-DD from local date parts
   const formatDate = (date: Date) => {
-    return date.toISOString().split("T")[0];
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
   };
 
   const isDateSelected = (date: Date) => {

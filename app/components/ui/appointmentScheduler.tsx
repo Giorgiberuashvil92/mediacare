@@ -153,11 +153,6 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
           ? homeVisitSlots
           : genericSlots;
 
-    // If fewer than 24 (or empty), show full-day hours so user can pick any time
-    if (slotsByMode.length < 24) {
-      return generateFullDaySlots();
-    }
-
     return slotsByMode;
   };
 

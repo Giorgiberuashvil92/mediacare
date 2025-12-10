@@ -81,6 +81,36 @@ export class AppointmentsService {
     const normalizedDate = new Date(appointmentDate);
     normalizedDate.setHours(0, 0, 0, 0);
 
+    // Build full appointment DateTime and enforce 2 hour lead time
+    const [hoursStr, minutesStr] = (
+      createAppointmentDto.appointmentTime || ''
+    ).split(':');
+    const hours = Number(hoursStr);
+    const minutes = Number(minutesStr);
+
+    if (
+      Number.isNaN(hours) ||
+      Number.isNaN(minutes) ||
+      hours < 0 ||
+      hours > 23 ||
+      minutes < 0 ||
+      minutes > 59
+    ) {
+      throw new BadRequestException('Invalid appointment time');
+    }
+
+    const appointmentDateTime = new Date(appointmentDate);
+    appointmentDateTime.setHours(hours, minutes, 0, 0);
+
+    const now = new Date();
+    const twoHoursInMs = 2 * 60 * 60 * 1000;
+
+    if (appointmentDateTime.getTime() - now.getTime() < twoHoursInMs) {
+      throw new BadRequestException(
+        'ჯავშნის გაკეთება შესაძლებელია მინიმუმ 2 საათით ადრე',
+      );
+    }
+
     // Check doctor's availability for the specific appointment type (video/home-visit)
     const availability = await this.availabilityModel.findOne({
       doctorId: new mongoose.Types.ObjectId(createAppointmentDto.doctorId),

@@ -233,7 +233,7 @@ export class AdminService {
     paymentStatus?: string;
     search?: string;
   }) {
-    const { page = 1, limit = 10, status, paymentStatus, search } = query;
+    const { page = 1, limit = 10, status, paymentStatus } = query;
     const skip = (page - 1) * limit;
 
     // Build filter
