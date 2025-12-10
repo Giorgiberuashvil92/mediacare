@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PatientGuard } from '../auth/guards/patient.guard';
@@ -50,6 +60,26 @@ export class AppointmentsController {
   @UseGuards(JwtAuthGuard, DoctorGuard)
   async getDoctorAppointments(@CurrentUser() user: { sub: string }) {
     return this.appointmentsService.getAppointmentsByDoctor(user.sub);
+  }
+
+  @Post(':id/documents')
+  @UseGuards(JwtAuthGuard, PatientGuard)
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadAppointmentDocument(
+    @CurrentUser() user: { sub: string },
+    @Param('id') appointmentId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.appointmentsService.addDocument(user.sub, appointmentId, file);
+  }
+
+  @Get(':id/documents')
+  @UseGuards(JwtAuthGuard)
+  async listAppointmentDocuments(
+    @CurrentUser() user: { sub: string },
+    @Param('id') appointmentId: string,
+  ) {
+    return this.appointmentsService.getDocuments(user.sub, appointmentId);
   }
 
   // ორივეს შეუძლია ნახოს appointment-ის დეტალები

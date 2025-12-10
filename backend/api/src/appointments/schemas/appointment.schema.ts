@@ -74,8 +74,28 @@ export class Appointment {
     problem?: string;
   };
 
-  @Prop({ type: [String], default: [] })
-  documents: string[];
+  @Prop({
+    type: [
+      {
+        url: String,
+        publicId: String,
+        name: String,
+        type: String,
+        size: Number,
+        uploadedAt: { type: Date, default: Date.now },
+      },
+    ],
+    default: [],
+    _id: false,
+  })
+  documents: {
+    url: string;
+    publicId?: string;
+    name?: string;
+    type?: string;
+    size?: number;
+    uploadedAt: Date;
+  }[];
 
   @Prop()
   notes?: string;

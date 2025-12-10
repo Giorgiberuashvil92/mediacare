@@ -1,10 +1,13 @@
 import { apiService } from "@/app/services/api";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import * as DocumentPicker from "expo-document-picker";
 import { Image } from "expo-image";
+import * as Linking from "expo-linking";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -52,6 +55,10 @@ const AppointmentDetails = () => {
   const [appointment, setAppointment] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [documents, setDocuments] = useState<
+    { url: string; name?: string; type?: string; uploadedAt?: string }[]
+  >([]);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -87,12 +94,67 @@ const AppointmentDetails = () => {
         if (appointmentResponse.success && appointmentResponse.data) {
           setAppointment(appointmentResponse.data);
         }
+
+        const docsResponse = await apiService.getAppointmentDocuments(
+          appointmentId as string
+        );
+        if (docsResponse.success && docsResponse.data) {
+          setDocuments(docsResponse.data);
+        }
       }
     } catch (err: any) {
       setError(err.message || "მონაცემების ჩატვირთვა ვერ მოხერხდა");
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleUploadDocument = async () => {
+    if (!appointmentId) return;
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["application/pdf", "image/jpeg", "image/jpg", "image/png", "image/webp"],
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled) return;
+      const file = result.assets?.[0];
+      if (!file) return;
+
+      if (file.size && file.size > 5 * 1024 * 1024) {
+        Alert.alert("შეცდომა", "ფაილი უნდა იყოს 5MB-მდე");
+        return;
+      }
+
+      setUploading(true);
+      const uploadResp = await apiService.uploadAppointmentDocument(
+        appointmentId as string,
+        {
+          uri: file.uri,
+          name: file.name || "document",
+          type: file.mimeType || "application/pdf",
+        }
+      );
+
+      if (uploadResp.success && uploadResp.data) {
+        setDocuments((prev) => [uploadResp.data, ...prev]);
+        Alert.alert("წარმატება", "ფაილი აიტვირთა");
+      } else {
+        Alert.alert("შეცდომა", uploadResp?.message || "ატვირთვა ვერ მოხერხდა");
+      }
+    } catch (err: any) {
+      console.error("Document upload error:", err);
+      Alert.alert("შეცდომა", err?.message || "ფაილის ატვირთვა ვერ მოხერხდა");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const openDocument = (url?: string) => {
+    if (!url) return;
+    Linking.openURL(url).catch(() =>
+      Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა")
+    );
   };
 
   if (loading) {
@@ -317,6 +379,51 @@ const AppointmentDetails = () => {
             </View>
           </View>
         </View>
+
+        {/* Documents */}
+        {appointmentId && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>კვლევის დოკუმენტები</Text>
+              <TouchableOpacity
+                style={styles.uploadBtn}
+                onPress={handleUploadDocument}
+                disabled={uploading}
+              >
+                <Ionicons name="cloud-upload-outline" size={16} color="#fff" />
+                <Text style={styles.uploadBtnText}>
+                  {uploading ? "იტვირთება..." : "ატვირთვა"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {documents.length === 0 ? (
+              <Text style={styles.emptyDocs}>ჯერჯერობით დოკუმენტი არ არის.</Text>
+            ) : (
+              documents.map((doc, idx) => (
+                <TouchableOpacity
+                  key={`${doc.url}-${idx}`}
+                  style={styles.docItem}
+                  onPress={() => openDocument(doc.url)}
+                >
+                  <Ionicons name="document-text-outline" size={20} color="#20BEB8" />
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <Text style={styles.docName}>{doc.name || "დოკუმენტი"}</Text>
+                    {doc.type ? (
+                      <Text style={styles.docMeta}>{doc.type}</Text>
+                    ) : null}
+                    {doc.uploadedAt ? (
+                      <Text style={styles.docMeta}>
+                        ატვირთულია: {new Date(doc.uploadedAt).toLocaleString()}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <Ionicons name="open-outline" size={18} color="#9CA3AF" />
+                </TouchableOpacity>
+              ))
+            )}
+          </View>
+        )}
       </ScrollView>
 
       {/* Back to Home Button */}
@@ -638,6 +745,51 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Poppins-SemiBold",
     color: "#FFFFFF",
+  },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  uploadBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#20BEB8",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    gap: 6,
+  },
+  uploadBtnText: {
+    color: "#fff",
+    fontFamily: "Poppins-Medium",
+    fontSize: 14,
+  },
+  emptyDocs: {
+    color: "#6B7280",
+    fontFamily: "Poppins-Regular",
+    fontSize: 14,
+  },
+  docItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  docName: {
+    fontFamily: "Poppins-Medium",
+    fontSize: 14,
+    color: "#111827",
+  },
+  docMeta: {
+    fontFamily: "Poppins-Regular",
+    fontSize: 12,
+    color: "#6B7280",
   },
   doctorImage: {
     width: "100%",

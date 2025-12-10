@@ -198,6 +198,20 @@ const MakeAppointment = () => {
   )} | ${selectedTime}`;
 
   const handleMakeAppointment = async () => {
+    // Client-side guard: at least 2 hours before selected time
+    if (selectedDate && selectedTime) {
+      const candidate = new Date(`${selectedDate}T${selectedTime}:00`);
+      const now = new Date();
+      const twoHoursMs = 2 * 60 * 60 * 1000;
+      if (candidate.getTime() - now.getTime() < twoHoursMs) {
+        Alert.alert(
+          "შეზღუდვა",
+          "ჯავშნის გაკეთება შესაძლებელია მინიმუმ 2 საათით ადრე.",
+        );
+        return;
+      }
+    }
+
     // Validate home visit address if needed
     if (appointmentType === "home-visit" && !visitAddress.trim()) {
       Alert.alert("შეცდომა", "გთხოვთ მიუთითოთ ბინაზე ვიზიტის მისამართი");
@@ -385,7 +399,6 @@ const MakeAppointment = () => {
           <Text style={styles.sectionTitle}>კონსულტაციის ტიპი</Text>
 
           {isLockedType ? (
-            // თუ ექიმის გვერდიდან მოვიდა ტიპი, ვაჩვენოთ მხოლოდ არჩეული ტიპი, ჩიპების გარეშე
             <View style={styles.typeSelectorContainer}>
               <View style={[styles.typeChip, styles.typeChipActive]}>
                 <Ionicons
@@ -470,7 +483,6 @@ const MakeAppointment = () => {
           )}
         </View>
 
-        {/* Patient Information */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>პაციენტის ინფორმაცია</Text>
           

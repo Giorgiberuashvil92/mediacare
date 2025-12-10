@@ -342,7 +342,6 @@ export class DoctorsService {
     const availability = await this.availabilityModel
       .find({
         doctorId: new mongoose.Types.ObjectId(doctorId),
-        date: { $gte: startDate, $lte: endDate },
         isAvailable: true,
       })
       .lean();
@@ -352,7 +351,7 @@ export class DoctorsService {
       .find({
         doctorId: new mongoose.Types.ObjectId(doctorId),
         appointmentDate: { $gte: startDate, $lte: endDate },
-        status: { $in: ['pending', 'confirmed', 'blocked'] }, // Include blocked appointments
+        status: { $in: ['pending', 'confirmed', 'blocked'] },
       })
       .select('appointmentDate appointmentTime')
       .lean();

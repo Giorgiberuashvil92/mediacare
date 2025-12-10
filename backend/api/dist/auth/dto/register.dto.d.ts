@@ -8,6 +8,7 @@ export declare class RegisterDto {
     idNumber: string;
     dateOfBirth?: string;
     gender?: Gender;
+    profileImage?: string;
     specialization?: string;
     licenseDocument?: string;
     degrees?: string;

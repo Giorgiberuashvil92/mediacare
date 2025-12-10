@@ -2,9 +2,11 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import mongoose from 'mongoose';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { Availability } from '../doctors/schemas/availability.schema';
 import { User, UserRole } from '../schemas/user.schema';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
@@ -25,11 +27,93 @@ export class AppointmentsService {
     private userModel: mongoose.Model<any>,
     @InjectModel(Availability.name)
     private availabilityModel: mongoose.Model<any>,
+    private readonly cloudinaryService: CloudinaryService,
   ) {
     // Clean up expired blocked appointments every minute
     setInterval(() => {
       this.cleanupExpiredBlocks();
     }, 60000); // 1 minute
+  }
+
+  private ensurePatientOwner(patientId: string, apt: AppointmentDocument) {
+    if (apt.patientId.toString() !== patientId.toString()) {
+      throw new UnauthorizedException('Not allowed for this appointment');
+    }
+  }
+
+  private ensureDoctorOrPatient(userId: string, apt: AppointmentDocument) {
+    const isOwner =
+      apt.patientId.toString() === userId.toString() ||
+      apt.doctorId.toString() === userId.toString();
+    if (!isOwner) {
+      throw new Error('Not allowed for this appointment');
+    }
+  }
+
+  async addDocument(
+    patientId: string,
+    appointmentId: string,
+    file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('ფაილი აუცილებელია');
+    }
+
+    const allowedTypes = [
+      'application/pdf',
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'image/jpg',
+    ];
+    if (!allowedTypes.includes(file.mimetype)) {
+      throw new BadRequestException('ფაილის ტიპი არასწორია');
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      throw new BadRequestException('ფაილი უნდა იყოს 5MB-მდე');
+    }
+
+    const appointment = await this.appointmentModel.findById(appointmentId);
+    if (!appointment) {
+      throw new NotFoundException('Appointment not found');
+    }
+
+    this.ensurePatientOwner(patientId, appointment);
+
+    const upload = await this.cloudinaryService.uploadBuffer(file.buffer, {
+      folder: 'mediacare/appointment-docs',
+      resource_type: 'auto',
+    });
+
+    const doc = {
+      url: upload.secure_url,
+      publicId: upload.public_id,
+      name: file.originalname,
+      type: file.mimetype,
+      size: file.size,
+      uploadedAt: new Date(),
+    };
+
+    appointment.documents = appointment.documents || [];
+    appointment.documents.push(doc as any);
+    await appointment.save();
+
+    return { success: true, data: doc };
+  }
+
+  async getDocuments(userId: string, appointmentId: string) {
+    const appointment = await this.appointmentModel.findById(appointmentId);
+    if (!appointment) {
+      throw new NotFoundException('Appointment not found');
+    }
+
+    this.ensureDoctorOrPatient(userId, appointment);
+
+    return {
+      success: true,
+      data: appointment.documents || [],
+    };
   }
 
   async createAppointment(

@@ -43,6 +43,35 @@ export class UploadImageController {
       publicId: result.public_id,
     };
   }
+
+  // Public upload for unauthenticated flows (e.g., doctor signup profile photo)
+  @Post('image/public')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadImagePublic(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('ფაილი აუცილებელია');
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    if (!allowedTypes.includes(file.mimetype)) {
+      throw new BadRequestException('ფაილის ტიპი არასწორია');
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      throw new BadRequestException('ფაილი უნდა იყოს 5MB-მდე');
+    }
+
+    const result = await this.cloudinaryService.uploadBuffer(file.buffer, {
+      folder: 'mediacare',
+      resource_type: 'image',
+    });
+
+    return {
+      success: true,
+      url: result.secure_url,
+      publicId: result.public_id,
+    };
+  }
 }
 
 @Controller('upload')
@@ -51,7 +80,7 @@ export class UploadController {
 
   @Post('license')
   @UseInterceptors(FileInterceptor('file'))
-  async uploadLicense(@UploadedFile() file: Express.Multer.File) {
+  uploadLicense(@UploadedFile() file: Express.Multer.File) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
@@ -64,7 +93,7 @@ export class UploadController {
     }
 
     // Save file
-    const filePath = await this.uploadService.saveLicenseDocument(file);
+    const filePath = this.uploadService.saveLicenseDocument(file);
 
     return {
       success: true,

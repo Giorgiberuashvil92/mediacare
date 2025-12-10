@@ -28,6 +28,7 @@ export function AddDoctorForm({ onSuccess, onCancel }: AddDoctorFormProps) {
     gender: 'male' as 'male' | 'female' | 'other',
   });
   const [licenseFile, setLicenseFile] = useState<File | null>(null);
+  const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
   const [specializations, setSpecializations] = useState<Specialization[]>([]);
   const [isLoadingSpecializations, setIsLoadingSpecializations] = useState(false);
 
@@ -71,6 +72,12 @@ export function AddDoctorForm({ onSuccess, onCancel }: AddDoctorFormProps) {
     setError(null);
   };
 
+  const handleProfileImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    setProfileImageFile(file ?? null);
+    setError(null);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -85,10 +92,18 @@ export function AddDoctorForm({ onSuccess, onCancel }: AddDoctorFormProps) {
 
     try {
       let licenseDocumentPath: string | undefined;
+      let profileImageUrl: string | undefined;
 
       const uploadResponse = await apiService.uploadLicenseDocument(licenseFile);
       if (uploadResponse.success) {
         licenseDocumentPath = uploadResponse.data.filePath;
+      }
+
+      if (profileImageFile) {
+        const imageResponse = await apiService.uploadProfileImage(profileImageFile);
+        if (imageResponse.success) {
+          profileImageUrl = imageResponse.data.url;
+        }
       }
 
       const registerData = {
@@ -105,6 +120,7 @@ export function AddDoctorForm({ onSuccess, onCancel }: AddDoctorFormProps) {
         about: formData.about || undefined,
         location: formData.location || undefined,
         licenseDocument: licenseDocumentPath,
+        profileImage: profileImageUrl,
       };
 
       const response = await apiService.apiCall('/auth/register', {
@@ -130,6 +146,7 @@ export function AddDoctorForm({ onSuccess, onCancel }: AddDoctorFormProps) {
           gender: 'male',
         });
         setLicenseFile(null);
+        setProfileImageFile(null);
         
         // Call onSuccess after a short delay to show success message
         setTimeout(() => {
@@ -318,6 +335,23 @@ export function AddDoctorForm({ onSuccess, onCancel }: AddDoctorFormProps) {
                 </p>
               )}
             </div>
+          </div>
+
+          <div className="mb-5.5">
+            <label className="mb-2.5 block text-sm font-medium text-dark dark:text-white">
+              პროფილის სურათი (არასავალდებულო)
+            </label>
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              onChange={handleProfileImageChange}
+              className="block w-full cursor-pointer rounded-lg border border-dashed border-stroke px-4 py-3 text-sm text-dark outline-none transition hover:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white"
+            />
+            {profileImageFile && (
+              <p className="mt-2 text-sm text-dark-4 dark:text-dark-6">
+                არჩეული: {profileImageFile.name}
+              </p>
+            )}
           </div>
 
           <div className="mb-5.5">

@@ -28,7 +28,7 @@ const getDefaultBaseUrl = () => {
   
   if (FORCE_RAILWAY) {
     console.log('🚂 Forcing Railway URL for testing');
-    return "https://mediacare-production.up.railway.app";  
+    return "http://localhost:4000";  
   }
 
   const envUrl =
@@ -87,6 +87,7 @@ export interface RegisterRequest {
   idNumber: string;
   specialization?: string;
   licenseDocument?: string;
+  profileImage?: string;
 }
 
 export interface AuthResponse {
@@ -327,6 +328,31 @@ class ApiService {
     return data;
   }
 
+  async uploadProfileImagePublic(
+    file: {
+      uri: string;
+      name: string;
+      type: string;
+    },
+  ): Promise<{ success: boolean; url: string; publicId: string }> {
+    const formData = new FormData();
+    formData.append("file", {
+      uri: file.uri,
+      name: file.name,
+      type: file.type,
+    } as any);
+
+    const response = await fetch(`${this.baseURL}/uploads/image/public`, {
+      method: "POST",
+      body: formData,
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+
+    return this.handleResponse<{ success: boolean; url: string; publicId: string }>(response);
+  }
+
   async refreshToken(): Promise<{ accessToken: string }> {
     const refreshToken = await AsyncStorage.getItem("refreshToken");
 
@@ -459,7 +485,7 @@ class ApiService {
     });
   }
 
-  async getDoctorById(id: string): Promise<{
+  async getDoctorById(id: string, includePending = true): Promise<{
     success: boolean;
     data: any;
   }> {
@@ -470,9 +496,25 @@ class ApiService {
       });
     }
 
-    return this.apiCall(`/doctors/${id}`, {
-      method: 'GET',
-    });
+    const query = includePending ? '?includePending=true' : '';
+
+    const [doctorRes, availabilityRes] = await Promise.all([
+      this.apiCall(`/doctors/${id}${query}`, {
+        method: 'GET',
+      }),
+      this.getDoctorAvailability(id),
+    ]);
+
+    const doctorData: any = (doctorRes as any)?.data ?? {};
+    const availabilityData: any = (availabilityRes as any)?.data ?? [];
+
+    return {
+      ...(doctorRes as any),
+      data: {
+        ...doctorData,
+        availability: availabilityData,
+      },
+    };
   }
 
   async getDoctorAvailability(
@@ -935,6 +977,71 @@ class ApiService {
     return this.apiCall(`/appointments/${appointmentId}`, {
       method: 'GET',
     });
+  }
+
+  async getAppointmentDocuments(appointmentId: string): Promise<{
+    success: boolean;
+    data: any[];
+  }> {
+    if (USE_MOCK_API) {
+      return Promise.resolve({
+        success: true,
+        data: [],
+      });
+    }
+
+    return this.apiCall(`/appointments/${appointmentId}/documents`, {
+      method: 'GET',
+    });
+  }
+
+  async uploadAppointmentDocument(
+    appointmentId: string,
+    file: {
+      uri: string;
+      name: string;
+      type: string;
+    },
+  ): Promise<{
+    success: boolean;
+    data: { url: string; publicId?: string; name?: string; type?: string; size?: number; uploadedAt: string };
+  }> {
+    if (USE_MOCK_API) {
+      return Promise.resolve({
+        success: true,
+        data: {
+          url: file.uri,
+          name: file.name,
+          type: file.type,
+          size: 0,
+          uploadedAt: new Date().toISOString(),
+        },
+      });
+    }
+
+    const formData = new FormData();
+    formData.append('file', {
+      uri: file.uri,
+      name: file.name,
+      type: file.type,
+    } as any);
+
+    const token = await AsyncStorage.getItem("accessToken");
+    const headers: HeadersInit = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${this.baseURL}/appointments/${appointmentId}/documents`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    return this.handleResponse<{
+      success: boolean;
+      data: { url: string; publicId?: string; name?: string; type?: string; size?: number; uploadedAt: string };
+    }>(response);
   }
 
   async getDoctorPatients(): Promise<{

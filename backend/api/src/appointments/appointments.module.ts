@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { PatientGuard } from '../auth/guards/patient.guard';
+import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 import { DoctorGuard } from '../doctors/guards/doctor.guard';
 import {
   Availability,
@@ -18,7 +19,7 @@ import { Appointment, AppointmentSchema } from './schemas/appointment.schema';
       { name: User.name, schema: UserSchema },
       { name: Availability.name, schema: AvailabilitySchema },
     ]),
-    // JwtModule.register is removed as it's now global in AppModule
+    CloudinaryModule,
   ],
   controllers: [AppointmentsController],
   providers: [AppointmentsService, PatientGuard, DoctorGuard],

@@ -45,6 +45,13 @@ export default function RegisterScreen() {
     filePath?: string;
   } | null>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [profileImage, setProfileImage] = useState<{
+    uri: string;
+    name: string;
+    type: string;
+    url?: string;
+  } | null>(null);
+  const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
   const [specializations, setSpecializations] = useState<Specialization[]>([]);
   const [loadingSpecializations, setLoadingSpecializations] = useState(false);
   const [specializationModalVisible, setSpecializationModalVisible] =
@@ -70,6 +77,7 @@ export default function RegisterScreen() {
         setSpecializations([]);
         setSelectedSpecializations([]);
         setLicenseDocument(null);
+        setProfileImage(null);
         // Reset doctor-specific fields (keep phone for all users)
         setDegrees("");
         setExperience("");
@@ -211,6 +219,60 @@ export default function RegisterScreen() {
     }
   };
 
+  const handleProfileImagePick = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["image/jpeg", "image/jpg", "image/png", "image/webp"],
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled) {
+        return;
+      }
+
+      const file = result.assets[0];
+
+      if (file.size && file.size > 5 * 1024 * 1024) {
+        showToast.error("სურათის ზომა არ უნდა აღემატებოდეს 5MB-ს", "შეცდომა");
+        return;
+      }
+
+      setUploadingProfileImage(true);
+
+      if (apiService.isMockMode()) {
+        setProfileImage({
+          uri: file.uri,
+          name: file.name,
+          type: file.mimeType || "image/jpeg",
+          url: file.uri,
+        });
+        showToast.success("სურათი აიტვირთა (mock)", "წარმატება");
+      } else {
+        const response = await apiService.uploadProfileImagePublic({
+          uri: file.uri,
+          name: file.name,
+          type: file.mimeType || "image/jpeg",
+        });
+
+        setProfileImage({
+          uri: file.uri,
+          name: file.name,
+          type: file.mimeType || "image/jpeg",
+          url: response.url,
+        });
+        showToast.success("სურათი წარმატებით აიტვირთა", "წარმატება");
+      }
+    } catch (error) {
+      console.error("Profile image pick error:", error);
+      showToast.error(
+        error instanceof Error ? error.message : "სურათის ატვირთვა ვერ მოხერხდა",
+        "შეცდომა"
+      );
+    } finally {
+      setUploadingProfileImage(false);
+    }
+  };
+
   const handleSignup = async () => {
     // Basic validation
     if (!name.trim() || !email.trim() || !password.trim() || !idNumber.trim()) {
@@ -264,6 +326,9 @@ export default function RegisterScreen() {
       if (selectedRole === "doctor") {
         registerData.specialization = selectedSpecializations.join(", ");
         registerData.licenseDocument = licenseDocument?.filePath;
+        if (profileImage?.url) {
+          registerData.profileImage = profileImage.url;
+        }
         // Add additional fields matching admin panel
         if (degrees.trim()) registerData.degrees = degrees.trim();
         if (experience.trim()) registerData.experience = experience.trim();
@@ -735,6 +800,76 @@ export default function RegisterScreen() {
                         {t("doctor.license.success")}
                       </Text>
                     )}
+                  </View>
+
+                  {/* Profile Image (optional) */}
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.label}>პროფილის სურათი (არასავალდებულო)</Text>
+                    <View style={styles.profileCard}>
+                      <View style={styles.profilePreview}>
+                        {profileImage?.uri ? (
+                          <Image
+                            source={{ uri: profileImage.uri }}
+                            style={styles.profilePreviewImage}
+                            contentFit="cover"
+                          />
+                        ) : (
+                          <View style={styles.profilePlaceholder}>
+                            <Ionicons name="person-circle-outline" size={36} color="#9CA3AF" />
+                            <Text style={styles.profilePlaceholderText}>პროფილის ფოტო</Text>
+                          </View>
+                        )}
+                      </View>
+
+                      <View style={styles.profileActions}>
+                        <TouchableOpacity
+                          style={[
+                            styles.filePickerButton,
+                            profileImage && styles.filePickerButtonActive,
+                          ]}
+                          onPress={handleProfileImagePick}
+                          disabled={uploadingProfileImage}
+                        >
+                          <Ionicons
+                            name={
+                              profileImage
+                                ? "checkmark-circle"
+                                : "cloud-upload-outline"
+                            }
+                            size={20}
+                            color={profileImage ? "#10B981" : "#9CA3AF"}
+                            style={styles.inputIcon}
+                          />
+                          {uploadingProfileImage ? (
+                            <View style={styles.uploadingContainer}>
+                              <ActivityIndicator size="small" color="#06B6D4" />
+                              <Text style={styles.uploadingText}>
+                                სურათი იტვირთება...
+                              </Text>
+                            </View>
+                          ) : (
+                            <Text
+                              style={[
+                                styles.filePickerText,
+                                profileImage && styles.filePickerTextActive,
+                              ]}
+                            >
+                              {profileImage
+                                ? profileImage.name
+                                : "აირჩიე პროფილის სურათი"}
+                            </Text>
+                          )}
+                          <Ionicons
+                            name="image-outline"
+                            size={20}
+                            color="#9CA3AF"
+                          />
+                        </TouchableOpacity>
+                        <Text style={styles.profileHint}>
+                          დაშვებულია JPG/PNG/WebP • მაქს 5MB
+                        </Text>
+                      </View>
+                    </View>
                   </View>
                 </>
               )}
@@ -1295,6 +1430,50 @@ const styles = StyleSheet.create({
     color: "#10B981",
     marginTop: 4,
     marginLeft: 4,
+  },
+  profileCard: {
+    flexDirection: "row",
+    gap: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 14,
+    backgroundColor: "#F8FAFC",
+  },
+  profilePreview: {
+    width: 72,
+    height: 72,
+    borderRadius: 12,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    backgroundColor: "#FFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  profilePreviewImage: {
+    width: "100%",
+    height: "100%",
+  },
+  profilePlaceholder: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+  },
+  profilePlaceholderText: {
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: "#9CA3AF",
+  },
+  profileActions: {
+    flex: 1,
+    gap: 8,
+    justifyContent: "center",
+  },
+  profileHint: {
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
   },
   specializationsLoading: {
     marginTop: 8,

@@ -40,6 +40,10 @@ export class RegisterDto {
   @IsOptional()
   gender?: Gender;
 
+  @IsString()
+  @IsOptional()
+  profileImage?: string;
+
   // Doctor specific fields
   @IsString()
   @IsOptional()

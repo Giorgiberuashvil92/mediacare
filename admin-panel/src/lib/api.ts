@@ -267,6 +267,28 @@ class ApiService {
     >(response);
   }
 
+  async uploadProfileImage(
+    file: File,
+  ): Promise<ApiResponse<{ url: string; publicId: string }>> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const headers: HeadersInit = {};
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
+    }
+
+    const response = await fetch(`${this.baseURL}/uploads/image`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    return this.handleResponse<ApiResponse<{ url: string; publicId: string }>>(
+      response,
+    );
+  }
+
   // Stats endpoint
   async getStats(): Promise<ApiResponse<any>> {
     const response = await fetch(`${this.baseURL}/admin/stats`, {

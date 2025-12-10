@@ -18,47 +18,49 @@ const app_controller_1 = require("./app.controller");
 const app_service_1 = require("./app.service");
 const appointments_module_1 = require("./appointments/appointments.module");
 const auth_module_1 = require("./auth/auth.module");
+const cloudinary_module_1 = require("./cloudinary/cloudinary.module");
 const doctors_module_1 = require("./doctors/doctors.module");
 const profile_module_1 = require("./profile/profile.module");
 const shop_module_1 = require("./shop/shop.module");
 const specializations_module_1 = require("./specializations/specializations.module");
 const terms_module_1 = require("./terms/terms.module");
 const upload_module_1 = require("./upload/upload.module");
+const moduleImports = [
+    config_1.ConfigModule.forRoot({
+        isGlobal: true,
+    }),
+    mongoose_1.MongooseModule.forRoot('mongodb+srv://gioberuashvili:Berobero12!@cluster0.g31ptrc.mongodb.net/?appName=Cluster0'),
+    jwt_1.JwtModule.registerAsync({
+        global: true,
+        useFactory: () => ({
+            secret: process.env.JWT_SECRET || 'your-secret-key',
+            signOptions: { expiresIn: '24h' },
+        }),
+    }),
+    throttler_1.ThrottlerModule.forRoot([
+        {
+            ttl: 60000,
+            limit: 10,
+        },
+    ]),
+    auth_module_1.AuthModule,
+    upload_module_1.UploadModule,
+    cloudinary_module_1.CloudinaryModule,
+    profile_module_1.ProfileModule,
+    doctors_module_1.DoctorsModule,
+    specializations_module_1.SpecializationsModule,
+    terms_module_1.TermsModule,
+    appointments_module_1.AppointmentsModule,
+    admin_module_1.AdminModule,
+    shop_module_1.ShopModule,
+    advisors_module_1.AdvisorsModule,
+];
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
 exports.AppModule = AppModule = __decorate([
     (0, common_1.Module)({
-        imports: [
-            config_1.ConfigModule.forRoot({
-                isGlobal: true,
-            }),
-            mongoose_1.MongooseModule.forRoot(process.env.DATABASE_URL ||
-                'mongodb+srv://Giorgiberuashvili1999:Berobero12@medicarehera.3obzg53.mongodb.net/medicare?retryWrites=true&w=majority&appName=Medicarehera'),
-            jwt_1.JwtModule.registerAsync({
-                global: true,
-                useFactory: () => ({
-                    secret: process.env.JWT_SECRET || 'your-secret-key',
-                    signOptions: { expiresIn: '24h' },
-                }),
-            }),
-            throttler_1.ThrottlerModule.forRoot([
-                {
-                    ttl: 60000,
-                    limit: 10,
-                },
-            ]),
-            auth_module_1.AuthModule,
-            upload_module_1.UploadModule,
-            profile_module_1.ProfileModule,
-            doctors_module_1.DoctorsModule,
-            specializations_module_1.SpecializationsModule,
-            terms_module_1.TermsModule,
-            appointments_module_1.AppointmentsModule,
-            admin_module_1.AdminModule,
-            shop_module_1.ShopModule,
-            advisors_module_1.AdvisorsModule,
-        ],
+        imports: moduleImports,
         controllers: [app_controller_1.AppController],
         providers: [app_service_1.AppService],
     })
