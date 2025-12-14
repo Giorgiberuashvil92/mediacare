@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Post,
+  Put,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -12,8 +13,10 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PatientGuard } from '../auth/guards/patient.guard';
+import { CreateFollowUpDto } from '../doctors/dto/create-follow-up.dto';
 import { DoctorGuard } from '../doctors/guards/doctor.guard';
 import { AppointmentsService } from './appointments.service';
+import { AssignLaboratoryTestsDto } from './dto/assign-laboratory-tests.dto';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 
 @Controller('appointments')
@@ -82,7 +85,103 @@ export class AppointmentsController {
     return this.appointmentsService.getDocuments(user.sub, appointmentId);
   }
 
+  // Check if patient is eligible for follow-up
+  // IMPORTANT: This must come BEFORE @Get(':id') to avoid route conflicts
+  @Get(':id/follow-up/eligibility')
+  @UseGuards(JwtAuthGuard, PatientGuard)
+  async checkFollowUpEligibility(
+    @CurrentUser() user: { sub: string },
+    @Param('id') appointmentId: string,
+  ) {
+    return this.appointmentsService.checkFollowUpEligibility(
+      appointmentId,
+      user.sub,
+    );
+  }
+
+  // Patient schedules follow-up appointment
+  // IMPORTANT: This must come BEFORE @Get(':id') to avoid route conflicts
+  @Post(':id/follow-up')
+  @UseGuards(JwtAuthGuard, PatientGuard)
+  async scheduleFollowUpByPatient(
+    @CurrentUser() user: { sub: string },
+    @Param('id') appointmentId: string,
+    @Body() body: CreateFollowUpDto,
+  ) {
+    return this.appointmentsService.scheduleFollowUpAppointmentByPatient(
+      user.sub,
+      appointmentId,
+      body,
+    );
+  }
+
+  // Reschedule appointment (admin, doctor, or patient can reschedule)
+  // IMPORTANT: This must come BEFORE @Get(':id') to avoid route conflicts
+  @Put(':id/reschedule')
+  @UseGuards(JwtAuthGuard)
+  async rescheduleAppointment(
+    @Param('id') appointmentId: string,
+    @Body() body: { newDate: string; newTime: string },
+  ) {
+    return this.appointmentsService.rescheduleAppointment(
+      appointmentId,
+      body.newDate,
+      body.newTime,
+    );
+  }
+
+  // Patient books laboratory test by selecting clinic
+  // IMPORTANT: This must come BEFORE @Put(':id/laboratory-tests') to avoid route conflicts
+  @Put(':id/laboratory-tests/book')
+  @UseGuards(JwtAuthGuard, PatientGuard)
+  async bookLaboratoryTest(
+    @CurrentUser() user: { sub: string },
+    @Param('id') appointmentId: string,
+    @Body() body: { productId: string; clinicId: string; clinicName: string },
+  ) {
+    return this.appointmentsService.bookLaboratoryTest(
+      user.sub,
+      appointmentId,
+      body,
+    );
+  }
+
+  // Doctor assigns laboratory tests to completed appointment
+  // IMPORTANT: This must come BEFORE @Get(':id') to avoid route conflicts
+  @Put(':id/laboratory-tests')
+  @UseGuards(JwtAuthGuard, DoctorGuard)
+  async assignLaboratoryTests(
+    @CurrentUser() user: { sub: string },
+    @Param('id') appointmentId: string,
+    @Body() dto: AssignLaboratoryTestsDto,
+  ) {
+    return this.appointmentsService.assignLaboratoryTests(
+      user.sub,
+      appointmentId,
+      dto.tests,
+    );
+  }
+
+  // Patient uploads laboratory test result
+  @Post(':id/laboratory-tests/:productId/result')
+  @UseGuards(JwtAuthGuard, PatientGuard)
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadLaboratoryTestResult(
+    @CurrentUser() user: { sub: string },
+    @Param('id') appointmentId: string,
+    @Param('productId') productId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.appointmentsService.uploadLaboratoryTestResult(
+      user.sub,
+      appointmentId,
+      productId,
+      file,
+    );
+  }
+
   // ორივეს შეუძლია ნახოს appointment-ის დეტალები
+  // IMPORTANT: This must come AFTER all specific routes like :id/reschedule, :id/follow-up, etc.
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   async getAppointmentById(@Param('id') id: string) {

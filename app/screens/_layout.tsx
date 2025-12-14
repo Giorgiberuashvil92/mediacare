@@ -12,6 +12,10 @@ export default function ScreensLayout() {
       <Stack.Screen name="medicine/category-details" />
       <Stack.Screen name="medicine/product-details" />
 
+      {/* Lab Routes */}
+      <Stack.Screen name="lab/product/[id]" />
+      <Stack.Screen name="lab/select-clinic" />
+
       {/* Doctors Routes */}
       <Stack.Screen name="doctors/departments" />
       <Stack.Screen name="doctors/doctors-list" />
@@ -26,6 +30,7 @@ export default function ScreensLayout() {
 
       {/* Profile Routes */}
       <Stack.Screen name="profile/profile" />
+      <Stack.Screen name="profile/edit-profile" />
       <Stack.Screen name="profile/medical-records" />
       <Stack.Screen name="profile/medical-cabinet" />
       <Stack.Screen name="profile/favourites" />

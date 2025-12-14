@@ -21,4 +21,9 @@ export class ShopController {
   async getProducts(@Query() query: QueryProductsDto) {
     return this.shopService.getProducts(query);
   }
+
+  @Get('clinics')
+  async getClinics() {
+    return this.shopService.findAllClinics(true); // Only active clinics
+  }
 }

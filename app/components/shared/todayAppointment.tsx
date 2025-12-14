@@ -54,19 +54,38 @@ const TodayAppointment = () => {
         console.log('🏠 TodayAppointment - API response:', response);
 
         if (response.success && response.data) {
-          // Get today's date in YYYY-MM-DD format
-          const today = new Date().toISOString().split("T")[0];
+          // Get today's date in YYYY-MM-DD format (local timezone)
+          const now = new Date();
+          const year = now.getFullYear();
+          const month = String(now.getMonth() + 1).padStart(2, '0');
+          const day = String(now.getDate()).padStart(2, '0');
+          const today = `${year}-${month}-${day}`;
           
           // Filter for today's scheduled appointments
           const todayScheduled = response.data.filter((appointment: any) => {
-            const appointmentDate = appointment.appointmentDate 
-              ? new Date(appointment.appointmentDate).toISOString().split("T")[0]
-              : appointment.date;
+            // Format appointment date in local timezone
+            let appointmentDate: string;
+            if (appointment.appointmentDate) {
+              const date = new Date(appointment.appointmentDate);
+              const appYear = date.getFullYear();
+              const appMonth = String(date.getMonth() + 1).padStart(2, '0');
+              const appDay = String(date.getDate()).padStart(2, '0');
+              appointmentDate = `${appYear}-${appMonth}-${appDay}`;
+            } else {
+              appointmentDate = appointment.date;
+            }
             
             return appointmentDate === today && 
                    (appointment.status === "scheduled" || 
                     appointment.status === "confirmed" || 
                     appointment.status === "pending");
+          });
+
+          // Sort by time (closest first) - show the appointment with the nearest time
+          todayScheduled.sort((a: any, b: any) => {
+            const timeA = a.appointmentTime || a.time || '00:00';
+            const timeB = b.appointmentTime || b.time || '00:00';
+            return timeA.localeCompare(timeB);
           });
 
           console.log('🏠 TodayAppointment - Today\'s appointments:', todayScheduled);
@@ -92,23 +111,37 @@ const TodayAppointment = () => {
 
   // Calculate time until appointment
   const getTimeUntil = () => {
-    const appointmentDate = appointment.date || 
-      (appointment.appointmentDate ? new Date(appointment.appointmentDate).toISOString().split("T")[0] : '');
-    const appointmentTime = appointment.time || appointment.appointmentTime;
+    // Get appointment date in local timezone
+    let appointmentDate: string;
+    if (appointment.appointmentDate) {
+      const date = new Date(appointment.appointmentDate);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      appointmentDate = `${year}-${month}-${day}`;
+    } else {
+      appointmentDate = appointment.date || '';
+    }
     
-    const appointmentDateTime = new Date(`${appointmentDate}T${appointmentTime}`);
+    const appointmentTime = appointment.time || appointment.appointmentTime || '00:00';
+    
+    // Create date from YYYY-MM-DD and HH:MM in local timezone
+    const [year, month, day] = appointmentDate.split('-').map(Number);
+    const [hours, minutes] = appointmentTime.split(':').map(Number);
+    const appointmentDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
+    
     const now = new Date();
     const diff = appointmentDateTime.getTime() - now.getTime();
 
     if (diff < 0) return "ახლა";
 
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const hoursUntil = Math.floor(diff / (1000 * 60 * 60));
+    const minutesUntil = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
 
-    if (hours > 0) {
-      return `${hours} საათში`;
-    } else if (minutes > 0) {
-      return `${minutes} წუთში`;
+    if (hoursUntil > 0) {
+      return `${hoursUntil} საათში`;
+    } else if (minutesUntil > 0) {
+      return `${minutesUntil} წუთში`;
     } else {
       return "ახლა";
     }
@@ -116,11 +149,25 @@ const TodayAppointment = () => {
 
   // Check if appointment is within 1 hour from now
   const isUrgent = () => {
-    const appointmentDate = appointment.date || 
-      (appointment.appointmentDate ? new Date(appointment.appointmentDate).toISOString().split("T")[0] : '');
-    const appointmentTime = appointment.time || appointment.appointmentTime;
+    // Get appointment date in local timezone
+    let appointmentDate: string;
+    if (appointment.appointmentDate) {
+      const date = new Date(appointment.appointmentDate);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      appointmentDate = `${year}-${month}-${day}`;
+    } else {
+      appointmentDate = appointment.date || '';
+    }
     
-    const appointmentDateTime = new Date(`${appointmentDate}T${appointmentTime}`);
+    const appointmentTime = appointment.time || appointment.appointmentTime || '00:00';
+    
+    // Create date from YYYY-MM-DD and HH:MM in local timezone
+    const [year, month, day] = appointmentDate.split('-').map(Number);
+    const [hours, minutes] = appointmentTime.split(':').map(Number);
+    const appointmentDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
+    
     const now = new Date();
     const diff = appointmentDateTime.getTime() - now.getTime();
     return diff > 0 && diff <= 60 * 60 * 1000; // 1 hour

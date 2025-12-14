@@ -17,6 +17,11 @@ export class CreateProductDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(50)
+  icdCode?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(500)
   description?: string;
 
@@ -64,4 +69,9 @@ export class CreateProductDto {
   @IsNumber()
   @Min(0)
   order?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  clinic?: string;
 }

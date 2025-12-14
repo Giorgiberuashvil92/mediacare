@@ -28,7 +28,7 @@ const getDefaultBaseUrl = () => {
   
   if (FORCE_RAILWAY) {
     console.log('🚂 Forcing Railway URL for testing');
-    return "https://mediacare-production.up.railway.app";  
+    return "http://localhost:4000";  
   }
 
   const envUrl =
@@ -58,9 +58,9 @@ const getDefaultBaseUrl = () => {
   // return "https://mediacare-production.up.railway.app";
   if (__DEV__) {
     console.log('🔍 __DEV__ mode:', __DEV__);
-    return "https://mediacare-production.up.railway.app";
+    return "http://localhost:4000";
   }
-  return "https://mediacare-production.up.railway.app";
+  return "localhost:4000";
 };
 
 const API_BASE_URL = getDefaultBaseUrl();
@@ -146,6 +146,17 @@ export interface MedicineShopOverview {
   laboratoryProducts: ShopProduct[];
   laboratoryCategories: ShopCategory[];
   equipmentCategories: ShopCategory[];
+}
+
+export interface Clinic {
+  id: string;
+  name: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export type AppointmentType = "video" | "home-visit";
@@ -335,6 +346,14 @@ class ApiService {
       type: string;
     },
   ): Promise<{ success: boolean; url: string; publicId: string }> {
+    if (USE_MOCK_API) {
+      return Promise.resolve({
+        success: true,
+        url: file.uri,
+        publicId: "mock-public-id",
+      });
+    }
+
     const formData = new FormData();
     formData.append("file", {
       uri: file.uri,
@@ -345,9 +364,7 @@ class ApiService {
     const response = await fetch(`${this.baseURL}/uploads/image/public`, {
       method: "POST",
       body: formData,
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      // Don't set Content-Type header - React Native FormData sets it automatically with boundary
     });
 
     return this.handleResponse<{ success: boolean; url: string; publicId: string }>(response);
@@ -611,6 +628,26 @@ class ApiService {
     });
   }
 
+  async changePassword(data: {
+    currentPassword: string;
+    newPassword: string;
+  }): Promise<{
+    success: boolean;
+    message?: string;
+  }> {
+    if (USE_MOCK_API) {
+      return Promise.resolve({
+        success: true,
+        message: 'პაროლი წარმატებით შეიცვალა',
+      });
+    }
+
+    return this.apiCall('/profile/password', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
   // Doctor Dashboard endpoints
   async getDoctorDashboardStats(): Promise<{
     success: boolean;
@@ -843,6 +880,7 @@ class ApiService {
       visitAddress?: string;
       reason?: string;
     },
+    isDoctor: boolean = false, // true for doctor, false for patient
   ) {
     if (USE_MOCK_API) {
       return Promise.resolve({
@@ -851,9 +889,78 @@ class ApiService {
       } as any);
     }
 
-    return this.apiCall(`/doctors/appointments/${appointmentId}/follow-up`, {
+    // Use different endpoints for doctor vs patient
+    const endpoint = isDoctor
+      ? `/doctors/appointments/${appointmentId}/follow-up`
+      : `/appointments/${appointmentId}/follow-up`;
+
+    return this.apiCall(endpoint, {
       method: 'POST',
       body: JSON.stringify(payload),
+    });
+  }
+
+  async checkFollowUpEligibility(appointmentId: string) {
+    if (USE_MOCK_API) {
+      return Promise.resolve({
+        success: true,
+        eligible: true,
+      } as any);
+    }
+
+    return this.apiCall(`/appointments/${appointmentId}/follow-up/eligibility`, {
+      method: 'GET',
+    });
+  }
+
+  async assignLaboratoryTests(
+    appointmentId: string,
+    tests: {
+      productId: string;
+      productName: string;
+      clinicId?: string;
+      clinicName?: string;
+    }[],
+  ): Promise<{
+    success: boolean;
+    message?: string;
+    data?: any;
+  }> {
+    if (USE_MOCK_API) {
+      return Promise.resolve({
+        success: true,
+        message: 'ლაბორატორიული კვლევები წარმატებით დაემატა',
+      });
+    }
+
+    return this.apiCall(`/appointments/${appointmentId}/laboratory-tests`, {
+      method: 'PUT',
+      body: JSON.stringify({ tests }),
+    });
+  }
+
+  async bookLaboratoryTest(
+    appointmentId: string,
+    data: {
+      productId: string;
+      clinicId: string;
+      clinicName: string;
+    },
+  ): Promise<{
+    success: boolean;
+    message?: string;
+    data?: any;
+  }> {
+    if (USE_MOCK_API) {
+      return Promise.resolve({
+        success: true,
+        message: 'ლაბორატორიული კვლევა წარმატებით დაჯავშნა',
+      });
+    }
+
+    return this.apiCall(`/appointments/${appointmentId}/laboratory-tests/book`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
     });
   }
 
@@ -1044,6 +1151,59 @@ class ApiService {
     }>(response);
   }
 
+  async uploadLaboratoryTestResult(
+    appointmentId: string,
+    productId: string,
+    file: {
+      uri: string;
+      name: string;
+      type: string;
+    },
+  ): Promise<{
+    success: boolean;
+    message?: string;
+    data?: { url: string; publicId?: string; name?: string; type?: string; size?: number; uploadedAt: string };
+  }> {
+    if (USE_MOCK_API) {
+      return Promise.resolve({
+        success: true,
+        message: 'ლაბორატორიული კვლევის შედეგი წარმატებით ატვირთა',
+        data: {
+          url: file.uri,
+          name: file.name,
+          type: file.type,
+          size: 0,
+          uploadedAt: new Date().toISOString(),
+        },
+      });
+    }
+
+    const formData = new FormData();
+    formData.append('file', {
+      uri: file.uri,
+      name: file.name,
+      type: file.type,
+    } as any);
+
+    const token = await AsyncStorage.getItem("accessToken");
+    const headers: HeadersInit = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${this.baseURL}/appointments/${appointmentId}/laboratory-tests/${productId}/result`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    return this.handleResponse<{
+      success: boolean;
+      message?: string;
+      data?: { url: string; publicId?: string; name?: string; type?: string; size?: number; uploadedAt: string };
+    }>(response);
+  }
+
   async getDoctorPatients(): Promise<{
     success: boolean;
     data: any[];
@@ -1076,6 +1236,22 @@ class ApiService {
     }
 
     return this.apiCall('/shop/overview', {
+      method: 'GET',
+    });
+  }
+
+  async getClinics(): Promise<{
+    success: boolean;
+    data: Clinic[];
+  }> {
+    if (USE_MOCK_API) {
+      return Promise.resolve({
+        success: true,
+        data: [],
+      });
+    }
+
+    return this.apiCall('/shop/clinics', {
       method: 'GET',
     });
   }

@@ -365,7 +365,7 @@ export class AppointmentsService {
       .find({
         patientId: new mongoose.Types.ObjectId(patientId),
       })
-      .populate('doctorId', 'name specialization profileImage')
+      .populate('doctorId', '_id name specialization profileImage')
       .sort({ appointmentDate: -1 })
       .lean();
 
@@ -401,14 +401,14 @@ export class AppointmentsService {
     if (mongoose.Types.ObjectId.isValid(appointmentId)) {
       appointment = await this.appointmentModel
         .findById(new mongoose.Types.ObjectId(appointmentId))
-        .populate('doctorId', 'name specialization profileImage')
+        .populate('doctorId', '_id name specialization profileImage')
         .populate('patientId', 'name email phone')
         .lean();
     } else {
       // If not ObjectId, try to find by appointmentNumber
       appointment = await this.appointmentModel
         .findOne({ appointmentNumber: appointmentId })
-        .populate('doctorId', 'name specialization profileImage')
+        .populate('doctorId', '_id name specialization profileImage')
         .populate('patientId', 'name email phone')
         .lean();
     }
@@ -420,6 +420,597 @@ export class AppointmentsService {
     return {
       success: true,
       data: appointment,
+    };
+  }
+
+  async rescheduleAppointment(
+    appointmentId: string,
+    newDate: string,
+    newTime: string,
+  ) {
+    // Find appointment
+    const appointment = await this.appointmentModel.findById(
+      new mongoose.Types.ObjectId(appointmentId),
+    );
+
+    if (!appointment) {
+      throw new NotFoundException('Appointment not found');
+    }
+
+    // Check if appointment can be rescheduled (not completed or cancelled)
+    if (
+      appointment.status === AppointmentStatus.COMPLETED ||
+      appointment.status === AppointmentStatus.CANCELLED
+    ) {
+      throw new BadRequestException(
+        'Cannot reschedule completed or cancelled appointment',
+      );
+    }
+
+    // Parse and validate date
+    const appointmentDate = new Date(newDate);
+    if (isNaN(appointmentDate.getTime())) {
+      throw new BadRequestException('Invalid appointment date');
+    }
+
+    // Normalize date (remove time component)
+    const normalizedDate = new Date(appointmentDate);
+    normalizedDate.setHours(0, 0, 0, 0);
+
+    // Create date range for MongoDB query (start and end of day)
+    // This handles timezone issues better than exact match
+    const startOfDay = new Date(normalizedDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(normalizedDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    // Validate time format
+    const [hoursStr, minutesStr] = (newTime || '').split(':');
+    const hours = Number(hoursStr);
+    const minutes = Number(minutesStr);
+
+    if (
+      Number.isNaN(hours) ||
+      Number.isNaN(minutes) ||
+      hours < 0 ||
+      hours > 23 ||
+      minutes < 0 ||
+      minutes > 59
+    ) {
+      throw new BadRequestException('Invalid appointment time');
+    }
+
+    // Build full appointment DateTime and enforce 2 hour lead time
+    const appointmentDateTime = new Date(appointmentDate);
+    appointmentDateTime.setHours(hours, minutes, 0, 0);
+
+    const now = new Date();
+    const twoHoursInMs = 2 * 60 * 60 * 1000;
+
+    // Check if new appointment time is in the past
+    if (appointmentDateTime.getTime() < now.getTime()) {
+      throw new BadRequestException(
+        'ახალი თარიღი და დრო არ შეიძლება იყოს წარსულში',
+      );
+    }
+
+    if (appointmentDateTime.getTime() - now.getTime() < twoHoursInMs) {
+      throw new BadRequestException(
+        'ჯავშნის გადაჯავშნა შესაძლებელია მინიმუმ 2 საათით ადრე',
+      );
+    }
+
+    // Check doctor's availability for the specific appointment type
+    // Use date range query to handle timezone issues
+    const availability = await this.availabilityModel.findOne({
+      doctorId: appointment.doctorId,
+      date: {
+        $gte: startOfDay,
+        $lte: endOfDay,
+      },
+      type: appointment.type,
+      isAvailable: true,
+    });
+
+    // Debug logging
+    console.log('Reschedule availability check:', {
+      doctorId: appointment.doctorId.toString(),
+      date: normalizedDate.toISOString(),
+      startOfDay: startOfDay.toISOString(),
+      endOfDay: endOfDay.toISOString(),
+      type: appointment.type,
+      found: !!availability,
+      availabilityTimeSlots: availability?.timeSlots,
+    });
+
+    if (!availability) {
+      const typeLabel =
+        appointment.type === AppointmentType.VIDEO
+          ? 'ვიდეო კონსულტაციის'
+          : 'ბინაზე ვიზიტის';
+      throw new BadRequestException(
+        `ექიმი არ არის ხელმისაწვდომი ამ თარიღზე ${typeLabel} ტიპის ჯავშნისთვის`,
+      );
+    }
+
+    // Check if the selected time slot is in the availability timeSlots
+    if (!availability.timeSlots || !availability.timeSlots.includes(newTime)) {
+      const typeLabel =
+        appointment.type === AppointmentType.VIDEO
+          ? 'ვიდეო კონსულტაციის'
+          : 'ბინაზე ვიზიტის';
+      throw new BadRequestException(
+        `არჩეული დრო (${newTime}) არ არის ხელმისაწვდომი ამ თარიღზე ${typeLabel} ტიპის ჯავშნისთვის`,
+      );
+    }
+
+    // Check if the new time slot is already booked
+    const existingAppointment = await this.appointmentModel.findOne({
+      doctorId: appointment.doctorId,
+      appointmentDate: normalizedDate,
+      appointmentTime: newTime,
+      type: appointment.type,
+      status: { $in: [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED] },
+      _id: { $ne: new mongoose.Types.ObjectId(appointmentId) },
+    });
+
+    if (existingAppointment) {
+      throw new BadRequestException('Selected time slot is already booked');
+    }
+
+    // Update appointment - ONLY date and time, keep status unchanged
+    const previousStatus = appointment.status;
+    appointment.appointmentDate = normalizedDate;
+    appointment.appointmentTime = newTime;
+    // Explicitly ensure status is not changed
+    appointment.status = previousStatus;
+    await appointment.save();
+
+    console.log('Appointment rescheduled:', {
+      appointmentId: (appointment._id as any).toString(),
+      previousDate: appointment.appointmentDate,
+      previousTime: appointment.appointmentTime,
+      newDate: normalizedDate,
+      newTime: newTime,
+      status: appointment.status, // Should remain unchanged
+    });
+
+    return {
+      success: true,
+      message: 'Appointment rescheduled successfully',
+      data: appointment,
+    };
+  }
+
+  // Helper function to calculate working days (excluding weekends)
+  private calculateWorkingDays(startDate: Date, days: number): Date {
+    const currentDate = new Date(startDate);
+    let workingDaysAdded = 0;
+
+    while (workingDaysAdded < days) {
+      currentDate.setDate(currentDate.getDate() + 1);
+      const dayOfWeek = currentDate.getDay();
+      // Skip weekends (Saturday = 6, Sunday = 0)
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+        workingDaysAdded++;
+      }
+    }
+
+    return currentDate;
+  }
+
+  // Check if follow-up is allowed (10 working days passed and not already used)
+  async checkFollowUpEligibility(appointmentId: string, patientId: string) {
+    const appointment = await this.appointmentModel.findOne({
+      _id: new mongoose.Types.ObjectId(appointmentId),
+      patientId: new mongoose.Types.ObjectId(patientId),
+      status: AppointmentStatus.COMPLETED,
+    });
+
+    if (!appointment) {
+      throw new NotFoundException('Appointment not found or not completed');
+    }
+
+    // Check if follow-up already exists
+    if (appointment.followUp?.appointmentId) {
+      const existingFollowUp = await this.appointmentModel.findById(
+        appointment.followUp.appointmentId,
+      );
+      if (existingFollowUp) {
+        console.log('განმეორებითი ვიზიტი უკვე დაჯავშნილია ამ კონსულტაციისთვის');
+      }
+    }
+
+    // Calculate 10 working days from appointment date
+    // Follow-up is available ONLY within 10 working days from the appointment
+    const appointmentDate = new Date(appointment.appointmentDate);
+    appointmentDate.setHours(0, 0, 0, 0);
+    const tenWorkingDaysLater = this.calculateWorkingDays(appointmentDate, 10);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Check if 10 working days have passed - if yes, follow-up is no longer available
+    if (today.getTime() > tenWorkingDaysLater.getTime()) {
+      const daysPassed = Math.ceil(
+        (today.getTime() - tenWorkingDaysLater.getTime()) /
+          (1000 * 60 * 60 * 24),
+      );
+      throw new BadRequestException(
+        `განმეორებითი ვიზიტისთვის გაქვს 10 სამუშაო დღე პირველადი ვიზიტიდან. 10 სამუშაო დღე უკვე გავიდა (${daysPassed} დღე წინ)`,
+      );
+    }
+
+    return {
+      success: true,
+      eligible: true,
+      originalAppointment: appointment,
+    };
+  }
+
+  async scheduleFollowUpAppointmentByPatient(
+    patientId: string,
+    appointmentId: string,
+    dto: {
+      date: string;
+      time: string;
+      type?: 'video' | 'home-visit';
+      visitAddress?: string;
+      reason?: string;
+    },
+  ) {
+    // Check eligibility first
+    const eligibilityCheck = await this.checkFollowUpEligibility(
+      appointmentId,
+      patientId,
+    );
+    const originalAppointment = eligibilityCheck.originalAppointment;
+
+    if (!dto.date || !dto.time) {
+      throw new BadRequestException('Follow-up date and time are required');
+    }
+
+    // Normalize date to UTC start of day for consistent comparison
+    const normalizedDate = new Date(dto.date);
+    if (Number.isNaN(normalizedDate.getTime())) {
+      throw new BadRequestException('Invalid follow-up date');
+    }
+    normalizedDate.setUTCHours(0, 0, 0, 0);
+
+    const followUpDateTime = new Date(`${dto.date}T${dto.time}`);
+    if (Number.isNaN(followUpDateTime.getTime())) {
+      throw new BadRequestException('Invalid follow-up time');
+    }
+
+    // Determine appointment type (default to original appointment type or 'video')
+    const appointmentType =
+      dto.type || originalAppointment.type || AppointmentType.VIDEO;
+
+    // Validate visit address for home-visit type
+    if (
+      appointmentType === AppointmentType.HOME_VISIT &&
+      !dto.visitAddress?.trim()
+    ) {
+      throw new BadRequestException(
+        'Visit address is required for home-visit appointments',
+      );
+    }
+
+    // Check doctor's availability for the selected type and time slot
+    // Use date range query to handle timezone differences
+    const startOfDay = new Date(normalizedDate);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+    const endOfDay = new Date(normalizedDate);
+    endOfDay.setUTCHours(23, 59, 59, 999);
+
+    const availabilityQuery = {
+      doctorId: originalAppointment.doctorId,
+      date: { $gte: startOfDay, $lte: endOfDay },
+      type: appointmentType,
+      isAvailable: true,
+    };
+
+    console.log(
+      '🔍 scheduleFollowUpAppointmentByPatient - Availability query:',
+      {
+        doctorId: originalAppointment.doctorId.toString(),
+        dateRange: {
+          start: startOfDay.toISOString(),
+          end: endOfDay.toISOString(),
+        },
+        type: appointmentType,
+        dtoDate: dto.date,
+        normalizedDate: normalizedDate.toISOString(),
+      },
+    );
+
+    const availability =
+      await this.availabilityModel.findOne(availabilityQuery);
+
+    console.log(
+      '🔍 scheduleFollowUpAppointmentByPatient - Availability found:',
+      {
+        found: !!availability,
+        availabilityDate: availability?.date,
+        availabilityTimeSlots: availability?.timeSlots,
+      },
+    );
+
+    if (!availability) {
+      const typeLabel =
+        appointmentType === AppointmentType.VIDEO
+          ? 'ვიდეო კონსულტაციის'
+          : 'ბინაზე ვიზიტის';
+      throw new BadRequestException(
+        `ექიმი არ არის ხელმისაწვდომი ამ თარიღზე ${typeLabel} ტიპის განმეორებითი ვიზიტისთვის`,
+      );
+    }
+
+    const timeSlots = availability.timeSlots;
+    if (!timeSlots || !timeSlots.includes(dto.time)) {
+      throw new BadRequestException(
+        'არჩეული დრო არ არის ხელმისაწვდომი ექიმის განრიგში',
+      );
+    }
+
+    // Check if the time slot is already booked
+    const existingAppointment = await this.appointmentModel.findOne({
+      doctorId: originalAppointment.doctorId,
+      appointmentDate: normalizedDate,
+      appointmentTime: dto.time,
+      type: appointmentType,
+      status: { $in: [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED] },
+    });
+
+    if (existingAppointment) {
+      throw new BadRequestException('არჩეული დრო უკვე დაკავებულია');
+    }
+
+    const appointmentNumber = await this.generateAppointmentNumber();
+
+    // Create follow-up appointment with FREE consultation fee (follow-up is free)
+    const followUpAppointment = new this.appointmentModel({
+      appointmentNumber,
+      doctorId: originalAppointment.doctorId,
+      patientId: new mongoose.Types.ObjectId(patientId),
+      appointmentDate: normalizedDate,
+      appointmentTime: dto.time,
+      type: appointmentType,
+      visitAddress:
+        appointmentType === AppointmentType.HOME_VISIT
+          ? dto.visitAddress?.trim()
+          : undefined,
+      status: AppointmentStatus.CONFIRMED,
+      consultationFee: 0, // Follow-up is free
+      totalAmount: 0, // Follow-up is free
+      paymentMethod: originalAppointment.paymentMethod,
+      paymentStatus: PaymentStatus.PAID, // Mark as paid since it's free
+      patientDetails: originalAppointment.patientDetails,
+      notes:
+        dto.reason ||
+        `განმეორებითი ვიზიტი appointment ${originalAppointment.appointmentNumber}-ისთვის`,
+    });
+
+    await followUpAppointment.save();
+    await followUpAppointment.populate(
+      'patientId',
+      'name dateOfBirth gender email phone',
+    );
+    await followUpAppointment.populate(
+      'doctorId',
+      'name specialization profileImage',
+    );
+
+    // Update original appointment with follow-up reference
+    originalAppointment.followUp = {
+      required: true,
+      date: followUpDateTime,
+      reason: dto.reason,
+      appointmentId: followUpAppointment._id as mongoose.Types.ObjectId,
+    };
+
+    await originalAppointment.save();
+
+    return {
+      success: true,
+      message: 'განმეორებითი ვიზიტი წარმატებით დაჯავშნა',
+      data: followUpAppointment,
+    };
+  }
+
+  async assignLaboratoryTests(
+    doctorId: string,
+    appointmentId: string,
+    tests: Array<{
+      productId: string;
+      productName: string;
+      clinicId?: string;
+      clinicName?: string;
+    }>,
+  ) {
+    const appointment = await this.appointmentModel.findById(
+      new mongoose.Types.ObjectId(appointmentId),
+    );
+
+    if (!appointment) {
+      throw new NotFoundException('Appointment not found');
+    }
+
+    // Check if doctor owns this appointment
+    if (appointment.doctorId.toString() !== doctorId.toString()) {
+      throw new UnauthorizedException(
+        'Not authorized to assign tests to this appointment',
+      );
+    }
+
+    // Check if appointment is completed
+    if (appointment.status !== AppointmentStatus.COMPLETED) {
+      throw new BadRequestException(
+        'Laboratory tests can only be assigned to completed appointments',
+      );
+    }
+
+    // Initialize laboratoryTests array if it doesn't exist
+    if (!appointment.laboratoryTests) {
+      appointment.laboratoryTests = [];
+    }
+
+    // Add new tests
+    const newTests = tests.map((test) => ({
+      productId: test.productId,
+      productName: test.productName,
+      clinicId: test.clinicId,
+      clinicName: test.clinicName,
+      assignedAt: new Date(),
+      booked: false,
+    }));
+
+    appointment.laboratoryTests.push(...newTests);
+    await appointment.save();
+
+    return {
+      success: true,
+      message: 'ლაბორატორიული კვლევები წარმატებით დაემატა',
+      data: appointment,
+    };
+  }
+
+  async bookLaboratoryTest(
+    patientId: string,
+    appointmentId: string,
+    data: {
+      productId: string;
+      clinicId: string;
+      clinicName: string;
+    },
+  ) {
+    const appointment = await this.appointmentModel.findById(
+      new mongoose.Types.ObjectId(appointmentId),
+    );
+
+    if (!appointment) {
+      throw new NotFoundException('Appointment not found');
+    }
+
+    // Check if patient owns this appointment
+    if (appointment.patientId.toString() !== patientId.toString()) {
+      throw new UnauthorizedException(
+        'Not authorized to book tests for this appointment',
+      );
+    }
+
+    // Check if appointment is completed
+    if (appointment.status !== AppointmentStatus.COMPLETED) {
+      throw new BadRequestException(
+        'Laboratory tests can only be booked for completed appointments',
+      );
+    }
+
+    // Find the laboratory test
+    if (
+      !appointment.laboratoryTests ||
+      appointment.laboratoryTests.length === 0
+    ) {
+      throw new NotFoundException(
+        'No laboratory tests found for this appointment',
+      );
+    }
+
+    const testIndex = appointment.laboratoryTests.findIndex(
+      (test) => test.productId === data.productId && !test.booked,
+    );
+
+    if (testIndex === -1) {
+      throw new NotFoundException(
+        'Laboratory test not found or already booked',
+      );
+    }
+
+    // Update the test with clinic and mark as booked
+    appointment.laboratoryTests[testIndex].clinicId = data.clinicId;
+    appointment.laboratoryTests[testIndex].clinicName = data.clinicName;
+    appointment.laboratoryTests[testIndex].booked = true;
+
+    await appointment.save();
+
+    return {
+      success: true,
+      message: 'ლაბორატორიული კვლევა წარმატებით დაჯავშნა',
+      data: appointment,
+    };
+  }
+
+  async uploadLaboratoryTestResult(
+    patientId: string,
+    appointmentId: string,
+    productId: string,
+    file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('ფაილი აუცილებელია');
+    }
+
+    const allowedTypes = [
+      'application/pdf',
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'image/jpg',
+    ];
+    if (!allowedTypes.includes(file.mimetype)) {
+      throw new BadRequestException('ფაილის ტიპი არასწორია');
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      throw new BadRequestException('ფაილი უნდა იყოს 10MB-მდე');
+    }
+
+    const appointment = await this.appointmentModel.findById(appointmentId);
+    if (!appointment) {
+      throw new NotFoundException('Appointment not found');
+    }
+
+    this.ensurePatientOwner(patientId, appointment);
+
+    if (
+      !appointment.laboratoryTests ||
+      appointment.laboratoryTests.length === 0
+    ) {
+      throw new NotFoundException(
+        'No laboratory tests found for this appointment',
+      );
+    }
+
+    const testIndex = appointment.laboratoryTests.findIndex(
+      (test) => test.productId.toString() === productId,
+    );
+
+    if (testIndex === -1) {
+      throw new NotFoundException('Laboratory test not found');
+    }
+
+    // Upload file to Cloudinary
+    const upload = await this.cloudinaryService.uploadBuffer(file.buffer, {
+      folder: 'mediacare/laboratory-results',
+      resource_type: 'auto',
+    });
+
+    const resultFile = {
+      url: upload.secure_url,
+      publicId: upload.public_id,
+      name: file.originalname,
+      type: file.mimetype,
+      size: file.size,
+      uploadedAt: new Date(),
+    };
+
+    // Update the test with result file
+    appointment.laboratoryTests[testIndex].resultFile = resultFile as any;
+    await appointment.save();
+
+    return {
+      success: true,
+      message: 'ლაბორატორიული კვლევის შედეგი წარმატებით ატვირთა',
+      data: resultFile,
     };
   }
 }

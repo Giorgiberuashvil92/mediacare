@@ -1,5 +1,5 @@
 // API Service for Medicare Admin Panel
-const API_BASE_URL = 'https://mediacare-production.up.railway.app';
+const API_BASE_URL = 'http://localhost:4000';
 
 export interface ApiResponse<T> {
   success: boolean;
@@ -57,6 +57,59 @@ export interface Specialization {
   description?: string;
   isActive: boolean;
   symptoms?: string[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type ShopEntityType = 'laboratory' | 'equipment';
+
+export interface ShopCategory {
+  id: string;
+  name: string;
+  slug: string;
+  type: ShopEntityType;
+  description?: string;
+  imageUrl?: string;
+  isActive: boolean;
+  parentCategory?: string | null;
+  order?: number;
+  tags?: string[];
+  metadata?: Record<string, any>;
+  products?: ShopProduct[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ShopProduct {
+  id: string;
+  name: string;
+  icdCode?: string;
+  description?: string;
+  type: ShopEntityType;
+  category?: string | null;
+  price?: number;
+  currency?: string;
+  discountPercent?: number;
+  stock?: number;
+  unit?: string;
+  isActive: boolean;
+  isFeatured: boolean;
+  imageUrl?: string;
+  order?: number;
+  tags?: string[];
+  metadata?: Record<string, any>;
+  clinic?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Clinic {
+  id: string;
+  name: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  isActive: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -181,6 +234,89 @@ class ApiService {
     );
   }
 
+  async getUserById(userId: string): Promise<ApiResponse<{ user: User }>> {
+    const response = await fetch(`${this.baseURL}/admin/users/${userId}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+
+    return this.handleResponse<ApiResponse<{ user: User }>>(response);
+  }
+
+  async createUser(userData: {
+    role: 'patient' | 'doctor';
+    name: string;
+    email: string;
+    password: string;
+    phone?: string;
+    dateOfBirth?: string;
+    gender?: 'male' | 'female' | 'other';
+    specialization?: string;
+    degrees?: string;
+    experience?: string;
+    consultationFee?: number;
+    followUpFee?: number;
+    about?: string;
+    location?: string;
+  }): Promise<ApiResponse<{ id: string; role: string; name: string; email: string }>> {
+    const response = await fetch(`${this.baseURL}/admin/users`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(userData),
+    });
+
+    return this.handleResponse<ApiResponse<{ id: string; role: string; name: string; email: string }>>(response);
+  }
+
+  async updateUser(
+    userId: string,
+    userData: {
+      name?: string;
+      email?: string;
+      password?: string;
+      phone?: string;
+      dateOfBirth?: string;
+      gender?: 'male' | 'female' | 'other';
+      profileImage?: string;
+      isVerified?: boolean;
+      isActive?: boolean;
+      approvalStatus?: 'pending' | 'approved' | 'rejected';
+      specialization?: string;
+      degrees?: string;
+      experience?: string;
+      consultationFee?: number;
+      followUpFee?: number;
+      about?: string;
+      location?: string;
+    },
+  ): Promise<ApiResponse<{ id: string; role: string; name: string; email: string }>> {
+    const response = await fetch(`${this.baseURL}/admin/users/${userId}`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(userData),
+    });
+
+    return this.handleResponse<ApiResponse<{ id: string; role: string; name: string; email: string }>>(response);
+  }
+
+  async deleteUser(userId: string): Promise<ApiResponse<{ message: string }>> {
+    const response = await fetch(`${this.baseURL}/admin/users/${userId}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+    });
+
+    return this.handleResponse<ApiResponse<{ message: string }>>(response);
+  }
+
+  async hardDeleteUser(userId: string): Promise<ApiResponse<{ message: string }>> {
+    const response = await fetch(`${this.baseURL}/admin/users/${userId}/hard`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+    });
+
+    return this.handleResponse<ApiResponse<{ message: string }>>(response);
+  }
+
   // Doctors endpoints
   async getDoctors(params?: {
     page?: number;
@@ -230,6 +366,46 @@ class ApiService {
     );
 
     return this.handleResponse<ApiResponse<User>>(response);
+  }
+
+  async getDoctorAvailability(
+    doctorId: string,
+    startDate?: string,
+    endDate?: string,
+    type?: 'video' | 'home-visit',
+  ): Promise<ApiResponse<any>> {
+    const queryParams = new URLSearchParams();
+    if (startDate) queryParams.append('startDate', startDate);
+    if (endDate) queryParams.append('endDate', endDate);
+    if (type) queryParams.append('type', type);
+
+    const response = await fetch(
+      `${this.baseURL}/doctors/${doctorId}/availability?${queryParams.toString()}`,
+      {
+        method: 'GET',
+        headers: this.getHeaders(),
+      },
+    );
+
+    return this.handleResponse<ApiResponse<any>>(response);
+  }
+
+  async updateDoctorAvailability(
+    doctorId: string,
+    availability: {
+      date: string;
+      timeSlots: string[];
+      isAvailable: boolean;
+      type: 'video' | 'home-visit';
+    }[],
+  ): Promise<ApiResponse<any>> {
+    const response = await fetch(`${this.baseURL}/admin/doctors/${doctorId}/availability`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ availability }),
+    });
+
+    return this.handleResponse<ApiResponse<any>>(response);
   }
 
   async updateDoctor(
@@ -461,6 +637,20 @@ class ApiService {
     return this.handleResponse<ApiResponse<any>>(response);
   }
 
+  async rescheduleAppointment(
+    appointmentId: string,
+    newDate: string,
+    newTime: string,
+  ): Promise<ApiResponse<any>> {
+    const response = await fetch(`${this.baseURL}/appointments/${appointmentId}/reschedule`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ newDate, newTime }),
+    });
+
+    return this.handleResponse<ApiResponse<any>>(response);
+  }
+
   async updateAppointmentStatus(appointmentId: string, status: string): Promise<ApiResponse<any>> {
     const response = await fetch(`${this.baseURL}/admin/appointments/${appointmentId}/status`, {
       method: 'PUT',
@@ -568,6 +758,241 @@ class ApiService {
     });
 
     return this.handleResponse<ApiResponse<{ type: string; content: string; updatedAt?: string }[]>>(response);
+  }
+
+  // Medicine shop endpoints
+  async getShopCategories(params?: {
+    type?: ShopEntityType;
+    search?: string;
+    isActive?: boolean;
+    parentCategory?: string;
+    includeProducts?: boolean;
+  }): Promise<ApiResponse<ShopCategory[]>> {
+    const queryParams = new URLSearchParams();
+    if (params?.type) queryParams.append('type', params.type);
+    if (params?.search) queryParams.append('search', params.search);
+    if (typeof params?.isActive === 'boolean')
+      queryParams.append('isActive', String(params.isActive));
+    if (params?.parentCategory) queryParams.append('parentCategory', params.parentCategory);
+    if (params?.includeProducts)
+      queryParams.append('includeProducts', String(params.includeProducts));
+
+    const response = await fetch(
+      `${this.baseURL}/shop/categories?${queryParams.toString()}`,
+      {
+        method: 'GET',
+        headers: this.getHeaders(),
+      },
+    );
+
+    return this.handleResponse<ApiResponse<ShopCategory[]>>(response);
+  }
+
+  async createShopCategory(
+    data: Pick<ShopCategory, 'name' | 'type'> &
+      Partial<
+        Pick<
+          ShopCategory,
+          | 'description'
+          | 'imageUrl'
+          | 'isActive'
+          | 'order'
+          | 'parentCategory'
+          | 'metadata'
+        >
+      >,
+  ): Promise<ApiResponse<ShopCategory>> {
+    const response = await fetch(`${this.baseURL}/admin/shop/categories`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data),
+    });
+
+    return this.handleResponse<ApiResponse<ShopCategory>>(response);
+  }
+
+  async updateShopCategory(
+    id: string,
+    data: Partial<ShopCategory>,
+  ): Promise<ApiResponse<ShopCategory>> {
+    const response = await fetch(
+      `${this.baseURL}/admin/shop/categories/${id}`,
+      {
+        method: 'PATCH',
+        headers: this.getHeaders(),
+        body: JSON.stringify(data),
+      },
+    );
+
+    return this.handleResponse<ApiResponse<ShopCategory>>(response);
+  }
+
+  async deleteShopCategory(id: string): Promise<ApiResponse<{ message: string }>> {
+    const response = await fetch(
+      `${this.baseURL}/admin/shop/categories/${id}`,
+      {
+        method: 'DELETE',
+        headers: this.getHeaders(),
+      },
+    );
+
+    return this.handleResponse<ApiResponse<{ message: string }>>(response);
+  }
+
+  async getShopProducts(params?: {
+    type?: ShopEntityType;
+    category?: string;
+    search?: string;
+    isActive?: boolean;
+    page?: number;
+    limit?: number;
+  }): Promise<
+    ApiResponse<{
+      items: ShopProduct[];
+      pagination: { page: number; limit: number; total: number; totalPages: number };
+    }>
+  > {
+    const queryParams = new URLSearchParams();
+    if (params?.type) queryParams.append('type', params.type);
+    if (params?.category) queryParams.append('category', params.category);
+    if (params?.search) queryParams.append('search', params.search);
+    if (typeof params?.isActive === 'boolean')
+      queryParams.append('isActive', String(params.isActive));
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+
+    const response = await fetch(
+      `${this.baseURL}/shop/products?${queryParams.toString()}`,
+      {
+        method: 'GET',
+        headers: this.getHeaders(),
+      },
+    );
+
+    return this.handleResponse<
+      ApiResponse<{
+        items: ShopProduct[];
+        pagination: { page: number; limit: number; total: number; totalPages: number };
+      }>
+    >(response);
+  }
+
+  async createShopProduct(
+    data: Pick<ShopProduct, 'name' | 'type'> &
+      Partial<
+        Pick<
+          ShopProduct,
+          | 'icdCode'
+          | 'description'
+          | 'price'
+          | 'currency'
+          | 'discountPercent'
+          | 'stock'
+          | 'unit'
+          | 'category'
+          | 'isActive'
+          | 'isFeatured'
+          | 'imageUrl'
+          | 'order'
+          | 'metadata'
+          | 'clinic'
+        >
+      >,
+  ): Promise<ApiResponse<ShopProduct>> {
+    const response = await fetch(`${this.baseURL}/admin/shop/products`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data),
+    });
+
+    return this.handleResponse<ApiResponse<ShopProduct>>(response);
+  }
+
+  async updateShopProduct(
+    id: string,
+    data: Partial<ShopProduct>,
+  ): Promise<ApiResponse<ShopProduct>> {
+    const response = await fetch(`${this.baseURL}/admin/shop/products/${id}`, {
+      method: 'PATCH',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data),
+    });
+
+    return this.handleResponse<ApiResponse<ShopProduct>>(response);
+  }
+
+  async deleteShopProduct(id: string): Promise<ApiResponse<{ message: string }>> {
+    const response = await fetch(`${this.baseURL}/admin/shop/products/${id}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+    });
+
+    return this.handleResponse<ApiResponse<{ message: string }>>(response);
+  }
+
+  // Clinic endpoints
+  async getClinics(isActive?: boolean): Promise<ApiResponse<Clinic[]>> {
+    const queryParams = new URLSearchParams();
+    if (typeof isActive === 'boolean') {
+      queryParams.append('isActive', String(isActive));
+    }
+
+    const response = await fetch(
+      `${this.baseURL}/admin/shop/clinics?${queryParams.toString()}`,
+      {
+        method: 'GET',
+        headers: this.getHeaders(),
+      },
+    );
+
+    return this.handleResponse<ApiResponse<Clinic[]>>(response);
+  }
+
+  async getClinicById(id: string): Promise<ApiResponse<Clinic>> {
+    const response = await fetch(`${this.baseURL}/admin/shop/clinics/${id}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+
+    return this.handleResponse<ApiResponse<Clinic>>(response);
+  }
+
+  async createClinic(data: {
+    name: string;
+    address?: string;
+    phone?: string;
+    email?: string;
+    isActive?: boolean;
+  }): Promise<ApiResponse<Clinic>> {
+    const response = await fetch(`${this.baseURL}/admin/shop/clinics`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data),
+    });
+
+    return this.handleResponse<ApiResponse<Clinic>>(response);
+  }
+
+  async updateClinic(
+    id: string,
+    data: Partial<Clinic>,
+  ): Promise<ApiResponse<Clinic>> {
+    const response = await fetch(`${this.baseURL}/admin/shop/clinics/${id}`, {
+      method: 'PATCH',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data),
+    });
+
+    return this.handleResponse<ApiResponse<Clinic>>(response);
+  }
+
+  async deleteClinic(id: string): Promise<ApiResponse<{ message: string }>> {
+    const response = await fetch(`${this.baseURL}/admin/shop/clinics/${id}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+    });
+
+    return this.handleResponse<ApiResponse<{ message: string }>>(response);
   }
 
   // Generic API call

@@ -5,6 +5,10 @@ import {
   Appointment,
   AppointmentSchema,
 } from 'src/appointments/schemas/appointment.schema';
+import {
+  Availability,
+  AvailabilitySchema,
+} from '../doctors/schemas/availability.schema';
 import { User, UserSchema } from '../schemas/user.schema';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
@@ -14,6 +18,7 @@ import { AdminService } from './admin.service';
     MongooseModule.forFeature([
       { name: User.name, schema: UserSchema },
       { name: Appointment.name, schema: AppointmentSchema },
+      { name: Availability.name, schema: AvailabilitySchema },
     ]),
     JwtModule.register({}),
   ],

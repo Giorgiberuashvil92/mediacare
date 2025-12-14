@@ -92,6 +92,15 @@ export default function DoctorProfile() {
             <View style={styles.onlineBadge} />
           </View>
           <View style={styles.profileInfo}>
+            {/* Rating above name */}
+            {doctorProfile?.rating !== undefined && (
+              <View style={styles.ratingContainer}>
+                <Ionicons name="star" size={12} color="#FACC15" />
+                <Text style={styles.ratingText}>
+                  {doctorProfile.rating?.toFixed(1) || "0.0"}
+                </Text>
+              </View>
+            )}
             <Text style={styles.profileName}>
               {user?.name || "Dr. Stefin Cook"}
             </Text>
@@ -532,6 +541,17 @@ const styles = StyleSheet.create({
   profileInfo: {
     flex: 1,
     marginLeft: 16,
+  },
+  ratingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+    gap: 3,
+  },
+  ratingText: {
+    fontSize: 12,
+    fontFamily: "Poppins-SemiBold",
+    color: "#666666",
   },
   profileName: {
     fontSize: 18,

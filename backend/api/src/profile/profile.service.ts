@@ -1,11 +1,14 @@
 import {
+  BadRequestException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import * as bcrypt from 'bcrypt';
 import * as mongoose from 'mongoose';
 import { User, UserDocument, UserRole } from '../schemas/user.schema';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Injectable()
@@ -35,6 +38,7 @@ export class ProfileService {
         gender: user.gender,
         profileImage: user.profileImage,
         address: user.address,
+        about: user.about,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
         // Doctor specific fields
@@ -45,7 +49,6 @@ export class ProfileService {
           experience: user.experience,
           consultationFee: user.consultationFee,
           followUpFee: user.followUpFee,
-          about: user.about,
           location: user.location,
           rating: user.rating,
           reviewCount: user.reviewCount,
@@ -89,7 +92,15 @@ export class ProfileService {
       updateData.gender = updateProfileDto.gender;
     }
     if (updateProfileDto.address !== undefined) {
-      updateData.address = updateProfileDto.address;
+      updateData.address = updateProfileDto.address as any;
+    }
+    if (updateProfileDto.profileImage !== undefined) {
+      updateData.profileImage = updateProfileDto.profileImage;
+    }
+
+    // About field is available for all users
+    if (updateProfileDto.about !== undefined) {
+      updateData.about = updateProfileDto.about;
     }
 
     // Doctor specific fields
@@ -111,9 +122,6 @@ export class ProfileService {
       }
       if (updateProfileDto.followUpFee !== undefined) {
         updateData.followUpFee = updateProfileDto.followUpFee;
-      }
-      if (updateProfileDto.about !== undefined) {
-        updateData.about = updateProfileDto.about;
       }
       if (updateProfileDto.location !== undefined) {
         updateData.location = updateProfileDto.location;
@@ -145,6 +153,51 @@ export class ProfileService {
       data: {
         profileImage: user.profileImage,
       },
+    };
+  }
+
+  async changePassword(userId: string, changePasswordDto: ChangePasswordDto) {
+    const user = await this.userModel.findById(userId);
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Verify current password
+    const isCurrentPasswordValid = await bcrypt.compare(
+      changePasswordDto.currentPassword,
+      user.password,
+    );
+
+    if (!isCurrentPasswordValid) {
+      throw new UnauthorizedException('მიმდინარე პაროლი არასწორია');
+    }
+
+    // Check if new password is different from current password
+    const isSamePassword = await bcrypt.compare(
+      changePasswordDto.newPassword,
+      user.password,
+    );
+
+    if (isSamePassword) {
+      throw new BadRequestException(
+        'ახალი პაროლი უნდა განსხვავდებოდეს მიმდინარე პაროლისგან',
+      );
+    }
+
+    // Hash new password
+    const hashedNewPassword = await bcrypt.hash(
+      changePasswordDto.newPassword,
+      10,
+    );
+
+    // Update password
+    user.password = hashedNewPassword;
+    await user.save();
+
+    return {
+      success: true,
+      message: 'პაროლი წარმატებით შეიცვალა',
     };
   }
 }

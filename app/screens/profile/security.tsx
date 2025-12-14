@@ -6,11 +6,10 @@ import {
   Alert,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -59,16 +58,17 @@ export default function SecurityScreen() {
         return;
       }
 
-      // TODO: Implement password change API call
-      // const response = await apiService.changePassword({
-      //   currentPassword,
-      //   newPassword,
-      // });
+      const response = await apiService.changePassword({
+        currentPassword,
+        newPassword,
+      });
 
-      Alert.alert("წარმატება", "პაროლი წარმატებით შეიცვალა");
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
+      if (response.success) {
+        Alert.alert("წარმატება", response.message || "პაროლი წარმატებით შეიცვალა");
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+      }
     } catch (error: any) {
       Alert.alert("შეცდომა", error.message || "პაროლის შეცვლა ვერ მოხერხდა");
     } finally {
@@ -202,123 +202,12 @@ export default function SecurityScreen() {
         </View>
 
         {/* Privacy Settings Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>პრივატულობა</Text>
-          <Text style={styles.sectionDescription}>
-            მართეთ თქვენი პროფილის ხილვადობა და მონაცემები
-          </Text>
 
-          {/* <View style={styles.settingItem}>
-            <View style={styles.settingInfo}>
-              <Ionicons name="person-outline" size={20} color="#06B6D4" />
-              <View style={styles.settingTextContainer}>
-                <Text style={styles.settingTitle}>პროფილის ხილვადობა</Text>
-                <Text style={styles.settingDescription}>
-                  დაუშვით სხვებმა ნახონ თქვენი პროფილი
-                </Text>
-              </View>
-            </View>
-            <Switch
-              value={profileVisibility}
-              onValueChange={setProfileVisibility}
-              trackColor={{ false: "#E5E7EB", true: "#06B6D4" }}
-              thumbColor="#FFFFFF"
-            />
-          </View> */}
 
-          <View style={styles.settingItem}>
-            <View style={styles.settingInfo}>
-              <Ionicons name="chatbubbles-outline" size={20} color="#06B6D4" />
-              <View style={styles.settingTextContainer}>
-                <Text style={styles.settingTitle}>შეტყობინებების მიღება</Text>
-                <Text style={styles.settingDescription}>
-                  დაუშვით სხვებმა გამოგიგზავნონ შეტყობინებები
-                </Text>
-              </View>
-            </View>
-            <Switch
-              value={allowMessages}
-              onValueChange={setAllowMessages}
-              trackColor={{ false: "#E5E7EB", true: "#06B6D4" }}
-              thumbColor="#FFFFFF"
-            />
-          </View>
 
-          <View style={styles.settingItem}>
-            <View style={styles.settingInfo}>
-              <Ionicons name="share-outline" size={20} color="#06B6D4" />
-              <View style={styles.settingTextContainer}>
-                <Text style={styles.settingTitle}>მონაცემების გაზიარება</Text>
-                <Text style={styles.settingDescription}>
-                  დაუშვით მონაცემების გაზიარება სტატისტიკისთვის
-                </Text>
-              </View>
-            </View>
-            <Switch
-              value={shareData}
-              onValueChange={setShareData}
-              trackColor={{ false: "#E5E7EB", true: "#06B6D4" }}
-              thumbColor="#FFFFFF"
-            />
-          </View>
-        </View>
-
-        {/* Security Settings Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>უსაფრთხოება</Text>
-          <Text style={styles.sectionDescription}>
-            დამატებითი უსაფრთხოების პარამეტრები
-          </Text>
-
-          <View style={styles.settingItem}>
-            <View style={styles.settingInfo}>
-              <Ionicons name="shield-checkmark-outline" size={20} color="#06B6D4" />
-              <View style={styles.settingTextContainer}>
-                <Text style={styles.settingTitle}>ორ-ფაქტორიანი ავტორიზაცია</Text>
-                <Text style={styles.settingDescription}>
-                  დამატებითი უსაფრთხოება თქვენი ანგარიშისთვის
-                </Text>
-              </View>
-            </View>
-            <Switch
-              value={twoFactorAuth}
-              onValueChange={setTwoFactorAuth}
-              trackColor={{ false: "#E5E7EB", true: "#06B6D4" }}
-              thumbColor="#FFFFFF"
-            />
-          </View>
-
-          <View style={styles.settingItem}>
-            <View style={styles.settingInfo}>
-              <Ionicons name="notifications-outline" size={20} color="#06B6D4" />
-              <View style={styles.settingTextContainer}>
-                <Text style={styles.settingTitle}>შესვლის შეტყობინებები</Text>
-                <Text style={styles.settingDescription}>
-                  მიიღეთ შეტყობინება ახალ შესვლებზე
-                </Text>
-              </View>
-            </View>
-            <Switch
-              value={loginAlerts}
-              onValueChange={setLoginAlerts}
-              trackColor={{ false: "#E5E7EB", true: "#06B6D4" }}
-              thumbColor="#FFFFFF"
-            />
-          </View>
-        </View>
 
         {/* Danger Zone */}
-        <View style={styles.section}>
-          <Text style={styles.dangerSectionTitle}>საშიში ზონა</Text>
-
-          <TouchableOpacity
-            style={styles.dangerButton}
-            onPress={handleDeleteAccount}
-          >
-            <Ionicons name="trash-outline" size={20} color="#EF4444" />
-            <Text style={styles.dangerButtonText}>ანგარიშის წაშლა</Text>
-          </TouchableOpacity>
-        </View>
+        
       </ScrollView>
     </SafeAreaView>
   );

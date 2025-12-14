@@ -4,6 +4,7 @@ import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 import { apiService, User } from '@/lib/api';
 import { useEffect, useState } from 'react';
 import { AddDoctorForm } from './_components/add-doctor-form';
+import { AvailabilityManager } from './_components/availability-manager';
 import { DoctorDetailsModal } from './_components/doctor-details-modal';
 import { EditDoctorForm } from './_components/edit-doctor-form';
 
@@ -37,6 +38,11 @@ export default function DoctorsPage() {
   const [selectedDoctor, setSelectedDoctor] = useState<User | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
+  const [showAvailabilityManager, setShowAvailabilityManager] = useState(false);
+  const [selectedDoctorForAvailability, setSelectedDoctorForAvailability] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   useEffect(() => {
     loadDoctors();
@@ -352,17 +358,31 @@ export default function DoctorsPage() {
                       </button>
                     )}
                     {doctor.approvalStatus === 'approved' && (
-                      <button
-                        onClick={() => handleToggleTopRated(doctor.id, doctor.isTopRated || false)}
-                        disabled={loading}
-                        className={`w-full rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 ${
-                          doctor.isTopRated
-                            ? 'bg-orange-500 hover:bg-orange-600'
-                            : 'bg-blue-500 hover:bg-blue-600'
-                        }`}
-                      >
-                        {doctor.isTopRated ? '⭐ ტოპ ექიმიდან ამოღება' : '⭐ ტოპ ექიმად დამატება'}
-                      </button>
+                      <>
+                        <button
+                          onClick={() => handleToggleTopRated(doctor.id, doctor.isTopRated || false)}
+                          disabled={loading}
+                          className={`w-full rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 ${
+                            doctor.isTopRated
+                              ? 'bg-orange-500 hover:bg-orange-600'
+                              : 'bg-blue-500 hover:bg-blue-600'
+                          }`}
+                        >
+                          {doctor.isTopRated ? '⭐ ტოპ ექიმიდან ამოღება' : '⭐ ტოპ ექიმად დამატება'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedDoctorForAvailability({
+                              id: doctor.id,
+                              name: doctor.name,
+                            });
+                            setShowAvailabilityManager(true);
+                          }}
+                          className="w-full rounded-lg bg-green-500 px-4 py-2 text-sm font-medium text-white hover:bg-green-600"
+                        >
+                          📅 ხელმისაწვდომობის მართვა
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -398,6 +418,19 @@ export default function DoctorsPage() {
             }}
           />
         </div>
+      )}
+
+      {showAvailabilityManager && selectedDoctorForAvailability && (
+        <AvailabilityManager
+          doctorId={selectedDoctorForAvailability.id}
+          doctorName={selectedDoctorForAvailability.name}
+          isOpen={showAvailabilityManager}
+          onClose={() => {
+            setShowAvailabilityManager(false);
+            setSelectedDoctorForAvailability(null);
+          }}
+          onUpdate={loadDoctors}
+        />
       )}
     </>
   );

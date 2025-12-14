@@ -11,6 +11,7 @@ interface AppointmentDetails {
   patientPhone?: string;
   patientDateOfBirth?: string;
   patientGender?: string;
+  doctorId?: string;
   doctorName: string;
   doctorEmail?: string;
   doctorPhone?: string;
@@ -36,20 +37,42 @@ interface AppointmentDetailsModalProps {
   appointmentId: string | null;
   isOpen: boolean;
   onClose: () => void;
+  onReschedule?: () => void;
 }
 
 export function AppointmentDetailsModal({
   appointmentId,
   isOpen,
   onClose,
+  onReschedule,
 }: AppointmentDetailsModalProps) {
   const [appointment, setAppointment] = useState<AppointmentDetails | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showRescheduleForm, setShowRescheduleForm] = useState(false);
+  const [rescheduleDate, setRescheduleDate] = useState('');
+  const [rescheduleTime, setRescheduleTime] = useState('');
+  const [rescheduling, setRescheduling] = useState(false);
+  const [rescheduleSuccess, setRescheduleSuccess] = useState(false);
+  const [previousDate, setPreviousDate] = useState<string | null>(null);
+  const [previousTime, setPreviousTime] = useState<string | null>(null);
+  const [doctorAvailability, setDoctorAvailability] = useState<any[]>([]);
+  const [loadingAvailability, setLoadingAvailability] = useState(false);
+  const [selectedDateForSlots, setSelectedDateForSlots] = useState<string>('');
+  const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [statusUpdateSuccess, setStatusUpdateSuccess] = useState(false);
 
   useEffect(() => {
     if (isOpen && appointmentId) {
       loadAppointmentDetails();
+      setShowRescheduleForm(false);
+      setRescheduleDate('');
+      setRescheduleTime('');
+      setRescheduleSuccess(false);
+      setPreviousDate(null);
+      setPreviousTime(null);
+      setStatusUpdateSuccess(false);
     }
   }, [isOpen, appointmentId]);
 
@@ -71,6 +94,7 @@ export function AppointmentDetailsModal({
           patientPhone: data.patientId?.phone,
           patientDateOfBirth: data.patientDetails?.dateOfBirth,
           patientGender: data.patientDetails?.gender,
+          doctorId: data.doctorId?._id || data.doctorId?.id || data.doctorId,
           doctorName: data.doctorId?.name || 'ექიმი',
           doctorEmail: data.doctorId?.email,
           doctorPhone: data.doctorId?.phone,
@@ -118,6 +142,176 @@ export function AppointmentDetailsModal({
     }
   };
 
+  const loadDoctorAvailability = async () => {
+    if (!appointment || !appointment.doctorId) return;
+
+    try {
+      setLoadingAvailability(true);
+      const startDate = new Date().toISOString().split('T')[0];
+      const endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+      const response = await apiService.getDoctorAvailability(
+        appointment.doctorId,
+        startDate,
+        endDate,
+        appointment.type,
+      );
+
+      if (response.success && response.data) {
+        // Backend returns { success: true, data: [...] } where data is an array
+        const availability = Array.isArray(response.data) 
+          ? response.data 
+          : response.data.availability || [];
+        
+        console.log('Loaded availability:', availability);
+        setDoctorAvailability(availability);
+      } else {
+        console.error('Failed to load availability:', response);
+      }
+    } catch (err: any) {
+      console.error('Error loading doctor availability:', err);
+    } finally {
+      setLoadingAvailability(false);
+    }
+  };
+
+  const handleDateSelect = (date: string) => {
+    setRescheduleDate(date);
+    setSelectedDateForSlots(date);
+    
+    // Find available slots for selected date
+    const dayAvailability = doctorAvailability.find((day: any) => {
+      const dayDate = day.date || day.dateString;
+      return dayDate && new Date(dayDate).toISOString().split('T')[0] === date;
+    });
+
+    // Backend returns 'timeSlots', not 'availableSlots'
+    if (dayAvailability && dayAvailability.timeSlots && dayAvailability.timeSlots.length > 0) {
+      setAvailableTimeSlots(dayAvailability.timeSlots);
+    } else {
+      setAvailableTimeSlots([]);
+    }
+    setRescheduleTime(''); // Reset time when date changes
+  };
+
+  const handleTimeSlotSelect = (time: string) => {
+    setRescheduleTime(time);
+  };
+
+  // Get available dates from availability
+  const getAvailableDates = () => {
+    const dates: string[] = [];
+    doctorAvailability.forEach((day: any) => {
+      const dayDate = day.date || day.dateString;
+      // Backend returns 'timeSlots', not 'availableSlots'
+      if (dayDate && day.timeSlots && Array.isArray(day.timeSlots) && day.timeSlots.length > 0) {
+        const dateStr = new Date(dayDate).toISOString().split('T')[0];
+        if (!dates.includes(dateStr)) {
+          dates.push(dateStr);
+        }
+      }
+    });
+    return dates.sort();
+  };
+
+  const handleStatusChange = async (newStatus: string) => {
+    if (!appointmentId || !appointment) return;
+
+    try {
+      setUpdatingStatus(true);
+      setError(null);
+      setStatusUpdateSuccess(false);
+
+      const response = await apiService.updateAppointmentStatus(appointmentId, newStatus);
+
+      if (response.success) {
+        setStatusUpdateSuccess(true);
+        // Update local state
+        setAppointment({
+          ...appointment,
+          status: newStatus as any,
+        });
+        
+        if (onReschedule) {
+          onReschedule();
+        }
+
+        // Hide success message after 3 seconds
+        setTimeout(() => {
+          setStatusUpdateSuccess(false);
+        }, 3000);
+      } else {
+        setError(response.message || 'სტატუსის შეცვლა ვერ მოხერხდა');
+      }
+    } catch (err: any) {
+      setError(err.message || 'სტატუსის შეცვლა ვერ მოხერხდა');
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  const handleReschedule = async () => {
+    if (!appointmentId || !rescheduleDate || !rescheduleTime) {
+      setError('გთხოვთ შეიყვანოთ თარიღი და დრო');
+      return;
+    }
+
+    try {
+      setRescheduling(true);
+      setError(null);
+      setRescheduleSuccess(false);
+      
+      // Save previous date and time for comparison
+      if (appointment) {
+        setPreviousDate(appointment.appointmentDate);
+        setPreviousTime(appointment.appointmentTime);
+      }
+
+      // Debug: Log appointment ID and details
+      console.log('Rescheduling appointment:', {
+        appointmentId,
+        currentDate: appointment?.appointmentDate,
+        currentTime: appointment?.appointmentTime,
+        newDate: rescheduleDate,
+        newTime: rescheduleTime,
+        currentStatus: appointment?.status,
+      });
+
+      const response = await apiService.rescheduleAppointment(
+        appointmentId,
+        rescheduleDate,
+        rescheduleTime,
+      );
+
+      if (response.success) {
+        setShowRescheduleForm(false);
+        setRescheduleDate('');
+        setRescheduleTime('');
+        setRescheduleSuccess(true);
+        
+        // Reload appointment details to show updated info
+        await loadAppointmentDetails();
+        
+        if (onReschedule) {
+          onReschedule();
+        }
+
+        // Hide success message after 5 seconds
+        setTimeout(() => {
+          setRescheduleSuccess(false);
+          setPreviousDate(null);
+          setPreviousTime(null);
+        }, 5000);
+      } else {
+        setError(response.message || 'გადაჯავშნა ვერ მოხერხდა');
+      }
+    } catch (err: any) {
+      setError(err.message || 'გადაჯავშნა ვერ მოხერხდა');
+    } finally {
+      setRescheduling(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -152,7 +346,7 @@ export function AppointmentDetailsModal({
             <div className="flex items-center justify-center py-10">
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
             </div>
-          ) : error ? (
+          ) : error && !rescheduleSuccess ? (
             <div className="rounded-lg bg-red-50 p-4 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
               {error}
             </div>
@@ -179,6 +373,57 @@ export function AppointmentDetailsModal({
                     {appointment.paymentStatus === 'paid' && 'გადახდილი'}
                     {appointment.paymentStatus === 'failed' && 'გადახდა ვერ მოხერხდა'}
                   </span>
+                </div>
+              </div>
+
+              {/* Status Update Success Message */}
+              {statusUpdateSuccess && (
+                <div className="mb-4 rounded-lg bg-green-50 p-4 text-sm text-green-600 dark:bg-green-900/20 dark:text-green-400">
+                  <div className="flex items-center gap-2">
+                    <svg
+                      className="h-5 w-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                    <span className="font-medium">სტატუსი წარმატებით შეიცვალა!</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Status Change Section */}
+              <div className="mb-4 rounded-lg border border-stroke bg-gray-50 p-4 dark:border-dark-3 dark:bg-dark-2">
+                <h3 className="mb-3 text-lg font-semibold text-dark dark:text-white">
+                  სტატუსის შეცვლა
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {['pending', 'confirmed', 'completed', 'cancelled'].map((status) => (
+                    <button
+                      key={status}
+                      onClick={() => handleStatusChange(status)}
+                      disabled={updatingStatus || appointment.status === status}
+                      className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                        appointment.status === status
+                          ? `${getStatusColor(status)} cursor-not-allowed`
+                          : 'bg-white text-dark hover:bg-gray-100 dark:bg-dark-3 dark:text-white dark:hover:bg-dark-4'
+                      } ${
+                        updatingStatus ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
+                    >
+                      {status === 'pending' && 'მოლოდინში'}
+                      {status === 'confirmed' && 'დადასტურებული'}
+                      {status === 'completed' && 'დასრულებული'}
+                      {status === 'cancelled' && 'გაუქმებული'}
+                      {updatingStatus && appointment.status === status && '...'}
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -270,26 +515,86 @@ export function AppointmentDetailsModal({
                 </div>
               </div>
 
+              {/* Success Message */}
+              {rescheduleSuccess && (
+                <div className="mb-4 rounded-lg bg-green-50 p-4 text-sm text-green-600 dark:bg-green-900/20 dark:text-green-400">
+                  <div className="flex items-center gap-2">
+                    <svg
+                      className="h-5 w-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                    <span className="font-medium">ჯავშანი წარმატებით გადაჯავშნილია!</span>
+                  </div>
+                  {previousDate && previousTime && (
+                    <div className="mt-2 text-xs">
+                      <span className="text-dark-4 dark:text-dark-6">წინა: </span>
+                      <span className="line-through">
+                        {new Date(previousDate).toLocaleDateString('ka-GE', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                        })}{' '}
+                        {previousTime}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Error Message */}
+              {error && !rescheduleSuccess && (
+                <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
+                  {error}
+                </div>
+              )}
+
               {/* Appointment Details */}
-              <div className="rounded-lg border border-stroke bg-gray-50 p-4 dark:border-dark-3 dark:bg-dark-2">
+              <div className={`rounded-lg border p-4 dark:border-dark-3 ${
+                rescheduleSuccess 
+                  ? 'border-green-500 bg-green-50 dark:bg-green-900/10' 
+                  : 'border-stroke bg-gray-50 dark:bg-dark-2'
+              }`}>
                 <h3 className="mb-3 text-lg font-semibold text-dark dark:text-white">
                   ჯავშნის დეტალები
                 </h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="text-dark-4 dark:text-dark-6">თარიღი:</span>
-                    <span className="ml-2 font-medium text-dark dark:text-white">
+                    <span className={`ml-2 font-medium ${
+                      rescheduleSuccess 
+                        ? 'text-green-700 dark:text-green-400 font-bold' 
+                        : 'text-dark dark:text-white'
+                    }`}>
                       {new Date(appointment.appointmentDate).toLocaleDateString('ka-GE', {
                         year: 'numeric',
                         month: 'long',
                         day: 'numeric',
                       })}
+                      {rescheduleSuccess && (
+                        <span className="ml-2 text-green-600 dark:text-green-400">✓</span>
+                      )}
                     </span>
                   </div>
                   <div>
                     <span className="text-dark-4 dark:text-dark-6">დრო:</span>
-                    <span className="ml-2 font-medium text-dark dark:text-white">
+                    <span className={`ml-2 font-medium ${
+                      rescheduleSuccess 
+                        ? 'text-green-700 dark:text-green-400 font-bold' 
+                        : 'text-dark dark:text-white'
+                    }`}>
                       {appointment.appointmentTime}
+                      {rescheduleSuccess && (
+                        <span className="ml-2 text-green-600 dark:text-green-400">✓</span>
+                      )}
                     </span>
                   </div>
                   <div>
@@ -421,6 +726,179 @@ export function AppointmentDetailsModal({
                       </div>
                     )}
                   </div>
+                </div>
+              )}
+
+              {/* Reschedule Section */}
+              {appointment.status !== 'completed' && appointment.status !== 'cancelled' && (
+                <div className="rounded-lg border border-stroke bg-blue-50 p-4 dark:border-blue-900/30 dark:bg-blue-900/10">
+                  <div className="mb-4 flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-dark dark:text-white">
+                      გადაჯავშნა
+                    </h3>
+                    {!showRescheduleForm && (
+                      <button
+                        onClick={async () => {
+                          setShowRescheduleForm(true);
+                          setRescheduleDate(appointment.appointmentDate.split('T')[0]);
+                          setRescheduleTime(appointment.appointmentTime);
+                          await loadDoctorAvailability();
+                        }}
+                        className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
+                      >
+                        გადაჯავშნა
+                      </button>
+                    )}
+                  </div>
+
+                  {showRescheduleForm && (
+                    <div className="space-y-4">
+                      {loadingAvailability ? (
+                        <div className="flex items-center justify-center py-4">
+                          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+                          <span className="ml-2 text-sm text-dark-4 dark:text-dark-6">ხელმისაწვდომობის ჩატვირთვა...</span>
+                        </div>
+                      ) : (
+                        <>
+                          {/* Available Dates Calendar */}
+                          <div>
+                            <label className="mb-3 block text-sm font-medium text-dark dark:text-white">
+                              აირჩიეთ თარიღი
+                            </label>
+                            <div className="grid grid-cols-7 gap-2 rounded-lg border border-stroke bg-white p-3 dark:border-dark-3 dark:bg-gray-dark">
+                              {getAvailableDates().length === 0 ? (
+                                <div className="col-span-7 py-4 text-center text-sm text-dark-4 dark:text-dark-6">
+                                  ამ პერიოდში ხელმისაწვდომი თარიღები არ არის
+                                </div>
+                              ) : (
+                                getAvailableDates().slice(0, 14).map((date) => {
+                                  const dateObj = new Date(date);
+                                  const isSelected = rescheduleDate === date;
+                                  const isToday = date === new Date().toISOString().split('T')[0];
+                                  
+                                  return (
+                                    <button
+                                      key={date}
+                                      type="button"
+                                      onClick={() => handleDateSelect(date)}
+                                      className={`rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
+                                        isSelected
+                                          ? 'bg-primary text-white'
+                                          : 'bg-gray-100 text-dark hover:bg-gray-200 dark:bg-dark-3 dark:text-white dark:hover:bg-dark-2'
+                                      } ${isToday ? 'ring-2 ring-primary' : ''}`}
+                                    >
+                                      <div className="text-center">
+                                        <div className="text-[10px] text-dark-4 dark:text-dark-6">
+                                          {dateObj.toLocaleDateString('ka-GE', { weekday: 'short' })}
+                                        </div>
+                                        <div className="mt-1">{dateObj.getDate()}</div>
+                                        <div className="text-[10px] text-dark-4 dark:text-dark-6">
+                                          {dateObj.toLocaleDateString('ka-GE', { month: 'short' })}
+                                        </div>
+                                      </div>
+                                    </button>
+                                  );
+                                })
+                              )}
+                            </div>
+                            {getAvailableDates().length > 14 && (
+                              <p className="mt-2 text-xs text-dark-4 dark:text-dark-6">
+                                ნაჩვენებია პირველი 14 დღე. სულ: {getAvailableDates().length} ხელმისაწვდომი დღე
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Available Time Slots */}
+                          {rescheduleDate && (
+                            <div>
+                              <label className="mb-3 block text-sm font-medium text-dark dark:text-white">
+                                აირჩიეთ დრო ({new Date(rescheduleDate).toLocaleDateString('ka-GE', {
+                                  year: 'numeric',
+                                  month: 'long',
+                                  day: 'numeric',
+                                })})
+                              </label>
+                              {availableTimeSlots.length === 0 ? (
+                                <div className="rounded-lg border border-stroke bg-gray-50 p-4 text-center text-sm text-dark-4 dark:border-dark-3 dark:bg-dark-2 dark:text-dark-6">
+                                  ამ თარიღზე ხელმისაწვდომი საათები არ არის
+                                </div>
+                              ) : (
+                                <div className="grid grid-cols-4 gap-2">
+                                  {availableTimeSlots.map((time) => {
+                                    const isSelected = rescheduleTime === time;
+                                    return (
+                                      <button
+                                        key={time}
+                                        type="button"
+                                        onClick={() => handleTimeSlotSelect(time)}
+                                        className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                                          isSelected
+                                            ? 'bg-primary text-white'
+                                            : 'border border-stroke bg-white text-dark hover:bg-gray-50 dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:hover:bg-dark-3'
+                                        }`}
+                                      >
+                                        {time}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Selected Date and Time Summary */}
+                          {rescheduleDate && rescheduleTime && (
+                            <div className="rounded-lg border border-green-500 bg-green-50 p-3 dark:border-green-600 dark:bg-green-900/20">
+                              <div className="flex items-center gap-2 text-sm">
+                                <svg
+                                  className="h-5 w-5 text-green-600 dark:text-green-400"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                                  />
+                                </svg>
+                                <span className="font-medium text-green-800 dark:text-green-300">
+                                  არჩეული: {new Date(rescheduleDate).toLocaleDateString('ka-GE', {
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric',
+                                  })}{' '}
+                                  {rescheduleTime}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleReschedule}
+                          disabled={rescheduling || !rescheduleDate || !rescheduleTime}
+                          className="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          {rescheduling ? 'მიმდინარეობს...' : 'დადასტურება'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowRescheduleForm(false);
+                            setRescheduleDate('');
+                            setRescheduleTime('');
+                            setError(null);
+                          }}
+                          disabled={rescheduling}
+                          className="rounded-lg border border-stroke bg-white px-4 py-2 text-sm font-medium text-dark hover:bg-gray-50 dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:hover:bg-dark-3 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          გაუქმება
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Modal,
   ScrollView,
   StyleSheet,
@@ -36,6 +37,9 @@ export default function MedicalCabinetScreen() {
   const [chronicDiseaseText, setChronicDiseaseText] = useState<string>("");
   const [hasAllergy, setHasAllergy] = useState(false);
   const [allergyText, setAllergyText] = useState<string>("");
+  const [about, setAbout] = useState<string>("");
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [patientVisits, setPatientVisits] = useState<VisitRecord[]>([]);
   const [loadingRecords, setLoadingRecords] = useState(false);
@@ -50,6 +54,34 @@ export default function MedicalCabinetScreen() {
       loadProfile();
     }
   }, [activeTab, user?.id]);
+
+  const loadProfile = async () => {
+    try {
+      setLoadingProfile(true);
+
+      if (apiService.isMockMode()) {
+        setLoadingProfile(false);
+        return;
+      }
+
+      const response = await apiService.getProfile();
+
+      if (response.success && response.data) {
+        const profile = response.data;
+        setSelectedGender(profile.gender || "");
+        setBirthDate(profile.dateOfBirth || "");
+        setSelectedBloodGroup(profile.bloodGroup || "");
+        setHasChronicDisease(!!profile.chronicDisease);
+        setChronicDiseaseText(profile.chronicDisease || "");
+        setHasAllergy(!!profile.allergy);
+        setAllergyText(profile.allergy || "");
+      }
+    } catch (err: any) {
+      console.error("Error loading profile:", err);
+    } finally {
+      setLoadingProfile(false);
+    }
+  };
 
   const loadMedicalRecords = async () => {
     try {
@@ -178,7 +210,7 @@ export default function MedicalCabinetScreen() {
           Alert.alert("შეცდომა", "ინფორმაციის შენახვა ვერ მოხერხდა");
           return;
         }
-        setShowSuccessModal(true);
+    setShowSuccessModal(true);
       } catch (err) {
         console.error("Failed to save profile", err);
         Alert.alert("შეცდომა", "ინფორმაციის შენახვა ვერ მოხერხდა");

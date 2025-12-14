@@ -9,6 +9,7 @@ import {
   Image,
   Linking,
   Modal,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -24,7 +25,7 @@ import {
   getStatusLabel,
 } from "../../assets/data/doctorDashboard";
 import { useAuth } from "../contexts/AuthContext";
-import { apiService } from "../services/api";
+import { apiService, Clinic, ShopProduct } from "../services/api";
 
 interface Medication {
   name: string;
@@ -55,6 +56,7 @@ export default function DoctorAppointments() {
   const [filterStatus, setFilterStatus] = useState<
     "all" | "completed" | "scheduled" | "in-progress" | "cancelled"
   >("all");
+  const [filterType, setFilterType] = useState<"all" | "video" | "home-visit">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedConsultation, setSelectedConsultation] =
     useState<Consultation | null>(null);
@@ -66,14 +68,28 @@ export default function DoctorAppointments() {
   const [showFollowUpScheduleModal, setShowFollowUpScheduleModal] = useState(false);
   const [followUpAvailability, setFollowUpAvailability] = useState<any[]>([]);
   const [loadingFollowUpAvailability, setLoadingFollowUpAvailability] = useState(false);
+  
+  // Laboratory tests state
+  const [laboratoryProducts, setLaboratoryProducts] = useState<ShopProduct[]>([]);
+  const [clinics, setClinics] = useState<Clinic[]>([]);
+  const [selectedLaboratoryTests, setSelectedLaboratoryTests] = useState<{
+    productId: string;
+    productName: string;
+    clinicId?: string;
+    clinicName?: string;
+  }[]>([]);
+  const [loadingLaboratoryData, setLoadingLaboratoryData] = useState(false);
+  
   const resetAppointmentForm = () => {
     setAppointmentData(createEmptyAppointmentData());
     setForm100File(null);
+    setSelectedLaboratoryTests([]);
   };
   const [currentTime, setCurrentTime] = useState(new Date());
   const [consultations, setConsultations] = useState<Consultation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Appointment form state
   const [appointmentData, setAppointmentData] = useState(createEmptyAppointmentData);
@@ -81,33 +97,51 @@ export default function DoctorAppointments() {
     useState<DocumentPicker.DocumentPickerAsset | null>(null);
 
   // Fetch consultations from API
-  useEffect(() => {
-    const fetchConsultations = async () => {
-      try {
+  const fetchConsultations = async (isRefresh = false) => {
+    try {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
         setLoading(true);
-        setError(null);
+      }
+      setError(null);
 
-        const response = (await apiService.getDoctorDashboardAppointments(
-          100,
-        )) as {
-          success: boolean;
-          data: Consultation[];
-        };
+      const response = (await apiService.getDoctorDashboardAppointments(
+        100,
+      )) as {
+        success: boolean;
+        data: Consultation[];
+      };
 
-        if (response.success) {
-          setConsultations(response.data as any);
-        } else {
-          setError("კონსულტაციების ჩატვირთვა ვერ მოხერხდა");
-        }
-      } catch (err) {
-        console.error("Error fetching consultations:", err);
+      // Log response for debugging
+      if (__DEV__) {
+        console.log('📱 Frontend - getDoctorDashboardAppointments response:', {
+          success: response.success,
+          dataLength: response.data?.length || 0,
+          types: [...new Set(response.data?.map(c => c.type) || [])],
+        });
+      }
+
+      if (response.success) {
+        setConsultations(response.data as any);
+      } else {
         setError("კონსულტაციების ჩატვირთვა ვერ მოხერხდა");
-      } finally {
+      }
+    } catch (err) {
+      console.error("Error fetching consultations:", err);
+      setError("კონსულტაციების ჩატვირთვა ვერ მოხერხდა");
+    } finally {
+      if (isRefresh) {
+        setRefreshing(false);
+      } else {
         setLoading(false);
       }
-    };
+    }
+  };
 
+  useEffect(() => {
     fetchConsultations();
+     
   }, []);
 
   // Update current time every minute for countdown
@@ -162,10 +196,13 @@ export default function DoctorAppointments() {
   const filteredConsultations = consultations.filter((consultation) => {
     const matchesStatus =
       filterStatus === "all" || consultation.status === filterStatus;
+    const matchesType =
+      filterType === "all" || consultation.type === filterType;
     const matchesSearch = consultation.patientName
       .toLowerCase()
       .includes(searchQuery.toLowerCase());
-    return matchesStatus && matchesSearch;
+    
+    return matchesStatus && matchesType && matchesSearch;
   });
 
   // Stats
@@ -243,7 +280,7 @@ export default function DoctorAppointments() {
     setShowDetailsModal(true);
   };
 
-  const openAppointment = (consultation: Consultation) => {
+  const openAppointment = async (consultation: Consultation) => {
     setSelectedConsultation(consultation);
     const summary = consultation.consultationSummary;
     let followUpTime = "";
@@ -281,7 +318,45 @@ export default function DoctorAppointments() {
       followUpReason: consultation.followUp?.reason || "",
     });
     setForm100File(null);
+    
+    // Load existing laboratory tests if appointment has them
+    if ((consultation as any).laboratoryTests) {
+      setSelectedLaboratoryTests((consultation as any).laboratoryTests.map((test: any) => ({
+        productId: test.productId,
+        productName: test.productName,
+        clinicId: test.clinicId,
+        clinicName: test.clinicName,
+      })));
+    } else {
+      setSelectedLaboratoryTests([]);
+    }
+    
+    // Load laboratory products and clinics (available when completing appointment)
+    loadLaboratoryData();
+    
     setShowAppointmentModal(true);
+  };
+
+  const loadLaboratoryData = async () => {
+    try {
+      setLoadingLaboratoryData(true);
+      const [overviewResponse, clinicsResponse] = await Promise.all([
+        apiService.getMedicineShopOverview(),
+        apiService.getClinics(),
+      ]);
+      
+      if (overviewResponse.success) {
+        setLaboratoryProducts(overviewResponse.data.laboratoryProducts || []);
+      }
+      
+      if (clinicsResponse.success) {
+        setClinics(clinicsResponse.data.filter((c) => c.isActive));
+      }
+    } catch (err) {
+      console.error("Failed to load laboratory data:", err);
+    } finally {
+      setLoadingLaboratoryData(false);
+    }
   };
 
   const handleSaveAppointment = async () => {
@@ -343,6 +418,29 @@ export default function DoctorAppointments() {
         updateConsultationState(latestConsultation);
       }
 
+      // Save laboratory tests after status is updated to "completed"
+      // This allows doctors to assign tests when completing the appointment
+      if (selectedLaboratoryTests.length > 0) {
+        try {
+          // Filter out clinicId and clinicName as they will be selected by patient
+          const testsToSend = selectedLaboratoryTests.map((test) => ({
+            productId: test.productId,
+            productName: test.productName,
+            // clinicId and clinicName are not sent - patient will select clinic when booking
+          }));
+          await apiService.assignLaboratoryTests(
+            selectedConsultation.id,
+            testsToSend
+          );
+        } catch (err) {
+          console.error("Failed to assign laboratory tests:", err);
+          Alert.alert(
+            "შეცდომა",
+            "ლაბორატორიული კვლევების დამატება ვერ მოხერხდა"
+          );
+        }
+      }
+
       if (
         appointmentData.followUpRequired &&
         appointmentData.followUpDate.trim() &&
@@ -368,7 +466,8 @@ export default function DoctorAppointments() {
                 ? appointmentData.followUpVisitAddress.trim()
                 : undefined,
             reason: appointmentData.followUpReason.trim() || undefined,
-          }
+          },
+          true // isDoctor = true for doctor side
         );
 
         if (followUpResponse.success && followUpResponse.data) {
@@ -504,7 +603,17 @@ export default function DoctorAppointments() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => fetchConsultations(true)}
+            colors={["#06B6D4"]}
+            tintColor="#06B6D4"
+          />
+        }
+      >
         {/* Header */}
         <View style={styles.header}>
           <View>
@@ -627,35 +736,79 @@ export default function DoctorAppointments() {
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[
-              styles.statCard,
-              filterStatus === "in-progress" && styles.statCardActive,
-            ]}
-            onPress={() => setFilterStatus("in-progress")}
-          >
-            <Ionicons
-              name="time"
-              size={24}
-              color={filterStatus === "in-progress" ? "#F59E0B" : "#6B7280"}
-            />
-            <Text
+          
+        </View>
+
+        {/* Type Filter */}
+        <View style={styles.typeFilterSection}>
+          <Text style={styles.typeFilterTitle}>კონსულტაციის ტიპი</Text>
+          <View style={styles.typeFilterRow}>
+            <TouchableOpacity
               style={[
-                styles.statValue,
-                filterStatus === "in-progress" && styles.statValueActive,
+                styles.typeFilterCard,
+                filterType === "all" && styles.typeFilterCardActive,
               ]}
+              onPress={() => setFilterType("all")}
             >
-              {stats.inProgress}
-            </Text>
-            <Text
+              <Ionicons
+                name="list"
+                size={20}
+                color={filterType === "all" ? "#FFFFFF" : "#6B7280"}
+              />
+              <Text
+                style={[
+                  styles.typeFilterText,
+                  filterType === "all" && styles.typeFilterTextActive,
+                ]}
+              >
+                ყველა
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
               style={[
-                styles.statLabel,
-                filterStatus === "in-progress" && styles.statLabelActive,
+                styles.typeFilterCard,
+                filterType === "video" && styles.typeFilterCardActiveVideo,
               ]}
+              onPress={() => setFilterType("video")}
             >
-              მიმდინარე
-            </Text>
-          </TouchableOpacity>
+              <Ionicons
+                name="videocam-outline"
+                size={20}
+                color={filterType === "video" ? "#FFFFFF" : "#2563EB"}
+              />
+              <Text
+                style={[
+                  styles.typeFilterText,
+                  filterType === "video" && styles.typeFilterTextActive,
+                ]}
+              >
+                ვიდეო
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.typeFilterCard,
+                filterType === "home-visit" && styles.typeFilterCardActiveHome,
+              ]}
+              onPress={() => setFilterType("home-visit")}
+            >
+              <Ionicons
+                name="home-outline"
+                size={20}
+                color={filterType === "home-visit" ? "#FFFFFF" : "#16A34A"}
+              />
+              <Text
+                style={[
+                  styles.typeFilterText,
+                  filterType === "home-visit" && styles.typeFilterTextActive,
+                ]}
+              >
+                ბინაზე
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Consultations List */}
@@ -1545,6 +1698,82 @@ export default function DoctorAppointments() {
                 />
               </View>
 
+              {/* Laboratory Tests - Available when completing appointment */}
+              {(selectedConsultation?.status === "completed" ||
+                selectedConsultation?.status === "scheduled" ||
+                selectedConsultation?.status === "in-progress") && (
+                <View style={styles.formSection}>
+                  <View style={styles.medicationsHeader}>
+                    <Text style={styles.formLabel}>ლაბორატორიული კვლევები</Text>
+                    <TouchableOpacity
+                      style={styles.addMedicationButton}
+                      onPress={() => {
+                        // Show product selection modal (clinic will be selected by patient)
+                        Alert.alert(
+                          "პროდუქტის არჩევა",
+                          "აირჩიეთ პროდუქტი",
+                          [
+                            ...laboratoryProducts.map((product) => ({
+                              text: product.name,
+                              onPress: () => {
+                                setSelectedLaboratoryTests([
+                                  ...selectedLaboratoryTests,
+                                  {
+                                    productId: product.id,
+                                    productName: product.name,
+                                    // clinicId and clinicName will be selected by patient when booking
+                                  },
+                                ]);
+                              },
+                            })),
+                            { text: "გაუქმება", style: "cancel" },
+                          ]
+                        );
+                      }}
+                    >
+                      <Ionicons name="add-circle" size={20} color="#06B6D4" />
+                      <Text style={styles.addMedicationText}>დამატება</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {selectedLaboratoryTests.map((test, index) => (
+                    <View key={index} style={styles.medicationCard}>
+                      <View style={styles.medicationCardHeader}>
+                        <Ionicons
+                          name="flask-outline"
+                          size={20}
+                          color="#06B6D4"
+                        />
+                        <View style={{ flex: 1, marginLeft: 8 }}>
+                          <Text style={styles.medicationNameInput}>
+                            {test.productName}
+                          </Text>
+                          <Text style={styles.clinicNameText}>
+                            კლინიკა აირჩევა პაციენტის მიერ დაჯავშნისას
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          onPress={() => {
+                            setSelectedLaboratoryTests(
+                              selectedLaboratoryTests.filter((_, i) => i !== index)
+                            );
+                          }}
+                        >
+                          <Ionicons name="close-circle" size={20} color="#EF4444" />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ))}
+                  
+                  {loadingLaboratoryData && (
+                    <View style={styles.loadingContainer}>
+                      <ActivityIndicator size="small" color="#06B6D4" />
+                      <Text style={styles.loadingText}>იტვირთება...</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+
               <View style={styles.formSection}>
                 <Text style={styles.formLabel}>ფორმა 100 ფაილი</Text>
                 {selectedConsultation?.form100?.pdfUrl ? (
@@ -1832,6 +2061,58 @@ const styles = StyleSheet.create({
   },
   statLabelActive: {
     color: "#06B6D4",
+  },
+  typeFilterSection: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+  },
+  typeFilterTitle: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#1F2937",
+    marginBottom: 12,
+  },
+  typeFilterRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  typeFilterCard: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  typeFilterCardActive: {
+    backgroundColor: "#6B7280",
+    borderColor: "#6B7280",
+  },
+  typeFilterCardActiveVideo: {
+    backgroundColor: "#0EA5E9",
+    borderColor: "#0EA5E9",
+  },
+  typeFilterCardActiveHome: {
+    backgroundColor: "#22C55E",
+    borderColor: "#22C55E",
+  },
+  typeFilterText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#6B7280",
+  },
+  typeFilterTextActive: {
+    color: "#FFFFFF",
   },
   listSection: {
     paddingHorizontal: 20,
@@ -2483,6 +2764,24 @@ const styles = StyleSheet.create({
     borderColor: "#E5E7EB",
     borderRadius: 8,
     padding: 10,
+  },
+  clinicNameText: {
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+    marginTop: 4,
+  },
+  loadingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 12,
+    gap: 8,
+  },
+  loadingText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
   },
   medicationDetails: {
     gap: 8,

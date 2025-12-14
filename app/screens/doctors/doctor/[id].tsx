@@ -56,10 +56,12 @@ const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
 };
 
 const DoctorDetail = () => {
-  const { id, appointmentType, lockAppointmentType } = useLocalSearchParams<{
+  const { id, appointmentType, lockAppointmentType, followUpAppointmentId, followUp } = useLocalSearchParams<{
     id: string;
     appointmentType?: string;
     lockAppointmentType?: string;
+    followUpAppointmentId?: string;
+    followUp?: string;
   }>();
   const [doctor, setDoctor] = useState<any>(null);
   console.log('🏥 Frontend doctor object:', doctor);
@@ -75,6 +77,13 @@ const DoctorDetail = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  // Auto-open scheduler if this is a follow-up appointment
+  useEffect(() => {
+    if (followUp === 'true' && followUpAppointmentId && doctor) {
+      setShowAppointmentScheduler(true);
+    }
+  }, [followUp, followUpAppointmentId, doctor]);
+
   const loadDoctor = async () => {
     try {
       setLoading(true);
@@ -89,8 +98,14 @@ const DoctorDetail = () => {
       const response = await apiService.getDoctorById(id as string);
 
       if (response.success && response.data) {
+        console.log('🏥 Doctor Detail - API Response:', JSON.stringify(response.data, null, 2));
+        console.log('🏥 Doctor Detail - Availability data:', JSON.stringify(response.data.availability, null, 2));
+        
         const apiBaseUrl = apiService.getBaseURL();
         const mappedDoctor = mapDoctorFromAPI(response.data, apiBaseUrl);
+        
+        console.log('🏥 Doctor Detail - Mapped doctor availability:', JSON.stringify(mappedDoctor.availability, null, 2));
+        
         setDoctor(mappedDoctor);
       } else {
         setDoctor(null);
@@ -145,7 +160,9 @@ const DoctorDetail = () => {
             <Ionicons name="arrow-back" size={24} color="#0F172A" />
           </TouchableOpacity>
           <View style={styles.schedulerHeaderInfo}>
-            <Text style={styles.schedulerTitle}>ჯავშნის გაკეთება</Text>
+            <Text style={styles.schedulerTitle}>
+              {followUp === 'true' ? 'განმეორებითი ვიზიტის დაჯავშნა' : 'ჯავშნის გაკეთება'}
+            </Text>
             <Text style={styles.schedulerSubtitle}>{doctor.name}</Text>
           </View>
           <View style={{ width: 36 }} />
@@ -166,6 +183,8 @@ const DoctorDetail = () => {
                 (appointmentType as "video" | "home-visit") || "video"
               }
               lockMode={lockAppointmentType === "true"}
+              followUpAppointmentId={followUpAppointmentId}
+              isFollowUp={followUp === 'true'}
             />
           </View>
         </ScrollView>
@@ -204,6 +223,13 @@ const DoctorDetail = () => {
       >
         {/* Basic Information */}
         <View style={styles.basicInfo}>
+          {/* Rating above name */}
+          <View style={styles.ratingContainer}>
+            <Ionicons name="star" size={14} color="#FACC15" />
+            <Text style={styles.ratingText}>
+              {doctor.rating ? doctor.rating.toFixed(1) : "0.0"}
+            </Text>
+          </View>
           <Text style={styles.doctorName}>{doctor.name}</Text>
           <Text style={styles.specialty}>{doctor.specialization}</Text>
           <Text style={styles.degrees}>{doctor.degrees}</Text>
@@ -345,6 +371,17 @@ const styles = StyleSheet.create({
   basicInfo: {
     alignItems: "center",
     marginBottom: 20,
+  },
+  ratingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+    gap: 4,
+  },
+  ratingText: {
+    fontSize: 13,
+    fontFamily: "Poppins-SemiBold",
+    color: "#666666",
   },
   doctorName: {
     fontSize: 24,

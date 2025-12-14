@@ -7,6 +7,8 @@ export interface CartItem {
   weight: string;
   quantity: number;
   image?: string;
+  clinic?: string; // Clinic name for laboratory products
+  clinicId?: string; // Clinic ID for laboratory products
 }
 
 interface CartContextType {

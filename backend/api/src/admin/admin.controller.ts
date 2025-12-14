@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
@@ -8,19 +9,62 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { Roles, RolesGuard } from 'src/auth/guards/roles.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { ApprovalStatus } from '../schemas/user.schema';
+import { UpdateAvailabilityDto } from '../doctors/dto/update-availability.dto';
+import { ApprovalStatus, UserRole } from '../schemas/user.schema';
 import { AdminService } from './admin.service';
+import { CreateUserDto } from './dto/create-user.dto';
 import { GetUsersDto } from './dto/get-users.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 @Controller('admin')
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
   @Get('users')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   async getUsers(@Query() query: GetUsersDto) {
     return this.adminService.getUsers(query);
+  }
+
+  @Get('users/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  async getUserById(@Param('id') userId: string) {
+    return this.adminService.getUserById(userId);
+  }
+
+  @Post('users')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  async createUser(@Body() createUserDto: CreateUserDto) {
+    return this.adminService.createUser(createUserDto);
+  }
+
+  @Put('users/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  async updateUser(
+    @Param('id') userId: string,
+    @Body() updateUserDto: UpdateUserDto,
+  ) {
+    return this.adminService.updateUser(userId, updateUserDto);
+  }
+
+  @Delete('users/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  async deleteUser(@Param('id') userId: string) {
+    return this.adminService.deleteUser(userId);
+  }
+
+  @Delete('users/:id/hard')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  async hardDeleteUser(@Param('id') userId: string) {
+    return this.adminService.hardDeleteUser(userId);
   }
 
   @Get('stats')
@@ -78,6 +122,18 @@ export class AdminController {
       doctorId,
       body.approvalStatus,
       body.isActive,
+    );
+  }
+
+  @Put('doctors/:id/availability')
+  @UseGuards(JwtAuthGuard)
+  async updateDoctorAvailability(
+    @Param('id') doctorId: string,
+    @Body() updateAvailabilityDto: UpdateAvailabilityDto,
+  ) {
+    return this.adminService.updateDoctorAvailability(
+      doctorId,
+      updateAvailabilityDto.availability,
     );
   }
 }

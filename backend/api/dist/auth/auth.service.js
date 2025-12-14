@@ -65,6 +65,9 @@ let AuthService = class AuthService {
         if (existingUser) {
             throw new common_1.ConflictException('User with this email already exists');
         }
+        if (role === user_schema_1.UserRole.DOCTOR && !registerDto.profileImage) {
+            throw new common_1.BadRequestException('Profile image is required for doctors');
+        }
         const hashedPassword = await bcrypt.hash(password, 10);
         const isDoctor = role === user_schema_1.UserRole.DOCTOR;
         const dateOfBirthDate = dateOfBirth ? new Date(dateOfBirth) : undefined;

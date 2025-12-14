@@ -276,7 +276,22 @@ const ProductCard = ({ product }: { product: ShopProduct }) => {
               </Text>
             )}
           </View>
-          <TouchableOpacity style={styles.addButton}>
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() =>
+              router.push({
+                pathname: "/screens/lab/select-clinic",
+                params: {
+                  productId: product.id,
+                  productName: product.name,
+                  productPrice: product.price?.toString() || "0",
+                  productImage: product.imageUrl,
+                  productDescription: product.description,
+                },
+              })
+            }
+            activeOpacity={0.8}
+          >
             <Ionicons name="add" size={20} color="#FFFFFF" />
           </TouchableOpacity>
         </View>

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   UnauthorizedException,
@@ -35,6 +36,11 @@ export class AuthService {
     const existingUser = await this.userModel.findOne({ email });
     if (existingUser) {
       throw new ConflictException('User with this email already exists');
+    }
+
+    // Validate profile image for doctors
+    if (role === UserRole.DOCTOR && !registerDto.profileImage) {
+      throw new BadRequestException('Profile image is required for doctors');
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);

@@ -55,6 +55,10 @@ export class UpdateProfileDto {
   @IsOptional()
   address?: AddressDto;
 
+  @IsString()
+  @IsOptional()
+  profileImage?: string;
+
   // Doctor specific fields
   @IsString()
   @IsOptional()
@@ -86,4 +90,3 @@ export class UpdateProfileDto {
   @IsOptional()
   location?: string;
 }
-

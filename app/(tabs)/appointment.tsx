@@ -107,8 +107,16 @@ const mapAppointmentFromAPI = (appointment: any, apiBaseUrl: string): PatientApp
   }
 
   // Format date from ISO to YYYY-MM-DD
+  // Use UTC methods to preserve the date as stored in backend (avoid timezone shift)
   const appointmentDate = appointment.appointmentDate
-    ? new Date(appointment.appointmentDate).toISOString().split("T")[0]
+    ? (() => {
+        const date = new Date(appointment.appointmentDate);
+        // Use UTC methods to get the date as stored, not converted to local timezone
+        const year = date.getUTCFullYear();
+        const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(date.getUTCDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      })()
     : "";
 
   // Map status
@@ -255,21 +263,46 @@ const Appointment = () => {
       return false;
     }
 
+    // Exclude cancelled appointments
+    if (appointment.status === "cancelled") {
+      return false;
+    }
+
+    // Exclude completed appointments - they should go to history
+    if (appointment.status === "completed") {
+      return false;
+    }
+
+    // Get today's date in local timezone (start of day)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    let appointmentDateTime = new Date(
-      `${appointment.date}T${appointment.time || "00:00"}`
-    );
-    if (Number.isNaN(appointmentDateTime.getTime())) {
-      appointmentDateTime = new Date(appointment.date);
+    // Parse appointment date and time
+    // appointment.date is in YYYY-MM-DD format (from backend UTC converted to local)
+    // appointment.time is in HH:MM format
+    let appointmentDateTime: Date;
+    
+    if (appointment.time) {
+      // Create date from YYYY-MM-DD and HH:MM in local timezone
+      const [year, month, day] = appointment.date.split('-').map(Number);
+      const [hours, minutes] = appointment.time.split(':').map(Number);
+      appointmentDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
+    } else {
+      // If no time, use date only
+      const [year, month, day] = appointment.date.split('-').map(Number);
+      appointmentDateTime = new Date(year, month - 1, day, 0, 0, 0, 0);
     }
 
     if (Number.isNaN(appointmentDateTime.getTime())) {
       return false;
     }
 
-    return appointmentDateTime.getTime() >= today.getTime();
+    // Show appointments from today onwards (including today)
+    // Compare dates only (ignore time for date comparison)
+    const appointmentDateOnly = new Date(appointmentDateTime);
+    appointmentDateOnly.setHours(0, 0, 0, 0);
+    
+    return appointmentDateOnly.getTime() >= today.getTime();
   };
 
   const upcomingAppointments = appointments.filter(isUpcomingAppointment);
@@ -525,7 +558,7 @@ const Appointment = () => {
             <Text style={styles.sectionTitle}>
               {filteredAppointments.length} ჯავშანი
             </Text>
-            <TouchableOpacity style={styles.sortButton}>
+            {/* <TouchableOpacity style={styles.sortButton}>
               <Ionicons name="funnel-outline" size={18} color="#6B7280" />
               <Text
                 style={styles.sortText}
@@ -533,7 +566,7 @@ const Appointment = () => {
               >
                 ფილტრი
               </Text>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
           </View>
 
           {filteredAppointments.length === 0 ? (

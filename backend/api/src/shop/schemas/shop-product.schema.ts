@@ -12,6 +12,9 @@ export class ShopProduct {
   @Prop({ required: true, trim: true })
   name: string;
 
+  @Prop({ trim: true, unique: true, sparse: true })
+  icdCode?: string;
+
   @Prop({ trim: true })
   description?: string;
 
@@ -57,6 +60,9 @@ export class ShopProduct {
 
   @Prop({ type: Object, default: {} })
   metadata?: Record<string, any>;
+
+  @Prop({ trim: true })
+  clinic?: string;
 }
 
 export type ShopProductDocument = ShopProduct & Document;

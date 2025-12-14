@@ -1,6 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
+import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
@@ -8,26 +10,107 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import {
-  doctorStatistics,
-  monthlyRevenue,
-  patientVisitHistory,
-} from "../../assets/data/doctorDashboard";
+import { apiService } from "../services/api";
+
+interface DashboardStats {
+  earnings: {
+    paid: number;
+    pending: number;
+    thisMonth: number;
+    lastMonth: number;
+  };
+  appointments: {
+    completed: number;
+    inProgress: number;
+    uncompleted: number;
+    total: number;
+  };
+  patients: {
+    total: number;
+    new: number;
+    returning: number;
+  };
+  visits: {
+    today: number;
+    thisWeek: number;
+    thisMonth: number;
+    total: number;
+  };
+}
 
 export default function RevenueDetails() {
   const router = useRouter();
-  const stats = doctorStatistics;
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
+
+  const fetchStats = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await apiService.getDoctorDashboardStats();
+
+      if (response.success && response.data) {
+        setStats(response.data as DashboardStats);
+      } else {
+        setError("სტატისტიკის ჩატვირთვა ვერ მოხერხდა");
+      }
+    } catch (err) {
+      console.error("Error fetching stats:", err);
+      setError("სტატისტიკის ჩატვირთვა ვერ მოხერხდა");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#06B6D4" />
+          <Text style={styles.loadingText}>მონაცემების ჩატვირთვა...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error || !stats) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle" size={48} color="#EF4444" />
+          <Text style={styles.errorText}>
+            {error || "სტატისტიკის ჩატვირთვა ვერ მოხერხდა"}
+          </Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={fetchStats}
+          >
+            <Text style={styles.retryButtonText}>ხელახლა ცდა</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   // Calculate percentages
   const revenueChange =
     stats.earnings.thisMonth > stats.earnings.lastMonth ? "up" : "down";
-  const revenueChangePercent = Math.abs(
-    Math.round(
-      ((stats.earnings.thisMonth - stats.earnings.lastMonth) /
-        stats.earnings.lastMonth) *
-        100
-    )
-  );
+  const revenueChangePercent =
+    stats.earnings.lastMonth > 0
+      ? Math.abs(
+          Math.round(
+            ((stats.earnings.thisMonth - stats.earnings.lastMonth) /
+              stats.earnings.lastMonth) *
+              100
+          )
+        )
+      : 0;
 
   // Calculate total revenue
   const totalRevenue = stats.earnings.paid + stats.earnings.pending;
@@ -55,7 +138,7 @@ export default function RevenueDetails() {
               <View>
                 <Text style={styles.revenueLabel}>მიმდინარე თვე</Text>
                 <Text style={styles.revenueValue}>
-                  ${stats.earnings.thisMonth.toLocaleString()}
+                  ₾{stats.earnings.thisMonth.toLocaleString()}
                 </Text>
               </View>
               <View
@@ -90,7 +173,7 @@ export default function RevenueDetails() {
                 <View>
                   <Text style={styles.revenueItemLabel}>გადახდილი</Text>
                   <Text style={styles.revenueItemValue}>
-                    ${stats.earnings.paid.toLocaleString()}
+                    ₾{stats.earnings.paid.toLocaleString()}
                   </Text>
                 </View>
               </View>
@@ -108,7 +191,7 @@ export default function RevenueDetails() {
                 <Ionicons name="checkmark-circle" size={24} color="#10B981" />
               </View>
               <Text style={styles.breakdownValue}>
-                ${stats.earnings.paid.toLocaleString()}
+                ₾{stats.earnings.paid.toLocaleString()}
               </Text>
               <Text style={styles.breakdownLabel}>გადახდილი</Text>
               <Text style={styles.breakdownPercentage}>
@@ -120,7 +203,7 @@ export default function RevenueDetails() {
                 <Ionicons name="time" size={24} color="#F59E0B" />
               </View>
               <Text style={styles.breakdownValue}>
-                ${stats.earnings.pending.toLocaleString()}
+                ₾{stats.earnings.pending.toLocaleString()}
               </Text>
               <Text style={styles.breakdownLabel}>მოსალოდნელი</Text>
               <Text style={styles.breakdownPercentage}>
@@ -134,61 +217,44 @@ export default function RevenueDetails() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>ყოველთვიური შემოსავალი</Text>
           <View style={styles.historyCard}>
-            {monthlyRevenue.slice(-6).map((month, index) => (
-              <View key={month.month} style={styles.historyItem}>
-                <View style={styles.historyInfo}>
-                  <Text style={styles.historyMonth}>{month.month}</Text>
-                  <Text style={styles.historyConsultations}>
-                    {month.consultations} კონსულტაცია
-                  </Text>
-                </View>
-                <Text style={styles.historyRevenue}>
-                  ${month.revenue.toLocaleString()}
-                </Text>
-                <View
-                  style={[
-                    styles.historyBar,
-                    {
-                      width: `${
-                        (month.revenue /
-                          Math.max(...monthlyRevenue.map((m) => m.revenue))) *
-                        100
-                      }%`,
-                    },
-                  ]}
-                />
-              </View>
-            ))}
+            <View style={styles.emptyState}>
+              <Ionicons name="calendar-outline" size={48} color="#D1D5DB" />
+              <Text style={styles.emptyStateText}>
+                ყოველთვიური ისტორია ჯერ არ არის ხელმისაწვდომი
+              </Text>
+            </View>
           </View>
         </View>
 
         {/* Top Patients by Revenue */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>
-            ტოპ პაციენტები შემოსავლის მიხედვით
+            პაციენტების სტატისტიკა
           </Text>
           <View style={styles.patientsCard}>
-            {patientVisitHistory
-              .sort((a, b) => b.totalSpent - a.totalSpent)
-              .slice(0, 5)
-              .map((patient, index) => (
-                <View key={patient.patientId} style={styles.patientItem}>
-                  <View style={styles.patientRank}>
-                    <Text style={styles.patientRankText}>#{index + 1}</Text>
-                  </View>
-                  <View style={styles.patientInfo}>
-                    <Text style={styles.patientName}>
-                      {patient.patientName}
-                    </Text>
-                    <Text style={styles.patientVisits}>
-                      {patient.totalVisits} ვიზიტი
-                    </Text>
-                  </View>
-                  <Text style={styles.patientRevenue}>
-                    ${patient.totalSpent.toLocaleString()}
-                  </Text>
-                </View>
-              ))}
+            <View style={styles.patientStatsGrid}>
+              <View style={styles.patientStatItem}>
+                <Ionicons name="people" size={24} color="#06B6D4" />
+                <Text style={styles.patientStatValue}>
+                  {stats.patients.total}
+                </Text>
+                <Text style={styles.patientStatLabel}>სულ პაციენტები</Text>
+              </View>
+              <View style={styles.patientStatItem}>
+                <Ionicons name="person-add" size={24} color="#10B981" />
+                <Text style={styles.patientStatValue}>
+                  {stats.patients.new}
+                </Text>
+                <Text style={styles.patientStatLabel}>ახალი</Text>
+              </View>
+              <View style={styles.patientStatItem}>
+                <Ionicons name="repeat" size={24} color="#F59E0B" />
+                <Text style={styles.patientStatValue}>
+                  {stats.patients.returning}
+                </Text>
+                <Text style={styles.patientStatLabel}>განმეორებითი</Text>
+              </View>
+            </View>
           </View>
         </View>
 
@@ -199,48 +265,32 @@ export default function RevenueDetails() {
             <View style={styles.statCard}>
               <Ionicons name="trending-up" size={32} color="#10B981" />
               <Text style={styles.statValue}>
-                $
-                {Math.round(
-                  monthlyRevenue.reduce(
-                    (sum, month) => sum + month.revenue,
-                    0
-                  ) / monthlyRevenue.length
-                ).toLocaleString()}
+                ₾{stats.earnings.thisMonth.toLocaleString()}
               </Text>
-              <Text style={styles.statLabel}>საშუალო თვიური</Text>
+              <Text style={styles.statLabel}>მიმდინარე თვე</Text>
             </View>
             <View style={styles.statCard}>
               <Ionicons name="calendar" size={32} color="#06B6D4" />
               <Text style={styles.statValue}>
-                {Math.round(
-                  monthlyRevenue.reduce(
-                    (sum, month) => sum + month.consultations,
-                    0
-                  ) / monthlyRevenue.length
-                )}
+                {stats.visits.thisMonth}
               </Text>
-              <Text style={styles.statLabel}>საშუალო კონსულტაცია</Text>
+              <Text style={styles.statLabel}>ამ თვის ვიზიტები</Text>
             </View>
             <View style={styles.statCard}>
               <Ionicons name="cash" size={32} color="#F59E0B" />
               <Text style={styles.statValue}>
-                $
-                {Math.round(
-                  monthlyRevenue.reduce(
-                    (sum, month) => sum + month.revenue,
-                    0
-                  ) /
-                    monthlyRevenue.reduce(
-                      (sum, month) => sum + month.consultations,
-                      0
-                    )
-                )}
+                ₾
+                {stats.appointments.total > 0
+                  ? Math.round(
+                      totalRevenue / stats.appointments.total
+                    ).toLocaleString()
+                  : 0}
               </Text>
               <Text style={styles.statLabel}>საშუალო ღირებულება</Text>
             </View>
             <View style={styles.statCard}>
               <Ionicons name="people" size={32} color="#8B5CF6" />
-              <Text style={styles.statValue}>{patientVisitHistory.length}</Text>
+              <Text style={styles.statValue}>{stats.patients.total}</Text>
               <Text style={styles.statLabel}>სულ პაციენტები</Text>
             </View>
           </View>
@@ -540,6 +590,79 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   statLabel: {
+    fontSize: 12,
+    fontFamily: "Poppins-Medium",
+    color: "#6B7280",
+    textAlign: "center",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  errorText: {
+    marginTop: 16,
+    fontSize: 16,
+    fontFamily: "Poppins-Medium",
+    color: "#EF4444",
+    textAlign: "center",
+  },
+  retryButton: {
+    marginTop: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    backgroundColor: "#06B6D4",
+    borderRadius: 12,
+  },
+  retryButtonText: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#FFFFFF",
+  },
+  emptyState: {
+    padding: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyStateText: {
+    marginTop: 12,
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+    textAlign: "center",
+  },
+  patientStatsGrid: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  patientStatItem: {
+    flex: 1,
+    alignItems: "center",
+    padding: 16,
+    backgroundColor: "#F9FAFB",
+    borderRadius: 12,
+  },
+  patientStatValue: {
+    fontSize: 20,
+    fontFamily: "Poppins-Bold",
+    color: "#1F2937",
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  patientStatLabel: {
     fontSize: 12,
     fontFamily: "Poppins-Medium",
     color: "#6B7280",

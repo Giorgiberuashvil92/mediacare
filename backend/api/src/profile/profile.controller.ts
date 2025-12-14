@@ -13,6 +13,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UploadService } from '../upload/upload.service';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ProfileService } from './profile.service';
 
@@ -52,5 +53,13 @@ export class ProfileController {
 
     // Update user profile image
     return this.profileService.updateProfileImage(user.sub, filePath);
+  }
+
+  @Put('password')
+  async changePassword(
+    @CurrentUser() user: { sub: string },
+    @Body() changePasswordDto: ChangePasswordDto,
+  ) {
+    return this.profileService.changePassword(user.sub, changePasswordDto);
   }
 }

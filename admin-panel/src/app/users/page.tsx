@@ -3,6 +3,7 @@
 import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 import { apiService, User } from '@/lib/api';
 import { useEffect, useState } from 'react';
+import UserFormModal from './_components/user-form-modal';
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -15,6 +16,10 @@ export default function UsersPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const limit = 10;
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
 
   useEffect(() => {
     loadUsers();
@@ -73,6 +78,26 @@ export default function UsersPage() {
     setCurrentPage(1);
   };
 
+  const handleDeleteUser = async (userId: string) => {
+    if (!confirm('დარწმუნებული ხართ რომ გსურთ ამ მომხმარებლის წაშლა?')) {
+      return;
+    }
+
+    setDeletingUserId(userId);
+    try {
+      await apiService.deleteUser(userId);
+      await loadUsers();
+    } catch (err: any) {
+      setError(err.message || 'შეცდომა მოხდა წაშლისას');
+    } finally {
+      setDeletingUserId(null);
+    }
+  };
+
+  const handleModalSuccess = () => {
+    loadUsers();
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-10">
@@ -91,6 +116,12 @@ export default function UsersPage() {
             <h2 className="text-2xl font-bold text-dark dark:text-white">
               მომხმარებლების მართვა
             </h2>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="rounded-lg bg-primary px-4 py-2 text-white transition hover:bg-primary/90"
+            >
+              + ახალი მომხმარებელი
+            </button>
           </div>
 
           {error && (
@@ -168,12 +199,15 @@ export default function UsersPage() {
                   <th className="p-4 text-left font-medium text-dark dark:text-white">
                     შექმნის თარიღი
                   </th>
+                  <th className="p-4 text-left font-medium text-dark dark:text-white">
+                    მოქმედებები
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={5} className="p-8 text-center">
+                    <td colSpan={6} className="p-8 text-center">
                       <div className="flex items-center justify-center">
                         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
                       </div>
@@ -181,7 +215,7 @@ export default function UsersPage() {
                   </tr>
                 ) : users.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="p-4 text-center text-dark-4">
+                    <td colSpan={6} className="p-4 text-center text-dark-4">
                       მომხმარებლები არ მოიძებნა
                     </td>
                   </tr>
@@ -223,6 +257,26 @@ export default function UsersPage() {
                         {user.createdAt
                           ? new Date(user.createdAt).toLocaleDateString('ka-GE')
                           : '-'}
+                      </td>
+                      <td className="p-4">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              setSelectedUser(user);
+                              setShowEditModal(true);
+                            }}
+                            className="rounded-lg bg-primary/10 px-3 py-1 text-xs font-medium text-primary transition hover:bg-primary/20"
+                          >
+                            რედაქტირება
+                          </button>
+                          <button
+                            onClick={() => handleDeleteUser(user.id)}
+                            disabled={deletingUserId === user.id}
+                            className="rounded-lg bg-danger/10 px-3 py-1 text-xs font-medium text-danger transition hover:bg-danger/20 disabled:opacity-50"
+                          >
+                            {deletingUserId === user.id ? 'წაშლა...' : 'წაშლა'}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -285,6 +339,26 @@ export default function UsersPage() {
           )}
         </div>
       </div>
+
+      {/* Create Modal */}
+      <UserFormModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSuccess={handleModalSuccess}
+        mode="create"
+      />
+
+      {/* Edit Modal */}
+      <UserFormModal
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setSelectedUser(null);
+        }}
+        onSuccess={handleModalSuccess}
+        user={selectedUser}
+        mode="edit"
+      />
     </>
   );
 }

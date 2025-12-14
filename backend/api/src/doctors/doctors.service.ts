@@ -92,21 +92,6 @@ export class DoctorsService {
       cancelled: 'cancelled',
     };
 
-    const determineType = () => {
-      const notes = apt.notes?.toLowerCase() || '';
-      const problem = apt.patientDetails?.problem?.toLowerCase() || '';
-
-      if (notes.includes('emergency') || problem.includes('emergency')) {
-        return 'emergency';
-      }
-
-      if (notes.includes('followup') || notes.includes('follow-up')) {
-        return 'followup';
-      }
-
-      return 'consultation';
-    };
-
     const consultationSummary = apt.consultationSummary || {};
     const followUp = apt.followUp || { required: false };
 
@@ -121,10 +106,29 @@ export class DoctorsService {
             new Date(apt.patientDetails.dateOfBirth).getFullYear()
           : 0),
       date: apt.appointmentDate
-        ? new Date(apt.appointmentDate).toISOString().split('T')[0]
+        ? (() => {
+            const date = new Date(apt.appointmentDate);
+            // Use local methods to match admin panel display (which uses toLocaleDateString)
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const formattedDate = `${year}-${month}-${day}`;
+            console.log('📅 formatDashboardAppointment - Date formatting:', {
+              original: apt.appointmentDate,
+              dateObject: date.toISOString(),
+              formatted: formattedDate,
+              localYear: year,
+              localMonth: month,
+              localDay: day,
+              utcYear: date.getUTCFullYear(),
+              utcMonth: String(date.getUTCMonth() + 1).padStart(2, '0'),
+              utcDay: String(date.getUTCDate()).padStart(2, '0'),
+            });
+            return formattedDate;
+          })()
         : '',
       time: apt.appointmentTime,
-      type: determineType(),
+      type: apt.type === 'home-visit' ? 'home-visit' : 'video', // Use actual appointment type (video or home-visit)
       status: statusMap[apt.status] || apt.status,
       fee: apt.consultationFee || apt.totalAmount || 0,
       isPaid: apt.paymentStatus === 'paid',
@@ -364,12 +368,24 @@ export class DoctorsService {
     );
 
     bookedAppointments.forEach((apt) => {
-      const dateStr = new Date(apt.appointmentDate).toISOString().split('T')[0];
+      // Convert appointmentDate to local date string (YYYY-MM-DD)
+      // This ensures it matches the availability date format
+      const aptDate = new Date(apt.appointmentDate);
+      const year = aptDate.getFullYear();
+      const month = String(aptDate.getMonth() + 1).padStart(2, '0');
+      const day = String(aptDate.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
+
       if (!bookedSlotsByDate[dateStr]) {
         bookedSlotsByDate[dateStr] = new Set();
       }
       if (apt.appointmentTime) {
-        bookedSlotsByDate[dateStr].add(apt.appointmentTime);
+        // Normalize appointmentTime to HH:MM format (remove seconds if present)
+        const normalizedTime = apt.appointmentTime
+          .split(':')
+          .slice(0, 2)
+          .join(':');
+        bookedSlotsByDate[dateStr].add(normalizedTime);
       }
     });
 
@@ -544,26 +560,77 @@ export class DoctorsService {
       dateFilter.appointmentDate = { $gte: start, $lte: end };
     }
 
+    const query = {
+      doctorId: new mongoose.Types.ObjectId(doctorId),
+      ...dateFilter,
+      status: { $ne: 'cancelled' }, // Exclude cancelled appointments
+    };
+
+    console.log(
+      '🏥 getDoctorAvailability - Query for booked appointments:',
+      JSON.stringify(
+        {
+          doctorId: doctorId,
+          dateFilter,
+          statusFilter: { $ne: 'cancelled' },
+        },
+        null,
+        2,
+      ),
+    );
+
     const bookedAppointments = await this.appointmentModel
-      .find({
-        doctorId: new mongoose.Types.ObjectId(doctorId),
-        ...dateFilter,
-        status: { $ne: 'cancelled' }, // Exclude cancelled appointments
-      })
-      .select('appointmentDate appointmentTime')
+      .find(query)
+      .select('appointmentDate appointmentTime status')
       .lean();
 
+    console.log(
+      '🏥 getDoctorAvailability - bookedAppointments count:',
+      bookedAppointments.length,
+    );
+    console.log(
+      '🏥 getDoctorAvailability - bookedAppointments:',
+      JSON.stringify(bookedAppointments, null, 2),
+    );
+
     // Create a map of booked time slots by date
+    // Use local date components to match availability date format
     const bookedSlotsByDate: { [key: string]: Set<string> } = {};
     bookedAppointments.forEach((apt) => {
-      const dateStr = new Date(apt.appointmentDate).toISOString().split('T')[0];
+      // Convert appointmentDate to local date string (YYYY-MM-DD)
+      // This ensures it matches the availability date format
+      const aptDate = new Date(apt.appointmentDate);
+      const year = aptDate.getFullYear();
+      const month = String(aptDate.getMonth() + 1).padStart(2, '0');
+      const day = String(aptDate.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
+
       if (!bookedSlotsByDate[dateStr]) {
         bookedSlotsByDate[dateStr] = new Set();
       }
       if (apt.appointmentTime) {
-        bookedSlotsByDate[dateStr].add(apt.appointmentTime);
+        // Normalize appointmentTime to HH:MM format (remove seconds if present)
+        const normalizedTime = apt.appointmentTime
+          .split(':')
+          .slice(0, 2)
+          .join(':');
+        bookedSlotsByDate[dateStr].add(normalizedTime);
       }
     });
+
+    console.log(
+      '🏥 getDoctorAvailability - bookedSlotsByDate:',
+      JSON.stringify(
+        Object.fromEntries(
+          Object.entries(bookedSlotsByDate).map(([key, value]) => [
+            key,
+            Array.from(value),
+          ]),
+        ),
+        null,
+        2,
+      ),
+    );
 
     // Format availability with Georgian day names and remove booked time slots
     const dayNames = [
@@ -576,27 +643,46 @@ export class DoctorsService {
       'შაბათი',
     ];
 
+    const result = availability.map((avail) => {
+      const date = new Date(avail.date);
+      const dateStr = date.toISOString().split('T')[0];
+      const bookedSlots = bookedSlotsByDate[dateStr] || new Set();
+
+      console.log(`🏥 getDoctorAvailability - Processing date ${dateStr}:`, {
+        availDate: avail.date,
+        dateStr,
+        bookedSlots: Array.from(bookedSlots),
+        originalTimeSlots: avail.timeSlots,
+      });
+
+      // Keep ALL time slots (including booked ones) in timeSlots
+      // Frontend will use bookedSlots to filter them out visually
+      const allTimeSlots = avail.timeSlots || [];
+
+      // Filter out booked time slots for availableTimeSlots
+      const availableTimeSlots = allTimeSlots.filter(
+        (slot: string) => !bookedSlots.has(slot),
+      );
+
+      return {
+        date: dateStr,
+        dayOfWeek: dayNames[date.getDay()],
+        timeSlots: allTimeSlots, // Include ALL slots (booked + available) for frontend
+        bookedSlots: Array.from(bookedSlots), // Include booked slots for frontend filtering
+        isAvailable: availableTimeSlots.length > 0,
+        // expose type so frontend can distinguish video vs home-visit
+        type: avail.type ?? 'video',
+      };
+    });
+
+    console.log(
+      '🏥 getDoctorAvailability - Final result:',
+      JSON.stringify(result, null, 2),
+    );
+
     return {
       success: true,
-      data: availability.map((avail) => {
-        const date = new Date(avail.date);
-        const dateStr = date.toISOString().split('T')[0];
-        const bookedSlots = bookedSlotsByDate[dateStr] || new Set();
-
-        // Filter out booked time slots
-        const availableTimeSlots = (avail.timeSlots || []).filter(
-          (slot: string) => !bookedSlots.has(slot),
-        );
-
-        return {
-          date: dateStr,
-          dayOfWeek: dayNames[date.getDay()],
-          timeSlots: availableTimeSlots,
-          isAvailable: availableTimeSlots.length > 0,
-          // expose type so frontend can distinguish video vs home-visit
-          type: avail.type ?? 'video',
-        };
-      }),
+      data: result,
     };
   }
 
@@ -1009,6 +1095,21 @@ export class DoctorsService {
     );
 
     // Format appointments for frontend
+    console.log(
+      '👨‍⚕️ DoctorsService.getDashboardAppointments - raw appointments sample:',
+      appointments.length > 0
+        ? {
+            _id: appointments[0]._id,
+            appointmentDate: appointments[0].appointmentDate,
+            appointmentTime: appointments[0].appointmentTime,
+            appointmentDateType: typeof appointments[0].appointmentDate,
+            appointmentDateISO:
+              appointments[0].appointmentDate instanceof Date
+                ? appointments[0].appointmentDate.toISOString()
+                : new Date(appointments[0].appointmentDate).toISOString(),
+          }
+        : 'No appointments',
+    );
 
     const formattedAppointments = appointments.map((apt: any) =>
       this.formatDashboardAppointment(apt),
@@ -1017,6 +1118,16 @@ export class DoctorsService {
     console.log(
       '👨‍⚕️ DoctorsService.getDashboardAppointments - formatted appointments:',
       formattedAppointments.length,
+      formattedAppointments.length > 0
+        ? {
+            firstAppointment: {
+              id: formattedAppointments[0].id,
+              date: formattedAppointments[0].date,
+              time: formattedAppointments[0].time,
+              type: formattedAppointments[0].type,
+            },
+          }
+        : 'No appointments',
     );
 
     return {

@@ -37,6 +37,8 @@ interface AppointmentSchedulerProps {
   doctorId?: string;
   initialMode?: "video" | "home-visit";
   lockMode?: boolean;
+  followUpAppointmentId?: string;
+  isFollowUp?: boolean;
 }
 
 const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
@@ -47,6 +49,8 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
   doctorId,
   initialMode = "video",
   lockMode = false,
+  followUpAppointmentId,
+  isFollowUp = false,
 }) => {
   const isTwentyFourSeven = workingHours?.includes("24");
   const [mode, setMode] = useState<"video" | "home-visit">(initialMode);
@@ -132,16 +136,37 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
   );
 
   const getVisibleTimeSlots = () => {
-    if (!selectedDayAvailability) return [];
+    if (!selectedDayAvailability) {
+      console.log('📅 AppointmentScheduler - No selectedDayAvailability');
+      return [];
+    }
+
+    console.log('📅 AppointmentScheduler - selectedDayAvailability:', {
+      date: selectedDayAvailability.date,
+      timeSlots: selectedDayAvailability.timeSlots,
+      bookedSlots: selectedDayAvailability.bookedSlots,
+      videoSlots: selectedDayAvailability.videoSlots,
+      homeVisitSlots: selectedDayAvailability.homeVisitSlots,
+      mode,
+    });
 
     // Full-day override if declared 24/7
     if (isTwentyFourSeven) {
-      return generateFullDaySlots();
+      const fullDaySlots = generateFullDaySlots();
+      // Return ALL slots (including booked ones) so they can be displayed as disabled
+      // The booked slots will be filtered out visually using isBooked check
+      console.log('📅 AppointmentScheduler - 24/7 mode:', {
+        fullDaySlots,
+        bookedSlots: selectedDayAvailability.bookedSlots || [],
+      });
+      
+      return fullDaySlots;
     }
 
     const videoSlots = selectedDayAvailability.videoSlots || [];
     const homeVisitSlots = selectedDayAvailability.homeVisitSlots || [];
     const genericSlots = selectedDayAvailability.timeSlots || [];
+    const bookedSlots = selectedDayAvailability.bookedSlots || [];
 
     // Choose slots by mode
     const slotsByMode =
@@ -153,8 +178,40 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
           ? homeVisitSlots
           : genericSlots;
 
+    // Return ALL slots (including booked ones) so they can be displayed as disabled
+    // The booked slots will be filtered out visually using isBooked check in render
+    console.log('📅 AppointmentScheduler - Available slots:', {
+      slotsByMode,
+      bookedSlots,
+      allSlots: slotsByMode,
+    });
+    
     return slotsByMode;
   };
+
+  // Log availability data when component mounts or availability changes
+  useEffect(() => {
+    console.log('📅 AppointmentScheduler - Full availability array:', JSON.stringify(availability, null, 2));
+    console.log('📅 AppointmentScheduler - Availability data:', {
+      availability,
+      isFollowUp,
+      followUpAppointmentId,
+      mode,
+      selectedDate,
+    });
+    
+    if (selectedDate) {
+      const selectedDay = availability.find((day: any) => day.date === selectedDate);
+      console.log('📅 AppointmentScheduler - Selected day data (full):', JSON.stringify(selectedDay, null, 2));
+      console.log('📅 AppointmentScheduler - Selected day data:', {
+        date: selectedDate,
+        selectedDay,
+        timeSlots: selectedDay?.timeSlots,
+        bookedSlots: selectedDay?.bookedSlots,
+        allKeys: selectedDay ? Object.keys(selectedDay) : [],
+      });
+    }
+  }, [availability, selectedDate, isFollowUp, followUpAppointmentId, mode]);
 
   return (
     <View style={styles.container}>
@@ -382,6 +439,49 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
               return;
             }
 
+            // If this is a follow-up appointment, schedule it directly
+            if (isFollowUp && followUpAppointmentId) {
+              try {
+                const followUpResponse = await apiService.scheduleFollowUpAppointment(
+                  followUpAppointmentId,
+                  {
+                    date: selectedDate,
+                    time: selectedTime,
+                    type: mode,
+                  },
+                  false // isDoctor = false for patient side
+                );
+
+                if (followUpResponse.success) {
+                  Alert.alert(
+                    "წარმატება",
+                    "განმეორებითი ვიზიტი წარმატებით დაჯავშნა!",
+                    [
+                      {
+                        text: "კარგი",
+                        onPress: () => {
+                          router.back();
+                        },
+                      },
+                    ]
+                  );
+                } else {
+                  Alert.alert(
+                    "შეცდომა",
+                    followUpResponse.message || "განმეორებითი ვიზიტის დაჯავშნა ვერ მოხერხდა"
+                  );
+                }
+              } catch (error: any) {
+                console.error("Failed to schedule follow-up appointment:", error);
+                Alert.alert(
+                  "შეცდომა",
+                  error.message || "განმეორებითი ვიზიტის დაჯავშნა ვერ მოხერხდა"
+                );
+              }
+              return;
+            }
+
+            // Regular appointment booking
             router.push({
               pathname: "/screens/appointment/make-appointment",
               params: {

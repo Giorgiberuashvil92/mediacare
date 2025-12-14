@@ -1,7 +1,9 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,21 +12,93 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
-  doctorStatistics,
+  Consultation,
   getConsultationTypeLabel,
   getStatusColor,
   getStatusLabel,
-  recentConsultations,
 } from "../../assets/data/doctorDashboard";
+import { apiService } from "../services/api";
 
 export default function AppointmentsDetails() {
   const router = useRouter();
-  const stats = doctorStatistics;
+  const [consultations, setConsultations] = useState<Consultation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchConsultations();
+  }, []);
+
+  const fetchConsultations = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = (await apiService.getDoctorDashboardAppointments(
+        100,
+      )) as {
+        success: boolean;
+        data: Consultation[];
+      };
+
+      if (response.success) {
+        setConsultations(response.data as any);
+      } else {
+        setError("კონსულტაციების ჩატვირთვა ვერ მოხერხდა");
+      }
+    } catch (err) {
+      console.error("Error fetching consultations:", err);
+      setError("კონსულტაციების ჩატვირთვა ვერ მოხერხდა");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Calculate statistics from real data
+  const stats = {
+    total: consultations.length,
+    completed: consultations.filter((c) => c.status === "completed").length,
+    scheduled: consultations.filter((c) => c.status === "scheduled").length,
+    inProgress: consultations.filter((c) => c.status === "in-progress").length,
+    cancelled: consultations.filter((c) => c.status === "cancelled").length,
+    uncompleted: consultations.filter(
+      (c) => c.status !== "completed" && c.status !== "cancelled"
+    ).length,
+  };
 
   // Calculate percentages
-  const appointmentCompletionRate = Math.round(
-    (stats.appointments.completed / stats.appointments.total) * 100
-  );
+  const appointmentCompletionRate =
+    stats.total > 0
+      ? Math.round((stats.completed / stats.total) * 100)
+      : 0;
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#06B6D4" />
+          <Text style={styles.loadingText}>მონაცემების ჩატვირთვა...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle" size={48} color="#EF4444" />
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={fetchConsultations}
+          >
+            <Text style={styles.retryButtonText}>ხელახლა ცდა</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -55,7 +129,7 @@ export default function AppointmentsDetails() {
                 <Ionicons name="checkmark-circle" size={24} color="#10B981" />
               </View>
               <Text style={styles.appointmentStatValue}>
-                {stats.appointments.completed}
+                {stats.completed}
               </Text>
               <Text style={styles.appointmentStatLabel}>შესრულებული</Text>
             </View>
@@ -69,7 +143,7 @@ export default function AppointmentsDetails() {
                 <Ionicons name="time" size={24} color="#F59E0B" />
               </View>
               <Text style={styles.appointmentStatValue}>
-                {stats.appointments.inProgress}
+                {stats.inProgress}
               </Text>
               <Text style={styles.appointmentStatLabel}>მიმდინარე</Text>
             </View>
@@ -83,7 +157,7 @@ export default function AppointmentsDetails() {
                 <Ionicons name="close-circle" size={24} color="#EF4444" />
               </View>
               <Text style={styles.appointmentStatValue}>
-                {stats.appointments.uncompleted}
+                {stats.uncompleted}
               </Text>
               <Text style={styles.appointmentStatLabel}>შეუსრულებელი</Text>
             </View>
@@ -109,8 +183,7 @@ export default function AppointmentsDetails() {
               />
             </View>
             <Text style={styles.completionDescription}>
-              {stats.appointments.completed} შესრულებული{" "}
-              {stats.appointments.total} სულ დანიშვნიდან
+              {stats.completed} შესრულებული {stats.total} სულ დანიშვნიდან
             </Text>
           </View>
         </View>
@@ -126,14 +199,13 @@ export default function AppointmentsDetails() {
               >
                 <Ionicons name="checkmark-circle" size={32} color="#FFFFFF" />
                 <Text style={styles.statusValue}>
-                  {stats.appointments.completed}
+                  {stats.completed}
                 </Text>
                 <Text style={styles.statusLabel}>შესრულებული</Text>
                 <Text style={styles.statusPercentage}>
-                  {Math.round(
-                    (stats.appointments.completed / stats.appointments.total) *
-                      100
-                  )}
+                  {stats.total > 0
+                    ? Math.round((stats.completed / stats.total) * 100)
+                    : 0}
                   %
                 </Text>
               </LinearGradient>
@@ -145,14 +217,13 @@ export default function AppointmentsDetails() {
               >
                 <Ionicons name="time" size={32} color="#FFFFFF" />
                 <Text style={styles.statusValue}>
-                  {stats.appointments.inProgress}
+                  {stats.inProgress}
                 </Text>
                 <Text style={styles.statusLabel}>მიმდინარე</Text>
                 <Text style={styles.statusPercentage}>
-                  {Math.round(
-                    (stats.appointments.inProgress / stats.appointments.total) *
-                      100
-                  )}
+                  {stats.total > 0
+                    ? Math.round((stats.inProgress / stats.total) * 100)
+                    : 0}
                   %
                 </Text>
               </LinearGradient>
@@ -164,15 +235,13 @@ export default function AppointmentsDetails() {
               >
                 <Ionicons name="close-circle" size={32} color="#FFFFFF" />
                 <Text style={styles.statusValue}>
-                  {stats.appointments.uncompleted}
+                  {stats.uncompleted}
                 </Text>
                 <Text style={styles.statusLabel}>შეუსრულებელი</Text>
                 <Text style={styles.statusPercentage}>
-                  {Math.round(
-                    (stats.appointments.uncompleted /
-                      stats.appointments.total) *
-                      100
-                  )}
+                  {stats.total > 0
+                    ? Math.round((stats.uncompleted / stats.total) * 100)
+                    : 0}
                   %
                 </Text>
               </LinearGradient>
@@ -191,7 +260,15 @@ export default function AppointmentsDetails() {
             </TouchableOpacity>
           </View>
           <View style={styles.appointmentsCard}>
-            {recentConsultations.slice(0, 8).map((consultation, index) => (
+            {consultations.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="calendar-outline" size={48} color="#D1D5DB" />
+                <Text style={styles.emptyStateText}>
+                  დანიშვნები ჯერ არ არის
+                </Text>
+              </View>
+            ) : (
+              consultations.slice(0, 8).map((consultation, index) => (
               <View key={consultation.id}>
                 <View style={styles.appointmentItem}>
                   <View
@@ -256,7 +333,7 @@ export default function AppointmentsDetails() {
                       </Text>
                     </View>
                     <Text style={styles.appointmentFee}>
-                      ${consultation.fee}
+                      ₾{consultation.fee}
                     </Text>
                     <Text
                       style={[
@@ -270,9 +347,12 @@ export default function AppointmentsDetails() {
                     </Text>
                   </View>
                 </View>
-                {index < 7 && <View style={styles.appointmentDivider} />}
+                {index < Math.min(7, consultations.length - 1) && (
+                  <View style={styles.appointmentDivider} />
+                )}
               </View>
-            ))}
+              ))
+            )}
           </View>
         </View>
 
@@ -283,7 +363,7 @@ export default function AppointmentsDetails() {
             <View style={styles.insightCard}>
               <Ionicons name="calendar" size={32} color="#06B6D4" />
               <Text style={styles.insightValue}>
-                {stats.appointments.total}
+                {stats.total}
               </Text>
               <Text style={styles.insightLabel}>სულ დანიშვნები</Text>
             </View>
@@ -297,14 +377,14 @@ export default function AppointmentsDetails() {
             <View style={styles.insightCard}>
               <Ionicons name="time" size={32} color="#F59E0B" />
               <Text style={styles.insightValue}>
-                {stats.appointments.inProgress}
+                {stats.inProgress}
               </Text>
               <Text style={styles.insightLabel}>მიმდინარე</Text>
             </View>
             <View style={styles.insightCard}>
               <Ionicons name="close-circle" size={32} color="#EF4444" />
               <Text style={styles.insightValue}>
-                {stats.appointments.uncompleted}
+                {stats.uncompleted}
               </Text>
               <Text style={styles.insightLabel}>შეუსრულებელი</Text>
             </View>
@@ -591,5 +671,53 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins-Medium",
     color: "#6B7280",
     textAlign: "center",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  errorText: {
+    marginTop: 16,
+    fontSize: 16,
+    fontFamily: "Poppins-Medium",
+    color: "#EF4444",
+    textAlign: "center",
+  },
+  retryButton: {
+    marginTop: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    backgroundColor: "#06B6D4",
+    borderRadius: 12,
+  },
+  retryButtonText: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#FFFFFF",
+  },
+  emptyState: {
+    padding: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyStateText: {
+    marginTop: 12,
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
   },
 });

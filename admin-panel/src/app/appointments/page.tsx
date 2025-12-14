@@ -4,6 +4,7 @@ import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 import { apiService } from '@/lib/api';
 import { useEffect, useState } from 'react';
 import { AppointmentDetailsModal } from './_components/appointment-details-modal';
+import { EmptySlots } from './_components/empty-slots';
 
 interface Appointment {
   id: string;
@@ -20,6 +21,7 @@ interface Appointment {
 }
 
 export default function AppointmentsPage() {
+  const [activeTab, setActiveTab] = useState<'appointments' | 'empty-slots'>('appointments');
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -144,6 +146,34 @@ export default function AppointmentsPage() {
             </h2>
           </div>
 
+          {/* Tabs */}
+          <div className="mb-6 flex gap-2 border-b border-stroke dark:border-dark-3">
+            <button
+              onClick={() => setActiveTab('appointments')}
+              className={`px-4 py-2 font-medium transition-colors ${
+                activeTab === 'appointments'
+                  ? 'border-b-2 border-primary text-primary'
+                  : 'text-dark-4 hover:text-dark dark:text-dark-6 dark:hover:text-white'
+              }`}
+            >
+              ჯავშნები
+            </button>
+            <button
+              onClick={() => setActiveTab('empty-slots')}
+              className={`px-4 py-2 font-medium transition-colors ${
+                activeTab === 'empty-slots'
+                  ? 'border-b-2 border-primary text-primary'
+                  : 'text-dark-4 hover:text-dark dark:text-dark-6 dark:hover:text-white'
+              }`}
+            >
+              ცარიელი ჯავშნები
+            </button>
+          </div>
+
+          {activeTab === 'empty-slots' ? (
+            <EmptySlots />
+          ) : (
+            <>
           {error && (
             <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
               {error}
@@ -291,6 +321,8 @@ export default function AppointmentsPage() {
               </tbody>
             </table>
           </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -300,6 +332,9 @@ export default function AppointmentsPage() {
         onClose={() => {
           setIsModalOpen(false);
           setSelectedAppointmentId(null);
+        }}
+        onReschedule={() => {
+          loadAppointments();
         }}
       />
     </>

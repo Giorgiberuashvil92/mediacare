@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { Clinic, ClinicSchema } from './schemas/clinic.schema';
 import {
   ShopCategory,
   ShopCategorySchema,
@@ -14,6 +15,7 @@ import { ShopService } from './shop.service';
     MongooseModule.forFeature([
       { name: ShopCategory.name, schema: ShopCategorySchema },
       { name: ShopProduct.name, schema: ShopProductSchema },
+      { name: Clinic.name, schema: ClinicSchema },
     ]),
   ],
   controllers: [ShopController, ShopAdminController],

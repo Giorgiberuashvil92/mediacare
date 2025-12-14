@@ -1,7 +1,11 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
+import * as DocumentPicker from "expo-document-picker";
+import { useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
+  Linking,
   Modal,
   RefreshControl,
   ScrollView,
@@ -16,6 +20,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { apiService } from "../services/api";
 
 const History = () => {
+  const router = useRouter();
   const { isAuthenticated, user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedVisit, setSelectedVisit] = useState<any>(null);
@@ -24,6 +29,9 @@ const History = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [checkingEligibility, setCheckingEligibility] = useState(false);
+  const [followUpEligible, setFollowUpEligible] = useState<boolean | null>(null);
+  const [uploadingResult, setUploadingResult] = useState<string | null>(null);
 
   useEffect(() => {
     if (isAuthenticated && user?.id) {
@@ -44,10 +52,27 @@ const History = () => {
       }
 
       const response = await apiService.getPatientAppointments();
+      console.log('📋 History - API Response:', JSON.stringify(response, null, 2));
+      
       if (response.success && Array.isArray(response.data)) {
+        console.log('📋 History - Appointments count:', response.data.length);
+        console.log('📋 History - First appointment:', JSON.stringify(response.data[0], null, 2));
+        
         const mapped = response.data
-          .map(mapAppointmentToVisit)
+          .map((appointment) => {
+            const visit = mapAppointmentToVisit(appointment);
+            console.log('📋 History - Mapped visit:', {
+              id: visit?.id,
+              doctorId: visit?.doctorId,
+              doctorIdType: typeof visit?.doctorId,
+              doctorIdValue: visit?.doctorId,
+              doctorName: visit?.doctorName,
+            });
+            return visit;
+          })
           .filter((visit) => visit && isPastAppointment(visit));
+        
+        console.log('📋 History - Filtered visits count:', mapped.length);
         setVisits(mapped);
       } else {
         setVisits([]);
@@ -78,9 +103,135 @@ const History = () => {
     });
   }, [visits, searchQuery]);
 
-  const openDetails = (visit: any) => {
+  const openDetails = async (visit: any) => {
+    console.log('📋 History - openDetails called with visit:', {
+      id: visit?.id,
+      doctorId: visit?.doctorId,
+      doctorIdType: typeof visit?.doctorId,
+      doctorIdValue: visit?.doctorId,
+      doctorId_id: visit?.doctorId?._id,
+      doctorId_idType: typeof visit?.doctorId?._id,
+      status: visit?.status,
+    });
+    
     setSelectedVisit(visit);
     setShowDetailsModal(true);
+    
+    // Check follow-up eligibility when modal opens
+    if (visit.id && visit.status === 'completed') {
+      try {
+        setCheckingEligibility(true);
+        const response = await apiService.checkFollowUpEligibility(visit.id);
+        // If response has success and eligible properties, use them
+        if (response && typeof response === 'object' && 'success' in response) {
+          setFollowUpEligible(response.success && (response as any).eligible);
+        } else {
+          // If response is the direct result (eligible: true), treat as eligible
+          setFollowUpEligible((response as any)?.eligible === true || (response as any)?.success === true);
+        }
+      } catch (err: any) {
+        console.error('Error checking follow-up eligibility:', err);
+        // If error contains message about eligibility, show it
+        setFollowUpEligible(false);
+      } finally {
+        setCheckingEligibility(false);
+      }
+    } else {
+      setFollowUpEligible(false);
+    }
+  };
+
+  const handleFollowUpAppointment = async () => {
+    if (!selectedVisit?.id) return;
+
+    try {
+      // Check eligibility first
+      setCheckingEligibility(true);
+      const eligibilityResponse = await apiService.checkFollowUpEligibility(selectedVisit.id);
+      
+      // Check if response indicates eligibility
+      const isEligible = (eligibilityResponse as any)?.success === true && 
+                        (eligibilityResponse as any)?.eligible === true;
+      
+      if (!isEligible) {
+        const errorMessage = (eligibilityResponse as any)?.message || 
+                            'განმეორებითი ვიზიტისთვის უნდა გავიდეს 10 სამუშაო დღე პირველადი ვიზიტიდან';
+        Alert.alert('განმეორებითი ვიზიტი', errorMessage);
+        return;
+      }
+
+      // Navigate to doctor's schedule page with follow-up flag
+      console.log('📋 History - handleFollowUpAppointment - selectedVisit:', {
+        id: selectedVisit?.id,
+        doctorId: selectedVisit?.doctorId,
+        doctorIdType: typeof selectedVisit?.doctorId,
+        doctorId_id: selectedVisit?.doctorId?._id,
+        doctorId_idType: typeof selectedVisit?.doctorId?._id,
+        doctorId_idString: selectedVisit?.doctorId?._id?.toString(),
+      });
+      
+      // Extract doctorId - it can be a string (from mapAppointmentToVisit) or an object
+      let doctorId: string | null = null;
+      
+      if (typeof selectedVisit.doctorId === 'string') {
+        doctorId = selectedVisit.doctorId;
+      } else if (selectedVisit.doctorId?._id) {
+        doctorId = typeof selectedVisit.doctorId._id === 'string' 
+          ? selectedVisit.doctorId._id 
+          : selectedVisit.doctorId._id.toString();
+      } else if (selectedVisit.doctorId?.id) {
+        doctorId = typeof selectedVisit.doctorId.id === 'string' 
+          ? selectedVisit.doctorId.id 
+          : selectedVisit.doctorId.id.toString();
+      } else if (selectedVisit.doctorId) {
+        doctorId = String(selectedVisit.doctorId);
+      }
+      
+      console.log('📋 History - Extracted doctorId:', {
+        doctorId,
+        doctorIdType: typeof doctorId,
+        doctorIdValue: doctorId,
+        selectedVisitDoctorId: selectedVisit.doctorId,
+        selectedVisitDoctorIdType: typeof selectedVisit.doctorId,
+      });
+      
+      if (doctorId && doctorId.trim()) {
+        const doctorIdString = String(doctorId).trim();
+        console.log('📋 History - Navigating with doctorId:', doctorIdString);
+        setShowDetailsModal(false);
+        router.push({
+          pathname: '/screens/doctors/doctor/[id]',
+          params: {
+            id: doctorIdString,
+            followUpAppointmentId: selectedVisit.id,
+            followUp: 'true',
+          },
+        });
+      } else {
+        console.error('📋 History - Doctor ID not found in visit:', {
+          selectedVisit,
+          doctorId: selectedVisit.doctorId,
+          doctorIdType: typeof selectedVisit.doctorId,
+        });
+        Alert.alert('შეცდომა', 'ექიმის ID ვერ მოიძებნა');
+      }
+    } catch (err: any) {
+      console.error('Error checking follow-up eligibility:', err);
+      // Extract error message from backend response
+      let errorMessage = 'განმეორებითი ვიზიტის შემოწმება ვერ მოხერხდა';
+      
+      if (err.message) {
+        errorMessage = err.message;
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (typeof err === 'string') {
+        errorMessage = err;
+      }
+      
+      Alert.alert('განმეორებითი ვიზიტი', errorMessage);
+    } finally {
+      setCheckingEligibility(false);
+    }
   };
 
   return (
@@ -434,6 +585,172 @@ const History = () => {
                   </View>
                 )}
 
+                {/* Laboratory Tests */}
+                {selectedVisit.laboratoryTests &&
+                  selectedVisit.laboratoryTests.length > 0 && (
+                    <View style={styles.detailSection}>
+                      <Text style={styles.detailLabel}>
+                        დანიშნული ლაბორატორიული კვლევები
+                      </Text>
+                      {selectedVisit.laboratoryTests.map(
+                        (test: any, index: number) => (
+                          <View key={index} style={styles.laboratoryTestCard}>
+                            <View style={styles.laboratoryTestHeader}>
+                              <Ionicons
+                                name="flask-outline"
+                                size={20}
+                                color="#06B6D4"
+                              />
+                              <View style={styles.laboratoryTestInfo}>
+                                <Text style={styles.laboratoryTestName}>
+                                  {test.productName}
+                                </Text>
+                                {test.clinicName && (
+                                  <Text style={styles.laboratoryTestClinic}>
+                                    კლინიკა: {test.clinicName}
+                                  </Text>
+                                )}
+                              </View>
+                            </View>
+                            {!test.booked && (
+                              <TouchableOpacity
+                                style={styles.bookTestButton}
+                                onPress={() => {
+                                  // Close modal before navigating
+                                  setShowDetailsModal(false);
+                                  // Navigate to clinic selection for this test
+                                  router.push({
+                                    pathname: "/screens/lab/select-clinic",
+                                    params: {
+                                      productId: test.productId,
+                                      productName: test.productName,
+                                      productPrice: "0", // Price will be fetched from product
+                                      appointmentId: selectedVisit.id,
+                                    },
+                                  });
+                                }}
+                              >
+                                <Ionicons
+                                  name="calendar-outline"
+                                  size={16}
+                                  color="#FFFFFF"
+                                />
+                                <Text style={styles.bookTestButtonText}>
+                                  დაჯავშნა
+                                </Text>
+                              </TouchableOpacity>
+                            )}
+                            {test.booked && (
+                              <View style={styles.bookedBadge}>
+                                <Ionicons
+                                  name="checkmark-circle"
+                                  size={16}
+                                  color="#10B981"
+                                />
+                                <Text style={styles.bookedBadgeText}>
+                                  დაჯავშნილია
+                                </Text>
+                              </View>
+                            )}
+                            {test.booked && (
+                              <TouchableOpacity
+                                style={[
+                                  styles.uploadResultButton,
+                                  uploadingResult === test.productId && styles.uploadResultButtonDisabled,
+                                ]}
+                                onPress={async () => {
+                                  if (uploadingResult === test.productId) return;
+                                  
+                                  try {
+                                    const result = await DocumentPicker.getDocumentAsync({
+                                      type: ["application/pdf", "image/jpeg", "image/jpg", "image/png", "image/webp"],
+                                      copyToCacheDirectory: true,
+                                    });
+
+                                    if (result.canceled) return;
+                                    const file = result.assets?.[0];
+                                    if (!file) return;
+
+                                    if (file.size && file.size > 10 * 1024 * 1024) {
+                                      Alert.alert("შეცდომა", "ფაილი უნდა იყოს 10MB-მდე");
+                                      return;
+                                    }
+
+                                    setUploadingResult(test.productId);
+                                    const uploadResp = await apiService.uploadLaboratoryTestResult(
+                                      selectedVisit.id,
+                                      test.productId,
+                                      {
+                                        uri: file.uri,
+                                        name: file.name || "document",
+                                        type: file.mimeType || "application/pdf",
+                                      }
+                                    );
+
+                                    if (uploadResp.success) {
+                                      Alert.alert("წარმატება", "ლაბორატორიული კვლევის შედეგი წარმატებით ატვირთა");
+                                      // Reload appointments to get updated data
+                                      loadPastAppointments();
+                                    } else {
+                                      Alert.alert("შეცდომა", uploadResp?.message || "ატვირთვა ვერ მოხერხდა");
+                                    }
+                                  } catch (err: any) {
+                                    console.error("Laboratory result upload error:", err);
+                                    Alert.alert("შეცდომა", err?.message || "ფაილის ატვირთვა ვერ მოხერხდა");
+                                  } finally {
+                                    setUploadingResult(null);
+                                  }
+                                }}
+                                disabled={uploadingResult === test.productId}
+                              >
+                                {uploadingResult === test.productId ? (
+                                  <>
+                                    <ActivityIndicator size="small" color="#FFFFFF" />
+                                    <Text style={styles.uploadResultButtonText}>
+                                      ატვირთვა...
+                                    </Text>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Ionicons
+                                      name="cloud-upload-outline"
+                                      size={16}
+                                      color="#FFFFFF"
+                                    />
+                                    <Text style={styles.uploadResultButtonText}>
+                                      {test.resultFile ? "შედეგის განახლება" : "შედეგის ატვირთვა"}
+                                    </Text>
+                                  </>
+                                )}
+                              </TouchableOpacity>
+                            )}
+                            {test.booked && test.resultFile && (
+                              <TouchableOpacity
+                                style={styles.viewResultButton}
+                                onPress={() => {
+                                  if (test.resultFile?.url) {
+                                    Linking.openURL(test.resultFile.url).catch(() =>
+                                      Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა")
+                                    );
+                                  }
+                                }}
+                              >
+                                <Ionicons
+                                  name="document-text-outline"
+                                  size={16}
+                                  color="#06B6D4"
+                                />
+                                <Text style={styles.viewResultButtonText}>
+                                  შედეგის ნახვა
+                                </Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        )
+                      )}
+                    </View>
+                  )}
+
                 {/* Follow-up */}
                 {selectedVisit.followUp && selectedVisit.followUp.required && (
                   <View style={styles.detailSection}>
@@ -459,6 +776,42 @@ const History = () => {
                         )}
                       </View>
                     </View>
+                  </View>
+                )}
+
+                {/* Follow-up Button - Show only for completed appointments without existing follow-up */}
+                {selectedVisit.status === 'completed' && 
+                 !selectedVisit.followUp?.appointmentId && (
+                  <View style={styles.detailSection}>
+                    {checkingEligibility ? (
+                      <View style={styles.followUpButton}>
+                        <ActivityIndicator size="small" color="#06B6D4" />
+                        <Text style={styles.followUpButtonText}>
+                          შემოწმება...
+                        </Text>
+                      </View>
+                    ) : followUpEligible ? (
+                      <TouchableOpacity
+                        style={styles.followUpButton}
+                        onPress={handleFollowUpAppointment}
+                      >
+                        <Ionicons name="calendar-outline" size={20} color="#FFFFFF" />
+                        <Text style={styles.followUpButtonText}>
+                          განმეორებითი ვიზიტისთვის
+                        </Text>
+                        <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    ) : followUpEligible === false ? (
+                      <TouchableOpacity
+                        style={styles.followUpButtonDisabled}
+                        onPress={handleFollowUpAppointment}
+                      >
+                        <Ionicons name="calendar-outline" size={20} color="#9CA3AF" />
+                        <Text style={styles.followUpButtonTextDisabled}>
+                          განმეორებითი ვიზიტი ჯერ არ არის ხელმისაწვდომი
+                        </Text>
+                      </TouchableOpacity>
+                    ) : null}
                   </View>
                 )}
 
@@ -545,6 +898,32 @@ const mapAppointmentToVisit = (appointment: any) => {
 
   const doctor =
     typeof appointment.doctorId === "object" ? appointment.doctorId : {};
+  
+  // Extract doctorId - handle both object and string formats
+  let doctorId: string | null = null;
+  if (appointment.doctorId) {
+    if (typeof appointment.doctorId === 'string') {
+      doctorId = appointment.doctorId;
+    } else if (appointment.doctorId._id) {
+      doctorId = typeof appointment.doctorId._id === 'string' 
+        ? appointment.doctorId._id 
+        : String(appointment.doctorId._id);
+    } else if (appointment.doctorId.id) {
+      doctorId = typeof appointment.doctorId.id === 'string' 
+        ? appointment.doctorId.id 
+        : String(appointment.doctorId.id);
+    } else {
+      doctorId = String(appointment.doctorId);
+    }
+  }
+  
+  console.log('📋 History - mapAppointmentToVisit - doctorId extraction:', {
+    appointmentDoctorId: appointment.doctorId,
+    appointmentDoctorIdType: typeof appointment.doctorId,
+    extractedDoctorId: doctorId,
+    extractedDoctorIdType: typeof doctorId,
+  });
+  
   const appointmentDate = appointment.appointmentDate
     ? new Date(appointment.appointmentDate).toISOString().split("T")[0]
     : "";
@@ -589,8 +968,9 @@ const mapAppointmentToVisit = (appointment: any) => {
 
   const status = appointment.status || "scheduled";
 
-  return {
+  const visit = {
     id: appointment._id || appointment.id || Math.random().toString(36).slice(2),
+    doctorId: doctorId,
     doctorName: doctor?.name || "უცნობი ექიმი",
     doctorSpecialty: doctor?.specialization || doctor?.speciality || "",
     date: appointmentDate,
@@ -608,14 +988,33 @@ const mapAppointmentToVisit = (appointment: any) => {
     consultationSummary: summary,
     followUp: appointment.followUp,
     form100: appointment.form100,
+    laboratoryTests: appointment.laboratoryTests || [],
     status,
     statusLabel: STATUS_LABELS[status],
   };
+  
+  console.log('📋 History - mapAppointmentToVisit - returning visit:', {
+    id: visit.id,
+    doctorId: visit.doctorId,
+    doctorIdType: typeof visit.doctorId,
+  });
+  
+  return visit;
 };
 
 const isPastAppointment = (visit: any) => {
   if (!visit?.appointmentDate) {
     return false;
+  }
+
+  // Include completed appointments in history, regardless of date
+  if (visit.status === "completed") {
+    return true;
+  }
+
+  // Include appointments with laboratory tests assigned by doctor, even if not completed
+  if (visit.laboratoryTests && Array.isArray(visit.laboratoryTests) && visit.laboratoryTests.length > 0) {
+    return true;
   }
 
   const timePart = visit.appointmentTime || "00:00";
@@ -1131,6 +1530,132 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Poppins-SemiBold",
     color: "#6B7280",
+  },
+  followUpButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#06B6D4",
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  followUpButtonDisabled: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#F3F4F6",
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  followUpButtonText: {
+    fontSize: 16,
+    fontFamily: "Poppins-SemiBold",
+    color: "#FFFFFF",
+  },
+  followUpButtonTextDisabled: {
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#9CA3AF",
+    textAlign: "center",
+  },
+  laboratoryTestCard: {
+    backgroundColor: "#F9FAFB",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  laboratoryTestHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 8,
+  },
+  laboratoryTestInfo: {
+    flex: 1,
+  },
+  laboratoryTestName: {
+    fontSize: 16,
+    fontFamily: "Poppins-SemiBold",
+    color: "#1F2937",
+    marginBottom: 4,
+  },
+  laboratoryTestClinic: {
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+  },
+  bookTestButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "#06B6D4",
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginTop: 8,
+  },
+  bookTestButtonText: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#FFFFFF",
+  },
+  bookedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#ECFDF5",
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginTop: 8,
+    alignSelf: "flex-start",
+  },
+  bookedBadgeText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#10B981",
+  },
+  uploadResultButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "#10B981",
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginTop: 8,
+  },
+  uploadResultButtonDisabled: {
+    opacity: 0.6,
+  },
+  uploadResultButtonText: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#FFFFFF",
+  },
+  viewResultButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "#E0F2FE",
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginTop: 8,
+  },
+  viewResultButtonText: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#06B6D4",
   },
 });
 

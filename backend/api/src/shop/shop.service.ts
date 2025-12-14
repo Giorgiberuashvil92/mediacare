@@ -2,11 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { FilterQuery, Model, Types } from 'mongoose';
 import { CreateCategoryDto } from './dto/create-category.dto';
+import { CreateClinicDto } from './dto/create-clinic.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { QueryCategoriesDto } from './dto/query-categories.dto';
 import { QueryProductsDto } from './dto/query-products.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
+import { UpdateClinicDto } from './dto/update-clinic.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { Clinic, ClinicDocument } from './schemas/clinic.schema';
 import {
   ShopCategory,
   ShopCategoryDocument,
@@ -75,6 +78,8 @@ export class ShopService {
     private readonly categoryModel: Model<ShopCategoryDocument>,
     @InjectModel(ShopProduct.name)
     private readonly productModel: Model<ShopProductDocument>,
+    @InjectModel(Clinic.name)
+    private readonly clinicModel: Model<ClinicDocument>,
   ) {}
 
   private normalizeObjectId(
@@ -496,6 +501,131 @@ export class ShopService {
         laboratoryCategories: formattedLaboratoryCategories,
         equipmentCategories: formattedEquipmentCategories,
       },
+    };
+  }
+
+  // Clinic methods
+  async createClinic(createClinicDto: CreateClinicDto) {
+    const clinic = new this.clinicModel(createClinicDto);
+    const savedClinic = await clinic.save();
+    const clinicDoc = savedClinic.toObject() as ClinicDocument & {
+      createdAt?: Date;
+      updatedAt?: Date;
+    };
+    return {
+      success: true,
+      data: {
+        id: (savedClinic._id as Types.ObjectId).toString(),
+        name: savedClinic.name,
+        address: savedClinic.address,
+        phone: savedClinic.phone,
+        email: savedClinic.email,
+        isActive: savedClinic.isActive,
+        createdAt: clinicDoc.createdAt,
+        updatedAt: clinicDoc.updatedAt,
+      },
+    };
+  }
+
+  async findAllClinics(isActive?: boolean) {
+    const filter: FilterQuery<ClinicDocument> = {};
+    if (typeof isActive === 'boolean') {
+      filter.isActive = isActive;
+    }
+
+    const clinics = await this.clinicModel
+      .find(filter)
+      .sort({ name: 1 })
+      .lean();
+
+    return {
+      success: true,
+      data: clinics.map((clinic: any) => ({
+        id: (clinic._id as Types.ObjectId).toString(),
+        name: clinic.name,
+        address: clinic.address,
+        phone: clinic.phone,
+        email: clinic.email,
+        isActive: clinic.isActive,
+        createdAt: clinic.createdAt,
+        updatedAt: clinic.updatedAt,
+      })),
+    };
+  }
+
+  async findClinicById(id: string) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new Error('Invalid clinic ID');
+    }
+
+    const clinic = await this.clinicModel.findById(id).lean();
+    if (!clinic) {
+      throw new Error('Clinic not found');
+    }
+
+    const clinicDoc = clinic as any;
+    return {
+      success: true,
+      data: {
+        id: (clinicDoc._id as Types.ObjectId).toString(),
+        name: clinicDoc.name,
+        address: clinicDoc.address,
+        phone: clinicDoc.phone,
+        email: clinicDoc.email,
+        isActive: clinicDoc.isActive,
+        createdAt: clinicDoc.createdAt,
+        updatedAt: clinicDoc.updatedAt,
+      },
+    };
+  }
+
+  async updateClinic(id: string, updateClinicDto: UpdateClinicDto) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new Error('Invalid clinic ID');
+    }
+
+    const clinic = await this.clinicModel.findByIdAndUpdate(
+      id,
+      updateClinicDto as any,
+      { new: true, runValidators: true },
+    );
+
+    if (!clinic) {
+      throw new Error('Clinic not found');
+    }
+
+    const clinicDoc = clinic.toObject() as ClinicDocument & {
+      createdAt?: Date;
+      updatedAt?: Date;
+    };
+    return {
+      success: true,
+      data: {
+        id: (clinic._id as Types.ObjectId).toString(),
+        name: clinic.name,
+        address: clinic.address,
+        phone: clinic.phone,
+        email: clinic.email,
+        isActive: clinic.isActive,
+        createdAt: clinicDoc.createdAt,
+        updatedAt: clinicDoc.updatedAt,
+      },
+    };
+  }
+
+  async deleteClinic(id: string) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new Error('Invalid clinic ID');
+    }
+
+    const clinic = await this.clinicModel.findByIdAndDelete(id);
+    if (!clinic) {
+      throw new Error('Clinic not found');
+    }
+
+    return {
+      success: true,
+      data: { message: 'Clinic deleted successfully' },
     };
   }
 }

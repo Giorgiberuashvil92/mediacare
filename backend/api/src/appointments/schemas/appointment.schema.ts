@@ -174,6 +174,45 @@ export class Appointment {
     fileName?: string;
   };
 
+  @Prop({
+    type: [
+      {
+        productId: { type: String, required: true },
+        productName: { type: String, required: true },
+        clinicId: String,
+        clinicName: String,
+        assignedAt: { type: Date, default: Date.now },
+        booked: { type: Boolean, default: false },
+        resultFile: {
+          url: String,
+          publicId: String,
+          name: String,
+          type: String,
+          size: Number,
+          uploadedAt: Date,
+        },
+      },
+    ],
+    default: [],
+    _id: false,
+  })
+  laboratoryTests?: {
+    productId: string;
+    productName: string;
+    clinicId?: string;
+    clinicName?: string;
+    assignedAt: Date;
+    booked: boolean;
+    resultFile?: {
+      url: string;
+      publicId?: string;
+      name?: string;
+      type?: string;
+      size?: number;
+      uploadedAt: Date;
+    };
+  }[];
+
   @Prop()
   expiresAt?: Date; // დროებით blocked appointments-ებისთვის
 

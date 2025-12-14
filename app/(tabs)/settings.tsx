@@ -94,6 +94,19 @@ export default function SettingsScreen() {
         <View style={styles.menuSection}>
           <TouchableOpacity
             style={styles.menuItem}
+            onPress={() => router.push("/screens/profile/edit-profile")}
+          >
+            <View
+              style={[styles.menuIconContainer, { backgroundColor: "#EFF6FF" }]}
+            >
+              <Ionicons name="person-outline" size={20} color="#06B6D4" />
+            </View>
+            <Text style={styles.menuText}>პროფილი</Text>
+            <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuItem}
             onPress={() => router.push("/screens/profile/medical-cabinet")}
           >
             <View
