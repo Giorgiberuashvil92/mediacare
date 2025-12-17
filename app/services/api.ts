@@ -213,7 +213,16 @@ class ApiService {
 
       throw new Error(errorMessage);
     }
-    return response.json();
+    
+    const jsonData = await response.json();
+    console.log('📦 Parsed JSON response:', {
+      hasSuccess: 'success' in jsonData,
+      success: jsonData?.success,
+      hasData: 'data' in jsonData,
+      dataKeys: jsonData?.data ? Object.keys(jsonData.data) : null,
+    });
+    
+    return jsonData;
   }
 
   // Auth endpoints
@@ -869,6 +878,34 @@ class ApiService {
     );
 
     return this.handleResponse(response);
+  }
+
+  async getAgoraToken(appointmentId: string): Promise<{
+    success: boolean;
+    data: {
+      token: string;
+      channelName: string;
+      appId: string;
+      uid: number;
+      expirationTime: number;
+    };
+  }> {
+    if (USE_MOCK_API) {
+      return Promise.resolve({
+        success: true,
+        data: {
+          token: "mock_token",
+          channelName: `appointment-${appointmentId}`,
+          appId: "mock_app_id",
+          uid: 1,
+          expirationTime: Math.floor(Date.now() / 1000) + 3600 * 24,
+        },
+      });
+    }
+
+    return this.apiCall(`/appointments/${appointmentId}/agora-token`, {
+      method: "GET",
+    });
   }
 
   async scheduleFollowUpAppointment(

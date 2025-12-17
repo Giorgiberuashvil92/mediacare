@@ -180,6 +180,16 @@ export class AppointmentsController {
     );
   }
 
+  // Agora token generation for video calls
+  @Get(':id/agora-token')
+  @UseGuards(JwtAuthGuard)
+  async getAgoraToken(
+    @CurrentUser() user: { sub: string },
+    @Param('id') appointmentId: string,
+  ) {
+    return this.appointmentsService.generateAgoraToken(user.sub, appointmentId);
+  }
+
   // ორივეს შეუძლია ნახოს appointment-ის დეტალები
   // IMPORTANT: This must come AFTER all specific routes like :id/reschedule, :id/follow-up, etc.
   @Get(':id')

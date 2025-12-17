@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import { RtcRole, RtcTokenBuilder } from 'agora-access-token';
 import mongoose from 'mongoose';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { Availability } from '../doctors/schemas/availability.schema';
@@ -1011,6 +1012,76 @@ export class AppointmentsService {
       success: true,
       message: 'ლაბორატორიული კვლევის შედეგი წარმატებით ატვირთა',
       data: resultFile,
+    };
+  }
+
+  /**
+   * Generate Agora RTC token for video call
+   * @param userId - User ID requesting the token
+   * @param appointmentId - Appointment ID
+   * @returns Agora token, channel name, and app ID
+   */
+  async generateAgoraToken(userId: string, appointmentId: string) {
+    const appointment = await this.appointmentModel.findById(appointmentId);
+    if (!appointment) {
+      throw new NotFoundException('Appointment not found');
+    }
+
+    // Verify user is part of this appointment (doctor or patient)
+    const isDoctor = appointment.doctorId.toString() === userId;
+    const isPatient = appointment.patientId.toString() === userId;
+
+    if (!isDoctor && !isPatient) {
+      throw new UnauthorizedException(
+        'You are not authorized to access this appointment video call',
+      );
+    }
+
+    // Get Agora configuration from environment variables
+    // Fallback to hardcoded values for development (should be removed in production)
+    const appId =
+      process.env.AGORA_APP_ID || '3f485e4bf3bd4b4ea9bac7375d33785a';
+    const appCertificate =
+      process.env.AGORA_APP_CERTIFICATE || '93a0c913f5aa4fdfb599e6172686fa9c';
+
+    if (!appId || !appCertificate) {
+      throw new BadRequestException(
+        'Agora configuration missing. Please configure AGORA_APP_ID and AGORA_APP_CERTIFICATE environment variables.',
+      );
+    }
+
+    // Channel name based on appointment ID
+    const channelName = `appointment-${appointmentId}`;
+
+    // UID - can be 0 for auto-assigned or use user ID converted to number
+    // Using timestamp-based UID to avoid conflicts
+    const uid = isDoctor ? 1 : 2; // Simple: doctor = 1, patient = 2
+
+    // Token expiration time (24 hours)
+    const expirationTimeInSeconds = Math.floor(Date.now() / 1000) + 3600 * 24;
+
+    // Role: Publisher for both doctor and patient (can publish video/audio)
+    const role = RtcRole.PUBLISHER;
+
+    // Build token
+    const token = RtcTokenBuilder.buildTokenWithUid(
+      appId,
+      appCertificate,
+      channelName,
+      uid,
+      role,
+      expirationTimeInSeconds,
+    );
+
+    return {
+      success: true,
+      data: {
+        token,
+        channelName,
+        appId,
+        uid,
+        expirationTime: expirationTimeInSeconds,
+      },
     };
   }
 }
