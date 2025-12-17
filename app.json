@@ -20,7 +20,9 @@
       "infoPlist": {
         "NSCameraUsageDescription": "აპლიკაციას სჭირდება კამერის წვდომა ვიდეო კონსულტაციებისთვის",
         "NSMicrophoneUsageDescription": "აპლიკაციას სჭირდება მიკროფონის წვდომა ვიდეო კონსულტაციებისთვის",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryUsageDescription": "აპლიკაციას სჭირდება ფოტო ბიბლიოთეკის წვდომა",
+        "NSPhotoLibraryAddUsageDescription": "აპლიკაციას სჭირდება ფოტოების დამატების ნებართვა"
       }
     },
     "android": {
