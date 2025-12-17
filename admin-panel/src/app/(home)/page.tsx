@@ -17,6 +17,9 @@ type PropsType = {
   }>;
 };
 
+// Force dynamic rendering because we use cookies() in getOverviewData
+export const dynamic = 'force-dynamic';
+
 export default async function Home({ searchParams }: PropsType) {
   // const { selected_time_frame } = await searchParams;
   // const extractTimeFrame = createTimeFrameExtractor(selected_time_frame);
