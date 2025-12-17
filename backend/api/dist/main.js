@@ -13,25 +13,52 @@ async function bootstrap() {
         prefix: '/uploads/',
     });
     const corsOrigins = process.env.CORS_ORIGINS
-        ? process.env.CORS_ORIGINS.split(',')
+        ? process.env.CORS_ORIGINS.split(',').map((origin) => origin.trim())
         : ['*'];
-    app.enableCors({
+    const corsConfig = {
         origin: corsOrigins.includes('*') ? true : corsOrigins,
         credentials: true,
-        methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'],
+        allowedHeaders: [
+            'Content-Type',
+            'Authorization',
+            'Accept',
+            'Origin',
+            'X-Requested-With',
+            'Access-Control-Allow-Origin',
+            'Access-Control-Allow-Headers',
+            'Access-Control-Allow-Methods',
+        ],
+        exposedHeaders: ['Content-Length', 'Content-Type'],
+        preflightContinue: false,
+        optionsSuccessStatus: 204,
+    };
+    console.log('🌐 CORS Configuration:', {
+        origins: corsOrigins.includes('*') ? 'All origins allowed' : corsOrigins,
+        methods: corsConfig.methods,
+        allowedHeaders: corsConfig.allowedHeaders,
     });
+    app.enableCors(corsConfig);
     app.useGlobalPipes(new common_1.ValidationPipe({
         whitelist: true,
         forbidNonWhitelisted: true,
         transform: true,
     }));
     app.use((req, res, next) => {
+        const origin = req.headers.origin || 'No origin';
         console.log('📥 Incoming Request:', {
             method: req.method,
             url: req.url,
+            origin,
             headers: req.headers.authorization ? 'Bearer token present' : 'No token',
         });
+        if (req.method === 'OPTIONS') {
+            console.log('🔄 Preflight OPTIONS request detected:', {
+                origin,
+                'access-control-request-method': req.headers['access-control-request-method'],
+                'access-control-request-headers': req.headers['access-control-request-headers'],
+            });
+        }
         next();
     });
     app.use((err, req, res, next) => {
