@@ -305,7 +305,7 @@ export function EditDoctorForm({
               className="w-full sm:w-1/2"
               type="number"
               name="consultationFee"
-              label="კონსულტაციის საფასური (₾)"
+              label="განმეორებითი ვიდეო კონსულტაციის საფასური (₾)"
               placeholder="100"
               value={formData.consultationFee}
               handleChange={handleChange}
@@ -316,7 +316,7 @@ export function EditDoctorForm({
               className="w-full sm:w-1/2"
               type="number"
               name="followUpFee"
-              label="განმეორებითი კონსულტაციის საფასური (₾)"
+              label="განმეორებითი ბინაზე ვიზიტის კონსულტაციის საფასური (₾)"
               placeholder="50"
               value={formData.followUpFee}
               handleChange={handleChange}
