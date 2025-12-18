@@ -709,11 +709,10 @@ const History = () => {
                                 </Text>
                               </View>
                             )}
-                            {/* Upload button - works with or without booking */}
+                            {/* Upload button - works for all assigned tests (booked or not) */}
                             <TouchableOpacity
                               style={[
                                 styles.uploadResultButton,
-                                !test.booked && styles.uploadResultButtonExternal,
                                 uploadingResult === test.productId && styles.uploadResultButtonDisabled,
                               ]}
                               onPress={async () => {
@@ -736,26 +735,17 @@ const History = () => {
 
                                   setUploadingResult(test.productId);
                                   
-                                  // Use external lab result upload if not booked, otherwise use regular upload
-                                  const uploadResp = test.booked 
-                                    ? await apiService.uploadLaboratoryTestResult(
-                                        selectedVisit.id,
-                                        test.productId,
-                                        {
-                                          uri: file.uri,
-                                          name: file.name || "document",
-                                          type: file.mimeType || "application/pdf",
-                                        }
-                                      )
-                                    : await apiService.uploadExternalLabResult(
-                                        selectedVisit.id,
-                                        {
-                                          uri: file.uri,
-                                          name: file.name || "document",
-                                          type: file.mimeType || "application/pdf",
-                                        },
-                                        test.productName
-                                      );
+                                  // Always use uploadLaboratoryTestResult for assigned tests (they have productId)
+                                  // This works for both booked and non-booked tests
+                                  const uploadResp = await apiService.uploadLaboratoryTestResult(
+                                    selectedVisit.id,
+                                    test.productId,
+                                    {
+                                      uri: file.uri,
+                                      name: file.name || "document",
+                                      type: file.mimeType || "application/pdf",
+                                    }
+                                  );
 
                                   if (uploadResp.success) {
                                     Alert.alert("წარმატება", "ლაბორატორიული კვლევის შედეგი წარმატებით ატვირთა");
