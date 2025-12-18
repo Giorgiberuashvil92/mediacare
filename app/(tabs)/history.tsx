@@ -788,7 +788,12 @@ const History = () => {
                                 style={styles.viewResultButton}
                                 onPress={() => {
                                   if (test.resultFile?.url) {
-                                    Linking.openURL(test.resultFile.url).catch(() =>
+                                    // Add fl_attachment flag to Cloudinary URL for proper PDF download
+                                    let url = test.resultFile.url;
+                                    if (url.includes('cloudinary.com') && url.includes('/raw/upload/')) {
+                                      url = url.replace('/raw/upload/', '/raw/upload/fl_attachment/');
+                                    }
+                                    Linking.openURL(url).catch(() =>
                                       Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა")
                                     );
                                   }
