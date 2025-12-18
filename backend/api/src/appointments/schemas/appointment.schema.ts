@@ -69,30 +69,33 @@ export class Appointment {
   })
   patientDetails?: {
     name?: string;
+    lastName?: string;
     dateOfBirth?: string;
     gender?: string;
+    personalId?: string;
+    address?: string;
     problem?: string;
   };
 
   @Prop({
     type: [
       {
-        url: String,
-        publicId: String,
-        name: String,
-        type: String,
-        size: Number,
+        url: { type: String, required: true },
+        publicId: { type: String },
+        name: { type: String },
+        mimeType: { type: String },
+        size: { type: Number },
         uploadedAt: { type: Date, default: Date.now },
       },
     ],
     default: [],
     _id: false,
   })
-  documents: {
+  documents?: {
     url: string;
     publicId?: string;
     name?: string;
-    type?: string;
+    mimeType?: string;
     size?: number;
     uploadedAt: Date;
   }[];
@@ -183,14 +186,8 @@ export class Appointment {
         clinicName: String,
         assignedAt: { type: Date, default: Date.now },
         booked: { type: Boolean, default: false },
-        resultFile: {
-          url: String,
-          publicId: String,
-          name: String,
-          type: String,
-          size: Number,
-          uploadedAt: Date,
-        },
+        // Store resultFile as a flexible subdocument (Mixed) so it can hold the full Cloudinary payload
+        resultFile: { type: mongoose.Schema.Types.Mixed },
       },
     ],
     default: [],

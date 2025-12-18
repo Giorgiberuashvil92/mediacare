@@ -64,4 +64,9 @@ export class UpdateDoctorDto {
   @IsBoolean()
   @IsOptional()
   isTopRated?: boolean;
+
+  // Minimum working days doctor must have scheduled in the next 2 weeks
+  @IsOptional()
+  @IsNumber()
+  minWorkingDaysRequired?: number;
 }

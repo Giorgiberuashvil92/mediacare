@@ -156,6 +156,10 @@ export class DoctorsService {
             reason: followUp.reason,
           }
         : { required: false },
+      // მიეცეს ექიმს სრულად დანიშნული/შესრულებული ლაბორატორიული კვლევები, მათ შორის ატვირთული შედეგიც
+      laboratoryTests: Array.isArray(apt.laboratoryTests)
+        ? apt.laboratoryTests
+        : [],
       form100: apt.form100
         ? {
             id: apt.form100.id,
@@ -170,6 +174,18 @@ export class DoctorsService {
             recommendations: apt.form100.recommendations,
             pdfUrl: apt.form100.pdfUrl,
             fileName: apt.form100.fileName,
+          }
+        : undefined,
+      // Include full patient details for doctor to see (for Form 100 generation)
+      patientDetails: apt.patientDetails
+        ? {
+            name: apt.patientDetails.name,
+            lastName: apt.patientDetails.lastName,
+            dateOfBirth: apt.patientDetails.dateOfBirth,
+            gender: apt.patientDetails.gender,
+            personalId: apt.patientDetails.personalId,
+            address: apt.patientDetails.address,
+            problem: apt.patientDetails.problem,
           }
         : undefined,
     };
@@ -500,13 +516,24 @@ export class DoctorsService {
     };
   }
 
+  /**
+   * ხელახლა დაწერილი availability ლოგიკა სპეციალურად მობაილისთვის.
+   *
+   * აბრუნებს ზუსტად იმ ფორმატს, რასაც front იყენებს:
+   * - date: 'YYYY-MM-DD'
+   * - dayOfWeek: ქართულის დღე
+   * - timeSlots: string[] (ექიმის სქედული, დაჯავშნილსაც შეიცავს)
+   * - bookedSlots: string[] (დაჯავშნილი საათები იმავე ფორმატში)
+   * - isAvailable: არის თუ არა ამ დღეს მაინც 1 თავისუფალი სლოტი
+   * - type: 'video' | 'home-visit'
+   */
   async getDoctorAvailability(
     doctorId: string,
     startDate?: string,
     endDate?: string,
     type?: 'video' | 'home-visit',
   ) {
-    // Validate ObjectId format
+    // 1) ვალიდაცია
     if (!mongoose.Types.ObjectId.isValid(doctorId)) {
       throw new NotFoundException('Invalid doctor ID format');
     }
@@ -520,85 +547,50 @@ export class DoctorsService {
       throw new NotFoundException('Doctor not found');
     }
 
-    const filter: FilterQuery<AvailabilityDocument> = {
+    // 2) თარიღების დიაპაზონი (default: დღეს + 30 დღე)
+    let rangeStart: Date;
+    let rangeEnd: Date;
+
+    if (startDate && endDate) {
+      rangeStart = new Date(startDate);
+      rangeStart.setHours(0, 0, 0, 0);
+      rangeEnd = new Date(endDate);
+      rangeEnd.setHours(23, 59, 59, 999);
+    } else {
+      rangeStart = new Date();
+      rangeStart.setHours(0, 0, 0, 0);
+      rangeEnd = new Date(rangeStart);
+      rangeEnd.setDate(rangeEnd.getDate() + 30);
+      rangeEnd.setHours(23, 59, 59, 999);
+    }
+
+    // 3) ამ დიაპაზონში ექიმის availability ამოვიღოთ
+    const availabilityFilter: FilterQuery<AvailabilityDocument> = {
       doctorId: new mongoose.Types.ObjectId(doctorId),
+      date: { $gte: rangeStart, $lte: rangeEnd },
     };
 
-    // Filter by type if provided
     if (type) {
-      filter.type = type;
+      availabilityFilter.type = type;
     }
 
-    if (startDate && endDate) {
-      filter.date = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate),
-      };
-    } else {
-      // Default to today (start of day) + next 30 days
-      const start = new Date();
-      start.setHours(0, 0, 0, 0);
-      const end = new Date();
-      end.setDate(end.getDate() + 30);
-      filter.date = { $gte: start, $lte: end };
-    }
+    const availabilityDocs = await this.availabilityModel
+      .find(availabilityFilter)
+      .lean();
 
-    const availability = await this.availabilityModel.find(filter).lean();
-
-    // Get booked appointments for this doctor in the same date range
-    const dateFilter: Record<string, any> = {};
-    if (startDate && endDate) {
-      dateFilter.appointmentDate = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate),
-      };
-    } else {
-      const start = new Date();
-      start.setHours(0, 0, 0, 0);
-      const end = new Date();
-      end.setDate(end.getDate() + 30);
-      dateFilter.appointmentDate = { $gte: start, $lte: end };
-    }
-
-    const query = {
-      doctorId: new mongoose.Types.ObjectId(doctorId),
-      ...dateFilter,
-      status: { $ne: 'cancelled' }, // Exclude cancelled appointments
-    };
-
-    console.log(
-      '🏥 getDoctorAvailability - Query for booked appointments:',
-      JSON.stringify(
-        {
-          doctorId: doctorId,
-          dateFilter,
-          statusFilter: { $ne: 'cancelled' },
-        },
-        null,
-        2,
-      ),
-    );
-
+    // 4) ამავე დიაპაზონში დაჯავშნილი ვიზიტები ამოვიღოთ
     const bookedAppointments = await this.appointmentModel
-      .find(query)
+      .find({
+        doctorId: new mongoose.Types.ObjectId(doctorId),
+        appointmentDate: { $gte: rangeStart, $lte: rangeEnd },
+        status: { $ne: 'cancelled' },
+      })
       .select('appointmentDate appointmentTime status')
       .lean();
 
-    console.log(
-      '🏥 getDoctorAvailability - bookedAppointments count:',
-      bookedAppointments.length,
-    );
-    console.log(
-      '🏥 getDoctorAvailability - bookedAppointments:',
-      JSON.stringify(bookedAppointments, null, 2),
-    );
-
-    // Create a map of booked time slots by date
-    // Use local date components to match availability date format
+    // 5) დავაგენერიროთ bookedSlotsByDate (YYYY-MM-DD -> Set<HH:mm>)
     const bookedSlotsByDate: { [key: string]: Set<string> } = {};
     bookedAppointments.forEach((apt) => {
-      // Convert appointmentDate to local date string (YYYY-MM-DD)
-      // This ensures it matches the availability date format
       const aptDate = new Date(apt.appointmentDate);
       const year = aptDate.getFullYear();
       const month = String(aptDate.getMonth() + 1).padStart(2, '0');
@@ -608,8 +600,8 @@ export class DoctorsService {
       if (!bookedSlotsByDate[dateStr]) {
         bookedSlotsByDate[dateStr] = new Set();
       }
+
       if (apt.appointmentTime) {
-        // Normalize appointmentTime to HH:MM format (remove seconds if present)
         const normalizedTime = apt.appointmentTime
           .split(':')
           .slice(0, 2)
@@ -618,21 +610,7 @@ export class DoctorsService {
       }
     });
 
-    console.log(
-      '🏥 getDoctorAvailability - bookedSlotsByDate:',
-      JSON.stringify(
-        Object.fromEntries(
-          Object.entries(bookedSlotsByDate).map(([key, value]) => [
-            key,
-            Array.from(value),
-          ]),
-        ),
-        null,
-        2,
-      ),
-    );
-
-    // Format availability with Georgian day names and remove booked time slots
+    // 6) ქართული დღეების სახელები
     const dayNames = [
       'კვირა',
       'ორშაბათი',
@@ -643,40 +621,73 @@ export class DoctorsService {
       'შაბათი',
     ];
 
-    const result = availability.map((avail) => {
+    // 7) availabilityDocs -> frontend-ისთვის საჭირო ფორმატი
+    // დავაგრუპოთ ჩანაწერები ერთი დღის და ერთი ტიპის ჭრილში,
+    // რომ ერთი და იმავე თარიღზე დუპლიკატები აღარ მოვიდეს.
+
+    const availabilityByDateType: Record<
+      string,
+      { date: Date; type: 'video' | 'home-visit'; slots: Set<string> }
+    > = {};
+
+    availabilityDocs.forEach((avail) => {
       const date = new Date(avail.date);
-      const dateStr = date.toISOString().split('T')[0];
-      const bookedSlots = bookedSlotsByDate[dateStr] || new Set();
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
+      const typeKey: 'video' | 'home-visit' = (avail.type as any) ?? 'video';
+      const key = `${dateStr}|${typeKey}`;
 
-      console.log(`🏥 getDoctorAvailability - Processing date ${dateStr}:`, {
-        availDate: avail.date,
-        dateStr,
-        bookedSlots: Array.from(bookedSlots),
-        originalTimeSlots: avail.timeSlots,
+      if (!availabilityByDateType[key]) {
+        availabilityByDateType[key] = {
+          date,
+          type: typeKey,
+          slots: new Set<string>(),
+        };
+      }
+
+      (avail.timeSlots || []).forEach((slot: string) => {
+        availabilityByDateType[key].slots.add(slot);
       });
-
-      // Keep ALL time slots (including booked ones) in timeSlots
-      // Frontend will use bookedSlots to filter them out visually
-      const allTimeSlots = avail.timeSlots || [];
-
-      // Filter out booked time slots for availableTimeSlots
-      const availableTimeSlots = allTimeSlots.filter(
-        (slot: string) => !bookedSlots.has(slot),
-      );
-
-      return {
-        date: dateStr,
-        dayOfWeek: dayNames[date.getDay()],
-        timeSlots: allTimeSlots, // Include ALL slots (booked + available) for frontend
-        bookedSlots: Array.from(bookedSlots), // Include booked slots for frontend filtering
-        isAvailable: availableTimeSlots.length > 0,
-        // expose type so frontend can distinguish video vs home-visit
-        type: avail.type ?? 'video',
-      };
     });
 
+    const result = Object.entries(availabilityByDateType)
+      .map(([key, value]) => {
+        const [dateStr] = key.split('|');
+        const { date, type, slots } = value;
+
+        const bookedSet = bookedSlotsByDate[dateStr] || new Set<string>();
+        const allTimeSlots: string[] = Array.from(slots).sort();
+
+        // Combine available slots with booked slots to show all slots that should be displayed
+        // This ensures booked slots are visible even if they're not in the doctor's availability
+        const allSlotsToShow = Array.from(
+          new Set([...allTimeSlots, ...Array.from(bookedSet)]),
+        ).sort();
+
+        // თუ არც availability-ს აქვს სლოტები და არც დაჯავშნილია რამე -> ასეთი დღე არ გვაინტერესებს
+        if (allTimeSlots.length === 0 && bookedSet.size === 0) {
+          return null;
+        }
+
+        const availableTimeSlots = allTimeSlots.filter(
+          (slot: string) => !bookedSet.has(slot),
+        );
+
+        return {
+          date: dateStr,
+          dayOfWeek: dayNames[date.getDay()],
+          timeSlots: allSlotsToShow, // Show all slots (available + booked) so booked slots are visible
+          bookedSlots: Array.from(bookedSet),
+          isAvailable: availableTimeSlots.length > 0,
+          type,
+        };
+      })
+      .filter((x): x is any => x !== null);
+
     console.log(
-      '🏥 getDoctorAvailability - Final result:',
+      '🏥 getDoctorAvailability - Returning result for mobile:',
       JSON.stringify(result, null, 2),
     );
 
@@ -705,17 +716,108 @@ export class DoctorsService {
       throw new UnauthorizedException('Only doctors can update availability');
     }
 
+    console.log(
+      '🏥 updateAvailability - incoming DTO:',
+      JSON.stringify(updateAvailabilityDto, null, 2),
+    );
+
+    // Check minWorkingDaysRequired constraint BEFORE making changes
+    const minWorkingDaysRequired = (doctor as any).minWorkingDaysRequired || 0;
+    if (minWorkingDaysRequired > 0) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const twoWeeksLater = new Date(today);
+      twoWeeksLater.setDate(twoWeeksLater.getDate() + 14);
+      twoWeeksLater.setHours(23, 59, 59, 999);
+
+      // Get current availability dates in next 2 weeks
+      const currentAvailabilities = await this.availabilityModel.find({
+        doctorId: new mongoose.Types.ObjectId(doctorId),
+        date: { $gte: today, $lte: twoWeeksLater },
+        timeSlots: { $exists: true, $ne: [] },
+      });
+
+      // Create a set of dates that will have availability after the update
+      const dateSet = new Set<string>();
+
+      // Add existing dates (as date strings for comparison)
+      for (const avail of currentAvailabilities) {
+        const dateStr = new Date(avail.date).toISOString().split('T')[0];
+        dateSet.add(dateStr);
+      }
+
+      // Process incoming changes to simulate the result
+      for (const slot of updateAvailabilityDto.availability) {
+        const slotDate = new Date(slot.date);
+        slotDate.setHours(0, 0, 0, 0);
+
+        // Only consider dates within the 2-week window
+        if (slotDate >= today && slotDate <= twoWeeksLater) {
+          const dateStr = slotDate.toISOString().split('T')[0];
+
+          if (!slot.timeSlots || slot.timeSlots.length === 0) {
+            // This date is being removed - check if there's another type for this date
+            const otherType = slot.type === 'video' ? 'home-visit' : 'video';
+            const hasOtherType = currentAvailabilities.some(
+              (a) =>
+                new Date(a.date).toISOString().split('T')[0] === dateStr &&
+                a.type === otherType,
+            );
+            if (!hasOtherType) {
+              dateSet.delete(dateStr);
+            }
+          } else {
+            // This date will have availability
+            dateSet.add(dateStr);
+          }
+        }
+      }
+
+      const projectedCount = dateSet.size;
+
+      if (projectedCount < minWorkingDaysRequired) {
+        throw new BadRequestException(
+          `მომავალი 2 კვირის განმავლობაში მინიმუმ ${minWorkingDaysRequired} დღე უნდა გქონდეთ გრაფიკი. ამ ცვლილების შემდეგ დარჩებოდა ${projectedCount} დღე. გთხოვთ არ გააუქმოთ სამუშაო დღეები ან დაამატოთ მეტი.`,
+        );
+      }
+    }
+
+    // Now actually perform the updates
     const results = [];
 
     for (const slot of updateAvailabilityDto.availability) {
-      const date = new Date(slot.date);
-      date.setHours(0, 0, 0, 0);
+      // Normalize incoming date string (YYYY-MM-DD) to start of day
+      const rawDate = new Date(slot.date);
+      const startOfDay = new Date(rawDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(startOfDay);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      // ჯერ წავშალოთ ამ ექიმის, ამ ტიპის და ამ კალენდარული დღის ყველა ძველი availability,
+      // რომ დუბლირებული დღეები აღარ დაგვიგროვდეს ბაზაში.
+      await this.availabilityModel.deleteMany({
+        doctorId: new mongoose.Types.ObjectId(doctorId),
+        type: slot.type,
+        date: {
+          $gte: startOfDay,
+          $lte: endOfDay,
+        },
+      });
+
+      // თუ ამ დღისთვის საერთოდ აღარ გვაქვს სლოტები -> უბრალოდ ვშლით და ახალს აღარ ვქმნით.
+      // ამით "გაუქმებული" დღე საერთოდ ქრება ბაზიდან.
+      if (!slot.timeSlots || slot.timeSlots.length === 0) {
+        continue;
+      }
 
       // Check for conflicting time slots with other types (video vs home-visit)
       const otherType = slot.type === 'video' ? 'home-visit' : 'video';
       const otherAvailability = await this.availabilityModel.findOne({
         doctorId: new mongoose.Types.ObjectId(doctorId),
-        date,
+        date: {
+          $gte: startOfDay,
+          $lte: endOfDay,
+        },
         type: otherType,
       });
 
@@ -732,21 +834,14 @@ export class DoctorsService {
         }
       }
 
-      const availability = await this.availabilityModel.findOneAndUpdate(
-        {
-          doctorId: new mongoose.Types.ObjectId(doctorId),
-          date,
-          type: slot.type,
-        },
-        {
-          doctorId: new mongoose.Types.ObjectId(doctorId),
-          date,
-          timeSlots: slot.timeSlots,
-          isAvailable: slot.isAvailable,
-          type: slot.type,
-        },
-        { upsert: true, new: true },
-      );
+      // ახალი availability დოკუმენტის შექმნა ამ დღეზე (უკვე წაშლილია ძველი ამ დღისთვის და ტიპისთვის)
+      const availability = await this.availabilityModel.create({
+        doctorId: new mongoose.Types.ObjectId(doctorId),
+        date: startOfDay,
+        timeSlots: slot.timeSlots,
+        isAvailable: slot.isAvailable,
+        type: slot.type,
+      });
 
       results.push(availability);
     }
@@ -829,6 +924,10 @@ export class DoctorsService {
     }
     if (updateDoctorDto.isTopRated !== undefined) {
       doctor.isTopRated = updateDoctorDto.isTopRated;
+    }
+    if (updateDoctorDto.minWorkingDaysRequired !== undefined) {
+      (doctor as any).minWorkingDaysRequired =
+        updateDoctorDto.minWorkingDaysRequired;
     }
 
     await doctor.save();
@@ -1027,6 +1126,35 @@ export class DoctorsService {
 
     const returningPatients = totalPatients - newPatientsThisMonth.length;
 
+    // Calculate video vs home-visit statistics
+    const videoAppointments = allAppointments.filter(
+      (apt: any) => apt.type === 'video',
+    );
+    const homeVisitAppointments = allAppointments.filter(
+      (apt: any) => apt.type === 'home-visit',
+    );
+
+    const videoThisMonth = thisMonthAppointments.filter(
+      (apt: any) => apt.type === 'video',
+    );
+    const homeVisitThisMonth = thisMonthAppointments.filter(
+      (apt: any) => apt.type === 'home-visit',
+    );
+
+    const videoLastMonth = lastMonthAppointments.filter(
+      (apt: any) => apt.type === 'video',
+    );
+    const homeVisitLastMonth = lastMonthAppointments.filter(
+      (apt: any) => apt.type === 'home-visit',
+    );
+
+    const completedVideoAppointments = videoAppointments.filter(
+      (apt: any) => apt.status === 'completed',
+    );
+    const completedHomeVisitAppointments = homeVisitAppointments.filter(
+      (apt: any) => apt.status === 'completed',
+    );
+
     // Real statistics based on appointments
     const stats = {
       earnings: {
@@ -1051,6 +1179,18 @@ export class DoctorsService {
         thisWeek: thisWeekAppointments.length,
         thisMonth: thisMonthAppointments.length,
         total: completedAppointments.length,
+      },
+      videoConsultations: {
+        total: videoAppointments.length,
+        completed: completedVideoAppointments.length,
+        thisMonth: videoThisMonth.length,
+        lastMonth: videoLastMonth.length,
+      },
+      homeVisits: {
+        total: homeVisitAppointments.length,
+        completed: completedHomeVisitAppointments.length,
+        thisMonth: homeVisitThisMonth.length,
+        lastMonth: homeVisitLastMonth.length,
       },
     };
 

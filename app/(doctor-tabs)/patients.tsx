@@ -33,7 +33,6 @@ export default function DoctorPatients() {
 
   useEffect(() => {
     if (user?.id) {
-      console.log('Loading patients for doctor ID:', user.id);
       loadPatients();
     }
      

@@ -300,14 +300,6 @@ export default function RegisterScreen() {
       return;
     }
 
-    if (selectedRole === "doctor" && !profileImage?.url) {
-      showToast.error(
-        "პროფილის ფოტო აუცილებელია ექიმისთვის",
-        t("auth.register.error.default"),
-      );
-      return;
-    }
-
     if (password.length < 6) {
       showToast.error(
         t("auth.register.validation.passwordLength"),
@@ -810,10 +802,10 @@ export default function RegisterScreen() {
                     )}
                   </View>
 
-                  {/* Profile Image (required for doctors) */}
+                  {/* Profile Image (optional for doctors) */}
                   <View style={styles.inputContainer}>
                     <Text style={styles.label}>
-                      პროფილის სურათი <Text style={styles.requiredLabel}>*</Text>
+                      პროფილის სურათი
                     </Text>
                     <View style={styles.profileCard}>
                       <View style={styles.profilePreview}>

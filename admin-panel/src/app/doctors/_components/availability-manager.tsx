@@ -67,14 +67,24 @@ export function AvailabilityManager({
           : response.data.availability || [];
 
         setAvailability(
-          data.map((day: any) => ({
-            date: day.date || day.dateString,
-            timeSlots: day.availableSlots || day.timeSlots || [],
-            bookedSlots: day.bookedSlots || [],
-            isAvailable: day.isAvailable !== false,
-            type: day.type || selectedType,
-            _id: day._id,
-          })),
+          data.map((day: any) => {
+            // Backend returns timeSlots (all slots: available + booked) and bookedSlots
+            // For admin panel, we want to show only available slots (timeSlots - bookedSlots)
+            const allSlots = day.timeSlots || [];
+            const bookedSlots = day.bookedSlots || [];
+            const availableSlots = allSlots.filter(
+              (slot: string) => !bookedSlots.includes(slot),
+            );
+
+            return {
+              date: day.date || day.dateString,
+              timeSlots: availableSlots, // Show only available slots in admin panel
+              bookedSlots: bookedSlots,
+              isAvailable: day.isAvailable !== false,
+              type: day.type || selectedType,
+              _id: day._id,
+            };
+          }),
         );
       }
     } catch (err: any) {
@@ -475,22 +485,38 @@ export function AvailabilityManager({
                                   disabled={isBooked}
                                   className={`rounded-lg px-3 py-2 text-xs font-medium transition ${
                                     isBooked
-                                      ? 'bg-red-100 text-red-700 opacity-60 cursor-not-allowed dark:bg-red-900/30 dark:text-red-400'
+                                      ? 'bg-red-500 text-white border-2 border-red-600 cursor-not-allowed shadow-md dark:bg-red-600 dark:border-red-700'
                                       : isSelected
                                         ? 'bg-primary text-white'
                                         : 'border border-stroke bg-white text-dark hover:bg-gray-50 dark:border-dark-3 dark:bg-gray-dark dark:text-white'
                                   }`}
                                   title={isBooked ? 'დაჯავშნილი - ვერ შეიცვლება' : isSelected ? 'არჩეული' : 'არჩევა'}
                                 >
-                                  {time} {isBooked && '🔒'}
+                                  {time} {isBooked && <span className="ml-1">🔒</span>}
                                 </button>
                               );
                             })}
                           </div>
                         </div>
                         {editingDay.bookedSlots && editingDay.bookedSlots.length > 0 && (
-                          <div className="rounded-lg bg-red-50 p-2 text-xs text-red-700 dark:bg-red-900/20 dark:text-red-400">
-                            ⚠️ დაჯავშნილი საათები ({editingDay.bookedSlots.join(', ')}) ვერ შეიცვლება
+                          <div className="rounded-lg border-2 border-red-300 bg-red-50 p-3 text-sm font-medium text-red-800 dark:bg-red-900/30 dark:border-red-600 dark:text-red-300">
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">🔒</span>
+                              <span>დაჯავშნილი საათები ({editingDay.bookedSlots.length}):</span>
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {editingDay.bookedSlots.map((slot) => (
+                                <span
+                                  key={slot}
+                                  className="rounded-full bg-red-500 px-3 py-1 text-xs font-semibold text-white shadow-sm"
+                                >
+                                  {slot}
+                                </span>
+                              ))}
+                            </div>
+                            <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+                              ⚠️ ეს საათები ვერ შეიცვლება, რადგან უკვე დაჯავშნილია
+                            </p>
                           </div>
                         )}
                         <div className="flex gap-2">
@@ -509,34 +535,53 @@ export function AvailabilityManager({
                         </div>
                       </div>
                     ) : (
-                      <div className="space-y-2">
-                        <div className="flex flex-wrap gap-2">
-                          {day.timeSlots.length === 0 ? (
-                            <span className="text-sm text-dark-4 dark:text-dark-6">
-                              საათები არ არის დამატებული
-                            </span>
-                          ) : (
-                            day.timeSlots.map((time: string) => {
-                              const isBooked = day.bookedSlots?.includes(time) || false;
-                              return (
-                                <span
-                                  key={time}
-                                  className={`rounded-full px-3 py-1 text-xs font-medium ${
-                                    isBooked
-                                      ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                                      : 'bg-primary/20 text-primary dark:bg-primary/30'
-                                  }`}
-                                  title={isBooked ? 'დაჯავშნილი' : 'თავისუფალი'}
-                                >
-                                  {time} {isBooked && '🔒'}
-                                </span>
-                              );
-                            })
-                          )}
+                      <div className="space-y-3">
+                        {/* Available Slots */}
+                        <div>
+                          <div className="mb-2 text-xs font-semibold text-dark-4 dark:text-dark-6">
+                            თავისუფალი საათები:
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {day.timeSlots.length === 0 ? (
+                              <span className="text-sm text-dark-4 dark:text-dark-6">
+                                საათები არ არის დამატებული
+                              </span>
+                            ) : (
+                              day.timeSlots
+                                .filter((time: string) => !day.bookedSlots?.includes(time))
+                                .map((time: string) => (
+                                  <span
+                                    key={time}
+                                    className="rounded-full bg-primary/20 px-3 py-1 text-xs font-medium text-primary dark:bg-primary/30"
+                                    title="თავისუფალი"
+                                  >
+                                    {time}
+                                  </span>
+                                ))
+                            )}
+                          </div>
                         </div>
+
+                        {/* Booked Slots */}
                         {day.bookedSlots && day.bookedSlots.length > 0 && (
-                          <div className="text-xs text-dark-4 dark:text-dark-6">
-                            🔒 დაჯავშნილი საათები: {day.bookedSlots.join(', ')}
+                          <div className="rounded-lg border-2 border-red-300 bg-red-50 p-3 dark:bg-red-900/20 dark:border-red-600">
+                            <div className="mb-2 flex items-center gap-2">
+                              <span className="text-base">🔒</span>
+                              <span className="text-sm font-semibold text-red-800 dark:text-red-300">
+                                დაჯავშნილი საათები ({day.bookedSlots.length}):
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {day.bookedSlots.map((slot: string) => (
+                                <span
+                                  key={slot}
+                                  className="rounded-full bg-red-500 px-3 py-1 text-xs font-semibold text-white shadow-sm"
+                                  title="დაჯავშნილი"
+                                >
+                                  {slot}
+                                </span>
+                              ))}
+                            </div>
                           </div>
                         )}
                       </div>

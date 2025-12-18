@@ -27,6 +27,14 @@ export default function EditProfileScreen() {
   const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
+  
+  // Doctor specific fields
+  const [consultationFee, setConsultationFee] = useState("");
+  const [experience, setExperience] = useState("");
+  const [location, setLocation] = useState("");
+  const [degrees, setDegrees] = useState("");
+  
+  const isDoctor = (user as any)?.role === "doctor";
 
   useEffect(() => {
     if (user?.id) {
@@ -58,6 +66,14 @@ export default function EditProfileScreen() {
         setPhone(profile.phone || "");
         setAbout(profile.about || "");
         setProfileImage(profile.profileImage || null);
+        
+        // Doctor specific fields
+        if (profile.consultationFee) {
+          setConsultationFee(String(profile.consultationFee));
+        }
+        setExperience(profile.experience || "");
+        setLocation(profile.location || "");
+        setDegrees(profile.degrees || "");
       }
     } catch (err: any) {
       console.error("Error loading profile:", err);
@@ -96,7 +112,10 @@ export default function EditProfileScreen() {
           type: file.mimeType || "image/jpeg",
         });
 
+        console.log("📸 [EditProfile] uploadResponse:", uploadResponse);
+
         if (uploadResponse.success && uploadResponse.url) {
+          console.log("📸 [EditProfile] Setting profileImage to:", uploadResponse.url);
           setProfileImage(uploadResponse.url);
           Alert.alert("წარმატება", "სურათი წარმატებით აიტვირთა");
         } else {
@@ -139,11 +158,33 @@ export default function EditProfileScreen() {
 
     if (profileImage) {
       payload.profileImage = profileImage;
+      console.log("📸 [EditProfile] Saving profile with profileImage:", profileImage);
+    } else {
+      console.log("📸 [EditProfile] No profileImage to save");
     }
+
+    // Doctor specific fields
+    if (isDoctor) {
+      if (consultationFee.trim()) {
+        payload.consultationFee = parseFloat(consultationFee.trim());
+      }
+      if (experience.trim()) {
+        payload.experience = experience.trim();
+      }
+      if (location.trim()) {
+        payload.location = location.trim();
+      }
+      if (degrees.trim()) {
+        payload.degrees = degrees.trim();
+      }
+    }
+
+    console.log("📸 [EditProfile] Full payload:", JSON.stringify(payload, null, 2));
 
     try {
       setSavingProfile(true);
       const response = await apiService.updateProfile(payload);
+      console.log("📸 [EditProfile] updateProfile response:", response);
       if (!response.success) {
         Alert.alert("შეცდომა", "ინფორმაციის შენახვა ვერ მოხერხდა");
         return;
@@ -295,6 +336,83 @@ export default function EditProfileScreen() {
               />
             </View>
           </View>
+
+          {/* Doctor Specific Fields */}
+          {isDoctor && (
+            <>
+              {/* Consultation Fee */}
+              <View style={styles.formItem}>
+                <View style={styles.labelContainer}>
+                  <Ionicons name="cash-outline" size={20} color="#10B981" />
+                  <Text style={styles.label}>კონსულტაციის ფასი (₾)</Text>
+                </View>
+                <View style={styles.input}>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="მაგ: 50"
+                    placeholderTextColor="#9CA3AF"
+                    value={consultationFee}
+                    onChangeText={setConsultationFee}
+                    keyboardType="numeric"
+                  />
+                </View>
+              </View>
+
+              {/* Experience */}
+              <View style={styles.formItem}>
+                <View style={styles.labelContainer}>
+                  <Ionicons name="briefcase-outline" size={20} color="#8B5CF6" />
+                  <Text style={styles.label}>გამოცდილება</Text>
+                </View>
+                <View style={styles.input}>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="მაგ: 10 წელი"
+                    placeholderTextColor="#9CA3AF"
+                    value={experience}
+                    onChangeText={setExperience}
+                  />
+                </View>
+              </View>
+
+              {/* Location */}
+              <View style={styles.formItem}>
+                <View style={styles.labelContainer}>
+                  <Ionicons name="location-outline" size={20} color="#F59E0B" />
+                  <Text style={styles.label}>მისამართი</Text>
+                </View>
+                <View style={styles.input}>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="მაგ: თბილისი, ვაკე"
+                    placeholderTextColor="#9CA3AF"
+                    value={location}
+                    onChangeText={setLocation}
+                  />
+                </View>
+              </View>
+
+              {/* Degrees */}
+              <View style={styles.formItem}>
+                <View style={styles.labelContainer}>
+                  <Ionicons name="school-outline" size={20} color="#06B6D4" />
+                  <Text style={styles.label}>კვალიფიკაცია / ხარისხი</Text>
+                </View>
+                <View style={[styles.input, styles.textAreaInput]}>
+                  <TextInput
+                    style={[styles.textInput, styles.textArea]}
+                    placeholder="მაგ: მედიცინის დოქტორი, თსსუ"
+                    placeholderTextColor="#9CA3AF"
+                    value={degrees}
+                    onChangeText={setDegrees}
+                    multiline
+                    numberOfLines={3}
+                    textAlignVertical="top"
+                  />
+                </View>
+              </View>
+            </>
+          )}
 
           {/* Save Button */}
           <TouchableOpacity

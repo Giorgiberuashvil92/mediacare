@@ -11,7 +11,16 @@ export class TermsService {
     private termModel: Model<TermDocument>,
   ) {}
 
-  async findOne(type: 'cancellation' | 'service' | 'privacy') {
+  async findOne(
+    type:
+      | 'cancellation'
+      | 'service'
+      | 'privacy'
+      | 'contract'
+      | 'usage'
+      | 'doctor-cancellation'
+      | 'doctor-service',
+  ) {
     const term = await this.termModel.findOne({ type, isActive: true }).lean();
 
     if (!term) {
@@ -37,7 +46,14 @@ export class TermsService {
   }
 
   async update(
-    type: 'cancellation' | 'service' | 'privacy',
+    type:
+      | 'cancellation'
+      | 'service'
+      | 'privacy'
+      | 'contract'
+      | 'usage'
+      | 'doctor-cancellation'
+      | 'doctor-service',
     updateTermDto: UpdateTermDto,
   ) {
     const term = await this.termModel

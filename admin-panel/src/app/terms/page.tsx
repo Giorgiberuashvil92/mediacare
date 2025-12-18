@@ -4,7 +4,7 @@ import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 import { apiService } from '@/lib/api';
 import { useEffect, useState } from 'react';
 
-type TermType = 'cancellation' | 'service' | 'privacy';
+type TermType = 'cancellation' | 'service' | 'privacy' | 'contract' | 'usage' | 'doctor-cancellation' | 'doctor-service';
 
 interface Term {
   type: string;
@@ -16,6 +16,10 @@ const termLabels: Record<TermType, string> = {
   cancellation: 'ჯავშნების გაუქმების პირობები',
   service: 'სერვისის პირობები',
   privacy: 'კონფიდენციალურობა',
+  contract: 'ხელშეკრულება (ექიმებისთვის)',
+  usage: 'მოხმარების წესები (ექიმებისთვის)',
+  'doctor-cancellation': 'ჯავშნების გაუქმების პირობები (ექიმებისთვის)',
+  'doctor-service': 'სერვისის პირობები (ექიმებისთვის)',
 };
 
 export default function TermsPage() {
@@ -23,6 +27,10 @@ export default function TermsPage() {
     cancellation: { type: 'cancellation', content: '' },
     service: { type: 'service', content: '' },
     privacy: { type: 'privacy', content: '' },
+    contract: { type: 'contract', content: '' },
+    usage: { type: 'usage', content: '' },
+    'doctor-cancellation': { type: 'doctor-cancellation', content: '' },
+    'doctor-service': { type: 'doctor-service', content: '' },
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -35,10 +43,14 @@ export default function TermsPage() {
       setLoading(true);
       setError(null);
       
-      const [cancellationRes, serviceRes, privacyRes] = await Promise.all([
+      const [cancellationRes, serviceRes, privacyRes, contractRes, usageRes, doctorCancellationRes, doctorServiceRes] = await Promise.all([
         apiService.getTerms('cancellation'),
         apiService.getTerms('service'),
         apiService.getTerms('privacy'),
+        apiService.getTerms('contract'),
+        apiService.getTerms('usage'),
+        apiService.getTerms('doctor-cancellation'),
+        apiService.getTerms('doctor-service'),
       ]);
 
       if (cancellationRes.success && serviceRes.success && privacyRes.success) {
@@ -46,6 +58,10 @@ export default function TermsPage() {
           cancellation: cancellationRes.data,
           service: serviceRes.data,
           privacy: privacyRes.data,
+          contract: contractRes.data || { type: 'contract', content: '' },
+          usage: usageRes.data || { type: 'usage', content: '' },
+          'doctor-cancellation': doctorCancellationRes.data || { type: 'doctor-cancellation', content: '' },
+          'doctor-service': doctorServiceRes.data || { type: 'doctor-service', content: '' },
         });
       } else {
         setError('ტერმინების ჩატვირთვა ვერ მოხერხდა');
@@ -125,7 +141,7 @@ export default function TermsPage() {
         )}
 
         <div className="p-6.5">
-          {(['cancellation', 'service', 'privacy'] as TermType[]).map((type) => (
+          {(['cancellation', 'service', 'privacy', 'contract', 'usage', 'doctor-cancellation', 'doctor-service'] as TermType[]).map((type) => (
             <div key={type} className="mb-6 rounded-lg border border-stroke bg-gray-50 p-6">
               <div className="mb-4 flex items-center justify-between">
                 <h4 className="text-lg font-semibold text-black">

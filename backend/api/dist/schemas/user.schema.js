@@ -138,6 +138,10 @@ __decorate([
     __metadata("design:type", Boolean)
 ], User.prototype, "isTopRated", void 0);
 __decorate([
+    (0, mongoose_1.Prop)({ default: 0 }),
+    __metadata("design:type", Number)
+], User.prototype, "minWorkingDaysRequired", void 0);
+__decorate([
     (0, mongoose_1.Prop)(),
     __metadata("design:type", Date)
 ], User.prototype, "createdAt", void 0);

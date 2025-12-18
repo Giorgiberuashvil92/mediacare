@@ -31,7 +31,14 @@ export class AuthService {
   ) {}
 
   async register(registerDto: RegisterDto) {
-    const { email, password, role, dateOfBirth, ...userData } = registerDto;
+    const {
+      email,
+      password,
+      role,
+      dateOfBirth,
+      minWorkingDaysRequired,
+      ...userData
+    } = registerDto;
 
     const existingUser = await this.userModel.findOne({ email });
     if (existingUser) {
@@ -56,6 +63,7 @@ export class AuthService {
       password: hashedPassword,
       role,
       dateOfBirth: dateOfBirthDate,
+      minWorkingDaysRequired: minWorkingDaysRequired || 0,
       isActive: isDoctor ? false : true,
       approvalStatus: isDoctor
         ? ApprovalStatus.PENDING

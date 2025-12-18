@@ -56,8 +56,22 @@ export class AppointmentsService {
     appointmentId: string,
     file: Express.Multer.File,
   ) {
+    console.log('📄 addDocument - Received file:', {
+      hasFile: !!file,
+      fileName: file?.originalname,
+      fileSize: file?.size,
+      fileMimetype: file?.mimetype,
+      hasBuffer: !!file?.buffer,
+      bufferLength: file?.buffer?.length,
+    });
+
     if (!file) {
       throw new BadRequestException('ფაილი აუცილებელია');
+    }
+
+    if (!file.buffer) {
+      console.error('❌ addDocument - File buffer is missing');
+      throw new BadRequestException('ფაილის ბუფერი არ არის ხელმისაწვდომი');
     }
 
     const allowedTypes = [
@@ -82,25 +96,33 @@ export class AppointmentsService {
 
     this.ensurePatientOwner(patientId, appointment);
 
-    const upload = await this.cloudinaryService.uploadBuffer(file.buffer, {
-      folder: 'mediacare/appointment-docs',
-      resource_type: 'auto',
-    });
+    try {
+      const upload = await this.cloudinaryService.uploadBuffer(file.buffer, {
+        folder: 'mediacare/appointment-docs',
+        resource_type: 'auto',
+      });
 
-    const doc = {
-      url: upload.secure_url,
-      publicId: upload.public_id,
-      name: file.originalname,
-      type: file.mimetype,
-      size: file.size,
-      uploadedAt: new Date(),
-    };
+      const doc = {
+        url: upload.secure_url,
+        publicId: upload.public_id,
+        name: file.originalname,
+        mimeType: file.mimetype,
+        size: file.size,
+        uploadedAt: new Date(),
+      };
 
-    appointment.documents = appointment.documents || [];
-    appointment.documents.push(doc as any);
-    await appointment.save();
+      if (!appointment.documents) {
+        appointment.documents = [];
+      }
+      appointment.documents.push(doc);
+      appointment.markModified('documents');
+      await appointment.save();
 
-    return { success: true, data: doc };
+      return { success: true, data: doc };
+    } catch (error) {
+      console.error('❌ addDocument - Cloudinary upload error:', error);
+      throw new BadRequestException('დოკუმენტის ატვირთვა ვერ მოხერხდა');
+    }
   }
 
   async getDocuments(userId: string, appointmentId: string) {
@@ -197,14 +219,52 @@ export class AppointmentsService {
     }
 
     // Check doctor's availability for the specific appointment type (video/home-visit)
-    const availability = await this.availabilityModel.findOne({
+    // Use date range query to handle timezone differences (same approach as scheduleFollowUpAppointmentByPatient)
+    const startOfDay = new Date(normalizedDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(normalizedDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const availabilityQuery = {
       doctorId: new mongoose.Types.ObjectId(createAppointmentDto.doctorId),
-      date: normalizedDate,
+      date: { $gte: startOfDay, $lte: endOfDay },
       type: createAppointmentDto.type, // Check availability for specific type
       isAvailable: true,
+    };
+
+    console.log('🔍 createAppointment - Availability query:', {
+      doctorId: createAppointmentDto.doctorId,
+      dateRange: {
+        start: startOfDay.toISOString(),
+        end: endOfDay.toISOString(),
+      },
+      type: createAppointmentDto.type,
+      appointmentDate: createAppointmentDto.appointmentDate,
+      normalizedDate: normalizedDate.toISOString(),
+    });
+
+    const availability =
+      await this.availabilityModel.findOne(availabilityQuery);
+
+    console.log('🔍 createAppointment - Availability found:', {
+      found: !!availability,
+      availabilityDate: availability?.date,
+      availabilityTimeSlots: availability?.timeSlots,
+      timeSlotsLength: availability?.timeSlots?.length || 0,
     });
 
     if (!availability) {
+      const typeLabel =
+        createAppointmentDto.type === AppointmentType.VIDEO
+          ? 'ვიდეო კონსულტაციის'
+          : 'ბინაზე ვიზიტის';
+      throw new BadRequestException(
+        `ექიმი არ არის ხელმისაწვდომი ამ თარიღზე ${typeLabel} ტიპის ჯავშნისთვის`,
+      );
+    }
+
+    // Also check if availability has time slots
+    if (!availability.timeSlots || availability.timeSlots.length === 0) {
       const typeLabel =
         createAppointmentDto.type === AppointmentType.VIDEO
           ? 'ვიდეო კონსულტაციის'
@@ -843,10 +903,16 @@ export class AppointmentsService {
       );
     }
 
-    // Check if appointment is completed
-    if (appointment.status !== AppointmentStatus.COMPLETED) {
+    // Check if appointment is in a valid status for lab test assignment
+    // Allowed statuses: confirmed, in-progress, completed
+    const allowedStatuses = [
+      AppointmentStatus.CONFIRMED,
+      AppointmentStatus.IN_PROGRESS,
+      AppointmentStatus.COMPLETED,
+    ];
+    if (!allowedStatuses.includes(appointment.status)) {
       throw new BadRequestException(
-        'Laboratory tests can only be assigned to completed appointments',
+        'ლაბორატორიული კვლევები მხოლოდ დადასტურებულ, მიმდინარე ან დასრულებულ ჯავშნებზე შეიძლება დაინიშნოს',
       );
     }
 

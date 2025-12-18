@@ -6,6 +6,20 @@ import { useEffect, useState } from 'react';
 import { AppointmentDetailsModal } from './_components/appointment-details-modal';
 import { EmptySlots } from './_components/empty-slots';
 
+interface LaboratoryTest {
+  productId: string;
+  productName: string;
+  clinicId?: string;
+  clinicName?: string;
+  assignedAt: string;
+  booked: boolean;
+  resultFile?: {
+    url: string;
+    name?: string;
+    uploadedAt?: string;
+  };
+}
+
 interface Appointment {
   id: string;
   appointmentNumber?: string;
@@ -18,6 +32,7 @@ interface Appointment {
   consultationFee: number;
   paymentStatus: 'pending' | 'paid' | 'failed';
   symptoms?: string;
+  laboratoryTests?: LaboratoryTest[];
 }
 
 export default function AppointmentsPage() {
@@ -86,7 +101,6 @@ export default function AppointmentsPage() {
         setAppointments(mockAppointments);
       }
     } catch (err: any) {
-      console.log('Error loading appointments:', err);
       setError(err.message || 'ჯავშნების ჩატვირთვა ვერ მოხერხდა');
       
       // Show mock data on error
@@ -243,6 +257,9 @@ export default function AppointmentsPage() {
                     გადახდა
                   </th>
                   <th className="p-4 text-left font-medium text-dark dark:text-white">
+                    ლაბ. კვლევები
+                  </th>
+                  <th className="p-4 text-left font-medium text-dark dark:text-white">
                     ღირებულება
                   </th>
                 </tr>
@@ -250,7 +267,7 @@ export default function AppointmentsPage() {
               <tbody>
                 {appointments.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="p-4 text-center text-dark-4">
+                    <td colSpan={9} className="p-4 text-center text-dark-4">
                       ჯავშნები არ მოიძებნა
                     </td>
                   </tr>
@@ -311,6 +328,28 @@ export default function AppointmentsPage() {
                           {appointment.paymentStatus === 'paid' && 'გადახდილი'}
                           {appointment.paymentStatus === 'failed' && 'ვერ გადაიხადა'}
                         </span>
+                      </td>
+                      <td className="p-4">
+                        {appointment.laboratoryTests && appointment.laboratoryTests.length > 0 ? (
+                          <div className="flex flex-col gap-1">
+                            <span className="flex items-center gap-1.5 rounded-full bg-purple-100 px-3 py-1 text-xs font-medium text-purple-800 dark:bg-purple-900/30 dark:text-purple-300">
+                              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                              </svg>
+                              {appointment.laboratoryTests.length} კვლევა
+                            </span>
+                            {appointment.laboratoryTests.some(t => t.resultFile) && (
+                              <span className="flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                {appointment.laboratoryTests.filter(t => t.resultFile).length} პასუხი
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-dark-4 dark:text-dark-6">—</span>
+                        )}
                       </td>
                       <td className="p-4 text-dark dark:text-white font-medium">
                         ₾{appointment.consultationFee}

@@ -1,7 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   ScrollView,
@@ -12,15 +13,51 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../../contexts/AuthContext";
+import { apiService } from "../../services/api";
 import { showToast } from "../../utils/toast";
 
 export default function ProfileScreen() {
   const { user, logout, isAuthenticated } = useAuth();
+  const [profileImage, setProfileImage] = useState<string | null>(null);
 
   const handleResetOnboarding = async () => {
     await AsyncStorage.removeItem("hasCompletedOnboarding");
     router.replace("/screens/auth/onboarding");
   };
+
+  const loadProfile = useCallback(async () => {
+    try {
+      const response = await apiService.getProfile();
+      console.log("📸 Profile response:", response);
+      if (response.success && response.data) {
+        const imageUrl = response.data.profileImage;
+        console.log("📸 Profile image URL:", imageUrl);
+        // Set profileImage if it exists and is not empty
+        if (imageUrl && imageUrl.trim() !== '') {
+          setProfileImage(imageUrl);
+        } else {
+          setProfileImage(null);
+        }
+      }
+    } catch (error) {
+      console.error("Error loading profile:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadProfile();
+    }
+  }, [isAuthenticated, loadProfile]);
+
+  // Reload profile when screen comes into focus (e.g., returning from edit-profile)
+  useFocusEffect(
+    useCallback(() => {
+      if (isAuthenticated) {
+        loadProfile();
+      }
+    }, [isAuthenticated, loadProfile]),
+  );
 
   const handleGoBack = () => {
     router.back();
@@ -63,15 +100,30 @@ export default function ProfileScreen() {
         {/* Profile Information Section */}
         <View style={styles.profileSection}>
           <View style={styles.profileImageContainer}>
-            <Image
-              source={{
-                uri: `https://picsum.photos/seed/${user?.name || "patient"}/200/200`,
-              }}
-              style={styles.profileImage}
-              contentFit="cover"
-            />
-            <TouchableOpacity style={styles.addPhotoButton}>
-              <Ionicons name="add" size={16} color="#FFFFFF" />
+            {profileImage ? (
+              <Image
+                source={{ uri: profileImage }}
+                style={styles.profileImage}
+                contentFit="cover"
+                onError={(error) => {
+                  console.error("Error loading profile image:", error);
+                  setProfileImage(null);
+                }}
+              />
+            ) : (
+              <Image
+                source={{
+                  uri: `https://picsum.photos/seed/${user?.name || "patient"}/200/200`,
+                }}
+                style={styles.profileImage}
+                contentFit="cover"
+              />
+            )}
+            <TouchableOpacity 
+              style={styles.addPhotoButton}
+              onPress={() => router.push("/screens/profile/edit-profile")}
+            >
+              <Ionicons name="camera" size={16} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
 
@@ -79,7 +131,10 @@ export default function ProfileScreen() {
             <Text style={styles.userName}>
               {user ? user.name : "მომხმარებელი"}
             </Text>
-            <TouchableOpacity style={styles.editButton}>
+            <TouchableOpacity 
+              style={styles.editButton}
+              onPress={() => router.push("/screens/profile/edit-profile")}
+            >
               <Ionicons name="pencil" size={16} color="#FFFFFF" />
             </TouchableOpacity>
           </View>

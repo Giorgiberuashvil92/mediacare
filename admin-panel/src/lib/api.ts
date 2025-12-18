@@ -1,7 +1,7 @@
 // API Service for Medicare Admin Panel
 const API_BASE_URL = 
   process.env.NEXT_PUBLIC_API_URL || 
-  'https://mediacare-production.up.railway.app';
+  'http://localhost:4000';
 
 export interface ApiResponse<T> {
   success: boolean;
@@ -36,6 +36,8 @@ export interface User {
   rating?: number;
   reviewCount?: number;
   isTopRated?: boolean;
+  // Minimum working days doctor must have scheduled in the next 2 weeks (set by admin)
+  minWorkingDaysRequired?: number;
 }
 
 export interface LoginRequest {
@@ -734,7 +736,7 @@ class ApiService {
   }
 
   // Terms endpoints
-  async getTerms(type: 'cancellation' | 'service' | 'privacy'): Promise<ApiResponse<{ type: string; content: string; updatedAt?: string }>> {
+  async getTerms(type: 'cancellation' | 'service' | 'privacy' | 'contract' | 'usage' | 'doctor-cancellation' | 'doctor-service'): Promise<ApiResponse<{ type: string; content: string; updatedAt?: string }>> {
     const response = await fetch(`${this.baseURL}/terms/${type}`, {
       method: 'GET',
       headers: this.getHeaders(),
@@ -743,7 +745,7 @@ class ApiService {
     return this.handleResponse<ApiResponse<{ type: string; content: string; updatedAt?: string }>>(response);
   }
 
-  async updateTerms(type: 'cancellation' | 'service' | 'privacy', content: string): Promise<ApiResponse<{ type: string; content: string }>> {
+  async updateTerms(type: 'cancellation' | 'service' | 'privacy' | 'contract' | 'usage' | 'doctor-cancellation' | 'doctor-service', content: string): Promise<ApiResponse<{ type: string; content: string }>> {
     const response = await fetch(`${this.baseURL}/terms/${type}`, {
       method: 'PUT',
       headers: this.getHeaders(),

@@ -111,6 +111,11 @@ export class User {
   @Prop({ default: false })
   isTopRated?: boolean;
 
+  // Minimum working days doctor must have scheduled in the next 2 weeks
+  // Admin sets this requirement (e.g., 10 means doctor must have at least 10 days with availability in next 14 days)
+  @Prop({ default: 0 })
+  minWorkingDaysRequired?: number;
+
   @Prop()
   createdAt?: Date;
 

@@ -34,6 +34,7 @@ export function EditDoctorForm({
     approvalStatus: doctor.approvalStatus || 'pending',
     isActive: doctor.isActive !== undefined ? doctor.isActive : true,
     gender: doctor.gender || 'male',
+    minWorkingDaysRequired: doctor.minWorkingDaysRequired?.toString() || '',
   });
 
   useEffect(() => {
@@ -93,6 +94,9 @@ export function EditDoctorForm({
       }
       if (formData.followUpFee) {
         updateData.followUpFee = parseFloat(formData.followUpFee);
+      }
+      if (formData.minWorkingDaysRequired) {
+        updateData.minWorkingDaysRequired = parseInt(formData.minWorkingDaysRequired, 10);
       }
 
       const response = await apiService.updateDoctor(doctor.id, updateData);
@@ -323,6 +327,23 @@ export function EditDoctorForm({
                 </label>
               </div>
             </div>
+          </div>
+
+          {/* Minimum Working Days Required - Admin restriction for doctor's availability */}
+          <div className="mb-5.5">
+            <InputGroup
+              className="w-full sm:w-1/2"
+              type="number"
+              name="minWorkingDaysRequired"
+              label="მინიმალური სამუშაო დღეები (2 კვირაში)"
+              placeholder="მაგ: 10"
+              value={formData.minWorkingDaysRequired}
+              handleChange={handleChange}
+              height="sm"
+            />
+            <p className="mt-1 text-xs text-dark-4 dark:text-dark-6">
+              ექიმმა მომავალი 2 კვირის განმავლობაში მინიმუმ ამდენი დღე უნდა ჰქონდეს გრაფიკი დაყენებული
+            </p>
           </div>
 
           <div className="flex justify-end gap-3">

@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
+import { Platform } from "react-native";
 import { logger } from "../utils/logger";
 
 const getExpoHostIp = () => {
@@ -28,7 +29,7 @@ const getDefaultBaseUrl = () => {
   
   if (FORCE_RAILWAY) {
     console.log('🚂 Forcing Railway URL for testing');
-    return "http://localhost:4000";  
+    return "https://localhost:4000";  
   }
 
   const envUrl =
@@ -48,19 +49,41 @@ const getDefaultBaseUrl = () => {
     return `http://${expoHostIp}:4000`;
   }
 
-  // if (__DEV__) {
-  //   if (Platform.OS === "android") {
-  //     return "https://mediacare-production.up.railway.app";
-  //   }
-  //   return "https://mediacare-production.up.railway.app";
-  // }
-
-  // return "https://mediacare-production.up.railway.app";
+  // For development, handle different platforms
   if (__DEV__) {
     console.log('🔍 __DEV__ mode:', __DEV__);
-    return "http://localhost:4000";
+    console.log('🔍 Platform.OS:', Platform.OS);
+    
+    // Fallback IP for real devices (when expoHostIp is not available)
+    // expoHostIp is automatically detected when running with Expo Go or dev client
+    // If it's not found, we're likely on a real device that needs the computer's IP
+    const FALLBACK_IP = "192.168.1.118"; // Your computer's local network IP
+    // Update this IP if your computer's IP changes
+    // To find your IP: ifconfig | grep "inet " | grep -v 127.0.0.1
+    
+    // iOS: Simulator can use localhost, but real device needs computer's IP
+    if (Platform.OS === 'ios') {
+      // expoHostIp is usually available when connected to Expo dev server
+      // If not found, we're on a real device and need the computer's IP
+      console.log('📱 iOS detected - expoHostIp not found, using fallback IP for real device:', FALLBACK_IP);
+      return `http://${FALLBACK_IP}:4000`;
   }
-  return "localhost:4000";
+    
+    // Android: Emulator uses 10.0.2.2, real device needs computer's IP
+    if (Platform.OS === 'android') {
+      // expoHostIp is usually available when connected to Expo dev server
+      // Android Emulator would typically have expoHostIp, so if missing, likely real device
+      console.log('🤖 Android detected - expoHostIp not found, using fallback IP for real device:', FALLBACK_IP);
+      return `http://${FALLBACK_IP}:4000`;
+    }
+    
+    // Default fallback - use your computer's IP
+    console.log('🔧 Using fallback IP:', FALLBACK_IP);
+    return `http://${FALLBACK_IP}:4000`;
+  }
+  
+  // Production - use Railway URL
+  return "https://mediacare-production.up.railway.app";
 };
 
 const API_BASE_URL = getDefaultBaseUrl();
@@ -72,6 +95,7 @@ export interface User {
   email: string;
   name: string;
   role: "doctor" | "patient";
+  profileImage?: string;
 }
 
 export interface LoginRequest {
@@ -624,6 +648,7 @@ class ApiService {
     success: boolean;
     data: any;
   }> {
+    console.log('📸 [ApiService] updateProfile called with:', JSON.stringify(profileData, null, 2));
     if (USE_MOCK_API) {
       return Promise.resolve({
         success: true,
@@ -631,10 +656,12 @@ class ApiService {
       });
     }
 
-    return this.apiCall('/profile', {
+    const result = await this.apiCall<{ success: boolean; data: any }>('/profile', {
       method: 'PUT',
       body: JSON.stringify(profileData),
     });
+    console.log('📸 [ApiService] updateProfile response:', JSON.stringify(result, null, 2));
+    return result;
   }
 
   async changePassword(data: {
@@ -684,6 +711,16 @@ class ApiService {
         thisMonth: number;
         total: number;
       };
+      videoConsultations: {
+        total: number;
+        completed: number;
+        thisMonth: number;
+      };
+      homeVisits: {
+        total: number;
+        completed: number;
+        thisMonth: number;
+      };
     };
   }> {
     if (USE_MOCK_API) {
@@ -712,6 +749,16 @@ class ApiService {
             thisWeek: 0,
             thisMonth: 0,
             total: 0,
+          },
+          videoConsultations: {
+            total: 0,
+            completed: 0,
+            thisMonth: 0,
+          },
+          homeVisits: {
+            total: 0,
+            completed: 0,
+            thisMonth: 0,
           },
         },
       });
@@ -1041,8 +1088,11 @@ class ApiService {
     paymentStatus?: string;
     patientDetails?: {
       name?: string;
+      lastName?: string;
       dateOfBirth?: string;
       gender?: string;
+      personalId?: string;
+      address?: string;
       problem?: string;
     };
     documents?: string[];
@@ -1053,7 +1103,26 @@ class ApiService {
     data: any;
     message?: string;
   }> {
+    console.log('🏥 [ApiService] createAppointment გამოძახებულია');
+    console.log('🏥 [ApiService] createAppointment - Full data:', JSON.stringify(appointmentData, null, 2));
+    console.log('🏥 [ApiService] createAppointment - Doctor ID:', appointmentData.doctorId);
+    console.log('🏥 [ApiService] createAppointment - Date:', appointmentData.appointmentDate);
+    console.log('🏥 [ApiService] createAppointment - Time:', appointmentData.appointmentTime);
+    console.log('🏥 [ApiService] createAppointment - Type:', appointmentData.type);
+    console.log('🏥 [ApiService] createAppointment - Fee:', appointmentData.consultationFee);
+    console.log('🏥 [ApiService] createAppointment - Total:', appointmentData.totalAmount);
+    console.log('🏥 [ApiService] createAppointment - Patient Details:', JSON.stringify(appointmentData.patientDetails, null, 2));
+    console.log('🏥 [ApiService] createAppointment - Visit Address:', appointmentData.visitAddress);
+    console.log('🏥 [ApiService] createAppointment - Notes:', appointmentData.notes);
+    console.log('🏥 [ApiService] createAppointment - Documents:', appointmentData.documents);
+    console.log('🏥 [ApiService] createAppointment - Payment Method:', appointmentData.paymentMethod);
+    console.log('🏥 [ApiService] createAppointment - Payment Status:', appointmentData.paymentStatus);
+    console.log('🏥 [ApiService] createAppointment - Base URL:', this.baseURL);
+    console.log('🏥 [ApiService] createAppointment - Endpoint: POST /appointments');
+    console.log('🏥 [ApiService] createAppointment - Mock Mode:', USE_MOCK_API);
+
     if (USE_MOCK_API) {
+      console.log('🎭 [ApiService] createAppointment - Mock API mode, returning mock response');
       return Promise.resolve({
         success: true,
         data: {
@@ -1063,10 +1132,18 @@ class ApiService {
       });
     }
 
-    return this.apiCall('/appointments', {
+    console.log('🌐 [ApiService] createAppointment - Sending request to backend...');
+    const result = await this.apiCall<{
+      success: boolean;
+      data: any;
+      message?: string;
+    }>('/appointments', {
       method: 'POST',
       body: JSON.stringify(appointmentData),
     });
+    
+    console.log('✅ [ApiService] createAppointment - Response received:', JSON.stringify(result, null, 2));
+    return result;
   }
 
   async getPatientAppointments(): Promise<{
@@ -1314,6 +1391,18 @@ class ApiService {
     const headers = await this.getAuthHeaders();
     console.log('🔑 Auth headers prepared:', headers ? 'Token present' : 'No token');
 
+    if (options.body && typeof options.body === 'string') {
+      try {
+        const bodyData = JSON.parse(options.body);
+        console.log('📦 Request body:', JSON.stringify(bodyData, null, 2));
+        if (bodyData.profileImage) {
+          console.log('📸 Request body contains profileImage:', bodyData.profileImage);
+        }
+      } catch {
+        console.log('📦 Request body (not JSON):', options.body);
+      }
+    }
+
     console.log('🌐 Making fetch request to:', fullUrl);
     const response = await fetch(fullUrl, {
       ...options,
@@ -1391,7 +1480,7 @@ class ApiService {
   }
 
   // Terms endpoints
-  async getTerms(type: "cancellation" | "service" | "privacy"): Promise<{
+  async getTerms(type: "cancellation" | "service" | "privacy" | "contract" | "usage" | "doctor-cancellation" | "doctor-service"): Promise<{
     success: boolean;
     data: { content: string; type: string; updatedAt?: string };
   }> {

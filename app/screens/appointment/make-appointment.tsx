@@ -1,4 +1,3 @@
-import { useAuth } from "@/app/contexts/AuthContext";
 import { apiService, AppointmentType } from "@/app/services/api";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
@@ -49,27 +48,21 @@ const MakeAppointment = () => {
     paymentMethod,
     appointmentType: appointmentTypeParam,
   } = useLocalSearchParams();
-  const { user } = useAuth();
   const [doctor, setDoctor] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedPatient, setSelectedPatient] = useState<"self" | "other">("self");
   const [promoCode, setPromoCode] = useState("");
   const [selectedPaymentMethod] = useState((paymentMethod as string) || "visa");
   const [appointmentType, setAppointmentType] = useState<AppointmentType>(
     (appointmentTypeParam as AppointmentType) || "video",
   );
   const [visitAddress, setVisitAddress] = useState("");
-  const [patientProfile, setPatientProfile] = useState<any>(null);
-  const [loadingProfile, setLoadingProfile] = useState(false);
-  const [creatingAppointment, setCreatingAppointment] = useState(false);
   const isLockedType = !!appointmentTypeParam;
 
   useEffect(() => {
     loadDoctor();
-    loadPatientProfile();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doctorId, user?.id]);
+  }, [doctorId]);
 
   const loadDoctor = async () => {
     try {
@@ -100,45 +93,6 @@ const MakeAppointment = () => {
     }
   };
 
-  const loadPatientProfile = async () => {
-    if (!user?.id) return;
-    
-    try {
-      setLoadingProfile(true);
-      const response = await apiService.getProfile();
-      if (response.success && response.data) {
-        setPatientProfile(response.data);
-      }
-    } catch (err: any) {
-      console.error("Error loading patient profile:", err);
-    } finally {
-      setLoadingProfile(false);
-    }
-  };
-
-  // Calculate age from date of birth
-  const calculateAge = (dateOfBirth?: string): number | null => {
-    if (!dateOfBirth) return null;
-    const birthDate = new Date(dateOfBirth);
-    const today = new Date();
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-    return age;
-  };
-
-  // Format gender to Georgian
-  const formatGender = (gender?: string): string => {
-    if (!gender) return "";
-    const genderMap: { [key: string]: string } = {
-      male: "კაცი",
-      female: "ქალი",
-      other: "სხვა",
-    };
-    return genderMap[gender.toLowerCase()] || gender;
-  };
 
   if (loading) {
     return (
@@ -218,108 +172,7 @@ const MakeAppointment = () => {
       return;
     }
 
-    // თუ პაციენტად შენთავს ირჩევ და პროფილის მონაცემები გვაქვს,
-    // საერთოდ აღარ გაგიშვეს დამატებითი ფორმაზე – პირდაპირ შეიქმნას ჯავშანი
-    if (selectedPatient === "self" && patientProfile) {
-      try {
-        setCreatingAppointment(true);
-
-        // გამოცდილებისთვის ვცდილობთ DOB გამოვიტანოთ, მაგრამ თუ არაა – უბრალოდ არ გავგზავნით
-        let dateOfBirthForAPI: string | undefined = patientProfile.dateOfBirth;
-
-        if (dateOfBirthForAPI && !dateOfBirthForAPI.includes("-")) {
-          const dateMatch = dateOfBirthForAPI.match(/(\d+)\s+(\w+)\s+(\d+)/);
-          if (dateMatch) {
-            const months = [
-              "იანვარი",
-              "თებერვალი",
-              "მარტი",
-              "აპრილი",
-              "მაისი",
-              "ივნისი",
-              "ივლისი",
-              "აგვისტო",
-              "სექტემბერი",
-              "ოქტომბერი",
-              "ნოემბერი",
-              "დეკემბერი",
-            ];
-            const monthIndex = months.indexOf(dateMatch[2]);
-            if (monthIndex !== -1) {
-              const date = new Date(
-                parseInt(dateMatch[3]),
-                monthIndex,
-                parseInt(dateMatch[1]),
-              );
-              dateOfBirthForAPI = date.toISOString().split("T")[0];
-            }
-          }
-        }
-
-        if (dateOfBirthForAPI && !dateOfBirthForAPI.includes("-")) {
-          const parsedDate = new Date(patientProfile.dateOfBirth);
-          if (!Number.isNaN(parsedDate.getTime())) {
-            dateOfBirthForAPI = parsedDate.toISOString().split("T")[0];
-          }
-        }
-
-        const response = await apiService.createAppointment({
-          doctorId: doctorId as string,
-          appointmentDate: selectedDate as string,
-          appointmentTime: selectedTime as string,
-          type: appointmentType,
-          consultationFee: consultationFee,
-          totalAmount: netAmount,
-          paymentMethod: "pending",
-          paymentStatus: "pending",
-          patientDetails: {
-            name: patientProfile.name || user?.name,
-            dateOfBirth: dateOfBirthForAPI,
-            gender: patientProfile.gender,
-            problem: "",
-          },
-          documents: [],
-          notes: "",
-          visitAddress:
-            appointmentType === "home-visit"
-              ? visitAddress.trim()
-              : undefined,
-        });
-
-        if (response.success) {
-          router.push({
-            pathname: "/screens/appointment/appointment-success",
-            params: {
-              doctorId: doctorId as string,
-              appointmentId: response.data?._id || response.data?.id || "",
-              selectedDate: selectedDate as string,
-              selectedTime: selectedTime as string,
-              paymentMethod: selectedPaymentMethod,
-              patientName: patientProfile.name || user?.name || "",
-              problem: "",
-              appointmentNumber: response.data?.appointmentNumber || "",
-            },
-          });
-        } else {
-          Alert.alert(
-            "შეცდომა",
-            response.message || "ჯავშნის შექმნა ვერ მოხერხდა",
-          );
-        }
-      } catch (error: any) {
-        console.error("Error creating appointment:", error);
-        Alert.alert(
-          "შეცდომა",
-          error.message ||
-            "ჯავშნის შექმნა ვერ მოხერხდა. გთხოვთ სცადოთ თავიდან.",
-        );
-      } finally {
-        setCreatingAppointment(false);
-      }
-      return;
-    }
-
-    // Otherwise, navigate to Patient Details page
+    // Always navigate to Patient Details page to fill in all information
     router.push({
       pathname: "/screens/appointment/patient-details",
       params: {
@@ -483,74 +336,6 @@ const MakeAppointment = () => {
           )}
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>პაციენტის ინფორმაცია</Text>
-          
-          {loadingProfile ? (
-            <View style={styles.patientOption}>
-              <ActivityIndicator size="small" color="#20BEB8" />
-              <Text style={styles.loadingText}>პროფილის ჩატვირთვა...</Text>
-            </View>
-          ) : patientProfile ? (
-            <TouchableOpacity
-              style={styles.patientOption}
-              onPress={() => setSelectedPatient("self")}
-            >
-              <View style={styles.radioButton}>
-                {selectedPatient === "self" && (
-                  <View style={styles.radioButtonSelected} />
-                )}
-              </View>
-              <View style={styles.patientInfo}>
-                <Text style={styles.patientName}>
-                  {patientProfile.name || user?.name || "პაციენტი"}
-                </Text>
-                <Text style={styles.patientDetails}>
-                  {patientProfile.dateOfBirth
-                    ? `${calculateAge(patientProfile.dateOfBirth) || "?"} წლის`
-                    : ""}
-                  {patientProfile.gender
-                    ? ` | ${formatGender(patientProfile.gender)}`
-                    : ""}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ) : user?.name ? (
-            <TouchableOpacity
-              style={styles.patientOption}
-              onPress={() => setSelectedPatient("self")}
-            >
-              <View style={styles.radioButton}>
-                {selectedPatient === "self" && (
-                  <View style={styles.radioButtonSelected} />
-                )}
-              </View>
-              <View style={styles.patientInfo}>
-                <Text style={styles.patientName}>{user.name}</Text>
-                <Text style={styles.patientDetails}>
-                  პროფილის დეტალები არ არის შევსებული
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ) : null}
-
-          <TouchableOpacity
-            style={styles.patientOption}
-            onPress={() => setSelectedPatient("other")}
-          >
-            <View style={styles.radioButton}>
-              {selectedPatient === "other" && (
-                <View style={styles.radioButtonSelected} />
-              )}
-            </View>
-            <View style={styles.patientInfo}>
-              <Text style={styles.patientName}>სხვა პაციენტი</Text>
-              <Text style={styles.patientDetails}>
-                ინფორმაცია შეიყვანება შემდეგ გვერდზე
-              </Text>
-            </View>
-          </TouchableOpacity>
-        </View>
 
         {/* Payment Details */}
         <View style={styles.section}>
@@ -609,19 +394,12 @@ const MakeAppointment = () => {
         <TouchableOpacity
           style={[
             styles.makeAppointmentButton,
-            (loading || creatingAppointment) && styles.makeAppointmentButtonDisabled,
+            loading && styles.makeAppointmentButtonDisabled,
           ]}
           onPress={handleMakeAppointment}
-          disabled={loading || creatingAppointment}
+          disabled={loading}
         >
-          {creatingAppointment ? (
-            <View style={styles.buttonContent}>
-              <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />
-              <Text style={styles.makeAppointmentButtonText}>შექმნა...</Text>
-            </View>
-          ) : (
-            <Text style={styles.makeAppointmentButtonText}>ჯავშნის გაკეთება</Text>
-          )}
+          <Text style={styles.makeAppointmentButtonText}>ჯავშნის გაკეთება</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

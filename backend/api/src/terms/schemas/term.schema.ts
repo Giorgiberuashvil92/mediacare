@@ -5,7 +5,19 @@ export type TermDocument = Term & Document;
 
 @Schema({ timestamps: true })
 export class Term {
-  @Prop({ required: true, enum: ['cancellation', 'service', 'privacy'], unique: true })
+  @Prop({
+    required: true,
+    enum: [
+      'cancellation',
+      'service',
+      'privacy',
+      'contract',
+      'usage',
+      'doctor-cancellation',
+      'doctor-service',
+    ],
+    unique: true,
+  })
   type: string;
 
   @Prop({ required: true, type: String })
@@ -16,7 +28,3 @@ export class Term {
 }
 
 export const TermSchema = SchemaFactory.createForClass(Term);
-
-
-
-

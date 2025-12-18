@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Modal,
@@ -35,9 +35,17 @@ export default function DoctorSchedule() {
   const [currentEditDate, setCurrentEditDate] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [hasSaved, setHasSaved] = useState(false);
+  // საწყისი მდგომარეობა: ცვლილება არ არის შენახვასთან შედარებით
+  const [hasSaved, setHasSaved] = useState(true);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // საწყისში backend-იდან წამოღებული თარიღები (რომლის "გამორთვაც" გვინდა შენახვისას)
+  const initialVideoDatesRef = useRef<string[]>([]);
+  const initialHomeVisitDatesRef = useRef<string[]>([]);
+  // საწყისში backend-იდან წამოღებული საათები თითოეული თარიღისთვის (რათა განვასხვაოთ ახლადარჩეული და შენახული)
+  const initialVideoSchedulesRef = useRef<{ [key: string]: string[] }>({});
+  const initialHomeVisitSchedulesRef = useRef<{ [key: string]: string[] }>({});
 
   const getCurrentModeSchedules = () =>
     mode === "video" ? videoSchedules : homeVisitSchedules;
@@ -78,11 +86,10 @@ export default function DoctorSchedule() {
             loadedBookedSlots[dateKey] = avail.bookedSlots;
           }
 
-          if (
-            avail.isAvailable &&
-            avail.timeSlots &&
-            avail.timeSlots.length > 0
-          ) {
+          // ექიმის სქედულისთვის დღე უნდა გამოჩნდეს მაშინაც კი,
+          // თუ ყველა სლოტი უკვე დაჯავშნილია (isAvailable შეიძლება იყოს false),
+          // ამიტომ მხოლოდ timeSlots-ზე ვამოწმებთ.
+          if (avail.timeSlots && avail.timeSlots.length > 0) {
             if (type === "video") {
               loadedVideoSchedules[avail.date] = avail.timeSlots;
               if (!videoDates.includes(avail.date)) {
@@ -102,6 +109,13 @@ export default function DoctorSchedule() {
         setVideoSelectedDates(videoDates);
         setHomeVisitSelectedDates(homeVisitDates);
         setBookedSlots(loadedBookedSlots);
+
+        // შევინახოთ საწყისი თარიღები და საათები, რომლებსაც backend უკვე იცნობს
+        initialVideoDatesRef.current = Object.keys(loadedVideoSchedules);
+        initialHomeVisitDatesRef.current = Object.keys(loadedHomeVisitSchedules);
+        // Deep copy schedules for initial state comparison
+        initialVideoSchedulesRef.current = JSON.parse(JSON.stringify(loadedVideoSchedules));
+        initialHomeVisitSchedulesRef.current = JSON.parse(JSON.stringify(loadedHomeVisitSchedules));
       }
     } catch (error) {
       console.error("Error loading availability:", error);
@@ -197,9 +211,117 @@ export default function DoctorSchedule() {
     return currentSelected.includes(formatDate(date));
   };
 
-  const toggleDateSelection = (date: Date) => {
+  const toggleDateSelection = async (date: Date) => {
     const dateStr = formatDate(date);
     const currentSelected = getCurrentModeSelectedDates();
+
+    // სპეციალური ლოგიკა "დღეს" თარიღზე დაჭერისთვის
+    // საჭირო, რომ დღევანდელი გრაფიკის სწრაფად მოხსნა იყოს შესაძლებელი:
+    // - თუ დღევანდელ თარიღზე არ არის ჯავშნები -> მოვხსნათ მთელი გრაფიკი (ყველა სლოტი და თვითონ დღე)
+    // - თუ დღევანდელ თარიღზე არის ჯავშნები   -> ყველა თავისუფალი სლოტი მოვხსნათ და დავტოვოთ მხოლოდ დაჯავშნილი საათები
+    const isTodayDate = (() => {
+      const today = new Date();
+      return (
+        date.getDate() === today.getDate() &&
+        date.getMonth() === today.getMonth() &&
+        date.getFullYear() === today.getFullYear()
+      );
+    })();
+
+    if (isTodayDate && currentSelected.includes(dateStr)) {
+      const currentSchedules = getCurrentModeSchedules();
+      const currentSlots = currentSchedules[dateStr] || [];
+      const dateKey = `${dateStr}-${mode}`;
+      const bookedForDate = bookedSlots[dateKey] || [];
+
+      // თუ საერთოდ არანაირი საათი არ არის ამ დღეზე, გადავდივართ სტანდარტულ ქცევაზე
+      if (currentSlots.length > 0) {
+        // 1) თუ ამ დღეზე არ არის არც ერთი დაჯავშნილი საათი -> მოვხსნათ მთელი გრაფიკი დღისთვის
+        if (bookedForDate.length === 0) {
+          const updater =
+            mode === "video" ? setVideoSelectedDates : setHomeVisitSelectedDates;
+          updater(currentSelected.filter((d) => d !== dateStr));
+
+          const updatedSchedules = { ...currentSchedules };
+          delete updatedSchedules[dateStr];
+
+          if (mode === "video") {
+            setVideoSchedules(updatedSchedules);
+          } else {
+            setHomeVisitSchedules(updatedSchedules);
+          }
+
+          // ბექენდზე მივყიდოთ, რომ დღევანდელ თარიღზე ამ რეჟიმისთვის აღარ არის ხელმისაწვდომობა
+          try {
+            await apiService.updateAvailability([
+              {
+                date: dateStr,
+                timeSlots: [],
+                isAvailable: false,
+                type: mode,
+              },
+            ]);
+            setHasSaved(false);
+          } catch (error: any) {
+            console.error("Error updating availability for today:", error);
+            Alert.alert(
+              "შეცდომა",
+              error?.message || "დღევანდელი დღის განრიგის განახლება ვერ მოხერხდა"
+            );
+            // Reload availability from backend to restore the correct state
+            await loadAvailability();
+          }
+
+          return;
+        }
+
+        // 2) თუ ამ დღეზე არის დაჯავშნილი საათები -> ყველა თავისუფალი საათი მოვხსნათ და დავტოვოთ მხოლოდ დაჯავშნილი
+        const newSlots = currentSlots.filter((time) =>
+          bookedForDate.includes(time)
+        );
+
+        const updatedSchedules = {
+          ...currentSchedules,
+          [dateStr]: newSlots,
+        };
+
+        if (mode === "video") {
+          setVideoSchedules(updatedSchedules);
+        } else {
+          setHomeVisitSchedules(updatedSchedules);
+        }
+
+        // თუ ყველა საათი მოიხსნა (თეორიულად არ უნდა მოხდეს, მაგრამ დაზღვევისათვის)
+        if (newSlots.length === 0) {
+          const updater =
+            mode === "video" ? setVideoSelectedDates : setHomeVisitSelectedDates;
+          updater(currentSelected.filter((d) => d !== dateStr));
+        }
+
+        // ბექენდზე მივყიდოთ განახლებული სლოტები დღევანდელი თარიღისთვის
+        try {
+          await apiService.updateAvailability([
+            {
+              date: dateStr,
+              timeSlots: newSlots,
+              isAvailable: newSlots.length > 0,
+              type: mode,
+            },
+          ]);
+          setHasSaved(false);
+        } catch (error: any) {
+          console.error("Error updating availability for today (booked slots kept):", error);
+          Alert.alert(
+            "შეცდომა",
+            error?.message || "დღევანდელი დღის განრიგის განახლება ვერ მოხერხდა"
+          );
+          // Reload availability from backend to restore the correct state
+          await loadAvailability();
+        }
+
+        return;
+      }
+    }
 
     if (currentSelected.includes(dateStr)) {
       // ამოიღე თარიღი მხოლოდ მიმდინარე რეჟიმიდან
@@ -216,6 +338,9 @@ export default function DoctorSchedule() {
       } else {
         setHomeVisitSchedules(updatedSchedules);
       }
+
+      // თარიღის მოხსნა ასევე ითვლება ცვლილებად, რომელიც უნდა შენახულ იქნას
+      setHasSaved(false);
     } else {
       const updater =
         mode === "video" ? setVideoSelectedDates : setHomeVisitSelectedDates;
@@ -230,8 +355,21 @@ export default function DoctorSchedule() {
   };
 
   // ფუნქცია, რომელიც ამოწმებს, დარჩენილია თუ არა 24 საათი ან მეტი კონკრეტულ თარიღსა და საათზე
+  // თუ საათი ახლახან დაემატა და ჯერ არ შენახულა backend-ზე, წაშლა შეუძლია
   const canDeleteSlot = (dateStr: string, time: string): boolean => {
     try {
+      // შევამოწმოთ ეს საათი backend-იდან წამოღებულია თუ ახლახან დაემატა
+      const initialSchedules = mode === "video" 
+        ? initialVideoSchedulesRef.current 
+        : initialHomeVisitSchedulesRef.current;
+      const initialSlotsForDate = initialSchedules[dateStr] || [];
+      
+      // თუ ეს საათი არ იყო საწყის schedules-ში, ეს ახლახან დაემატა და წაშლა შეუძლია
+      if (!initialSlotsForDate.includes(time)) {
+        return true;
+      }
+      
+      // თუ საათი backend-იდანაა, 24 საათის წესი მოქმედებს
       const [hours, minutes] = time.split(":").map(Number);
       const slotDateTime = new Date(dateStr);
       slotDateTime.setHours(hours, minutes || 0, 0, 0);
@@ -259,7 +397,7 @@ export default function DoctorSchedule() {
       const diffMs = slotDateTime.getTime() - now.getTime();
       const diffHours = diffMs / (1000 * 60 * 60);
       
-      // თუ დარჩენილია მინიმუმ 2.5 საათი (2 საათი და 30 წუთი), შეუძლია დამატება
+      // თუ დარჩენილია მინიმუმ 2.5 საათი, შეუძლია დამატება
       return diffHours >= 2.5;
     } catch (error) {
       console.error("Error calculating time difference:", error);
@@ -343,14 +481,19 @@ export default function DoctorSchedule() {
       setIsSaving(true);
 
       const currentSchedules = getCurrentModeSchedules();
+      const initialDates =
+        mode === "video"
+          ? initialVideoDatesRef.current
+          : initialHomeVisitDatesRef.current;
 
-      // მხოლოდ ის თარიღები, რომლებსაც ამ რეჟიმში აქვთ საათები (ყველა დღე, რომელსაც აქვს საათები, არა მხოლოდ selectedDates-ში)
-      const datesWithSlots = Object.keys(currentSchedules).filter((dateStr) => {
-        const slots = currentSchedules[dateStr];
-        return slots && slots.length > 0;
-      });
+      // ყველა თარიღი, რომელზეც ოდესმე იყო სქედული (საწყისი + текущი)
+      const allDates = Array.from(
+        new Set([...initialDates, ...Object.keys(currentSchedules)])
+      );
 
-      if (datesWithSlots.length === 0) {
+      // შევამოწმოთ, რომ საერთოდ რაღაც დღე მაინც არსებობს.
+      // თუ allDates ცარიელია, მაშინ არც ადრე და არც ახლა არ გაქვს სქედული -> არაფრის შენახვა არ გვჭირდება.
+      if (allDates.length === 0) {
         Alert.alert(
           "შეცდომა",
           "გთხოვთ აირჩიოთ მინიმუმ ერთი დრო, სანამ განრიგს შეინახავთ"
@@ -358,15 +501,24 @@ export default function DoctorSchedule() {
         return;
       }
 
-      // Prepare availability data for API (მხოლოდ არაცარიელი დღეები ამ რეჟიმისთვის)
-      const availabilityData = datesWithSlots.map((dateStr) => ({
-        date: dateStr,
-        timeSlots: currentSchedules[dateStr] || [],
-        isAvailable: (currentSchedules[dateStr] || []).length > 0,
-        type: mode,
-      }));
+      // სრული სია backend-ისთვის:
+      // - დღეებს, რომლებზეც სლოტები აღარ გვაქვს -> timeSlots: [], isAvailable: false
+      // - სხვა დღეებს -> რეალური სლოტები
+      const availabilityData = allDates.map((dateStr) => {
+        const slots = currentSchedules[dateStr] || [];
+        return {
+          date: dateStr,
+          timeSlots: slots,
+          isAvailable: slots.length > 0,
+          type: mode,
+        };
+      });
 
       // Save to backend
+      console.log(
+        "📤 [DoctorSchedule] Sending availability to backend:",
+        JSON.stringify(availabilityData, null, 2)
+      );
       const response = await apiService.updateAvailability(availabilityData);
 
       if (response.success) {
@@ -374,12 +526,21 @@ export default function DoctorSchedule() {
         setHasSaved(true); // Mark as saved
 
         // განვაახლოთ თარიღების სიები მხოლოდ იმ დღეებით, რომლებსაც აქვთ საათები
-        const updatedSelectedDates = datesWithSlots;
+        const updatedSelectedDates = allDates.filter((dateStr) => {
+          const slots = currentSchedules[dateStr] || [];
+          return slots.length > 0;
+        });
 
         if (mode === "video") {
           setVideoSelectedDates(updatedSelectedDates);
+          initialVideoDatesRef.current = allDates;
+          // განვაახლოთ initial schedules - ახლა ეს არის backend-ზე შენახული მდგომარეობა
+          initialVideoSchedulesRef.current = JSON.parse(JSON.stringify(currentSchedules));
         } else {
           setHomeVisitSelectedDates(updatedSelectedDates);
+          initialHomeVisitDatesRef.current = allDates;
+          // განვაახლოთ initial schedules - ახლა ეს არის backend-ზე შენახული მდგომარეობა
+          initialHomeVisitSchedulesRef.current = JSON.parse(JSON.stringify(currentSchedules));
         }
 
         // Hide success message after 2 seconds
@@ -398,6 +559,8 @@ export default function DoctorSchedule() {
         "შეცდომა",
         error.message || "განრიგის შენახვა ვერ მოხერხდა. გთხოვთ სცადოთ თავიდან."
       );
+      // Reload availability from backend to restore the correct state
+      await loadAvailability();
     } finally {
       setIsSaving(false);
     }
@@ -759,7 +922,7 @@ export default function DoctorSchedule() {
       </ScrollView>
 
       {/* Floating Save Button */}
-      {getCurrentModeSelectedDates().length > 0 && !saveSuccess && !hasSaved && (
+      {!saveSuccess && !hasSaved && (
           <TouchableOpacity
             style={[
               styles.floatingButton,
@@ -862,12 +1025,12 @@ export default function DoctorSchedule() {
               const currentSchedules = getCurrentModeSchedules();
               const currentSlots = currentSchedules[currentEditDate] || [];
               
-              // დათვლა: რამდენი საათია დაჯავშნილი, რამდენია 24 საათზე ნაკლები დარჩენილი (წაშლისთვის), და რამდენია 2.5 საათზე ნაკლები დარჩენილი (დამატებისთვის)
+              // დათვლა: რამდენი საათია დაჯავშნილი, რამდენია 24 საათზე ნაკლები დარჩენილი (წაშლისთვის), და რამდენია 24 საათზე ნაკლები დარჩენილი (დამატებისთვის)
               const lockedForDeletion = currentSlots.filter(
                 (time) => !bookedForDate.includes(time) && !canDeleteSlot(currentEditDate, time)
               );
               
-              // დათვლა: რამდენი საათია 2.5 საათზე ნაკლები დარჩენილი (დამატებისთვის)
+              // დათვლა: რამდენი საათია 24 საათზე ნაკლები დარჩენილი (დამატებისთვის)
               const lockedForAddition = AVAILABLE_HOURS.filter(
                 (time) => !bookedForDate.includes(time) && !currentSlots.includes(time) && !canAddSlot(currentEditDate, time)
               );

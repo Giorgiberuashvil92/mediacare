@@ -127,7 +127,37 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
     setSelectedTime(""); // Reset time selection when date changes
   };
 
+  // Helper function to check if a time slot can be booked (at least 2 hours in advance)
+  const canBookTimeSlot = (dateStr: string, time: string): boolean => {
+    try {
+      const [hours, minutes] = time.split(":").map(Number);
+      const slotDateTime = new Date(dateStr);
+      slotDateTime.setHours(hours, minutes || 0, 0, 0);
+      
+      const now = new Date();
+      const diffMs = slotDateTime.getTime() - now.getTime();
+      const diffHours = diffMs / (1000 * 60 * 60);
+      
+      // Must be at least 2 hours in advance
+      return diffHours >= 2;
+    } catch (error) {
+      console.error("Error calculating time difference:", error);
+      return false;
+    }
+  };
+
   const handleTimeSelect = (time: string) => {
+    if (!selectedDate) return;
+    
+    // Check if booking is allowed (at least 2 hours in advance)
+    if (!canBookTimeSlot(selectedDate, time)) {
+      Alert.alert(
+        "დრო არ არის ხელმისაწვდომი",
+        "ჯავშნის გაკეთება შესაძლებელია მინიმუმ 2 საათით ადრე. გთხოვთ აირჩიოთ სხვა დრო."
+      );
+      return;
+    }
+    
     setSelectedTime(time);
   };
 
@@ -329,6 +359,9 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
             {getVisibleTimeSlots().map((time) => {
               const isBooked =
                 selectedDayAvailability?.bookedSlots?.includes(time) || false;
+              const canBook = selectedDate ? canBookTimeSlot(selectedDate, time) : true;
+              const isTooSoon = !canBook && !isBooked;
+              
               return (
                 <TouchableOpacity
                   key={time}
@@ -336,15 +369,17 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
                     styles.timeSlot,
                     selectedTime === time && styles.selectedTimeSlot,
                     isBooked && styles.bookedTimeSlot,
+                    isTooSoon && styles.disabledTimeSlot,
                   ]}
-                  onPress={() => !isBooked && handleTimeSelect(time)}
-                  disabled={isBooked}
+                  onPress={() => !isBooked && !isTooSoon && handleTimeSelect(time)}
+                  disabled={isBooked || isTooSoon}
                 >
                   <Text
                     style={[
                       styles.timeText,
                       selectedTime === time && styles.selectedTimeText,
                       isBooked && styles.bookedTimeText,
+                      isTooSoon && styles.disabledTimeText,
                     ]}
                   >
                     {time}
@@ -352,6 +387,11 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
                   {isBooked && (
                     <View style={styles.bookedIndicator}>
                       <Ionicons name="lock-closed" size={12} color="#EF4444" />
+                    </View>
+                  )}
+                  {isTooSoon && (
+                    <View style={styles.bookedIndicator}>
+                      <Ionicons name="time-outline" size={12} color="#F59E0B" />
                     </View>
                   )}
                 </TouchableOpacity>
@@ -392,6 +432,15 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
         disabled={!selectedDate || !selectedTime}
         onPress={async () => {
           if (!selectedDate || !selectedTime || !doctorId) return;
+
+          // Validate: booking must be at least 2 hours in advance
+          if (!canBookTimeSlot(selectedDate, selectedTime)) {
+            Alert.alert(
+              "დრო არ არის ხელმისაწვდომი",
+              "ჯავშნის გაკეთება შესაძლებელია მინიმუმ 2 საათით ადრე. გთხოვთ აირჩიოთ სხვა დრო."
+            );
+            return;
+          }
 
           try {
             // გადამოწმება: ისევ თავისუფალია ეს დრო ამ ტიპისთვის?
@@ -648,6 +697,15 @@ const styles = StyleSheet.create({
   bookedTimeText: {
     color: "#EF4444",
     textDecorationLine: "line-through",
+  },
+  disabledTimeSlot: {
+    backgroundColor: "#FEF3C7",
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+    opacity: 0.7,
+  },
+  disabledTimeText: {
+    color: "#F59E0B",
   },
   bookedIndicator: {
     position: "absolute",

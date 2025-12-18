@@ -97,4 +97,8 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], RegisterDto.prototype, "location", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], RegisterDto.prototype, "minWorkingDaysRequired", void 0);
 //# sourceMappingURL=register.dto.js.map

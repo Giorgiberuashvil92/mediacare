@@ -27,7 +27,10 @@ export class ProfileController {
 
   @Get()
   async getProfile(@CurrentUser() user: { sub: string }) {
-    return this.profileService.getProfile(user.sub);
+    console.log('📸 [ProfileController] getProfile called for user:', user.sub);
+    const result = await this.profileService.getProfile(user.sub);
+    console.log('📸 [ProfileController] Returning profile:', JSON.stringify(result, null, 2));
+    return result;
   }
 
   @Put()

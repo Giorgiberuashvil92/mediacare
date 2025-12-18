@@ -60,7 +60,7 @@ let AuthService = class AuthService {
         this.jwtService = jwtService;
     }
     async register(registerDto) {
-        const { email, password, role, dateOfBirth, ...userData } = registerDto;
+        const { email, password, role, dateOfBirth, minWorkingDaysRequired, ...userData } = registerDto;
         const existingUser = await this.userModel.findOne({ email });
         if (existingUser) {
             throw new common_1.ConflictException('User with this email already exists');
@@ -77,6 +77,7 @@ let AuthService = class AuthService {
             password: hashedPassword,
             role,
             dateOfBirth: dateOfBirthDate,
+            minWorkingDaysRequired: minWorkingDaysRequired || 0,
             isActive: isDoctor ? false : true,
             approvalStatus: isDoctor
                 ? user_schema_1.ApprovalStatus.PENDING

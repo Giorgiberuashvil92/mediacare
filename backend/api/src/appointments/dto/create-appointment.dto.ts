@@ -1,11 +1,11 @@
 import { Type } from 'class-transformer';
 import {
-  IsEnum,
-  IsNotEmpty,
-  IsNumber,
-  IsOptional,
-  IsString,
-  ValidateNested,
+    IsEnum,
+    IsNotEmpty,
+    IsNumber,
+    IsOptional,
+    IsString,
+    ValidateNested,
 } from 'class-validator';
 import { AppointmentType, PaymentStatus } from '../schemas/appointment.schema';
 
@@ -16,11 +16,23 @@ class PatientDetailsDto {
 
   @IsOptional()
   @IsString()
+  lastName?: string;
+
+  @IsOptional()
+  @IsString()
   dateOfBirth?: string;
 
   @IsOptional()
   @IsString()
   gender?: string;
+
+  @IsOptional()
+  @IsString()
+  personalId?: string;
+
+  @IsOptional()
+  @IsString()
+  address?: string;
 
   @IsOptional()
   @IsString()

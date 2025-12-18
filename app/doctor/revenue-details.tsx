@@ -36,17 +36,47 @@ interface DashboardStats {
     thisMonth: number;
     total: number;
   };
+  videoConsultations?: {
+    total: number;
+    completed: number;
+    thisMonth: number;
+    lastMonth: number;
+  };
+  homeVisits?: {
+    total: number;
+    completed: number;
+    thisMonth: number;
+    lastMonth: number;
+  };
 }
+
+const MONTHS = [
+  { key: "01", label: "იანვარი" },
+  { key: "02", label: "თებერვალი" },
+  { key: "03", label: "მარტი" },
+  { key: "04", label: "აპრილი" },
+  { key: "05", label: "მაისი" },
+  { key: "06", label: "ივნისი" },
+  { key: "07", label: "ივლისი" },
+  { key: "08", label: "აგვისტო" },
+  { key: "09", label: "სექტემბერი" },
+  { key: "10", label: "ოქტომბერი" },
+  { key: "11", label: "ნოემბერი" },
+  { key: "12", label: "დეკემბერი" },
+];
 
 export default function RevenueDetails() {
   const router = useRouter();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<string>(
+    String(new Date().getMonth() + 1).padStart(2, "0")
+  );
 
   useEffect(() => {
     fetchStats();
-  }, []);
+  }, [selectedMonth]);
 
   const fetchStats = async () => {
     try {
@@ -126,13 +156,76 @@ export default function RevenueDetails() {
           >
             <Ionicons name="arrow-back" size={24} color="#1F2937" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>შემოსავლების დეტალები</Text>
+          <Text style={styles.headerTitle}>დეტალური სტატისტიკა</Text>
           <View style={styles.placeholder} />
         </View>
 
-        {/* Current Month Overview */}
+        {/* Month Filter */}
+        <View style={styles.monthFilterSection}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.monthFilterContent}
+          >
+            {MONTHS.map((month) => (
+              <TouchableOpacity
+                key={month.key}
+                style={[
+                  styles.monthFilterItem,
+                  selectedMonth === month.key && styles.monthFilterItemActive,
+                ]}
+                onPress={() => setSelectedMonth(month.key)}
+              >
+                <Text
+                  style={[
+                    styles.monthFilterText,
+                    selectedMonth === month.key && styles.monthFilterTextActive,
+                  ]}
+                >
+                  {month.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* Consultation Types Overview */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>მიმდინარე თვის მიმოხილვა</Text>
+          <Text style={styles.sectionTitle}>კონსულტაციების ტიპები</Text>
+          <View style={styles.consultationTypesRow}>
+            {/* Video Consultations */}
+            <View style={styles.consultationTypeCard}>
+              <View style={[styles.consultationTypeIcon, { backgroundColor: "#E0F2FE" }]}>
+                <Ionicons name="videocam" size={28} color="#0EA5E9" />
+              </View>
+              <Text style={styles.consultationTypeValue}>
+                {stats?.videoConsultations?.thisMonth || 0}
+              </Text>
+              <Text style={styles.consultationTypeLabel}>ვიდეო კონსულტაციები</Text>
+              <Text style={styles.consultationTypeSubLabel}>
+                სულ: {stats?.videoConsultations?.total || 0}
+              </Text>
+            </View>
+
+            {/* Home Visits */}
+            <View style={styles.consultationTypeCard}>
+              <View style={[styles.consultationTypeIcon, { backgroundColor: "#DCFCE7" }]}>
+                <Ionicons name="home" size={28} color="#10B981" />
+              </View>
+              <Text style={styles.consultationTypeValue}>
+                {stats?.homeVisits?.thisMonth || 0}
+              </Text>
+              <Text style={styles.consultationTypeLabel}>ბინაზე ვიზიტები</Text>
+              <Text style={styles.consultationTypeSubLabel}>
+                სულ: {stats?.homeVisits?.total || 0}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Financial Overview */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>ფინანსური მიმოხილვა</Text>
           <View style={styles.revenueCard}>
             <View style={styles.revenueHeader}>
               <View>
@@ -258,6 +351,28 @@ export default function RevenueDetails() {
           </View>
         </View>
 
+        {/* Appointment Statistics */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>ჯავშნების სტატისტიკა</Text>
+          <View style={styles.appointmentStatsGrid}>
+            <View style={[styles.appointmentStatCard, styles.appointmentStatCompleted]}>
+              <Ionicons name="checkmark-circle" size={28} color="#10B981" />
+              <Text style={styles.appointmentStatValue}>{stats.appointments.completed}</Text>
+              <Text style={styles.appointmentStatLabel}>დასრულებული</Text>
+            </View>
+            <View style={[styles.appointmentStatCard, styles.appointmentStatInProgress]}>
+              <Ionicons name="time" size={28} color="#F59E0B" />
+              <Text style={styles.appointmentStatValue}>{stats.appointments.inProgress}</Text>
+              <Text style={styles.appointmentStatLabel}>მიმდინარე</Text>
+            </View>
+            <View style={[styles.appointmentStatCard, styles.appointmentStatCancelled]}>
+              <Ionicons name="close-circle" size={28} color="#EF4444" />
+              <Text style={styles.appointmentStatValue}>{stats.appointments.uncompleted}</Text>
+              <Text style={styles.appointmentStatLabel}>გაუქმებული</Text>
+            </View>
+          </View>
+        </View>
+
         {/* Revenue Statistics */}
         <View style={[styles.section, { marginBottom: 20 }]}>
           <Text style={styles.sectionTitle}>შემოსავლის სტატისტიკა</Text>
@@ -333,6 +448,77 @@ const styles = StyleSheet.create({
   },
   placeholder: {
     width: 44,
+  },
+  // Month Filter
+  monthFilterSection: {
+    marginBottom: 20,
+  },
+  monthFilterContent: {
+    paddingHorizontal: 20,
+    gap: 8,
+  },
+  monthFilterItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  monthFilterItemActive: {
+    backgroundColor: "#06B6D4",
+    borderColor: "#06B6D4",
+  },
+  monthFilterText: {
+    fontSize: 13,
+    fontFamily: "Poppins-Medium",
+    color: "#4B5563",
+  },
+  monthFilterTextActive: {
+    color: "#FFFFFF",
+  },
+  // Consultation Types Row
+  consultationTypesRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  consultationTypeCard: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 16,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  consultationTypeIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  consultationTypeValue: {
+    fontSize: 28,
+    fontFamily: "Poppins-Bold",
+    color: "#1F2937",
+  },
+  consultationTypeLabel: {
+    fontSize: 12,
+    fontFamily: "Poppins-Medium",
+    color: "#4B5563",
+    textAlign: "center",
+    marginTop: 4,
+  },
+  consultationTypeSubLabel: {
+    fontSize: 11,
+    fontFamily: "Poppins-Regular",
+    color: "#9CA3AF",
+    marginTop: 4,
   },
   section: {
     marginBottom: 24,
@@ -664,6 +850,48 @@ const styles = StyleSheet.create({
   },
   patientStatLabel: {
     fontSize: 12,
+    fontFamily: "Poppins-Medium",
+    color: "#6B7280",
+    textAlign: "center",
+  },
+  // Appointment Statistics
+  appointmentStatsGrid: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  appointmentStatCard: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    padding: 16,
+    borderRadius: 12,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  appointmentStatCompleted: {
+    borderBottomWidth: 3,
+    borderBottomColor: "#10B981",
+  },
+  appointmentStatInProgress: {
+    borderBottomWidth: 3,
+    borderBottomColor: "#F59E0B",
+  },
+  appointmentStatCancelled: {
+    borderBottomWidth: 3,
+    borderBottomColor: "#EF4444",
+  },
+  appointmentStatValue: {
+    fontSize: 22,
+    fontFamily: "Poppins-Bold",
+    color: "#1F2937",
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  appointmentStatLabel: {
+    fontSize: 11,
     fontFamily: "Poppins-Medium",
     color: "#6B7280",
     textAlign: "center",

@@ -64,6 +64,25 @@ export default function DoctorTabsLayout() {
             ),
           }}
         />
+        {/* Hidden screens - accessible via navigation but not shown in tab bar */}
+        <Tabs.Screen
+          name="chat"
+          options={{
+            href: null,
+          }}
+        />
+        <Tabs.Screen
+          name="active-patients"
+          options={{
+            href: null,
+          }}
+        />
+        <Tabs.Screen
+          name="laboratory"
+          options={{
+            href: null,
+          }}
+        />
       </Tabs>
     </ScheduleProvider>
   );

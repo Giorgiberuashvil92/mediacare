@@ -77,6 +77,15 @@ export default function DoctorAppointments() {
     productName: string;
     clinicId?: string;
     clinicName?: string;
+    // თუ უკვე ატვირთულია პასუხი, შევინახოთ resultFile, რომ ექიმმა Modal-ში დაინახოს
+    resultFile?: {
+      url: string;
+      publicId?: string;
+      name?: string;
+      type?: string;
+      size?: number;
+      uploadedAt?: string | Date;
+    };
   }[]>([]);
   const [loadingLaboratoryData, setLoadingLaboratoryData] = useState(false);
   
@@ -113,14 +122,10 @@ export default function DoctorAppointments() {
         data: Consultation[];
       };
 
+      console.log("🔍 Frontend - getDoctorDashboardAppointments response:", response);
+
       // Log response for debugging
-      if (__DEV__) {
-        console.log('📱 Frontend - getDoctorDashboardAppointments response:', {
-          success: response.success,
-          dataLength: response.data?.length || 0,
-          types: [...new Set(response.data?.map(c => c.type) || [])],
-        });
-      }
+      
 
       if (response.success) {
         setConsultations(response.data as any);
@@ -154,10 +159,7 @@ export default function DoctorAppointments() {
   }, []);
 
   // Debug modal state
-  useEffect(() => {
-    console.log("🔍 Modal state changed - showFollowUpScheduleModal:", showFollowUpScheduleModal);
-    console.log("🔍 Availability length:", followUpAvailability.length);
-  }, [showFollowUpScheduleModal, followUpAvailability]);
+
 
   // Function to calculate time until consultation
   const getTimeUntilConsultation = (consultation: Consultation) => {
@@ -321,12 +323,16 @@ export default function DoctorAppointments() {
     
     // Load existing laboratory tests if appointment has them
     if ((consultation as any).laboratoryTests) {
-      setSelectedLaboratoryTests((consultation as any).laboratoryTests.map((test: any) => ({
-        productId: test.productId,
-        productName: test.productName,
-        clinicId: test.clinicId,
-        clinicName: test.clinicName,
-      })));
+      setSelectedLaboratoryTests(
+        (consultation as any).laboratoryTests.map((test: any) => ({
+          productId: test.productId,
+          productName: test.productName,
+          clinicId: test.clinicId,
+          clinicName: test.clinicName,
+          // გადავიტანოთ უკვე ატვირთული პასუხი, თუ არსებობს
+          resultFile: test.resultFile,
+        })),
+      );
     } else {
       setSelectedLaboratoryTests([]);
     }
@@ -1128,6 +1134,62 @@ export default function DoctorAppointments() {
 
             {selectedConsultation && (
               <ScrollView style={styles.modalBody}>
+                {/* Patient Details Section - for Form 100 generation */}
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailSectionTitle}>კონსულტაციის ისტორია</Text>
+                  
+                  <View style={styles.patientInfoCard}>
+                    <View style={styles.patientInfoRow}>
+                      <Text style={styles.patientInfoLabel}>სახელი:</Text>
+                      <Text style={styles.patientInfoValue}>
+                        {(selectedConsultation as any).patientDetails?.name || selectedConsultation.patientName || 'არ არის მითითებული'}
+                      </Text>
+                    </View>
+                    
+                    {(selectedConsultation as any).patientDetails?.lastName && (
+                      <View style={styles.patientInfoRow}>
+                        <Text style={styles.patientInfoLabel}>გვარი:</Text>
+                        <Text style={styles.patientInfoValue}>
+                          {(selectedConsultation as any).patientDetails.lastName}
+                        </Text>
+                      </View>
+                    )}
+                    
+                    <View style={styles.patientInfoRow}>
+                      <Text style={styles.patientInfoLabel}>დაბადების თარიღი:</Text>
+                      <Text style={styles.patientInfoValue}>
+                        {(selectedConsultation as any).patientDetails?.dateOfBirth 
+                          ? new Date((selectedConsultation as any).patientDetails.dateOfBirth).toLocaleDateString('ka-GE', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric'
+                            })
+                          : selectedConsultation.patientAge 
+                            ? `${selectedConsultation.patientAge} წელი`
+                            : 'არ არის მითითებული'}
+                      </Text>
+                    </View>
+                    
+                    {(selectedConsultation as any).patientDetails?.personalId && (
+                      <View style={styles.patientInfoRow}>
+                        <Text style={styles.patientInfoLabel}>პირადი ნომერი:</Text>
+                        <Text style={styles.patientInfoValue}>
+                          {(selectedConsultation as any).patientDetails.personalId}
+                        </Text>
+                      </View>
+                    )}
+                    
+                    {(selectedConsultation as any).patientDetails?.address && (
+                      <View style={styles.patientInfoRow}>
+                        <Text style={styles.patientInfoLabel}>მისამართი:</Text>
+                        <Text style={styles.patientInfoValue}>
+                          {(selectedConsultation as any).patientDetails.address}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+
                 <View style={styles.detailSection}>
                   <Text style={styles.detailLabel}>პაციენტი</Text>
                   <Text style={styles.detailValue}>
@@ -1194,6 +1256,65 @@ export default function DoctorAppointments() {
                     </Text>
                   </View>
                 )}
+                {selectedConsultation.laboratoryTests &&
+                  selectedConsultation.laboratoryTests.length > 0 && (
+                    <View style={styles.detailSection}>
+                      <Text style={styles.detailLabel}>
+                        ლაბორატორიული კვლევები
+                      </Text>
+                      {selectedConsultation.laboratoryTests.map(
+                        (test: any) => (
+                          <View
+                            key={test.productId}
+                            style={styles.laboratoryTestCard}
+                          >
+                            <View style={styles.laboratoryTestHeader}>
+                              <Ionicons
+                                name="flask-outline"
+                                size={18}
+                                color="#06B6D4"
+                              />
+                              <View style={styles.laboratoryTestInfo}>
+                                <Text style={styles.laboratoryTestName}>
+                                  {test.productName}
+                                </Text>
+                                {test.resultFile?.name && (
+                                  <Text style={styles.laboratoryTestMeta}>
+                                    ატვირთული შედეგი •{" "}
+                                    {test.resultFile.name}
+                                  </Text>
+                                )}
+                              </View>
+                              {test.resultFile?.url && (
+                                <TouchableOpacity
+                                  style={styles.viewResultPill}
+                                  onPress={() => {
+                                    Linking.openURL(
+                                      test.resultFile.url
+                                    ).catch(() =>
+                                      Alert.alert(
+                                        "შეცდომა",
+                                        "ფაილის გახსნა ვერ მოხერხდა"
+                                      )
+                                    );
+                                  }}
+                                >
+                                  <Ionicons
+                                    name="document-text-outline"
+                                    size={14}
+                                    color="#0369A1"
+                                  />
+                                  <Text style={styles.viewResultPillText}>
+                                    შედეგის ნახვა
+                                  </Text>
+                                </TouchableOpacity>
+                              )}
+                            </View>
+                          </View>
+                        )
+                      )}
+                    </View>
+                  )}
 
                 {selectedConsultation.consultationSummary?.notes && (
                   <View style={styles.detailSection}>
@@ -1603,9 +1724,7 @@ export default function DoctorAppointments() {
                       <TouchableOpacity
                         style={styles.scheduleButton}
                         onPress={async () => {
-                          console.log("📅 Follow-up schedule button pressed");
-                          console.log("👤 User:", user?.id);
-                          console.log("📋 Follow-up type:", appointmentData.followUpType);
+                         
 
                           if (!user?.id) {
                             Alert.alert("შეცდომა", "ექიმის ID ვერ მოიძებნა");
@@ -1614,29 +1733,24 @@ export default function DoctorAppointments() {
 
                           setLoadingFollowUpAvailability(true);
                           try {
-                            console.log("🔄 Fetching availability...");
+                           
                             const response = await apiService.getDoctorAvailability(
                               user.id,
                               appointmentData.followUpType,
                             );
-                            console.log("✅ Availability response:", response);
+                            
                             
                             if (response.success && response.data) {
-                              console.log("📊 Availability data:", response.data);
-                              console.log("📊 Availability data length:", response.data?.length);
+                            
                               
                               // Filter availability by selected type
                               const filteredAvailability = (response.data || []).filter(
                                 (day: any) => day.type === appointmentData.followUpType
                               );
                               
-                              console.log("🔍 Filtered availability:", filteredAvailability);
-                              console.log("🔍 Filtered availability length:", filteredAvailability.length);
-                              
+                            
                               setFollowUpAvailability(filteredAvailability);
-                              console.log("🔓 Opening modal...");
                               setShowFollowUpScheduleModal(true);
-                              console.log("✅ Modal should be open now");
                             } else {
                               console.error("❌ Response not successful:", response);
                               Alert.alert("შეცდომა", "განრიგის ჩატვირთვა ვერ მოხერხდა");
@@ -1751,6 +1865,11 @@ export default function DoctorAppointments() {
                           <Text style={styles.clinicNameText}>
                             კლინიკა აირჩევა პაციენტის მიერ დაჯავშნისას
                           </Text>
+                          {test.resultFile?.name && (
+                            <Text style={styles.clinicNameText}>
+                              ატვირთული შედეგი: {test.resultFile.name}
+                            </Text>
+                          )}
                         </View>
                         <TouchableOpacity
                           onPress={() => {
@@ -2443,6 +2562,37 @@ const styles = StyleSheet.create({
   detailSection: {
     marginBottom: 20,
   },
+  detailSectionTitle: {
+    fontSize: 18,
+    fontFamily: "Poppins-Bold",
+    color: "#1F2937",
+    marginBottom: 12,
+  },
+  patientInfoCard: {
+    backgroundColor: "#F9FAFB",
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  patientInfoRow: {
+    flexDirection: "row",
+    marginBottom: 10,
+    alignItems: "flex-start",
+  },
+  patientInfoLabel: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#6B7280",
+    width: 120,
+    marginRight: 8,
+  },
+  patientInfoValue: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#1F2937",
+  },
   detailLabel: {
     fontSize: 12,
     fontFamily: "Poppins-Medium",
@@ -2770,6 +2920,49 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins-Regular",
     color: "#6B7280",
     marginTop: 4,
+  },
+  laboratoryTestCard: {
+    backgroundColor: "#F9FAFB",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  laboratoryTestName: {
+    fontSize: 16,
+    fontFamily: "Poppins-SemiBold",
+    color: "#1F2937",
+    marginBottom: 4,
+  },
+  laboratoryTestHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  laboratoryTestInfo: {
+    flex: 1,
+    marginLeft: 8,
+  },
+  laboratoryTestMeta: {
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+  },
+  viewResultPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "#E0F2FE",
+  },
+  viewResultPillText: {
+    fontSize: 12,
+    fontFamily: "Poppins-Medium",
+    color: "#0369A1",
   },
   loadingContainer: {
     flexDirection: "row",

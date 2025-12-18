@@ -76,4 +76,8 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   location?: string;
+
+  // Minimum working days doctor must have scheduled in the next 2 weeks
+  @IsOptional()
+  minWorkingDaysRequired?: number;
 }

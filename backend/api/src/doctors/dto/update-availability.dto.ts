@@ -15,7 +15,6 @@ class AvailabilitySlotDto {
   date: string;
 
   @IsArray()
-  @IsNotEmpty()
   timeSlots: string[];
 
   @IsBoolean()

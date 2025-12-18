@@ -24,7 +24,16 @@ export class ProfileService {
       throw new NotFoundException('User not found');
     }
 
-    return {
+    console.log(
+      '📸 [ProfileService] User profileImage from DB:',
+      user.profileImage,
+    );
+    console.log(
+      '📸 [ProfileService] User full object:',
+      JSON.stringify(user, null, 2),
+    );
+
+    const profileData = {
       success: true,
       data: {
         id: (user._id as string).toString(),
@@ -56,6 +65,12 @@ export class ProfileService {
         }),
       },
     };
+
+    console.log(
+      '📸 [ProfileService] Returning profile data with profileImage:',
+      profileData.data.profileImage,
+    );
+    return profileData;
   }
 
   async updateProfile(userId: string, updateProfileDto: UpdateProfileDto) {
@@ -95,6 +110,10 @@ export class ProfileService {
       updateData.address = updateProfileDto.address as any;
     }
     if (updateProfileDto.profileImage !== undefined) {
+      console.log(
+        '📸 [ProfileService] updateProfile - updating profileImage to:',
+        updateProfileDto.profileImage,
+      );
       updateData.profileImage = updateProfileDto.profileImage;
     }
 
@@ -132,11 +151,22 @@ export class ProfileService {
     Object.assign(user, updateData);
     await user.save();
 
+    console.log(
+      '📸 [ProfileService] updateProfile - user saved. profileImage:',
+      user.profileImage,
+    );
+
     // Return updated profile
     return this.getProfile(userId);
   }
 
   async updateProfileImage(userId: string, imageUrl: string) {
+    console.log(
+      '📸 [ProfileService] updateProfileImage called with userId:',
+      userId,
+      'imageUrl:',
+      imageUrl,
+    );
     const user = await this.userModel.findByIdAndUpdate(
       userId,
       { profileImage: imageUrl },
@@ -146,6 +176,11 @@ export class ProfileService {
     if (!user) {
       throw new NotFoundException('User not found');
     }
+
+    console.log(
+      '📸 [ProfileService] Profile image updated. New profileImage:',
+      user.profileImage,
+    );
 
     return {
       success: true,

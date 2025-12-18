@@ -1,6 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -241,108 +240,118 @@ export default function DoctorDashboard() {
           </TouchableOpacity>
         </View>
 
-        {/* Quick Stats */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>მთავარი სტატისტიკა</Text>
-          <View style={styles.statsGrid}>
-            {/* Earnings Card */}
+        {/* Quick Actions */}
+        <View style={styles.quickActionsSection}>
+          <Text style={styles.quickActionsTitle}>სწრაფი მოქმედებები</Text>
+          <View style={styles.quickActionsGrid}>
+            {/* Chat */}
             <TouchableOpacity
-              onPress={() => router.push("/doctor/revenue-details" as any)}
-              style={styles.statCardTouchable}
+              style={[styles.quickActionCard, styles.quickActionChat]}
+              onPress={() => router.push("/(doctor-tabs)/chat" as any)}
+              activeOpacity={0.85}
             >
-              <LinearGradient
-                colors={["#06B6D4", "#0891B2"]}
-                style={styles.statCard}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
-                <View style={styles.statIconContainer}>
-                  <Ionicons name="wallet" size={24} color="#FFFFFF" />
-                </View>
-                <Text style={styles.statValue}>
-                  ${stats.earnings.paid.toLocaleString()}
-                </Text>
-                <Text style={styles.statLabel}>დარიცხული</Text>
-                <View style={styles.statBadge}>
-                  <Text style={styles.statBadgeText}>
-                    +${stats.earnings.pending} მოსალოდნელი
-                  </Text>
-                </View>
-              </LinearGradient>
+              <View style={styles.quickActionIconWrapper}>
+                <Ionicons name="chatbubbles" size={28} color="#FFFFFF" />
+              </View>
+              <Text style={styles.quickActionLabel}>ჩატი</Text>
+              <Text style={styles.quickActionSubLabel}>პაციენტებთან</Text>
             </TouchableOpacity>
 
-            {/* Appointments Card */}
+            {/* Active Patients - Video */}
             <TouchableOpacity
-              onPress={() => router.push("/doctor/appointments-details" as any)}
-              style={styles.statCardTouchable}
+              style={[styles.quickActionCard, styles.quickActionVideo]}
+              onPress={() => router.push("/(doctor-tabs)/active-patients?type=video" as any)}
+              activeOpacity={0.85}
             >
-              <LinearGradient
-                colors={["#10B981", "#059669"]}
-                style={styles.statCard}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
-                <View style={styles.statIconContainer}>
-                  <Ionicons name="calendar" size={24} color="#FFFFFF" />
-                </View>
-                <Text style={styles.statValue}>
-                  {stats.appointments.completed}
-                </Text>
-                <Text style={styles.statLabel}>შესრულებული</Text>
-                <View style={styles.statBadge}>
-                  <Text style={styles.statBadgeText}>
-                    {appointmentCompletionRate}% შესრულება
-                  </Text>
-                </View>
-              </LinearGradient>
+              <View style={styles.quickActionIconWrapper}>
+                <Ionicons name="videocam" size={28} color="#FFFFFF" />
+              </View>
+              <Text style={styles.quickActionLabel}>ვიდეო</Text>
+              <Text style={styles.quickActionSubLabel}>აქტიური პაციენტები</Text>
             </TouchableOpacity>
 
-            {/* Patients Card */}
-            <View style={styles.statCardTouchable}>
-              <LinearGradient
-                colors={["#8B5CF6", "#7C3AED"]}
-                style={styles.statCard}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
-                <View style={styles.statIconContainer}>
-                  <Ionicons name="people" size={24} color="#FFFFFF" />
-                </View>
-                <Text style={styles.statValue}>{stats.patients.total}</Text>
-                <Text style={styles.statLabel}>პაციენტები</Text>
-                <View style={styles.statBadge}>
-                  <Text style={styles.statBadgeText}>
-                    +{stats.patients.new} ახალი
-                  </Text>
-                </View>
-              </LinearGradient>
-            </View>
+            {/* Active Patients - Home Visit */}
+            <TouchableOpacity
+              style={[styles.quickActionCard, styles.quickActionHomeVisit]}
+              onPress={() => router.push("/(doctor-tabs)/active-patients?type=home-visit" as any)}
+              activeOpacity={0.85}
+            >
+              <View style={styles.quickActionIconWrapper}>
+                <Ionicons name="home" size={28} color="#FFFFFF" />
+              </View>
+              <Text style={styles.quickActionLabel}>ბინაზე</Text>
+              <Text style={styles.quickActionSubLabel}>აქტიური პაციენტები</Text>
+            </TouchableOpacity>
 
-            {/* Visits Card */}
-            <View style={styles.statCardTouchable}>
-              <LinearGradient
-                colors={["#F59E0B", "#D97706"]}
-                style={styles.statCard}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
-                <View style={styles.statIconContainer}>
-                  <MaterialCommunityIcons
-                    name="hospital-building"
-                    size={24}
-                    color="#FFFFFF"
-                  />
-                </View>
-                <Text style={styles.statValue}>{stats.visits.thisMonth}</Text>
-                <Text style={styles.statLabel}>ამ თვის ვიზიტები</Text>
-                <View style={styles.statBadge}>
-                  <Text style={styles.statBadgeText}>
-                    {stats.visits.today} დღეს
-                  </Text>
-                </View>
-              </LinearGradient>
-            </View>
+            {/* Laboratory */}
+            <TouchableOpacity
+              style={[styles.quickActionCard, styles.quickActionLab]}
+              onPress={() => router.push("/(doctor-tabs)/laboratory" as any)}
+              activeOpacity={0.85}
+            >
+              <View style={styles.quickActionIconWrapper}>
+                <Ionicons name="flask" size={28} color="#FFFFFF" />
+              </View>
+              <Text style={styles.quickActionLabel}>ლაბორატორია</Text>
+              <Text style={styles.quickActionSubLabel}>კვლევების დანიშვნა</Text>
+            </TouchableOpacity>
           </View>
+        </View>
+
+        {/* Quick Stats */}
+        <View style={styles.statsCardsSection}>
+          <Text style={styles.statsCardsTitle}>სტატისტიკა</Text>
+          <View style={styles.statsCardsRow}>
+            {/* Video Consultations */}
+            <TouchableOpacity
+              style={styles.statsCard}
+              onPress={() => router.push("/doctor/revenue-details" as any)}
+              activeOpacity={0.85}
+            >
+              <View style={[styles.statsCardIcon, { backgroundColor: "#E0F2FE" }]}>
+                <Ionicons name="videocam" size={22} color="#0EA5E9" />
+              </View>
+              <Text style={styles.statsCardValue}>
+                {stats?.videoConsultations?.thisMonth || stats?.appointments?.total || 0}
+              </Text>
+              <Text style={styles.statsCardLabel}>ვიდეო კონსულტაციები</Text>
+              <Text style={styles.statsCardSubLabel}>ამ თვეში</Text>
+            </TouchableOpacity>
+
+            {/* Home Visits */}
+            <TouchableOpacity
+              style={styles.statsCard}
+              onPress={() => router.push("/doctor/revenue-details" as any)}
+              activeOpacity={0.85}
+            >
+              <View style={[styles.statsCardIcon, { backgroundColor: "#DCFCE7" }]}>
+                <Ionicons name="home" size={22} color="#10B981" />
+              </View>
+              <Text style={styles.statsCardValue}>
+                {stats?.homeVisits?.thisMonth || 0}
+              </Text>
+              <Text style={styles.statsCardLabel}>ბინაზე ვიზიტები</Text>
+              <Text style={styles.statsCardSubLabel}>ამ თვეში</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Detailed Statistics Button */}
+          <TouchableOpacity
+            style={styles.detailedStatsButton}
+            onPress={() => router.push("/doctor/revenue-details" as any)}
+            activeOpacity={0.85}
+          >
+            <View style={styles.detailedStatsLeft}>
+              <View style={styles.detailedStatsIcon}>
+                <Ionicons name="stats-chart" size={24} color="#8B5CF6" />
+              </View>
+              <View>
+                <Text style={styles.detailedStatsTitle}>დეტალური სტატისტიკა</Text>
+                <Text style={styles.detailedStatsSubtitle}>ფინანსური, თვეების მიხედვით</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+          </TouchableOpacity>
         </View>
 
         {/* My Available Schedule */}
@@ -826,6 +835,157 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 10,
     paddingBottom: 20,
+  },
+  // Quick Actions
+  quickActionsSection: {
+    paddingHorizontal: 20,
+    marginBottom: 24,
+  },
+  quickActionsTitle: {
+    fontSize: 18,
+    fontFamily: "Poppins-SemiBold",
+    color: "#1F2937",
+    marginBottom: 14,
+  },
+  quickActionsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  quickActionCard: {
+    width: "48%",
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  quickActionChat: {
+    backgroundColor: "#8B5CF6",
+  },
+  quickActionVideo: {
+    backgroundColor: "#0EA5E9",
+  },
+  quickActionHomeVisit: {
+    backgroundColor: "#10B981",
+  },
+  quickActionLab: {
+    backgroundColor: "#F59E0B",
+  },
+  quickActionIconWrapper: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  quickActionLabel: {
+    fontSize: 16,
+    fontFamily: "Poppins-Bold",
+    color: "#FFFFFF",
+    marginBottom: 2,
+  },
+  quickActionSubLabel: {
+    fontSize: 11,
+    fontFamily: "Poppins-Medium",
+    color: "rgba(255, 255, 255, 0.85)",
+    textAlign: "center",
+  },
+  // Stats Cards Section
+  statsCardsSection: {
+    paddingHorizontal: 20,
+    marginBottom: 24,
+  },
+  statsCardsTitle: {
+    fontSize: 18,
+    fontFamily: "Poppins-SemiBold",
+    color: "#1F2937",
+    marginBottom: 14,
+  },
+  statsCardsRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 12,
+  },
+  statsCard: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 16,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  statsCardIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  statsCardValue: {
+    fontSize: 24,
+    fontFamily: "Poppins-Bold",
+    color: "#1F2937",
+  },
+  statsCardLabel: {
+    fontSize: 12,
+    fontFamily: "Poppins-Medium",
+    color: "#4B5563",
+    textAlign: "center",
+    marginTop: 2,
+  },
+  statsCardSubLabel: {
+    fontSize: 10,
+    fontFamily: "Poppins-Regular",
+    color: "#9CA3AF",
+    marginTop: 2,
+  },
+  detailedStatsButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  detailedStatsLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  detailedStatsIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: "#F3E8FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  detailedStatsTitle: {
+    fontSize: 15,
+    fontFamily: "Poppins-SemiBold",
+    color: "#1F2937",
+  },
+  detailedStatsSubtitle: {
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
   },
   greeting: {
     fontSize: 14,

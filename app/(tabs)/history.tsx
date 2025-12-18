@@ -52,11 +52,9 @@ const History = () => {
       }
 
       const response = await apiService.getPatientAppointments();
-      console.log('📋 History - API Response:', JSON.stringify(response, null, 2));
       
       if (response.success && Array.isArray(response.data)) {
-        console.log('📋 History - Appointments count:', response.data.length);
-        console.log('📋 History - First appointment:', JSON.stringify(response.data[0], null, 2));
+       
         
         const mapped = response.data
           .map((appointment) => {
@@ -70,7 +68,17 @@ const History = () => {
             });
             return visit;
           })
-          .filter((visit) => visit && isPastAppointment(visit));
+          .filter((visit) => visit && isPastAppointment(visit))
+          // Sort by date and time - most recent first (newest at top)
+          .sort((a: any, b: any) => {
+            const getDateTime = (visit: any) => {
+              if (!visit?.appointmentDate) return 0;
+              const [year, month, day] = visit.appointmentDate.split('-').map(Number);
+              const [hours, minutes] = (visit.appointmentTime || '00:00').split(':').map(Number);
+              return new Date(year, month - 1, day, hours || 0, minutes || 0).getTime();
+            };
+            return getDateTime(b) - getDateTime(a); // Descending - newest first
+          });
         
         console.log('📋 History - Filtered visits count:', mapped.length);
         setVisits(mapped);
@@ -322,6 +330,12 @@ const History = () => {
                   </View>
                   <View style={styles.dateBadge}>
                     <Text style={styles.dateText}>{visit.date}</Text>
+                    {visit.appointmentTime && (
+                      <View style={styles.timeRow}>
+                        <Ionicons name="time-outline" size={12} color="#06B6D4" />
+                        <Text style={styles.timeText}>{visit.appointmentTime}</Text>
+                      </View>
+                    )}
                     {visit.statusLabel ? (
                       <Text style={styles.statusLabel}>{visit.statusLabel}</Text>
                     ) : null}
@@ -378,6 +392,49 @@ const History = () => {
                             </Text>
                           </View>
                         )}
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Laboratory Tests Indicator */}
+                  {visit.laboratoryTests && visit.laboratoryTests.length > 0 && (
+                    <View style={styles.labTestsContainer}>
+                      <View style={styles.labTestsHeader}>
+                        <Ionicons name="flask" size={16} color="#8B5CF6" />
+                        <Text style={styles.labTestsLabel}>
+                          ლაბორატორიული კვლევები
+                        </Text>
+                      </View>
+                      <View style={styles.labTestsBadges}>
+                        <View style={styles.labTestBadge}>
+                          <Text style={styles.labTestBadgeText}>
+                            {visit.laboratoryTests.length} კვლევა
+                          </Text>
+                        </View>
+                        {(() => {
+                          const withResults = visit.laboratoryTests.filter((t: any) => t.resultFile?.url).length;
+                          const pending = visit.laboratoryTests.length - withResults;
+                          return (
+                            <>
+                              {withResults > 0 && (
+                                <View style={[styles.labTestBadge, styles.labTestBadgeSuccess]}>
+                                  <Ionicons name="checkmark-circle" size={12} color="#10B981" />
+                                  <Text style={[styles.labTestBadgeText, styles.labTestBadgeTextSuccess]}>
+                                    {withResults} პასუხი
+                                  </Text>
+                                </View>
+                              )}
+                              {pending > 0 && (
+                                <View style={[styles.labTestBadge, styles.labTestBadgePending]}>
+                                  <Ionicons name="time-outline" size={12} color="#F59E0B" />
+                                  <Text style={[styles.labTestBadgeText, styles.labTestBadgeTextPending]}>
+                                    {pending} მოლოდინში
+                                  </Text>
+                                </View>
+                              )}
+                            </>
+                          );
+                        })()}
                       </View>
                     </View>
                   )}
@@ -917,15 +974,19 @@ const mapAppointmentToVisit = (appointment: any) => {
     }
   }
   
-  console.log('📋 History - mapAppointmentToVisit - doctorId extraction:', {
-    appointmentDoctorId: appointment.doctorId,
-    appointmentDoctorIdType: typeof appointment.doctorId,
-    extractedDoctorId: doctorId,
-    extractedDoctorIdType: typeof doctorId,
-  });
   
+  // Format date from ISO to YYYY-MM-DD
+  // Use LOCAL methods to get the date as it appears in user's timezone
+  // This matches the logic in appointment.tsx for consistency
   const appointmentDate = appointment.appointmentDate
-    ? new Date(appointment.appointmentDate).toISOString().split("T")[0]
+    ? (() => {
+        const date = new Date(appointment.appointmentDate);
+        // Use LOCAL methods to get the date as it appears in user's timezone
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      })()
     : "";
 
   const rawSymptoms = appointment.symptoms || appointment.patientDetails?.problem;
@@ -999,40 +1060,99 @@ const mapAppointmentToVisit = (appointment: any) => {
     doctorIdType: typeof visit.doctorId,
   });
   
+  // Log laboratory tests for debugging
+  if (visit.laboratoryTests && visit.laboratoryTests.length > 0) {
+    console.log('🧪 [History] Lab tests for visit:', visit.id);
+    console.log('🧪 [History] Lab tests data:', JSON.stringify(visit.laboratoryTests, null, 2));
+    visit.laboratoryTests.forEach((test: any, idx: number) => {
+      console.log(`🧪 [History] Test ${idx}:`, {
+        productId: test.productId,
+        productName: test.productName,
+        booked: test.booked,
+        clinicName: test.clinicName,
+        hasResultFile: !!test.resultFile,
+        resultFileUrl: test.resultFile?.url || null,
+      });
+    });
+  }
+  
   return visit;
 };
 
 const isPastAppointment = (visit: any) => {
   if (!visit?.appointmentDate) {
+    console.log('❌ [isPastAppointment] No date:', visit?.id);
     return false;
   }
 
-  // Include completed appointments in history, regardless of date
+  // Cancelled appointments ALWAYS go to history, regardless of date
+  if (visit.status === "cancelled") {
+    console.log('✅ [isPastAppointment] Cancelled -> history:', visit.id, visit.appointmentDate);
+    return true;
+  }
+
+  // Completed appointments ALWAYS go to history, regardless of date
+  // (doctor has changed status to completed)
   if (visit.status === "completed") {
+    console.log('✅ [isPastAppointment] Completed -> history:', visit.id, visit.appointmentDate);
     return true;
   }
 
   // Include appointments with laboratory tests assigned by doctor, even if not completed
+  // (doctor has interacted with the appointment)
   if (visit.laboratoryTests && Array.isArray(visit.laboratoryTests) && visit.laboratoryTests.length > 0) {
+    console.log('✅ [isPastAppointment] Has lab tests -> history:', visit.id, visit.appointmentDate);
     return true;
   }
 
+  // For other statuses (pending, scheduled, in-progress), check if date has passed
+  // Use local timezone to avoid timezone issues
   const timePart = visit.appointmentTime || "00:00";
-  let appointmentDateTime = new Date(`${visit.appointmentDate}T${timePart}`);
+  let appointmentDateTime: Date;
 
-  if (Number.isNaN(appointmentDateTime.getTime())) {
-    appointmentDateTime = new Date(`${visit.appointmentDate} ${timePart}`);
-  }
-
-  if (Number.isNaN(appointmentDateTime.getTime())) {
-    appointmentDateTime = new Date(visit.appointmentDate);
-  }
-
-  if (Number.isNaN(appointmentDateTime.getTime())) {
+  // Parse date in YYYY-MM-DD format and time in HH:MM format in local timezone
+  const dateStr = visit.appointmentDate;
+  if (!dateStr) {
     return false;
   }
 
-  return appointmentDateTime.getTime() < Date.now();
+  try {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    
+    if (timePart && timePart !== "00:00") {
+      const [hours, minutes] = timePart.split(':').map(Number);
+      appointmentDateTime = new Date(year, month - 1, day, hours || 0, minutes || 0, 0, 0);
+    } else {
+      appointmentDateTime = new Date(year, month - 1, day, 0, 0, 0, 0);
+    }
+
+    if (Number.isNaN(appointmentDateTime.getTime())) {
+      console.log('❌ [isPastAppointment] Invalid date:', visit.id, dateStr, timePart);
+      return false;
+    }
+  } catch (error) {
+    console.error('❌ [isPastAppointment] Error parsing appointment date:', error);
+    return false;
+  }
+
+  // Include past appointments (date/time has passed)
+  // Compare with current time in local timezone
+  const now = Date.now();
+  const isPast = appointmentDateTime.getTime() < now;
+  
+  console.log('📅 [isPastAppointment] Check:', {
+    visitId: visit.id,
+    date: dateStr,
+    time: timePart,
+    status: visit.status,
+    appointmentDateTime: appointmentDateTime.toISOString(),
+    now: new Date(now).toISOString(),
+    isPast,
+    diff: appointmentDateTime.getTime() - now,
+    diffHours: (appointmentDateTime.getTime() - now) / (1000 * 60 * 60),
+  });
+  
+  return isPast;
 };
 
 const styles = StyleSheet.create({
@@ -1146,6 +1266,17 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins-SemiBold",
     color: "#06B6D4",
   },
+  timeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 2,
+  },
+  timeText: {
+    fontSize: 11,
+    fontFamily: "Poppins-Medium",
+    color: "#06B6D4",
+  },
   statusLabel: {
     fontSize: 11,
     fontFamily: "Poppins-Regular",
@@ -1224,6 +1355,57 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Poppins-Medium",
     color: "#8B5CF6",
+  },
+  // Lab Tests Indicator Styles
+  labTestsContainer: {
+    marginTop: 12,
+    backgroundColor: "#F5F3FF",
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#E9D5FF",
+  },
+  labTestsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 8,
+  },
+  labTestsLabel: {
+    fontSize: 13,
+    fontFamily: "Poppins-SemiBold",
+    color: "#7C3AED",
+  },
+  labTestsBadges: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  labTestBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#E9D5FF",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+  },
+  labTestBadgeText: {
+    fontSize: 11,
+    fontFamily: "Poppins-Medium",
+    color: "#7C3AED",
+  },
+  labTestBadgeSuccess: {
+    backgroundColor: "#D1FAE5",
+  },
+  labTestBadgeTextSuccess: {
+    color: "#10B981",
+  },
+  labTestBadgePending: {
+    backgroundColor: "#FEF3C7",
+  },
+  labTestBadgeTextPending: {
+    color: "#F59E0B",
   },
   visitFooter: {
     flexDirection: "row",

@@ -1,4 +1,4 @@
-#!/bin/bash
+ #!/bin/bash
 
 echo "🧪 Testing Medicare API Endpoints..."
 echo ""

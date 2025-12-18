@@ -3,6 +3,20 @@
 import { apiService } from '@/lib/api';
 import { useEffect, useState } from 'react';
 
+interface LaboratoryTest {
+  productId: string;
+  productName: string;
+  clinicId?: string;
+  clinicName?: string;
+  assignedAt: string;
+  booked: boolean;
+  resultFile?: {
+    url: string;
+    name?: string;
+    uploadedAt?: string;
+  };
+}
+
 interface AppointmentDetails {
   id: string;
   appointmentNumber?: string;
@@ -29,6 +43,7 @@ interface AppointmentDetails {
   visitAddress?: string;
   notes?: string;
   documents?: string[];
+  laboratoryTests?: LaboratoryTest[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -112,6 +127,7 @@ export function AppointmentDetailsModal({
           visitAddress: data.visitAddress,
           notes: data.notes,
           documents: data.documents,
+          laboratoryTests: data.laboratoryTests || [],
           createdAt: data.createdAt,
           updatedAt: data.updatedAt,
         });
@@ -163,7 +179,6 @@ export function AppointmentDetailsModal({
           ? response.data 
           : response.data.availability || [];
         
-        console.log('Loaded availability:', availability);
         setDoctorAvailability(availability);
       } else {
         console.error('Failed to load availability:', response);
@@ -268,14 +283,7 @@ export function AppointmentDetailsModal({
       }
 
       // Debug: Log appointment ID and details
-      console.log('Rescheduling appointment:', {
-        appointmentId,
-        currentDate: appointment?.appointmentDate,
-        currentTime: appointment?.appointmentTime,
-        newDate: rescheduleDate,
-        newTime: rescheduleTime,
-        currentStatus: appointment?.status,
-      });
+     
 
       const response = await apiService.rescheduleAppointment(
         appointmentId,
@@ -664,6 +672,95 @@ export function AppointmentDetailsModal({
                   <p className="text-sm text-dark dark:text-white whitespace-pre-wrap">
                     {appointment.notes}
                   </p>
+                </div>
+              )}
+
+              {/* Laboratory Tests */}
+              {appointment.laboratoryTests && appointment.laboratoryTests.length > 0 && (
+                <div className="rounded-lg border border-purple-200 bg-purple-50 p-4 dark:border-purple-900/30 dark:bg-purple-900/10">
+                  <div className="mb-4 flex items-center justify-between">
+                    <h3 className="flex items-center gap-2 text-lg font-semibold text-dark dark:text-white">
+                      <svg className="h-5 w-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                      </svg>
+                      ლაბორატორიული კვლევები
+                    </h3>
+                    <div className="flex gap-2">
+                      <span className="rounded-full bg-purple-200 px-3 py-1 text-xs font-medium text-purple-800 dark:bg-purple-800/50 dark:text-purple-200">
+                        სულ: {appointment.laboratoryTests.length}
+                      </span>
+                      <span className="rounded-full bg-green-200 px-3 py-1 text-xs font-medium text-green-800 dark:bg-green-800/50 dark:text-green-200">
+                        პასუხი: {appointment.laboratoryTests.filter(t => t.resultFile).length}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    {appointment.laboratoryTests.map((test, index) => (
+                      <div
+                        key={`${test.productId}-${index}`}
+                        className={`rounded-lg border p-3 ${
+                          test.resultFile 
+                            ? 'border-green-300 bg-green-50 dark:border-green-800/50 dark:bg-green-900/20' 
+                            : 'border-gray-200 bg-white dark:border-dark-3 dark:bg-dark-2'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className={`h-2.5 w-2.5 rounded-full ${
+                                test.resultFile ? 'bg-green-500' : test.booked ? 'bg-yellow-500' : 'bg-gray-400'
+                              }`} />
+                              <span className="font-medium text-dark dark:text-white">
+                                {test.productName}
+                              </span>
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                              {test.clinicName && (
+                                <span className="rounded bg-blue-100 px-2 py-0.5 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                                  კლინიკა: {test.clinicName}
+                                </span>
+                              )}
+                              <span className={`rounded px-2 py-0.5 ${
+                                test.booked 
+                                  ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' 
+                                  : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
+                              }`}>
+                                {test.booked ? '✓ დაჯავშნილი' : '⏳ არ არის დაჯავშნილი'}
+                              </span>
+                              <span className="rounded bg-gray-100 px-2 py-0.5 text-gray-600 dark:bg-dark-3 dark:text-gray-400">
+                                დანიშნულია: {new Date(test.assignedAt).toLocaleDateString('ka-GE')}
+                              </span>
+                            </div>
+                          </div>
+                          {test.resultFile && (
+                            <a
+                              href={test.resultFile.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="flex items-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-xs font-medium text-white hover:bg-green-700 transition-colors"
+                            >
+                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                              შედეგის ნახვა
+                            </a>
+                          )}
+                        </div>
+                        {test.resultFile && (
+                          <div className="mt-2 text-xs text-green-700 dark:text-green-400">
+                            <span>📄 {test.resultFile.name || 'ატვირთული ფაილი'}</span>
+                            {test.resultFile.uploadedAt && (
+                              <span className="ml-2">
+                                • ატვირთულია: {new Date(test.resultFile.uploadedAt).toLocaleDateString('ka-GE')}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 

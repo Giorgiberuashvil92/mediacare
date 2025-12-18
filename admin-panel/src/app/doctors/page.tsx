@@ -26,6 +26,7 @@ interface Doctor {
   isActive: boolean;
   approvalStatus: 'pending' | 'approved' | 'rejected';
   isTopRated?: boolean;
+  minScheduleDate?: string;
 }
 
 export default function DoctorsPage() {
@@ -77,8 +78,8 @@ export default function DoctorsPage() {
             isActive: doctor.isActive !== undefined ? doctor.isActive : false,
             approvalStatus: (doctor.approvalStatus || 'pending') as 'pending' | 'approved' | 'rejected',
             isTopRated: doctor.isTopRated ?? false,
+            minScheduleDate: doctor.minScheduleDate ? doctor.minScheduleDate.split('T')[0] : '',
           };
-          console.log('Mapped doctor:', mapped);
           return mapped;
         });
         setDoctors(mappedDoctors);

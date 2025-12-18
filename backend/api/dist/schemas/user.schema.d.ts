@@ -46,6 +46,7 @@ export declare class User {
     rating: number;
     reviewCount: number;
     isTopRated?: boolean;
+    minWorkingDaysRequired?: number;
     createdAt?: Date;
     updatedAt?: Date;
 }

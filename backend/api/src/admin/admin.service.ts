@@ -299,18 +299,21 @@ export class AdminService {
 
       return {
         id: idString,
+        appointmentNumber: appointment.appointmentNumber,
         patientName: appointment.patientId?.name || 'უცნობი პაციენტი',
         patientEmail: appointment.patientId?.email,
         doctorName: appointment.doctorId?.name || 'უცნობი ექიმი',
         doctorSpecialization: appointment.doctorId?.specialization,
         appointmentDate: formatAppointmentDate(appointment.appointmentDate),
         appointmentTime: appointment.appointmentTime,
+        type: appointment.type,
         status: appointment.status,
         consultationFee:
           appointment.consultationFee || appointment.totalAmount || 0,
         paymentStatus: appointment.paymentStatus,
         symptoms: appointment.patientDetails?.problem || appointment.symptoms,
         diagnosis: appointment.diagnosis,
+        laboratoryTests: appointment.laboratoryTests || [],
         createdAt: appointment.createdAt,
         updatedAt: appointment.updatedAt,
       };
@@ -599,6 +602,11 @@ export class AdminService {
         updateData.about = updateUserDto.about;
       if (updateUserDto.location !== undefined)
         updateData.location = updateUserDto.location;
+      // minWorkingDaysRequired - minimum working days doctor must have in next 2 weeks
+      if (updateUserDto.minWorkingDaysRequired !== undefined) {
+        updateData.minWorkingDaysRequired =
+          updateUserDto.minWorkingDaysRequired;
+      }
     }
 
     const updatedUser = await this.userModel

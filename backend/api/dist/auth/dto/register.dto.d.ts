@@ -17,4 +17,5 @@ export declare class RegisterDto {
     followUpFee?: number;
     about?: string;
     location?: string;
+    minWorkingDaysRequired?: number;
 }

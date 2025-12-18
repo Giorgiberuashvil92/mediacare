@@ -74,4 +74,8 @@ export class RegisterDto {
   @IsString()
   @IsOptional()
   location?: string;
+
+  // Minimum working days doctor must have scheduled in the next 2 weeks (set by admin)
+  @IsOptional()
+  minWorkingDaysRequired?: number;
 }

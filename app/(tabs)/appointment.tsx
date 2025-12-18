@@ -107,15 +107,33 @@ const mapAppointmentFromAPI = (appointment: any, apiBaseUrl: string): PatientApp
   }
 
   // Format date from ISO to YYYY-MM-DD
-  // Use UTC methods to preserve the date as stored in backend (avoid timezone shift)
+  // Use LOCAL methods to get the date as it appears in user's timezone
+  // Backend stores dates in UTC, but we want to display them in user's local timezone
   const appointmentDate = appointment.appointmentDate
     ? (() => {
         const date = new Date(appointment.appointmentDate);
-        // Use UTC methods to get the date as stored, not converted to local timezone
-        const year = date.getUTCFullYear();
-        const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-        const day = String(date.getUTCDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
+        // Use LOCAL methods to get the date as it appears in user's timezone
+        // This ensures the date matches what the user expects to see
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const formattedDate = `${year}-${month}-${day}`;
+        
+        console.log('📅 [mapAppointmentFromAPI] Date parsing:', {
+          appointmentId: appointment._id || appointment.id,
+          original: appointment.appointmentDate,
+          dateObject: date.toISOString(),
+          localYear: year,
+          localMonth: month,
+          localDay: day,
+          formatted: formattedDate,
+          utcYear: date.getUTCFullYear(),
+          utcMonth: String(date.getUTCMonth() + 1).padStart(2, '0'),
+          utcDay: String(date.getUTCDate()).padStart(2, '0'),
+          timezoneOffset: date.getTimezoneOffset(),
+        });
+        
+        return formattedDate;
       })()
     : "";
 
@@ -208,6 +226,7 @@ const Appointment = () => {
       const response = await apiService.getPatientAppointments();
 
       if (response.success && response.data) {
+        console.log('🔍 response.data:', response.data);
         const apiBaseUrl = apiService.getBaseURL();
         const mappedAppointments = response.data.map((appointment: any) =>
           mapAppointmentFromAPI(appointment, apiBaseUrl)
@@ -260,16 +279,19 @@ const Appointment = () => {
 
   const isUpcomingAppointment = (appointment: PatientAppointment) => {
     if (!appointment.date) {
+      console.log('❌ [isUpcomingAppointment] No date:', appointment.id);
       return false;
     }
 
     // Exclude cancelled appointments
     if (appointment.status === "cancelled") {
+      console.log('❌ [isUpcomingAppointment] Cancelled:', appointment.id, appointment.date);
       return false;
     }
 
     // Exclude completed appointments - they should go to history
     if (appointment.status === "completed") {
+      console.log('❌ [isUpcomingAppointment] Completed:', appointment.id, appointment.date);
       return false;
     }
 
@@ -294,6 +316,7 @@ const Appointment = () => {
     }
 
     if (Number.isNaN(appointmentDateTime.getTime())) {
+      console.log('❌ [isUpcomingAppointment] Invalid date:', appointment.id, appointment.date, appointment.time);
       return false;
     }
 
@@ -302,23 +325,50 @@ const Appointment = () => {
     const appointmentDateOnly = new Date(appointmentDateTime);
     appointmentDateOnly.setHours(0, 0, 0, 0);
     
-    return appointmentDateOnly.getTime() >= today.getTime();
+    const isUpcoming = appointmentDateOnly.getTime() >= today.getTime();
+    
+    console.log('📅 [isUpcomingAppointment] Check:', {
+      appointmentId: appointment.id,
+      date: appointment.date,
+      time: appointment.time,
+      status: appointment.status,
+      appointmentDateTime: appointmentDateTime.toISOString(),
+      appointmentDateOnly: appointmentDateOnly.toISOString(),
+      today: today.toISOString(),
+      isUpcoming,
+      diff: appointmentDateOnly.getTime() - today.getTime(),
+      diffDays: (appointmentDateOnly.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+    });
+    
+    return isUpcoming;
   };
 
   const upcomingAppointments = appointments.filter(isUpcomingAppointment);
 
   // Filter appointments
-  const filteredAppointments = upcomingAppointments.filter((appointment) => {
-    const matchesStatus =
-      filterStatus === "all" || appointment.status === filterStatus;
-    const matchesType =
-      filterType === "all" || appointment.type === filterType;
-    const matchesStart =
-      !filterStartDate || appointment.date >= filterStartDate.trim();
-    const matchesEnd =
-      !filterEndDate || appointment.date <= filterEndDate.trim();
-    return matchesStatus && matchesType && matchesStart && matchesEnd;
-  });
+  const filteredAppointments = upcomingAppointments
+    .filter((appointment) => {
+      const matchesStatus =
+        filterStatus === "all" || appointment.status === filterStatus;
+      const matchesType =
+        filterType === "all" || appointment.type === filterType;
+      const matchesStart =
+        !filterStartDate || appointment.date >= filterStartDate.trim();
+      const matchesEnd =
+        !filterEndDate || appointment.date <= filterEndDate.trim();
+      return matchesStatus && matchesType && matchesStart && matchesEnd;
+    })
+    // Sort by date and time - nearest appointment first
+    .sort((a, b) => {
+      // Parse date and time for comparison
+      const getDateTime = (appt: PatientAppointment) => {
+        if (!appt.date) return Infinity;
+        const [year, month, day] = appt.date.split('-').map(Number);
+        const [hours, minutes] = (appt.time || '00:00').split(':').map(Number);
+        return new Date(year, month - 1, day, hours || 0, minutes || 0).getTime();
+      };
+      return getDateTime(a) - getDateTime(b);
+    });
 
   // Stats
   const stats = {

@@ -4,11 +4,14 @@
   "version": "1.0.0",
   "scripts": {
     "start": "expo start",
+    "start:clear": "expo start --clear",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "clear": "expo start --clear",
+    "reset": "expo start --clear --reset-cache"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",

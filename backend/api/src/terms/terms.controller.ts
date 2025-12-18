@@ -10,7 +10,17 @@ export class TermsController {
   constructor(private readonly termsService: TermsService) {}
 
   @Get(':type')
-  async findOne(@Param('type') type: 'cancellation' | 'service' | 'privacy') {
+  async findOne(
+    @Param('type')
+    type:
+      | 'cancellation'
+      | 'service'
+      | 'privacy'
+      | 'contract'
+      | 'usage'
+      | 'doctor-cancellation'
+      | 'doctor-service',
+  ) {
     return this.termsService.findOne(type);
   }
 
@@ -18,7 +28,15 @@ export class TermsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
   async update(
-    @Param('type') type: 'cancellation' | 'service' | 'privacy',
+    @Param('type')
+    type:
+      | 'cancellation'
+      | 'service'
+      | 'privacy'
+      | 'contract'
+      | 'usage'
+      | 'doctor-cancellation'
+      | 'doctor-service',
     @Body() updateTermDto: UpdateTermDto,
   ) {
     return this.termsService.update(type, updateTermDto);

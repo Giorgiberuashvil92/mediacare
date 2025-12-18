@@ -8,22 +8,20 @@ import { CartProvider } from "./contexts/CartContext";
 import { FavoritesProvider } from "./contexts/FavoritesContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
 
-// Reactotron disabled for debugging
-// if (__DEV__) {
-//   try {
-//     require("../ReactotronConfig");
-//     console.log('✅ Reactotron loaded successfully');
-//   } catch (error) {
-//     console.warn('⚠️ Reactotron failed to load:', error);
-//     // Continue without Reactotron
-//   }
-// }
+if (__DEV__) {
+  try {
+    require("../ReactotronConfig");
+    console.log('✅ Reactotron loaded successfully');
+  } catch (error) {
+    console.warn('⚠️ Reactotron failed to load:', error);
+    // Continue without Reactotron
+  }
+}
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  console.log('🚀 RootLayout component loaded');
-  console.log('🔧 __DEV__ mode:', __DEV__);
+  // Removed console.logs to improve Fast Refresh performance
   const [loaded, error] = useFonts({
     "Poppins-Regular": require("../assets/fonts/Poppins-Regular.ttf"),
     "Poppins-Medium": require("../assets/fonts/Poppins-Medium.ttf"),

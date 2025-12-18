@@ -24,6 +24,18 @@ export interface DoctorStatistics {
     thisMonth: number; // ამ თვის
     total: number; // სულ ვიზიტები
   };
+  videoConsultations?: {
+    thisMonth: number; // ვიდეო კონსულტაციები ამ თვეში
+    lastMonth: number; // ვიდეო კონსულტაციები წინა თვეში
+    total: number; // სულ ვიდეო კონსულტაციები
+    completed: number; // დასრულებული ვიდეო კონსულტაციები
+  };
+  homeVisits?: {
+    thisMonth: number; // ბინაზე ვიზიტები ამ თვეში
+    lastMonth: number; // ბინაზე ვიზიტები წინა თვეში
+    total: number; // სულ ბინაზე ვიზიტები
+    completed: number; // დასრულებული ბინაზე ვიზიტები
+  };
 }
 
 export interface ConsultationVitals {
@@ -59,6 +71,16 @@ export interface Form100Info {
   fileName?: string;
 }
 
+export interface PatientDetails {
+  name?: string;
+  lastName?: string;
+  dateOfBirth?: string;
+  gender?: string;
+  personalId?: string;
+  address?: string;
+  problem?: string;
+}
+
 export interface Consultation {
   id: string;
   patientName: string;
@@ -80,6 +102,8 @@ export interface Consultation {
   consultationSummary?: ConsultationSummary;
   followUp?: FollowUpInfo;
   form100?: Form100Info;
+  patientDetails?: PatientDetails; // Full patient details for Form 100 generation
+  laboratoryTests?: any[]; // Laboratory tests assigned to this appointment
 }
 
 export interface Schedule {

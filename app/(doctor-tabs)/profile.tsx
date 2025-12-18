@@ -1,20 +1,23 @@
 import { apiService } from "@/app/services/api";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import * as DocumentPicker from "expo-document-picker";
+import { Image } from "expo-image";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
+  Modal,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../contexts/AuthContext";
+import { showToast } from "../utils/toast";
 
 export default function DoctorProfile() {
   const { user, logout } = useAuth();
@@ -27,11 +30,50 @@ export default function DoctorProfile() {
   });
   const [doctorProfile, setDoctorProfile] = useState<any>(null);
   const [stats, setStats] = useState<any>(null);
+  const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
+  const [statusModalVisible, setStatusModalVisible] = useState(false);
+
+  // Check if doctor profile is complete (active) or incomplete (passive)
+  const getProfileStatus = () => {
+    if (!doctorProfile) return { isActive: false, missingFields: [] };
+    
+    const missingFields: string[] = [];
+    
+    if (!doctorProfile.about || doctorProfile.about.trim() === '') {
+      missingFields.push('შესახებ');
+    }
+    if (!doctorProfile.specialization) {
+      missingFields.push('სპეციალიზაცია');
+    }
+    if (!doctorProfile.experience) {
+      missingFields.push('გამოცდილება');
+    }
+    if (!doctorProfile.consultationFee) {
+      missingFields.push('კონსულტაციის ფასი');
+    }
+    if (!doctorProfile.profileImage) {
+      missingFields.push('პროფილის ფოტო');
+    }
+    
+    return {
+      isActive: missingFields.length === 0,
+      missingFields,
+    };
+  };
+
+  const profileStatus = getProfileStatus();
 
   useEffect(() => {
     loadProfileData();
-     
   }, [user?.id]);
+
+  // Reload profile when screen comes into focus (e.g., returning from edit-profile)
+  useFocusEffect(
+    useCallback(() => {
+      loadProfileData();
+       
+    }, [])
+  );
 
   const loadProfileData = async () => {
     try {
@@ -54,6 +96,58 @@ export default function DoctorProfile() {
       }
     } catch (error) {
     console.log(error);
+    }
+  };
+
+  const handleProfileImagePick = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["image/jpeg", "image/jpg", "image/png", "image/webp"],
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled) {
+        return;
+      }
+
+      const file = result.assets[0];
+
+      if (file.size && file.size > 5 * 1024 * 1024) {
+        showToast.error("სურათის ზომა არ უნდა აღემატებოდეს 5MB-ს", "შეცდომა");
+        return;
+      }
+
+      setUploadingProfileImage(true);
+
+      // Upload image
+      const uploadResponse = await apiService.uploadProfileImagePublic({
+        uri: file.uri,
+        name: file.name,
+        type: file.mimeType || "image/jpeg",
+      });
+
+      if (uploadResponse.url) {
+        // Update profile with new image
+        const updateResponse = await apiService.updateProfile({
+          profileImage: uploadResponse.url,
+        });
+
+        if (updateResponse.success) {
+          setDoctorProfile((prev: any) => ({
+            ...prev,
+            profileImage: uploadResponse.url,
+          }));
+          showToast.success("ფოტო წარმატებით განახლდა", "წარმატება");
+        }
+      }
+    } catch (error) {
+      console.error("Profile image pick error:", error);
+      showToast.error(
+        error instanceof Error ? error.message : "ფოტოს ატვირთვა ვერ მოხერხდა",
+        "შეცდომა"
+      );
+    } finally {
+      setUploadingProfileImage(false);
     }
   };
 
@@ -85,12 +179,31 @@ export default function DoctorProfile() {
 
         {/* Profile Card */}
         <View style={styles.profileCard}>
-          <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              <Ionicons name="person" size={40} color="#FFFFFF" />
-            </View>
+          <TouchableOpacity 
+            style={styles.avatarContainer}
+            onPress={handleProfileImagePick}
+            disabled={uploadingProfileImage}
+          >
+            {uploadingProfileImage ? (
+              <View style={styles.avatar}>
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              </View>
+            ) : doctorProfile?.profileImage ? (
+              <Image
+                source={{ uri: doctorProfile.profileImage }}
+                style={styles.avatarImage}
+                contentFit="cover"
+              />
+            ) : (
+              <View style={styles.avatar}>
+                <Ionicons name="person" size={40} color="#FFFFFF" />
+              </View>
+            )}
             <View style={styles.onlineBadge} />
-          </View>
+            <View style={styles.cameraIconContainer}>
+              <Ionicons name="camera" size={14} color="#FFFFFF" />
+            </View>
+          </TouchableOpacity>
           <View style={styles.profileInfo}>
             {/* Rating above name */}
             {doctorProfile?.rating !== undefined && (
@@ -101,9 +214,34 @@ export default function DoctorProfile() {
                 </Text>
               </View>
             )}
-            <Text style={styles.profileName}>
-              {user?.name || "Dr. Stefin Cook"}
-            </Text>
+            <View style={styles.nameWithStatusRow}>
+              <Text style={styles.profileName}>
+                {user?.name || "Dr. Stefin Cook"}
+              </Text>
+              {/* Active/Passive Status Badge */}
+              <TouchableOpacity
+                onPress={() => setStatusModalVisible(true)}
+                style={[
+                  styles.statusBadge,
+                  profileStatus.isActive ? styles.statusBadgeActive : styles.statusBadgePassive,
+                ]}
+              >
+                <View
+                  style={[
+                    styles.statusDot,
+                    profileStatus.isActive ? styles.statusDotActive : styles.statusDotPassive,
+                  ]}
+                />
+                <Text
+                  style={[
+                    styles.statusText,
+                    profileStatus.isActive ? styles.statusTextActive : styles.statusTextPassive,
+                  ]}
+                >
+                  {profileStatus.isActive ? "აქტიური" : "პასიური"}
+                </Text>
+              </TouchableOpacity>
+            </View>
             <Text style={styles.profileEmail}>
               {user?.email || "doctor@medicare.ge"}
             </Text>
@@ -120,40 +258,37 @@ export default function DoctorProfile() {
               </View>
             )}
           </View>
-          <TouchableOpacity style={styles.editButton}>
+          <TouchableOpacity 
+            style={styles.editButton}
+            onPress={() => router.push("/screens/profile/edit-profile")}
+          >
             <Ionicons name="create-outline" size={20} color="#06B6D4" />
           </TouchableOpacity>
         </View>
 
         {/* Statistics */}
-        <View style={styles.statsSection}>
-          <View style={styles.statCard}>
-            <View style={styles.statIcon}>
-              <Ionicons name="calendar" size={20} color="#06B6D4" />
+
+
+        {/* Quick Stats Row */}
+        
+
+        {/* Detailed Statistics Button */}
+        <View style={styles.section}>
+          <TouchableOpacity 
+            style={styles.detailedStatsButton}
+            onPress={() => router.push("/doctor/revenue-details" as any)}
+          >
+            <View style={styles.detailedStatsLeft}>
+              <View style={styles.detailedStatsIcon}>
+                <Ionicons name="stats-chart" size={24} color="#8B5CF6" />
+              </View>
+              <View>
+                <Text style={styles.detailedStatsTitle}>დეტალური სტატისტიკა</Text>
+                <Text style={styles.detailedStatsSubtitle}>ფინანსური და თვეების მიხედვით</Text>
+              </View>
             </View>
-            <Text style={styles.statValue}>
-              {stats?.appointments?.total || 0}
-            </Text>
-            <Text style={styles.statLabel}>კონსულტაციები</Text>
-          </View>
-          <View style={styles.statCard}>
-            <View style={styles.statIcon}>
-              <Ionicons name="people" size={20} color="#10B981" />
-            </View>
-            <Text style={styles.statValue}>
-              {stats?.patients?.total || 0}
-            </Text>
-            <Text style={styles.statLabel}>პაციენტები</Text>
-          </View>
-          <View style={styles.statCard}>
-            <View style={styles.statIcon}>
-              <Ionicons name="star" size={20} color="#F59E0B" />
-            </View>
-            <Text style={styles.statValue}>
-              {doctorProfile?.rating?.toFixed(1) || "0.0"}
-            </Text>
-            <Text style={styles.statLabel}>რეიტინგი</Text>
-          </View>
+            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+          </TouchableOpacity>
         </View>
 
         {/* Language Settings */}
@@ -186,165 +321,10 @@ export default function DoctorProfile() {
         </View>
 
         {/* Appearance */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>გარეგნობა</Text>
-          <View style={styles.menuCard}>
-            <View style={styles.menuItem}>
-              <View style={styles.menuItemLeft}>
-                <View style={styles.menuIconContainer}>
-                  <Ionicons
-                    name={isDarkMode ? "moon" : "sunny"}
-                    size={22}
-                    color={isDarkMode ? "#8B5CF6" : "#F59E0B"}
-                  />
-                </View>
-                <View style={styles.menuItemContent}>
-                  <Text style={styles.menuItemTitle}>ბნელი რეჟიმი</Text>
-                  <Text style={styles.menuItemSubtitle}>
-                    {isDarkMode ? "ბნელი თემა ჩართულია" : "ღია თემა ჩართულია"}
-                  </Text>
-                </View>
-              </View>
-              <Switch
-                value={isDarkMode}
-                onValueChange={setIsDarkMode}
-                trackColor={{ false: "#D1D5DB", true: "#06B6D4" }}
-                thumbColor={isDarkMode ? "#FFFFFF" : "#F3F4F6"}
-              />
-            </View>
-          </View>
-        </View>
+        
 
         {/* Notifications */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>შეტყობინებები</Text>
-          <View style={styles.menuCard}>
-            <View style={styles.menuItem}>
-              <View style={styles.menuItemLeft}>
-                <View style={styles.menuIconContainer}>
-                  <Ionicons name="notifications" size={22} color="#10B981" />
-                </View>
-                <View style={styles.menuItemContent}>
-                  <Text style={styles.menuItemTitle}>დანიშვნები</Text>
-                  <Text style={styles.menuItemSubtitle}>
-                    ახალი დანიშვნების შეტყობინებები
-                  </Text>
-                </View>
-              </View>
-              <Switch
-                value={notifications.appointments}
-                onValueChange={(value) =>
-                  setNotifications({ ...notifications, appointments: value })
-                }
-                trackColor={{ false: "#D1D5DB", true: "#06B6D4" }}
-                thumbColor={notifications.appointments ? "#FFFFFF" : "#F3F4F6"}
-              />
-            </View>
 
-            <View style={styles.divider} />
-
-            <View style={styles.menuItem}>
-              <View style={styles.menuItemLeft}>
-                <View style={styles.menuIconContainer}>
-                  <Ionicons name="chatbubbles" size={22} color="#06B6D4" />
-                </View>
-                <View style={styles.menuItemContent}>
-                  <Text style={styles.menuItemTitle}>შეტყობინებები</Text>
-                  <Text style={styles.menuItemSubtitle}>
-                    პაციენტების შეტყობინებები
-                  </Text>
-                </View>
-              </View>
-              <Switch
-                value={notifications.messages}
-                onValueChange={(value) =>
-                  setNotifications({ ...notifications, messages: value })
-                }
-                trackColor={{ false: "#D1D5DB", true: "#06B6D4" }}
-                thumbColor={notifications.messages ? "#FFFFFF" : "#F3F4F6"}
-              />
-            </View>
-
-            <View style={styles.divider} />
-
-            <View style={styles.menuItem}>
-              <View style={styles.menuItemLeft}>
-                <View style={styles.menuIconContainer}>
-                  <Ionicons name="megaphone" size={22} color="#F59E0B" />
-                </View>
-                <View style={styles.menuItemContent}>
-                  <Text style={styles.menuItemTitle}>განახლებები</Text>
-                  <Text style={styles.menuItemSubtitle}>
-                    სისტემის განახლებები და სიახლეები
-                  </Text>
-                </View>
-              </View>
-              <Switch
-                value={notifications.updates}
-                onValueChange={(value) =>
-                  setNotifications({ ...notifications, updates: value })
-                }
-                trackColor={{ false: "#D1D5DB", true: "#06B6D4" }}
-                thumbColor={notifications.updates ? "#FFFFFF" : "#F3F4F6"}
-              />
-            </View>
-          </View>
-        </View>
-
-        {/* Account Settings */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>ანგარიში</Text>
-          <View style={styles.menuCard}>
-            <TouchableOpacity style={styles.menuItem}>
-              <View style={styles.menuItemLeft}>
-                <View style={styles.menuIconContainer}>
-                  <Ionicons name="person-circle" size={22} color="#06B6D4" />
-                </View>
-                <View style={styles.menuItemContent}>
-                  <Text style={styles.menuItemTitle}>პროფილის რედაქტირება</Text>
-                  <Text style={styles.menuItemSubtitle}>
-                    პირადი ინფორმაციის შეცვლა
-                  </Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
-            </TouchableOpacity>
-
-            <View style={styles.divider} />
-
-            <TouchableOpacity style={styles.menuItem}>
-              <View style={styles.menuItemLeft}>
-                <View style={styles.menuIconContainer}>
-                  <Ionicons name="lock-closed" size={22} color="#8B5CF6" />
-                </View>
-                <View style={styles.menuItemContent}>
-                  <Text style={styles.menuItemTitle}>უსაფრთხოება</Text>
-                  <Text style={styles.menuItemSubtitle}>
-                    პაროლი და ორფაქტორიანი ავთენტიფიკაცია
-                  </Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
-            </TouchableOpacity>
-
-            <View style={styles.divider} />
-
-            <TouchableOpacity style={styles.menuItem}>
-              <View style={styles.menuItemLeft}>
-                <View style={styles.menuIconContainer}>
-                  <Ionicons name="shield-checkmark" size={22} color="#10B981" />
-                </View>
-                <View style={styles.menuItemContent}>
-                  <Text style={styles.menuItemTitle}>კონფიდენციალურობა</Text>
-                  <Text style={styles.menuItemSubtitle}>
-                    მონაცემების დაცვა და პირადი ინფორმაცია
-                  </Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
-            </TouchableOpacity>
-          </View>
-        </View>
 
         {/* Help & Support */}
         <View style={styles.section}>
@@ -403,25 +383,22 @@ export default function DoctorProfile() {
           </View>
         </View>
 
-        {/* Testing Tools - დატოვებული სატესტოდ */}
+        {/* Collaboration Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🧪 Testing Tools (Dev)</Text>
+          <Text style={styles.sectionTitle}>თანამშრომლობა</Text>
           <View style={styles.menuCard}>
-            <TouchableOpacity
+            <TouchableOpacity 
               style={styles.menuItem}
-              onPress={async () => {
-                await AsyncStorage.setItem("@medicare_user_role", "patient");
-                router.replace("/(tabs)");
-              }}
+              onPress={() => router.push("/screens/profile/terms/contract" as any)}
             >
               <View style={styles.menuItemLeft}>
                 <View style={styles.menuIconContainer}>
-                  <Ionicons name="swap-horizontal" size={22} color="#06B6D4" />
+                  <Ionicons name="document-attach" size={22} color="#8B5CF6" />
                 </View>
                 <View style={styles.menuItemContent}>
-                  <Text style={styles.menuItemTitle}>Switch to Patient</Text>
+                  <Text style={styles.menuItemTitle}>ხელშეკრულება</Text>
                   <Text style={styles.menuItemSubtitle}>
-                    პაციენტის როუთების ტესტირება
+                    თანამშრომლობის პირობები
                   </Text>
                 </View>
               </View>
@@ -430,37 +407,58 @@ export default function DoctorProfile() {
 
             <View style={styles.divider} />
 
-            <TouchableOpacity
+            <TouchableOpacity 
               style={styles.menuItem}
-              onPress={async () => {
-                Alert.alert(
-                  "Reset App",
-                  "ნამდვილად გსურთ აპლიკაციის გადატვირთვა?",
-                  [
-                    {
-                      text: "გაუქმება",
-                      style: "cancel",
-                    },
-                    {
-                      text: "Reset",
-                      style: "destructive",
-                      onPress: async () => {
-                        await AsyncStorage.clear();
-                        router.replace("/screens/auth/onboarding");
-                      },
-                    },
-                  ]
-                );
-              }}
+              onPress={() => router.push("/screens/profile/terms/usage" as any)}
             >
               <View style={styles.menuItemLeft}>
                 <View style={styles.menuIconContainer}>
-                  <Ionicons name="refresh" size={22} color="#F59E0B" />
+                  <Ionicons name="reader" size={22} color="#10B981" />
                 </View>
                 <View style={styles.menuItemContent}>
-                  <Text style={styles.menuItemTitle}>Reset App</Text>
+                  <Text style={styles.menuItemTitle}>მოხმარების წესები</Text>
                   <Text style={styles.menuItemSubtitle}>
-                    Clear all data და restart
+                    აპლიკაციის მოხმარების წესები
+                  </Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+            </TouchableOpacity>
+
+            <View style={styles.divider} />
+
+            <TouchableOpacity 
+              style={styles.menuItem}
+              onPress={() => router.push("/screens/profile/terms/doctor-cancellation" as any)}
+            >
+              <View style={styles.menuItemLeft}>
+                <View style={styles.menuIconContainer}>
+                  <Ionicons name="close-circle-outline" size={22} color="#EF4444" />
+                </View>
+                <View style={styles.menuItemContent}>
+                  <Text style={styles.menuItemTitle}>ჯავშნების გაუქმების პირობები</Text>
+                  <Text style={styles.menuItemSubtitle}>
+                    გაუქმების წესები და პირობები
+                  </Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+            </TouchableOpacity>
+
+            <View style={styles.divider} />
+
+            <TouchableOpacity 
+              style={styles.menuItem}
+              onPress={() => router.push("/screens/profile/terms/doctor-service" as any)}
+            >
+              <View style={styles.menuItemLeft}>
+                <View style={styles.menuIconContainer}>
+                  <Ionicons name="document-text-outline" size={22} color="#0EA5E9" />
+                </View>
+                <View style={styles.menuItemContent}>
+                  <Text style={styles.menuItemTitle}>სერვისის პირობები</Text>
+                  <Text style={styles.menuItemSubtitle}>
+                    სერვისის გამოყენების პირობები
                   </Text>
                 </View>
               </View>
@@ -468,6 +466,9 @@ export default function DoctorProfile() {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Testing Tools - დატოვებული სატესტოდ */}
+
 
         {/* Logout Button */}
         <View style={styles.logoutSection}>
@@ -482,6 +483,81 @@ export default function DoctorProfile() {
           <Text style={styles.footerVersion}>Version 1.0.0 (Build 100)</Text>
         </View>
       </ScrollView>
+
+      {/* Status Modal */}
+      <Modal
+        visible={statusModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setStatusModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                პროფილის სტატუსი
+              </Text>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setStatusModalVisible(false)}
+              >
+                <Ionicons name="close" size={22} color="#4B5563" />
+              </TouchableOpacity>
+            </View>
+
+            {profileStatus.isActive ? (
+              <View style={styles.statusModalActive}>
+                <View style={styles.statusModalIconActive}>
+                  <Ionicons name="checkmark-circle" size={48} color="#10B981" />
+                </View>
+                <Text style={styles.statusModalTitle}>თქვენი პროფილი აქტიურია!</Text>
+                <Text style={styles.statusModalSubtitle}>
+                  ბოლოს განახლდა: {doctorProfile?.updatedAt 
+                    ? new Date(doctorProfile.updatedAt).toLocaleDateString("ka-GE", {
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      })
+                    : "უცნობია"}
+                </Text>
+                <View style={styles.recommendationBox}>
+                  <Ionicons name="bulb-outline" size={20} color="#F59E0B" />
+                  <Text style={styles.recommendationText}>
+                    რეკომენდაცია: პერიოდულად გადახედეთ და განაახლეთ თქვენი პროფილი, რომ პაციენტებს ჰქონდეთ აქტუალური ინფორმაცია.
+                  </Text>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.statusModalPassive}>
+                <View style={styles.statusModalIconPassive}>
+                  <Ionicons name="alert-circle" size={48} color="#EF4444" />
+                </View>
+                <Text style={styles.statusModalTitle}>თქვენი პროფილი არასრულია</Text>
+                <Text style={styles.statusModalSubtitle}>
+                  გთხოვთ შეავსოთ შემდეგი ველები:
+                </Text>
+                <View style={styles.missingFieldsList}>
+                  {profileStatus.missingFields.map((field, index) => (
+                    <View key={index} style={styles.missingFieldItem}>
+                      <Ionicons name="close-circle" size={18} color="#EF4444" />
+                      <Text style={styles.missingFieldText}>{field}</Text>
+                    </View>
+                  ))}
+                </View>
+                <TouchableOpacity
+                  style={styles.editProfileButton}
+                  onPress={() => {
+                    setStatusModalVisible(false);
+                    router.push("/screens/profile/edit-profile");
+                  }}
+                >
+                  <Text style={styles.editProfileButtonText}>პროფილის რედაქტირება</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -526,6 +602,24 @@ const styles = StyleSheet.create({
     backgroundColor: "#06B6D4",
     alignItems: "center",
     justifyContent: "center",
+  },
+  avatarImage: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+  },
+  cameraIconContainer: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#06B6D4",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
   },
   onlineBadge: {
     position: "absolute",
@@ -727,5 +821,222 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: "Poppins-Regular",
     color: "#D1D5DB",
+  },
+  // Status Badge styles
+  nameWithStatusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    gap: 4,
+  },
+  statusBadgeActive: {
+    backgroundColor: "#DCFCE7",
+  },
+  statusBadgePassive: {
+    backgroundColor: "#FEE2E2",
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusDotActive: {
+    backgroundColor: "#10B981",
+  },
+  statusDotPassive: {
+    backgroundColor: "#EF4444",
+  },
+  statusText: {
+    fontSize: 11,
+    fontFamily: "Poppins-Medium",
+  },
+  statusTextActive: {
+    color: "#10B981",
+  },
+  statusTextPassive: {
+    color: "#EF4444",
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    width: "88%",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontFamily: "Poppins-SemiBold",
+    color: "#111827",
+  },
+  modalCloseButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#F3F4F6",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  statusModalActive: {
+    alignItems: "center",
+    paddingVertical: 16,
+  },
+  statusModalPassive: {
+    alignItems: "center",
+    paddingVertical: 16,
+  },
+  statusModalIconActive: {
+    marginBottom: 12,
+  },
+  statusModalIconPassive: {
+    marginBottom: 12,
+  },
+  statusModalTitle: {
+    fontSize: 16,
+    fontFamily: "Poppins-SemiBold",
+    color: "#1F2937",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  statusModalSubtitle: {
+    fontSize: 13,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+    marginBottom: 16,
+    textAlign: "center",
+  },
+  recommendationBox: {
+    flexDirection: "row",
+    backgroundColor: "#FEF3C7",
+    borderRadius: 12,
+    padding: 12,
+    gap: 10,
+    alignItems: "flex-start",
+  },
+  recommendationText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: "#92400E",
+  },
+  missingFieldsList: {
+    width: "100%",
+    gap: 8,
+    marginBottom: 20,
+  },
+  missingFieldItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#FEF2F2",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  missingFieldText: {
+    fontSize: 13,
+    fontFamily: "Poppins-Medium",
+    color: "#DC2626",
+  },
+  editProfileButton: {
+    backgroundColor: "#06B6D4",
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  editProfileButtonText: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#FFFFFF",
+  },
+  // Additional stat styles
+  statSubLabel: {
+    fontSize: 10,
+    fontFamily: "Poppins-Regular",
+    color: "#9CA3AF",
+    marginTop: 2,
+  },
+  // Quick stats row
+  quickStatsRow: {
+    flexDirection: "row",
+    backgroundColor: "#FFFFFF",
+    marginHorizontal: 20,
+    marginTop: 12,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: "center",
+    justifyContent: "space-around",
+  },
+  quickStatItem: {
+    alignItems: "center",
+    flex: 1,
+  },
+  quickStatValue: {
+    fontSize: 18,
+    fontFamily: "Poppins-Bold",
+    color: "#1F2937",
+    marginTop: 4,
+  },
+  quickStatLabel: {
+    fontSize: 11,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+  },
+  quickStatDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: "#E5E7EB",
+  },
+  // Detailed stats button
+  detailedStatsButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 16,
+  },
+  detailedStatsLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  detailedStatsIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: "#F3E8FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  detailedStatsTitle: {
+    fontSize: 15,
+    fontFamily: "Poppins-SemiBold",
+    color: "#1F2937",
+  },
+  detailedStatsSubtitle: {
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
   },
 });
