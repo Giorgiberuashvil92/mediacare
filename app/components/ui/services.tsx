@@ -61,15 +61,12 @@ const Services = () => {
         <Text style={styles.title}>სწრაფი სერვისები</Text>
       </View>
       <View style={styles.grid}>
-        {QUICK_SERVICES.map((service, index) => (
+        {QUICK_SERVICES.map((service) => (
           <TouchableOpacity
             key={service.id}
             onPress={() => handlePress(service.id, service.onPress)}
             activeOpacity={0.85}
-            style={[
-              styles.serviceCard,
-              index % 2 === 0 ? styles.cardLeft : styles.cardRight,
-            ]}
+            style={styles.serviceCard}
           >
             <LinearGradient
               colors={service.gradient as [string, string]}
@@ -77,24 +74,19 @@ const Services = () => {
               end={{ x: 1, y: 1 }}
               style={styles.gradientBackground}
             >
-              <View style={styles.cardContent}>
-                <View style={styles.iconContainer}>
-                  <Ionicons
-                    name={service.icon as any}
-                    size={28}
-                    color="#FFFFFF"
-                  />
-                </View>
-                <View style={styles.textContainer}>
-                  <Text style={styles.serviceTitle}>{service.title}</Text>
-                  <Text style={styles.serviceDescription}>
-                    {service.description}
-                  </Text>
-                </View>
-                <View style={styles.arrowContainer}>
-                  <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.7)" />
-                </View>
+              <View style={styles.iconContainer}>
+                <Ionicons
+                  name={service.icon as any}
+                  size={26}
+                  color="#FFFFFF"
+                />
               </View>
+              <Text style={styles.serviceTitle} numberOfLines={1}>
+                {service.title}
+              </Text>
+              <Text style={styles.serviceDescription} numberOfLines={1}>
+                {service.description}
+              </Text>
             </LinearGradient>
           </TouchableOpacity>
         ))}
@@ -138,7 +130,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 14,
   },
   title: {
     fontSize: 18,
@@ -148,59 +140,47 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "space-between",
+    gap: 12,
   },
   serviceCard: {
-    width: "48%",
-    marginBottom: 12,
-    borderRadius: 20,
+    width: "47%",
+    borderRadius: 18,
     overflow: "hidden",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  cardLeft: {
-    marginRight: "2%",
-  },
-  cardRight: {
-    marginLeft: "2%",
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 5,
   },
   gradientBackground: {
-    borderRadius: 20,
-  },
-  cardContent: {
-    flexDirection: "row",
+    borderRadius: 18,
+    paddingVertical: 18,
+    paddingHorizontal: 14,
     alignItems: "center",
-    padding: 16,
-    minHeight: 90,
+    justifyContent: "center",
+    height: 120,
   },
   iconContainer: {
-    width: 50,
-    height: 50,
+    width: 48,
+    height: 48,
     borderRadius: 14,
     backgroundColor: "rgba(255, 255, 255, 0.25)",
     justifyContent: "center",
     alignItems: "center",
-  },
-  textContainer: {
-    flex: 1,
-    marginLeft: 12,
+    marginBottom: 10,
   },
   serviceTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: "Poppins-SemiBold",
     color: "#FFFFFF",
+    textAlign: "center",
     marginBottom: 2,
   },
   serviceDescription: {
-    fontSize: 11,
+    fontSize: 10,
     fontFamily: "Poppins-Regular",
-    color: "rgba(255, 255, 255, 0.85)",
-  },
-  arrowContainer: {
-    marginLeft: 4,
+    color: "rgba(255, 255, 255, 0.8)",
+    textAlign: "center",
   },
   modalOverlay: {
     flex: 1,

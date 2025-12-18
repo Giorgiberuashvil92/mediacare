@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { DynamicModule, ForwardReference, Module, Type } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
@@ -12,6 +11,7 @@ import { AppointmentsModule } from './appointments/appointments.module';
 import { AuthModule } from './auth/auth.module';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { DoctorsModule } from './doctors/doctors.module';
+import { HelpCenterModule } from './help-center/help-center.module';
 import { ProfileModule } from './profile/profile.module';
 import { ShopModule } from './shop/shop.module';
 import { SpecializationsModule } from './specializations/specializations.module';
@@ -52,6 +52,7 @@ const moduleImports: Array<
   AdminModule,
   ShopModule,
   AdvisorsModule,
+  HelpCenterModule,
 ];
 
 @Module({

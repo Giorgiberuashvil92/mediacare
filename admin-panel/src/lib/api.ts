@@ -778,6 +778,67 @@ class ApiService {
     return this.handleResponse<ApiResponse<{ type: string; content: string; updatedAt?: string }[]>>(response);
   }
 
+  // Help Center endpoints
+  async getHelpCenter(): Promise<ApiResponse<{
+    faqs: { question: string; answer: string; isActive?: boolean; order?: number }[];
+    contactInfo: {
+      phone?: string;
+      whatsapp?: string;
+      email?: string;
+      website?: string;
+      address?: string;
+      workingHours?: string;
+    };
+    updatedAt?: string;
+  }>> {
+    const response = await fetch(`${this.baseURL}/help-center`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+
+    return this.handleResponse(response);
+  }
+
+  async getHelpCenterAdmin(): Promise<ApiResponse<{
+    faqs: { question: string; answer: string; isActive: boolean; order: number }[];
+    contactInfo: {
+      phone?: string;
+      whatsapp?: string;
+      email?: string;
+      website?: string;
+      address?: string;
+      workingHours?: string;
+    };
+    updatedAt?: string;
+  }>> {
+    const response = await fetch(`${this.baseURL}/help-center/admin`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+
+    return this.handleResponse(response);
+  }
+
+  async updateHelpCenter(data: {
+    faqs?: { question: string; answer: string; isActive?: boolean; order?: number }[];
+    contactInfo?: {
+      phone?: string;
+      whatsapp?: string;
+      email?: string;
+      website?: string;
+      address?: string;
+      workingHours?: string;
+    };
+  }): Promise<ApiResponse<any>> {
+    const response = await fetch(`${this.baseURL}/help-center`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data),
+    });
+
+    return this.handleResponse(response);
+  }
+
   // Medicine shop endpoints
   async getShopCategories(params?: {
     type?: ShopEntityType;

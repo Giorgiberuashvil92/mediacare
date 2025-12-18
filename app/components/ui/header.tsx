@@ -1,14 +1,36 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
-import { router } from "expo-router";
-import React from "react";
+import { router, useFocusEffect } from "expo-router";
+import React, { useCallback, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useAuth } from "../../contexts/AuthContext";
 import { useCart } from "../../contexts/CartContext";
+import { apiService } from "../../services/api";
 
 const Header = () => {
   const { getTotalItems } = useCart();
   const { user, isAuthenticated } = useAuth();
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+
+  // Fetch latest profile image when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      const loadProfileImage = async () => {
+        try {
+          const response = await apiService.getProfile();
+          if (response.success && response.data?.profileImage) {
+            setProfileImage(response.data.profileImage);
+          }
+        } catch (error) {
+          console.log("Failed to load profile image:", error);
+        }
+      };
+      
+      if (isAuthenticated) {
+        loadProfileImage();
+      }
+    }, [isAuthenticated])
+  );
 
   const handleProfilePress = () => {
     if (isAuthenticated) {
@@ -22,16 +44,23 @@ const Header = () => {
     router.push("/screens/medicine/cart");
   };
 
+  // Get profile image - prioritize fetched image, then user context, then fallback
+  const getProfileImage = () => {
+    const image = profileImage || user?.profileImage;
+    if (image) {
+      return image;
+    }
+    // Fallback to ui-avatars
+    const name = user?.name || 'User';
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=06B6D4&color=fff&size=200`;
+  };
+
   return (
     <View style={styles.container}>
       <TouchableOpacity style={styles.header} onPress={handleProfilePress}>
         <Image
           style={{ width: 44, height: 44, borderRadius: 22 }}
-          source={{
-            uri: `https://picsum.photos/seed/${
-              user?.name || "patient"
-            }/200/200`,
-          }}
+          source={{ uri: getProfileImage() }}
         />
         <View>
           <Text style={{ color: "#171717", fontFamily: "Poppins-Medium" }}>

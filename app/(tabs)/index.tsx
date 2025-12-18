@@ -7,7 +7,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Banner from "../components/shared/banner";
 import TodayAppointment from "../components/shared/todayAppointment";
 import Departments from "../components/ui/departments";
 import Header from "../components/ui/header";
@@ -41,7 +40,7 @@ export default function HomeScreen() {
         <TodayAppointment />
         <Services />
         <Departments />
-        <Banner />
+        
       </SafeAreaView>
     </ScrollView>
   );

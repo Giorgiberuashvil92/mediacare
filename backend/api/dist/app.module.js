@@ -20,6 +20,7 @@ const appointments_module_1 = require("./appointments/appointments.module");
 const auth_module_1 = require("./auth/auth.module");
 const cloudinary_module_1 = require("./cloudinary/cloudinary.module");
 const doctors_module_1 = require("./doctors/doctors.module");
+const help_center_module_1 = require("./help-center/help-center.module");
 const profile_module_1 = require("./profile/profile.module");
 const shop_module_1 = require("./shop/shop.module");
 const specializations_module_1 = require("./specializations/specializations.module");
@@ -54,6 +55,7 @@ const moduleImports = [
     admin_module_1.AdminModule,
     shop_module_1.ShopModule,
     advisors_module_1.AdvisorsModule,
+    help_center_module_1.HelpCenterModule,
 ];
 let AppModule = class AppModule {
 };

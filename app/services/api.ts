@@ -1567,6 +1567,42 @@ class ApiService {
       body: JSON.stringify({ content }),
     });
   }
+
+  // Help Center endpoints
+  async getHelpCenter(): Promise<{
+    success: boolean;
+    data: {
+      faqs: {
+        question: string;
+        answer: string;
+        isActive?: boolean;
+        order?: number;
+      }[];
+      contactInfo: {
+        phone?: string;
+        whatsapp?: string;
+        email?: string;
+        website?: string;
+        address?: string;
+        workingHours?: string;
+      };
+      updatedAt?: string;
+    };
+  }> {
+    if (USE_MOCK_API) {
+      return Promise.resolve({
+        success: true,
+        data: {
+          faqs: [],
+          contactInfo: {},
+        },
+      });
+    }
+
+    return this.apiCall("/help-center", {
+      method: "GET",
+    });
+  }
 }
 
 export const apiService = new ApiService();
