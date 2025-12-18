@@ -2,7 +2,6 @@
 import { EmailIcon, PasswordIcon } from "@/assets/icons";
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import React, { useState } from "react";
 import InputGroup from "../FormElements/InputGroup";
 import { Checkbox } from "../FormElements/checkbox";
@@ -17,7 +16,6 @@ export default function SigninWithPassword() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { login } = useAuth();
-  const router = useRouter();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setData({
@@ -34,16 +32,16 @@ export default function SigninWithPassword() {
 
     try {
       await login(data.email, data.password);
-      router.push('/');
+      // router.push is already called inside login function
     } catch (err: any) {
       setError(err.message || 'Login failed. Please check your credentials.');
-    } finally {
       setLoading(false);
     }
+    // Don't set loading to false on success - page will redirect
   };
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit} autoComplete="off">
       <InputGroup
         type="email"
         label="Email"
@@ -53,6 +51,7 @@ export default function SigninWithPassword() {
         handleChange={handleChange}
         value={data.email}
         icon={<EmailIcon />}
+        autoComplete="email"
       />
 
       <InputGroup
@@ -64,6 +63,7 @@ export default function SigninWithPassword() {
         handleChange={handleChange}
         value={data.password}
         icon={<PasswordIcon />}
+        autoComplete="current-password"
       />
 
       <div className="mb-6 flex items-center justify-between gap-2 py-2 font-medium">

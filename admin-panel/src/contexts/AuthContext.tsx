@@ -30,6 +30,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Check if user is already logged in
     const checkAuth = async () => {
+      // Skip if we're on auth pages - no need to check or redirect
+      const currentPath = window.location.pathname;
+      if (currentPath.startsWith('/auth')) {
+        setIsLoading(false);
+        return;
+      }
+
       try {
         const storedUser = localStorage.getItem('user');
         const token = localStorage.getItem('accessToken');
@@ -44,19 +51,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             document.cookie = `accessToken=${token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax${isSecure ? '; Secure' : ''}`;
           }
         } else {
-          // No token found, redirect to login if not on auth page
-          const currentPath = window.location.pathname;
-          if (!currentPath.startsWith('/auth')) {
-            router.push('/auth/sign-in');
-          }
+          // No token found, redirect to login
+          router.push('/auth/sign-in');
         }
       } catch (error) {
         console.error('Auth check error:', error);
-        // On error, redirect to login
-        const currentPath = window.location.pathname;
-        if (!currentPath.startsWith('/auth')) {
-          router.push('/auth/sign-in');
-        }
+        router.push('/auth/sign-in');
       } finally {
         setIsLoading(false);
       }
@@ -66,28 +66,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [router]);
 
   const login = async (email: string, password: string) => {
+    console.log('🔐 [Auth] Starting login...');
     try {
       const response: AuthResponse = await apiService.login({ email, password });
+      console.log('🔐 [Auth] Login response:', response.success);
       
       if (response.success && response.data.user) {
+        console.log('🔐 [Auth] Setting user data...');
         setUser(response.data.user);
         localStorage.setItem('user', JSON.stringify(response.data.user));
         
         // Store tokens
         if (response.data.token) {
+          console.log('🔐 [Auth] Storing token...');
           localStorage.setItem('accessToken', response.data.token);
           apiService.setToken(response.data.token);
           // Also store in cookie for middleware and server-side access
           const isSecure = typeof window !== 'undefined' && window.location.protocol === 'https:';
           document.cookie = `accessToken=${response.data.token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax${isSecure ? '; Secure' : ''}`;
+          console.log('🔐 [Auth] Cookie set, isSecure:', isSecure);
         }
         if (response.data.refreshToken) {
           localStorage.setItem('refreshToken', response.data.refreshToken);
         }
         
+        console.log('🔐 [Auth] Redirecting to /...');
         router.push('/');
+      } else {
+        console.log('🔐 [Auth] Login failed - no user in response');
+        throw new Error('Login failed - invalid response');
       }
     } catch (error: any) {
+      console.error('🔐 [Auth] Login error:', error);
       throw new Error(error.message || 'Login failed');
     }
   };
