@@ -7,8 +7,10 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
   Linking,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -1417,26 +1419,35 @@ export default function DoctorAppointments() {
         transparent={true}
         onRequestClose={() => setShowAppointmentModal(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <View>
-                <Text style={styles.modalTitle}>დანიშნულება</Text>
-                {selectedConsultation && (
-                  <Text style={styles.modalSubtitle}>
-                    {selectedConsultation.patientName}
-                  </Text>
-                )}
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <View>
+                  <Text style={styles.modalTitle}>დანიშნულება</Text>
+                  {selectedConsultation && (
+                    <Text style={styles.modalSubtitle}>
+                      {selectedConsultation.patientName}
+                    </Text>
+                  )}
+                </View>
+                <TouchableOpacity
+                  onPress={() => setShowAppointmentModal(false)}
+                  style={styles.closeButton}
+                >
+                  <Ionicons name="close" size={24} color="#6B7280" />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity
-                onPress={() => setShowAppointmentModal(false)}
-                style={styles.closeButton}
-              >
-                <Ionicons name="close" size={24} color="#6B7280" />
-              </TouchableOpacity>
-            </View>
 
-            <ScrollView style={styles.modalBody}>
+              <ScrollView 
+                style={styles.modalBody}
+                contentContainerStyle={{ paddingBottom: 20 }}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={true}
+              >
               {/* Diagnosis */}
               <View style={styles.formSection}>
                 <Text style={styles.formLabel}>დიაგნოზი *</Text>
@@ -1947,22 +1958,23 @@ export default function DoctorAppointments() {
               </View>
             </ScrollView>
 
-            <View style={styles.modalFooter}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonSecondary]}
-                onPress={() => setShowAppointmentModal(false)}
-              >
-                <Text style={styles.modalButtonTextSecondary}>გაუქმება</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonPrimary]}
-                onPress={handleSaveAppointment}
-              >
-                <Text style={styles.modalButtonTextPrimary}>შენახვა</Text>
-              </TouchableOpacity>
+              <View style={styles.modalFooter}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalButtonSecondary]}
+                  onPress={() => setShowAppointmentModal(false)}
+                >
+                  <Text style={styles.modalButtonTextSecondary}>გაუქმება</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalButtonPrimary]}
+                  onPress={handleSaveAppointment}
+                >
+                  <Text style={styles.modalButtonTextPrimary}>შენახვა</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Success Modal */}
