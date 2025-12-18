@@ -709,43 +709,56 @@ const History = () => {
                                 </Text>
                               </View>
                             )}
-                            {test.booked && (
-                              <TouchableOpacity
-                                style={[
-                                  styles.uploadResultButton,
-                                  uploadingResult === test.productId && styles.uploadResultButtonDisabled,
-                                ]}
-                                onPress={async () => {
-                                  if (uploadingResult === test.productId) return;
+                            {/* Upload button - works with or without booking */}
+                            <TouchableOpacity
+                              style={[
+                                styles.uploadResultButton,
+                                !test.booked && styles.uploadResultButtonExternal,
+                                uploadingResult === test.productId && styles.uploadResultButtonDisabled,
+                              ]}
+                              onPress={async () => {
+                                if (uploadingResult === test.productId) return;
+                                
+                                try {
+                                  const result = await DocumentPicker.getDocumentAsync({
+                                    type: ["application/pdf", "image/jpeg", "image/jpg", "image/png", "image/webp"],
+                                    copyToCacheDirectory: true,
+                                  });
+
+                                  if (result.canceled) return;
+                                  const file = result.assets?.[0];
+                                  if (!file) return;
+
+                                  if (file.size && file.size > 10 * 1024 * 1024) {
+                                    Alert.alert("შეცდომა", "ფაილი უნდა იყოს 10MB-მდე");
+                                    return;
+                                  }
+
+                                  setUploadingResult(test.productId);
                                   
-                                  try {
-                                    const result = await DocumentPicker.getDocumentAsync({
-                                      type: ["application/pdf", "image/jpeg", "image/jpg", "image/png", "image/webp"],
-                                      copyToCacheDirectory: true,
-                                    });
+                                  // Use external lab result upload if not booked, otherwise use regular upload
+                                  const uploadResp = test.booked 
+                                    ? await apiService.uploadLaboratoryTestResult(
+                                        selectedVisit.id,
+                                        test.productId,
+                                        {
+                                          uri: file.uri,
+                                          name: file.name || "document",
+                                          type: file.mimeType || "application/pdf",
+                                        }
+                                      )
+                                    : await apiService.uploadExternalLabResult(
+                                        selectedVisit.id,
+                                        {
+                                          uri: file.uri,
+                                          name: file.name || "document",
+                                          type: file.mimeType || "application/pdf",
+                                        },
+                                        test.productName
+                                      );
 
-                                    if (result.canceled) return;
-                                    const file = result.assets?.[0];
-                                    if (!file) return;
-
-                                    if (file.size && file.size > 10 * 1024 * 1024) {
-                                      Alert.alert("შეცდომა", "ფაილი უნდა იყოს 10MB-მდე");
-                                      return;
-                                    }
-
-                                    setUploadingResult(test.productId);
-                                    const uploadResp = await apiService.uploadLaboratoryTestResult(
-                                      selectedVisit.id,
-                                      test.productId,
-                                      {
-                                        uri: file.uri,
-                                        name: file.name || "document",
-                                        type: file.mimeType || "application/pdf",
-                                      }
-                                    );
-
-                                    if (uploadResp.success) {
-                                      Alert.alert("წარმატება", "ლაბორატორიული კვლევის შედეგი წარმატებით ატვირთა");
+                                  if (uploadResp.success) {
+                                    Alert.alert("წარმატება", "ლაბორატორიული კვლევის შედეგი წარმატებით ატვირთა");
                                       // Reload appointments to get updated data
                                       loadPastAppointments();
                                     } else {
@@ -780,8 +793,7 @@ const History = () => {
                                   </>
                                 )}
                               </TouchableOpacity>
-                            )}
-                            {test.booked && test.resultFile && (
+                            {test.resultFile && (
                               <TouchableOpacity
                                 style={styles.viewResultButton}
                                 onPress={() => {
@@ -1814,6 +1826,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 12,
     marginTop: 8,
+  },
+  uploadResultButtonExternal: {
+    backgroundColor: "#7C3AED",
   },
   uploadResultButtonDisabled: {
     opacity: 0.6,

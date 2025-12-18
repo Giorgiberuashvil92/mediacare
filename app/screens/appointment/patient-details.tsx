@@ -59,64 +59,12 @@ const PatientDetails = () => {
   // Auto-fill disabled - user always enters data manually
   useEffect(() => {
     const loadProfile = async () => {
-      // Auto-fill disabled for both "myself" and "other" options
       return;
       
-      try {
-        const response = await apiService.getProfile();
-        if (response.success && response.data) {
-          const profile = response.data;
-          
-          // Convert date of birth to Georgian format if needed
-          let dateOfBirthFormatted = "";
-          if (profile.dateOfBirth) {
-            if (profile.dateOfBirth.includes("-")) {
-              // ISO format - convert to Georgian
-              const date = new Date(profile.dateOfBirth);
-              const day = date.getDate();
-              const months = [
-                "იანვარი",
-                "თებერვალი",
-                "მარტი",
-                "აპრილი",
-                "მაისი",
-                "ივნისი",
-                "ივლისი",
-                "აგვისტო",
-                "სექტემბერი",
-                "ოქტომბერი",
-                "ნოემბერი",
-                "დეკემბერი",
-              ];
-              const month = months[date.getMonth()];
-              const year = date.getFullYear();
-              dateOfBirthFormatted = `${day} ${month} ${year}`;
-            } else {
-              dateOfBirthFormatted = profile.dateOfBirth;
-            }
-          }
-          
-          setFormData({
-            name: profile.name || user?.name || "",
-            lastName: profile.lastName || "",
-            dateOfBirth: dateOfBirthFormatted,
-            gender: profile.gender || "",
-            personalId: profile.personalId || "",
-            address: profile.address || "",
-            problem: "",
-          });
-          
-          setProfileLoaded(true);
-        }
-      } catch (err) {
-        console.error("Error loading profile:", err);
-        // If profile loading fails, still allow user to fill form manually
-        setProfileLoaded(true);
-      }
     };
     
     loadProfile();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [user?.id]);
 
   const handleInputChange = (field: string, value: string) => {
@@ -1013,28 +961,31 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    paddingBottom: 40,
+    paddingBottom: 50,
   },
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: "#E5E5EA",
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontFamily: "Poppins-SemiBold",
     color: "#333333",
+    flex: 1,
+    textAlign: "center",
   },
   modalButton: {
     paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
+    minWidth: 80,
   },
   modalButtonText: {
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: "Poppins-Regular",
     color: "#666666",
   },
