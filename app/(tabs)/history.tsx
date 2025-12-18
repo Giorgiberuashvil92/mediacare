@@ -1,6 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as DocumentPicker from "expo-document-picker";
+import { File as ExpoFile, Paths } from "expo-file-system";
 import { useRouter } from "expo-router";
+import * as Sharing from "expo-sharing";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -794,23 +796,39 @@ const History = () => {
                                     if (isPdf) {
                                       try {
                                         // Download PDF and open with native viewer
-                                        const filename = test.resultFile.name || `document_${Date.now()}.pdf`;
-                                        const fileUri = `${FileSystem.cacheDirectory}${filename}`;
+                                        const filename = (test.resultFile.name || `document_${Date.now()}.pdf`).replace(/%20/g, '_');
+                                        const file = new ExpoFile(Paths.cache, filename);
                                         
-                                        const downloadResult = await FileSystem.downloadAsync(url, fileUri);
+                                        // Download file content
+                                        const response = await fetch(url);
+                                        if (!response.ok) {
+                                          throw new Error('Download failed');
+                                        }
+                                        const blob = await response.blob();
                                         
-                                        if (downloadResult.status === 200) {
-                                          const canShare = await Sharing.isAvailableAsync();
-                                          if (canShare) {
-                                            await Sharing.shareAsync(downloadResult.uri, {
-                                              mimeType: 'application/pdf',
-                                              UTI: 'com.adobe.pdf',
-                                            });
-                                          } else {
-                                            Alert.alert("შეცდომა", "გაზიარება მიუწვდომელია");
-                                          }
+                                        // Convert blob to base64
+                                        const base64 = await new Promise<string>((resolve, reject) => {
+                                          const reader = new FileReader();
+                                          reader.onload = () => {
+                                            const result = reader.result as string;
+                                            resolve(result.split(',')[1]);
+                                          };
+                                          reader.onerror = reject;
+                                          reader.readAsDataURL(blob);
+                                        });
+                                        
+                                        // Write to file
+                                        await file.write(base64, { encoding: 'base64' });
+                                        
+                                        // Share the file
+                                        const canShare = await Sharing.isAvailableAsync();
+                                        if (canShare) {
+                                          await Sharing.shareAsync(file.uri, {
+                                            mimeType: 'application/pdf',
+                                            UTI: 'com.adobe.pdf',
+                                          });
                                         } else {
-                                          Alert.alert("შეცდომა", "ფაილის გადმოწერა ვერ მოხერხდა");
+                                          Alert.alert("შეცდომა", "გაზიარება მიუწვდომელია");
                                         }
                                       } catch (err) {
                                         console.error("PDF download error:", err);
