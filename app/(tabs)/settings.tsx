@@ -1,7 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
 import {
   Alert,
   ScrollView,
@@ -12,10 +13,32 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../contexts/AuthContext";
+import { apiService } from "../services/api";
 import { showToast } from "../utils/toast";
 
 export default function SettingsScreen() {
   const { user, logout, isAuthenticated } = useAuth();
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+
+  // Fetch profile image when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      const loadProfileImage = async () => {
+        try {
+          const response = await apiService.getProfile();
+          if (response.success && response.data?.profileImage) {
+            setProfileImage(response.data.profileImage);
+          }
+        } catch (error) {
+          console.log("Failed to load profile image:", error);
+        }
+      };
+      
+      if (isAuthenticated) {
+        loadProfileImage();
+      }
+    }, [isAuthenticated])
+  );
 
   const handleResetOnboarding = async () => {
     await AsyncStorage.removeItem("hasCompletedOnboarding");
@@ -56,12 +79,15 @@ export default function SettingsScreen() {
           <View style={styles.profileImageContainer}>
             <Image
               source={{
-                uri: user?.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&size=200&background=06B6D4&color=fff`,
+                uri: profileImage || user?.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&size=200&background=06B6D4&color=fff`,
               }}
               style={styles.profileImage}
               contentFit="cover"
             />
-            <TouchableOpacity style={styles.addPhotoButton}>
+            <TouchableOpacity 
+              style={styles.addPhotoButton}
+              onPress={() => router.push("/screens/profile/edit-profile")}
+            >
               <Ionicons name="add" size={16} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
