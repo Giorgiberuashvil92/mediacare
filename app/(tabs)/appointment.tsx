@@ -456,29 +456,27 @@ const Appointment = () => {
         
         // Load doctor availability
         const availabilityResponse = await apiService.getDoctorAvailability(doctorId);
+        console.log('📅 Availability response:', JSON.stringify(availabilityResponse.data, null, 2));
+        
         if (availabilityResponse.success && availabilityResponse.data) {
           // Flatten availability into slots
           const slots: { date: string; time: string }[] = [];
           const availability = availabilityResponse.data;
           
-          // Get next 14 days of available slots
-          const today = new Date();
-          for (let i = 1; i <= 14; i++) {
-            const date = new Date(today);
-            date.setDate(date.getDate() + i);
-            const dateStr = date.toISOString().split('T')[0];
-            const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
-            
-            // Find availability for this day
-            const dayAvailability = availability.find((a: any) => a.dayOfWeek?.toLowerCase() === dayOfWeek);
-            if (dayAvailability?.slots) {
-              dayAvailability.slots.forEach((slot: any) => {
-                if (slot.available) {
-                  slots.push({ date: dateStr, time: slot.time });
+          // API returns: { date, dayOfWeek, timeSlots, bookedSlots, isAvailable, type }
+          availability.forEach((day: any) => {
+            if (day.isAvailable && day.timeSlots) {
+              const bookedSet = new Set(day.bookedSlots || []);
+              day.timeSlots.forEach((time: string) => {
+                // Only add if not booked
+                if (!bookedSet.has(time)) {
+                  slots.push({ date: day.date, time });
                 }
               });
             }
-          }
+          });
+          
+          console.log('📅 Parsed slots:', slots);
           setAvailableSlots(slots);
         }
       }
