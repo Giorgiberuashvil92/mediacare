@@ -62,6 +62,17 @@ interface AppointmentDetailsModalProps {
   onReschedule?: () => void;
 }
 
+// Helper to fix incomplete Cloudinary URLs
+const getFullCloudinaryUrl = (url: string): string => {
+  if (!url) return '';
+  // If URL already has protocol, return as-is
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  // Otherwise, prepend Cloudinary base URL
+  return `https://res.cloudinary.com/${url}`;
+};
+
 export function AppointmentDetailsModal({
   appointmentId,
   isOpen,
@@ -741,7 +752,7 @@ export function AppointmentDetailsModal({
                           </div>
                           {test.resultFile && (
                             <a
-                              href={test.resultFile.url}
+                              href={getFullCloudinaryUrl(test.resultFile.url)}
                               target="_blank"
                               rel="noopener noreferrer"
                               onClick={(e) => e.stopPropagation()}
@@ -781,7 +792,7 @@ export function AppointmentDetailsModal({
                     {appointment.documents.map((doc, index) => (
                       <a
                         key={index}
-                        href={doc.url}
+                        href={getFullCloudinaryUrl(doc.url)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-2 text-sm text-primary hover:underline"
