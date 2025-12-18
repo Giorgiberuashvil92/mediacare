@@ -1,7 +1,15 @@
-import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
+
+// DEVELOPMENT MODE: Auth disabled
+const DISABLE_AUTH = true;
 
 export function middleware(request: NextRequest) {
+  // Skip all auth checks if disabled
+  if (DISABLE_AUTH) {
+    return NextResponse.next();
+  }
+
   const token = request.cookies.get('accessToken')?.value;
   const isAuthPage = request.nextUrl.pathname.startsWith('/auth');
   const isPublicPage = request.nextUrl.pathname === '/' || 

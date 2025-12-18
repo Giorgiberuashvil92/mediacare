@@ -43,6 +43,20 @@ export declare class AuthService {
             refreshToken: string;
         };
     }>;
+    getDevAdminToken(): Promise<{
+        success: boolean;
+        message: string;
+        data: {
+            user: {
+                id: string;
+                role: UserRole;
+                name: string;
+                email: string;
+            };
+            token: string;
+            refreshToken: string;
+        };
+    }>;
     refreshToken(refreshToken: string): Promise<{
         success: boolean;
         message: string;

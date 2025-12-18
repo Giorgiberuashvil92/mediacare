@@ -2,7 +2,7 @@
 import { EmailIcon, PasswordIcon } from "@/assets/icons";
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import InputGroup from "../FormElements/InputGroup";
 import { Checkbox } from "../FormElements/checkbox";
 
@@ -17,6 +17,10 @@ export default function SigninWithPassword() {
   const [error, setError] = useState<string | null>(null);
   const { login } = useAuth();
 
+  useEffect(() => {
+    console.log('📝 [SigninWithPassword] Component mounted!');
+  }, []);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setData({
       ...data,
@@ -26,14 +30,19 @@ export default function SigninWithPassword() {
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    console.log('🚀 [Form] handleSubmit called!');
     e.preventDefault();
+    console.log('🚀 [Form] preventDefault called, email:', data.email);
     setError(null);
     setLoading(true);
 
     try {
+      console.log('🚀 [Form] Calling login...');
       await login(data.email, data.password);
+      console.log('🚀 [Form] Login completed!');
       // router.push is already called inside login function
     } catch (err: any) {
+      console.error('🚀 [Form] Login error:', err);
       setError(err.message || 'Login failed. Please check your credentials.');
       setLoading(false);
     }
@@ -99,6 +108,7 @@ export default function SigninWithPassword() {
         <button
           type="submit"
           disabled={loading}
+          onClick={() => console.log('🔘 [Button] Sign In clicked!')}
           className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-primary p-4 font-medium text-white transition hover:bg-opacity-90 disabled:opacity-50"
         >
           Sign In

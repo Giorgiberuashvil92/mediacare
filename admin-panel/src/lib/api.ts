@@ -4,6 +4,12 @@ const API_BASE_URL =
   'https://mediacare-production.up.railway.app';
   // 'http://localhost:4000';
 
+// DEVELOPMENT MODE: Skip auth and use static token
+const DISABLE_AUTH = true;
+// This token should be a valid JWT for an admin user (get it from /auth/dev-token)
+// Production token - expires in 24h, refresh via: curl https://mediacare-production.up.railway.app/auth/dev-token
+const DEV_STATIC_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTQzYjEyNTMwYzQwOTI0ODA2YTI0YTYiLCJpYXQiOjE3NjYwNDcwNzMsImV4cCI6MTc2NjEzMzQ3M30.QOTftYPmecMDcECNleZt_5eeqZ7XUdyXVBl4856Q-7c';
+
 export interface ApiResponse<T> {
   success: boolean;
   message?: string;
@@ -135,8 +141,11 @@ class ApiService {
       'Content-Type': 'application/json',
     };
 
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
+    // Use static token in dev mode if available
+    const tokenToUse = DISABLE_AUTH && DEV_STATIC_TOKEN ? DEV_STATIC_TOKEN : this.token;
+    
+    if (tokenToUse) {
+      headers['Authorization'] = `Bearer ${tokenToUse}`;
     }
 
     return headers;

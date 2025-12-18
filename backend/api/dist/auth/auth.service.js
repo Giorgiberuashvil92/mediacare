@@ -135,6 +135,30 @@ let AuthService = class AuthService {
             },
         };
     }
+    async getDevAdminToken() {
+        const admin = await this.userModel.findOne({
+            email: 'admin@medicare.com',
+            role: user_schema_1.UserRole.ADMIN,
+        });
+        if (!admin) {
+            throw new common_1.UnauthorizedException('Admin user not found');
+        }
+        const tokens = await this.generateTokens(admin._id.toString());
+        return {
+            success: true,
+            message: 'DEV: Admin token generated',
+            data: {
+                user: {
+                    id: admin._id.toString(),
+                    role: admin.role,
+                    name: admin.name,
+                    email: admin.email,
+                },
+                token: tokens.accessToken,
+                refreshToken: tokens.refreshToken,
+            },
+        };
+    }
     async refreshToken(refreshToken) {
         const tokenDoc = await this.refreshTokenModel
             .findOne({

@@ -35,6 +35,9 @@ let AuthController = class AuthController {
     async logout(refreshTokenDto) {
         return this.authService.logout(refreshTokenDto.refreshToken);
     }
+    async getDevToken() {
+        return this.authService.getDevAdminToken();
+    }
 };
 exports.AuthController = AuthController;
 __decorate([
@@ -66,6 +69,12 @@ __decorate([
     __metadata("design:paramtypes", [refresh_token_dto_1.RefreshTokenDto]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "logout", null);
+__decorate([
+    (0, common_1.Get)('dev-token'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "getDevToken", null);
 exports.AuthController = AuthController = __decorate([
     (0, common_1.Controller)('auth'),
     __metadata("design:paramtypes", [auth_service_1.AuthService])

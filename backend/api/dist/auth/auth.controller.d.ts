@@ -51,4 +51,18 @@ export declare class AuthController {
         success: boolean;
         message: string;
     }>;
+    getDevToken(): Promise<{
+        success: boolean;
+        message: string;
+        data: {
+            user: {
+                id: string;
+                role: import("../schemas/user.schema").UserRole;
+                name: string;
+                email: string;
+            };
+            token: string;
+            refreshToken: string;
+        };
+    }>;
 }

@@ -4,6 +4,17 @@ import { apiService, AuthResponse, User } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
+// DEVELOPMENT MODE: Skip auth
+const DISABLE_AUTH = true;
+const FAKE_ADMIN_USER: User = {
+  id: 'dev-admin',
+  name: 'Dev Admin',
+  email: 'admin@medicare.com',
+  role: 'admin',
+  isActive: true,
+  isVerified: true,
+};
+
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
@@ -28,6 +39,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
+    // DEVELOPMENT: Skip auth and use fake user
+    if (DISABLE_AUTH) {
+      console.log('🔓 [Auth] DEVELOPMENT MODE - Auth disabled, using fake admin');
+      setUser(FAKE_ADMIN_USER);
+      setIsLoading(false);
+      return;
+    }
+
     // Check if user is already logged in
     const checkAuth = async () => {
       // Skip if we're on auth pages - no need to check or redirect
