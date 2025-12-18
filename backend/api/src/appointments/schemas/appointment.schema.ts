@@ -104,7 +104,7 @@ export class Appointment {
   notes?: string;
 
   @Prop()
-  visitAddress?: string; // Used when type === 'home-visit'
+  visitAddress?: string;
 
   @Prop({
     type: {

@@ -42,7 +42,14 @@ interface AppointmentDetails {
   problem?: string;
   visitAddress?: string;
   notes?: string;
-  documents?: string[];
+  documents?: {
+    url: string;
+    publicId?: string;
+    name?: string;
+    mimeType?: string;
+    size?: number;
+    uploadedAt?: string;
+  }[];
   laboratoryTests?: LaboratoryTest[];
   createdAt?: string;
   updatedAt?: string;
@@ -768,13 +775,13 @@ export function AppointmentDetailsModal({
               {appointment.documents && appointment.documents.length > 0 && (
                 <div className="rounded-lg border border-stroke bg-gray-50 p-4 dark:border-dark-3 dark:bg-dark-2">
                   <h3 className="mb-3 text-lg font-semibold text-dark dark:text-white">
-                    დოკუმენტები
+                    დოკუმენტები ({appointment.documents.length})
                   </h3>
                   <div className="space-y-2">
                     {appointment.documents.map((doc, index) => (
                       <a
                         key={index}
-                        href={doc}
+                        href={doc.url}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-2 text-sm text-primary hover:underline"
@@ -792,7 +799,12 @@ export function AppointmentDetailsModal({
                             d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                           />
                         </svg>
-                        დოკუმენტი {index + 1}
+                        {doc.name || `დოკუმენტი ${index + 1}`}
+                        {doc.uploadedAt && (
+                          <span className="text-xs text-gray-500">
+                            ({new Date(doc.uploadedAt).toLocaleDateString('ka-GE')})
+                          </span>
+                        )}
                       </a>
                     ))}
                   </div>
