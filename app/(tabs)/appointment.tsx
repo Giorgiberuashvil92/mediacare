@@ -884,6 +884,21 @@ const Appointment = () => {
                   </View>
                 )}
 
+                {/* Reschedule button - only for scheduled appointments */}
+                {(appointment.status === "scheduled" || appointment.status === "pending") && (
+                  <TouchableOpacity
+                    style={styles.rescheduleCardButton}
+                    onPress={() => {
+                      setSelectedAppointment(appointment);
+                      handleOpenReschedule(appointment);
+                    }}
+                  >
+                    <Ionicons name="calendar-outline" size={18} color="#8B5CF6" />
+                    <Text style={styles.rescheduleCardButtonText}>გადაჯავშნა</Text>
+                    <Ionicons name="chevron-forward" size={16} color="#8B5CF6" />
+                  </TouchableOpacity>
+                )}
+
                 <View style={styles.appointmentFooter}>
                   <View style={styles.feeRow}>
                     <Ionicons name="wallet" size={16} color="#6B7280" />
@@ -1031,17 +1046,6 @@ const Appointment = () => {
             )}
 
             <View style={styles.modalFooter}>
-              {/* Show reschedule button only for scheduled/pending appointments */}
-              {selectedAppointment && 
-               (selectedAppointment.status === 'scheduled' || selectedAppointment.status === 'pending') && (
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.rescheduleButton]}
-                  onPress={() => handleOpenReschedule(selectedAppointment)}
-                >
-                  <Ionicons name="calendar-outline" size={18} color="#FFFFFF" />
-                  <Text style={[styles.modalButtonText, styles.rescheduleButtonText]}>გადაჯავშნა</Text>
-                </TouchableOpacity>
-              )}
               <TouchableOpacity
                 style={styles.modalButton}
                 onPress={() => setShowDetailsModal(false)}
@@ -1861,6 +1865,24 @@ const styles = StyleSheet.create({
     borderRadius: 24,
   },
   // Reschedule styles
+  rescheduleCardButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    backgroundColor: "#F3E8FF",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#DDD6FE",
+  },
+  rescheduleCardButtonText: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#8B5CF6",
+  },
   rescheduleButton: {
     backgroundColor: "#8B5CF6",
     flexDirection: "row",
