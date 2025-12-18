@@ -56,10 +56,11 @@ const PatientDetails = () => {
     (appointmentTypeParam as AppointmentType) || "video";
   const isBookingForOther = bookingFor === "other";
 
-  // Load user profile and auto-fill form data (only if booking for myself)
+  // Auto-fill disabled - user always enters data manually
   useEffect(() => {
     const loadProfile = async () => {
-      if (!user?.id || profileLoaded || isBookingForOther) return;
+      // Auto-fill disabled for both "myself" and "other" options
+      return;
       
       try {
         const response = await apiService.getProfile();
