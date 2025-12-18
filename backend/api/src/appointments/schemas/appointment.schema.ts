@@ -86,6 +86,7 @@ export class Appointment {
         mimeType: { type: String },
         size: { type: Number },
         uploadedAt: { type: Date, default: Date.now },
+        isExternalLabResult: { type: Boolean, default: false },
       },
     ],
     default: [],
@@ -98,6 +99,7 @@ export class Appointment {
     mimeType?: string;
     size?: number;
     uploadedAt: Date;
+    isExternalLabResult?: boolean;
   }[];
 
   @Prop()

@@ -1235,6 +1235,63 @@ class ApiService {
     }>(response);
   }
 
+  async uploadExternalLabResult(
+    appointmentId: string,
+    file: {
+      uri: string;
+      name: string;
+      type: string;
+    },
+    testName?: string,
+  ): Promise<{
+    success: boolean;
+    message?: string;
+    data?: { url: string; publicId?: string; name?: string; type?: string; size?: number; uploadedAt: string; isExternalLabResult?: boolean };
+  }> {
+    if (USE_MOCK_API) {
+      return Promise.resolve({
+        success: true,
+        message: 'გარე ლაბორატორიული კვლევის შედეგი წარმატებით ატვირთა',
+        data: {
+          url: file.uri,
+          name: testName || file.name,
+          type: file.type,
+          size: 0,
+          uploadedAt: new Date().toISOString(),
+          isExternalLabResult: true,
+        },
+      });
+    }
+
+    const formData = new FormData();
+    formData.append('file', {
+      uri: file.uri,
+      name: file.name,
+      type: file.type,
+    } as any);
+    if (testName) {
+      formData.append('testName', testName);
+    }
+
+    const token = await AsyncStorage.getItem("accessToken");
+    const headers: HeadersInit = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${this.baseURL}/appointments/${appointmentId}/external-lab-result`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    return this.handleResponse<{
+      success: boolean;
+      message?: string;
+      data?: { url: string; publicId?: string; name?: string; type?: string; size?: number; uploadedAt: string; isExternalLabResult?: boolean };
+    }>(response);
+  }
+
   async uploadLaboratoryTestResult(
     appointmentId: string,
     productId: string,

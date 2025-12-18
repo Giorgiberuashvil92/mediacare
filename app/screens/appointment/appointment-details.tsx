@@ -56,9 +56,10 @@ const AppointmentDetails = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [documents, setDocuments] = useState<
-    { url: string; name?: string; type?: string; uploadedAt?: string }[]
+    { url: string; name?: string; type?: string; uploadedAt?: string; isExternalLabResult?: boolean }[]
   >([]);
   const [uploading, setUploading] = useState(false);
+  const [uploadingLabResult, setUploadingLabResult] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -148,6 +149,63 @@ const AppointmentDetails = () => {
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleUploadExternalLabResult = async () => {
+    if (!appointmentId) return;
+    
+    Alert.prompt(
+      "კვლევის სახელი",
+      "შეიყვანეთ კვლევის დასახელება (არასავალდებულო)",
+      [
+        { text: "გაუქმება", style: "cancel" },
+        {
+          text: "ატვირთვა",
+          onPress: async (testName?: string) => {
+            try {
+              const result = await DocumentPicker.getDocumentAsync({
+                type: ["application/pdf", "image/jpeg", "image/jpg", "image/png", "image/webp"],
+                copyToCacheDirectory: true,
+              });
+
+              if (result.canceled) return;
+              const file = result.assets?.[0];
+              if (!file) return;
+
+              if (file.size && file.size > 10 * 1024 * 1024) {
+                Alert.alert("შეცდომა", "ფაილი უნდა იყოს 10MB-მდე");
+                return;
+              }
+
+              setUploadingLabResult(true);
+              const uploadResp = await apiService.uploadExternalLabResult(
+                appointmentId as string,
+                {
+                  uri: file.uri,
+                  name: file.name || "lab-result",
+                  type: file.mimeType || "application/pdf",
+                },
+                testName
+              );
+
+              if (uploadResp.success && uploadResp.data) {
+                setDocuments((prev) => [uploadResp.data as any, ...prev]);
+                Alert.alert("წარმატება", "ლაბორატორიული შედეგი აიტვირთა");
+              } else {
+                Alert.alert("შეცდომა", uploadResp?.message || "ატვირთვა ვერ მოხერხდა");
+              }
+            } catch (err: any) {
+              console.error("Lab result upload error:", err);
+              Alert.alert("შეცდომა", err?.message || "ფაილის ატვირთვა ვერ მოხერხდა");
+            } finally {
+              setUploadingLabResult(false);
+            }
+          },
+        },
+      ],
+      "plain-text",
+      ""
+    );
   };
 
   const openDocument = (url?: string) => {
@@ -385,16 +443,28 @@ const AppointmentDetails = () => {
           <View style={styles.section}>
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionTitle}>კვლევის დოკუმენტები</Text>
-              <TouchableOpacity
-                style={styles.uploadBtn}
-                onPress={handleUploadDocument}
-                disabled={uploading}
-              >
-                <Ionicons name="cloud-upload-outline" size={16} color="#fff" />
-                <Text style={styles.uploadBtnText}>
-                  {uploading ? "იტვირთება..." : "ატვირთვა"}
-                </Text>
-              </TouchableOpacity>
+              <View style={styles.uploadButtonsRow}>
+                <TouchableOpacity
+                  style={[styles.uploadBtn, styles.labResultBtn]}
+                  onPress={handleUploadExternalLabResult}
+                  disabled={uploadingLabResult}
+                >
+                  <Ionicons name="flask-outline" size={16} color="#fff" />
+                  <Text style={styles.uploadBtnText}>
+                    {uploadingLabResult ? "..." : "კვლევა"}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.uploadBtn}
+                  onPress={handleUploadDocument}
+                  disabled={uploading}
+                >
+                  <Ionicons name="cloud-upload-outline" size={16} color="#fff" />
+                  <Text style={styles.uploadBtnText}>
+                    {uploading ? "..." : "ფაილი"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             {documents.length === 0 ? (
@@ -403,12 +473,23 @@ const AppointmentDetails = () => {
               documents.map((doc, idx) => (
                 <TouchableOpacity
                   key={`${doc.url}-${idx}`}
-                  style={styles.docItem}
+                  style={[styles.docItem, doc.isExternalLabResult && styles.labResultItem]}
                   onPress={() => openDocument(doc.url)}
                 >
-                  <Ionicons name="document-text-outline" size={20} color="#20BEB8" />
+                  <Ionicons 
+                    name={doc.isExternalLabResult ? "flask-outline" : "document-text-outline"} 
+                    size={20} 
+                    color={doc.isExternalLabResult ? "#7C3AED" : "#20BEB8"} 
+                  />
                   <View style={{ flex: 1, marginLeft: 10 }}>
-                    <Text style={styles.docName}>{doc.name || "დოკუმენტი"}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={styles.docName}>{doc.name || "დოკუმენტი"}</Text>
+                      {doc.isExternalLabResult && (
+                        <View style={styles.labResultBadge}>
+                          <Text style={styles.labResultBadgeText}>კვლევა</Text>
+                        </View>
+                      )}
+                    </View>
                     {doc.type ? (
                       <Text style={styles.docMeta}>{doc.type}</Text>
                     ) : null}
@@ -752,6 +833,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 12,
   },
+  uploadButtonsRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
   uploadBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -760,6 +845,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 10,
     gap: 6,
+  },
+  labResultBtn: {
+    backgroundColor: "#7C3AED",
   },
   uploadBtnText: {
     color: "#fff",
@@ -781,6 +869,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E5E7EB",
   },
+  labResultItem: {
+    borderColor: "#7C3AED",
+    borderWidth: 1.5,
+    backgroundColor: "#FAF5FF",
+  },
   docName: {
     fontFamily: "Poppins-Medium",
     fontSize: 14,
@@ -790,6 +883,17 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins-Regular",
     fontSize: 12,
     color: "#6B7280",
+  },
+  labResultBadge: {
+    backgroundColor: "#7C3AED",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  labResultBadgeText: {
+    fontFamily: "Poppins-Medium",
+    fontSize: 10,
+    color: "#FFFFFF",
   },
   doctorImage: {
     width: "100%",

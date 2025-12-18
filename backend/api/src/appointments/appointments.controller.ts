@@ -162,7 +162,7 @@ export class AppointmentsController {
     );
   }
 
-  // Patient uploads laboratory test result
+  // Patient uploads laboratory test result (for assigned tests)
   @Post(':id/laboratory-tests/:productId/result')
   @UseGuards(JwtAuthGuard, PatientGuard)
   @UseInterceptors(FileInterceptor('file'))
@@ -177,6 +177,24 @@ export class AppointmentsController {
       appointmentId,
       productId,
       file,
+    );
+  }
+
+  // Patient uploads external lab result (not pre-assigned)
+  @Post(':id/external-lab-result')
+  @UseGuards(JwtAuthGuard, PatientGuard)
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadExternalLabResult(
+    @CurrentUser() user: { sub: string },
+    @Param('id') appointmentId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Body() body: { testName?: string },
+  ) {
+    return this.appointmentsService.uploadExternalLabResult(
+      user.sub,
+      appointmentId,
+      file,
+      body.testName,
     );
   }
 

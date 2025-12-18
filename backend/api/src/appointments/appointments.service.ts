@@ -1082,6 +1082,71 @@ export class AppointmentsService {
   }
 
   /**
+   * Upload external lab result (for tests done outside the app)
+   */
+  async uploadExternalLabResult(
+    patientId: string,
+    appointmentId: string,
+    file: Express.Multer.File,
+    testName?: string,
+  ) {
+    if (!file) {
+      throw new BadRequestException('ფაილი აუცილებელია');
+    }
+
+    const allowedTypes = [
+      'application/pdf',
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'image/jpg',
+    ];
+    if (!allowedTypes.includes(file.mimetype)) {
+      throw new BadRequestException('ფაილის ტიპი არასწორია');
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      throw new BadRequestException('ფაილი უნდა იყოს 10MB-მდე');
+    }
+
+    const appointment = await this.appointmentModel.findById(appointmentId);
+    if (!appointment) {
+      throw new NotFoundException('Appointment not found');
+    }
+
+    this.ensurePatientOwner(patientId, appointment);
+
+    // Upload file to Cloudinary
+    const upload = await this.cloudinaryService.uploadBuffer(file.buffer, {
+      folder: 'mediacare/external-lab-results',
+      resource_type: 'auto',
+    });
+
+    const doc = {
+      url: upload.secure_url,
+      publicId: upload.public_id,
+      name: testName || file.originalname,
+      mimeType: file.mimetype,
+      size: file.size,
+      uploadedAt: new Date(),
+      isExternalLabResult: true, // Flag to identify external lab results
+    };
+
+    if (!appointment.documents) {
+      appointment.documents = [];
+    }
+    appointment.documents.push(doc as any);
+    appointment.markModified('documents');
+    await appointment.save();
+
+    return {
+      success: true,
+      message: 'გარე ლაბორატორიული კვლევის შედეგი წარმატებით ატვირთა',
+      data: doc,
+    };
+  }
+
+  /**
    * Generate Agora RTC token for video call
    * @param userId - User ID requesting the token
    * @param appointmentId - Appointment ID
