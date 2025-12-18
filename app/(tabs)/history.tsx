@@ -788,10 +788,11 @@ const History = () => {
                                 style={styles.viewResultButton}
                                 onPress={() => {
                                   if (test.resultFile?.url) {
-                                    // Add fl_attachment flag to Cloudinary URL for proper PDF download
                                     let url = test.resultFile.url;
-                                    if (url.includes('cloudinary.com') && url.includes('/raw/upload/')) {
-                                      url = url.replace('/raw/upload/', '/raw/upload/fl_attachment/');
+                                    // For PDFs, use Google Docs Viewer for reliable viewing
+                                    if (test.resultFile.type === 'application/pdf' || url.endsWith('.pdf')) {
+                                      const encodedUrl = encodeURIComponent(url);
+                                      url = `https://docs.google.com/viewer?url=${encodedUrl}&embedded=true`;
                                     }
                                     Linking.openURL(url).catch(() =>
                                       Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა")
