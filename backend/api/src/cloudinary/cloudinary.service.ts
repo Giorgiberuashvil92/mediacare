@@ -26,10 +26,20 @@ export class CloudinaryService {
   async uploadBuffer(
     buffer: Buffer,
     options: UploadApiOptions = {},
+    mimeType?: string,
   ): Promise<UploadApiResponse> {
     return new Promise((resolve, reject) => {
-      // For PDFs and other raw files, use 'raw' or 'auto' resource_type
-      const resourceType = options.resource_type || 'auto';
+      // For PDFs and documents, use 'raw' resource_type
+      // For images, use 'image'
+      let resourceType = options.resource_type || 'auto';
+      if (
+        mimeType === 'application/pdf' ||
+        mimeType?.startsWith('application/')
+      ) {
+        resourceType = 'raw';
+      } else if (mimeType?.startsWith('image/')) {
+        resourceType = 'image';
+      }
 
       const stream = this.cloudinaryClient.uploader.upload_stream(
         {

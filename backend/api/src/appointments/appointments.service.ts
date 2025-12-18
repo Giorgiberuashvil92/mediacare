@@ -97,10 +97,11 @@ export class AppointmentsService {
     this.ensurePatientOwner(patientId, appointment);
 
     try {
-      const upload = await this.cloudinaryService.uploadBuffer(file.buffer, {
-        folder: 'mediacare/appointment-docs',
-        resource_type: 'auto',
-      });
+      const upload = await this.cloudinaryService.uploadBuffer(
+        file.buffer,
+        { folder: 'mediacare/appointment-docs' },
+        file.mimetype,
+      );
 
       const doc = {
         url: upload.secure_url,
@@ -1056,10 +1057,11 @@ export class AppointmentsService {
     }
 
     // Upload file to Cloudinary
-    const upload = await this.cloudinaryService.uploadBuffer(file.buffer, {
-      folder: 'mediacare/laboratory-results',
-      resource_type: 'auto',
-    });
+    const upload = await this.cloudinaryService.uploadBuffer(
+      file.buffer,
+      { folder: 'mediacare/laboratory-results' },
+      file.mimetype,
+    );
 
     const resultFile = {
       url: upload.secure_url,
@@ -1135,10 +1137,11 @@ export class AppointmentsService {
 
     // Upload file to Cloudinary
     console.log('📤 Uploading to Cloudinary...');
-    const upload = await this.cloudinaryService.uploadBuffer(file.buffer, {
-      folder: 'mediacare/external-lab-results',
-      resource_type: 'auto',
-    });
+    const upload = await this.cloudinaryService.uploadBuffer(
+      file.buffer,
+      { folder: 'mediacare/external-lab-results' },
+      file.mimetype,
+    );
     console.log('✅ Cloudinary upload result:', upload?.secure_url);
 
     const doc = {
