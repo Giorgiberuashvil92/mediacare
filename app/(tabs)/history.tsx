@@ -788,8 +788,14 @@ const History = () => {
                                 style={styles.viewResultButton}
                                 onPress={() => {
                                   if (test.resultFile?.url) {
-                                    // Open directly - Cloudinary serves PDFs correctly now
-                                    Linking.openURL(test.resultFile.url).catch(() =>
+                                    let url = test.resultFile.url;
+                                    // For PDFs, convert raw URL to image URL with page transformation for viewing
+                                    if (test.resultFile.type === 'application/pdf' || url.includes('/raw/upload/')) {
+                                      // Convert /raw/upload/ to /image/upload/ with pg_1 for first page preview
+                                      // Or use fl_attachment for download
+                                      url = url.replace('/raw/upload/', '/raw/upload/fl_attachment/');
+                                    }
+                                    Linking.openURL(url).catch(() =>
                                       Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა")
                                     );
                                   }

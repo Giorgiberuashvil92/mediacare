@@ -32,11 +32,10 @@ export class CloudinaryService {
     // Determine resource type based on mimeType
     let resourceType: 'image' | 'video' | 'raw' | 'auto' = 'auto';
 
-    if (mimeType === 'application/pdf') {
-      resourceType = 'image'; // Cloudinary can handle PDFs as images
-    } else if (mimeType?.startsWith('image/')) {
+    if (mimeType?.startsWith('image/')) {
       resourceType = 'image';
-    } else if (mimeType?.startsWith('application/')) {
+    } else {
+      // PDFs and other files use 'raw'
       resourceType = 'raw';
     }
 
