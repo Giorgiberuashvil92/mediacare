@@ -334,8 +334,8 @@ export default function MedicineShopPage() {
                 className="rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
               >
                 <option value="all">ყველა</option>
-                <option value="laboratory">ლაბორატორია</option>
-                <option value="equipment">ექუიფმენთი</option>
+                <option value="laboratory">ლაბორატორიული კვლევები</option>
+                <option value="equipment">ინსტრუმენტული გამოკვლევები</option>
               </select>
             </div>
           </div>
@@ -367,7 +367,7 @@ export default function MedicineShopPage() {
                       კატეგორიების მართვა
                     </h3>
                     <p className="text-sm text-dark-4 dark:text-dark-6">
-                      დაამატე ან შეცვალე კატეგორიები ლაბორატორიისა და ექუიფმენთის მიხედვით
+                      დაამატე ან შეცვალე კატეგორიები ლაბორატორიული და ინსტრუმენტული გამოკვლევებისთვის
                     </p>
                   </div>
                   {editingCategoryId && (
@@ -412,7 +412,7 @@ export default function MedicineShopPage() {
                     >
                       {CATEGORY_TYPES.map((type) => (
                         <option key={type} value={type}>
-                          {type === 'laboratory' ? 'ლაბორატორია' : 'ექუიფმენთი'}
+                          {type === 'laboratory' ? 'ლაბორატორიული კვლევები' : 'ინსტრუმენტული გამოკვლევები'}
                         </option>
                       ))}
                     </select>
@@ -532,7 +532,7 @@ export default function MedicineShopPage() {
                       პროდუქტების მართვა
                     </h3>
                     <p className="text-sm text-dark-4 dark:text-dark-6">
-                      დაამატე ლაბორატორიის პაკეტები და ექუიფმენთის პროდუქტი
+                      დაამატე ლაბორატორიული და ინსტრუმენტული გამოკვლევები
                     </p>
                   </div>
                   {editingProductId && (
@@ -611,7 +611,7 @@ export default function MedicineShopPage() {
                     >
                       {CATEGORY_TYPES.map((type) => (
                         <option key={type} value={type}>
-                          {type === 'laboratory' ? 'ლაბორატორია' : 'ექუიფმენთი'}
+                          {type === 'laboratory' ? 'ლაბორატორიული კვლევები' : 'ინსტრუმენტული გამოკვლევები'}
                         </option>
                       ))}
                     </select>
@@ -719,7 +719,7 @@ export default function MedicineShopPage() {
 
                   <div>
                     <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
-                      კატეგორია ({productForm.type === 'laboratory' ? 'ლაბორატორია' : 'ექუიფმენთი'})
+                      კატეგორია ({productForm.type === 'laboratory' ? 'ლაბორატორიული კვლევები' : 'ინსტრუმენტული გამოკვლევები'})
                     </label>
                     <select
                       value={productForm.category}
@@ -991,7 +991,7 @@ export default function MedicineShopPage() {
                                 )}
                               </td>
                               <td className="p-3 capitalize">
-                                {category.type === 'laboratory' ? 'ლაბორატორია' : 'ექუიფმენთი'}
+                                {category.type === 'laboratory' ? 'ლაბორატორიული კვლევები' : 'ინსტრუმენტული გამოკვლევები'}
                               </td>
                               <td className="p-3">
                                 <span

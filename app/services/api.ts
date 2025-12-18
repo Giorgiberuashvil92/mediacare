@@ -139,6 +139,7 @@ export interface ShopCategory {
 export interface MedicineShopOverview {
   laboratoryProducts: ShopProduct[];
   laboratoryCategories: ShopCategory[];
+  equipmentProducts: ShopProduct[];
   equipmentCategories: ShopCategory[];
 }
 
@@ -1393,6 +1394,7 @@ class ApiService {
         data: {
           laboratoryProducts: [],
           laboratoryCategories: [],
+          equipmentProducts: [],
           equipmentCategories: [],
         },
       });

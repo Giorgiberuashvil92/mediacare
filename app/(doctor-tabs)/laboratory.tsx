@@ -17,12 +17,15 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { apiService } from "../services/api";
 import { showToast } from "../utils/toast";
 
+type ExamType = "laboratory" | "instrumental";
+
 interface LabTest {
   id: string;
   name: string;
   category: string;
   price: number;
   description?: string;
+  type: ExamType;
 }
 
 interface Appointment {
@@ -60,6 +63,9 @@ export default function LaboratoryScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [preSelectedApplied, setPreSelectedApplied] = useState(false);
   
+  // Type filter (laboratory vs instrumental)
+  const [selectedType, setSelectedType] = useState<ExamType>("laboratory");
+  
   // Modal states
   const [showTestModal, setShowTestModal] = useState(false);
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
@@ -72,6 +78,12 @@ export default function LaboratoryScreen() {
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([
     { id: "all", name: "ყველა" },
   ]);
+  
+  // Store all categories by type
+  const [allCategories, setAllCategories] = useState<{
+    laboratory: { id: string; name: string }[];
+    instrumental: { id: string; name: string }[];
+  }>({ laboratory: [], instrumental: [] });
 
   const loadData = useCallback(async () => {
     try {
@@ -83,34 +95,53 @@ export default function LaboratoryScreen() {
       
       // Load lab tests from API
       if (overviewResponse.success && overviewResponse.data) {
-        // First, build category map from laboratoryCategories
-        const categoryMap: Record<string, string> = {};
-        if (overviewResponse.data.laboratoryCategories) {
-          overviewResponse.data.laboratoryCategories.forEach((cat: any) => {
-            const catId = cat._id || cat.id;
-            categoryMap[catId] = cat.name;
-          });
-        }
-        
-        // Map lab products with category names
+        // Map laboratory products
         const labProducts = (overviewResponse.data.laboratoryProducts || []).map((p: any): LabTest => ({
           id: p._id || p.id,
           name: p.name,
           category: p.category || "other",
           price: p.price || 0,
           description: p.description,
+          type: "laboratory" as ExamType,
         }));
-        setLabTests(labProducts);
         
-        // Build dynamic categories from laboratoryCategories
-        const dynamicCategories = [
+        // Map equipment/instrumental products
+        const instrumentalProducts = (overviewResponse.data.equipmentProducts || []).map((p: any): LabTest => ({
+          id: p._id || p.id,
+          name: p.name,
+          category: p.category || "other",
+          price: p.price || 0,
+          description: p.description,
+          type: "instrumental" as ExamType,
+        }));
+        
+        // Combine all products
+        setLabTests([...labProducts, ...instrumentalProducts]);
+        
+        // Build dynamic categories for each type
+        const labCategories = [
           { id: "all", name: "ყველა" },
           ...(overviewResponse.data.laboratoryCategories || []).map((cat: any) => ({
             id: cat._id || cat.id,
             name: cat.name,
           })),
         ];
-        setCategories(dynamicCategories);
+        
+        const instrumentalCategories = [
+          { id: "all", name: "ყველა" },
+          ...(overviewResponse.data.equipmentCategories || []).map((cat: any) => ({
+            id: cat._id || cat.id,
+            name: cat.name,
+          })),
+        ];
+        
+        setAllCategories({
+          laboratory: labCategories,
+          instrumental: instrumentalCategories,
+        });
+        
+        // Set initial categories based on selected type
+        setCategories(labCategories);
       }
       
       // Build appointments list for lab test assignment
@@ -198,10 +229,19 @@ export default function LaboratoryScreen() {
   }, [loadData]);
 
   const filteredTests = labTests.filter((test) => {
+    const matchesType = test.type === selectedType;
     const matchesSearch = test.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === "all" || test.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+    return matchesType && matchesSearch && matchesCategory;
   });
+  
+  // Update categories when type changes
+  const handleTypeChange = (type: ExamType) => {
+    setSelectedType(type);
+    setSelectedCategory("all");
+    setCategories(allCategories[type]);
+    setSelectedTests([]); // Clear selected tests when changing type
+  };
 
 
   const toggleTestSelection = (test: LabTest) => {
@@ -286,17 +326,21 @@ export default function LaboratoryScreen() {
 
   const renderTestItem = ({ item }: { item: LabTest }) => {
     const isSelected = selectedTests.find((t) => t.id === item.id);
+    const accentColor = selectedType === "instrumental" ? "#8B5CF6" : "#F59E0B";
     return (
       <TouchableOpacity
-        style={[styles.testItem, isSelected && styles.testItemSelected]}
+        style={[
+          styles.testItem, 
+          isSelected && [styles.testItemSelected, { borderColor: accentColor }]
+        ]}
         onPress={() => toggleTestSelection(item)}
         activeOpacity={0.7}
       >
         <View style={styles.testInfo}>
           <Text style={styles.testName}>{item.name}</Text>
-          <Text style={styles.testPrice}>{item.price} ₾</Text>
+          <Text style={[styles.testPrice, { color: accentColor }]}>{item.price} ₾</Text>
         </View>
-        <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
+        <View style={[styles.checkbox, isSelected && [styles.checkboxSelected, { backgroundColor: accentColor, borderColor: accentColor }]]}>
           {isSelected && <Ionicons name="checkmark" size={16} color="#FFFFFF" />}
         </View>
       </TouchableOpacity>
@@ -347,12 +391,44 @@ export default function LaboratoryScreen() {
           <Ionicons name="arrow-back" size={24} color="#1F2937" />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
-          <View style={styles.headerIcon}>
-            <Ionicons name="flask" size={18} color="#FFFFFF" />
+          <View style={[styles.headerIcon, selectedType === "instrumental" && { backgroundColor: "#8B5CF6" }]}>
+            <Ionicons name={selectedType === "laboratory" ? "flask" : "pulse"} size={18} color="#FFFFFF" />
           </View>
-          <Text style={styles.headerTitle}>ლაბორატორია</Text>
+          <Text style={styles.headerTitle}>
+            {selectedType === "laboratory" ? "ლაბორატორია" : "ინსტრუმენტული"}
+          </Text>
         </View>
         <View style={styles.headerRight} />
+      </View>
+
+      {/* Type Selector Tabs */}
+      <View style={styles.typeTabsContainer}>
+        <TouchableOpacity
+          style={[styles.typeTab, selectedType === "laboratory" && styles.typeTabActive]}
+          onPress={() => handleTypeChange("laboratory")}
+        >
+          <Ionicons 
+            name="flask-outline" 
+            size={18} 
+            color={selectedType === "laboratory" ? "#F59E0B" : "#6B7280"} 
+          />
+          <Text style={[styles.typeTabText, selectedType === "laboratory" && styles.typeTabTextActive]}>
+            ლაბორატორიული
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.typeTab, selectedType === "instrumental" && styles.typeTabActiveInstrumental]}
+          onPress={() => handleTypeChange("instrumental")}
+        >
+          <Ionicons 
+            name="pulse-outline" 
+            size={18} 
+            color={selectedType === "instrumental" ? "#8B5CF6" : "#6B7280"} 
+          />
+          <Text style={[styles.typeTabText, selectedType === "instrumental" && styles.typeTabTextActiveInstrumental]}>
+            ინსტრუმენტული
+          </Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -361,9 +437,11 @@ export default function LaboratoryScreen() {
       >
         {/* Quick Prescribe Card */}
         <View style={styles.prescribeCard}>
-          <Text style={styles.prescribeTitle}>კვლევების დანიშვნა</Text>
+          <Text style={styles.prescribeTitle}>
+            {selectedType === "laboratory" ? "ლაბორატორიული კვლევების" : "ინსტრუმენტული გამოკვლევების"} დანიშვნა
+          </Text>
           <Text style={styles.prescribeSubtitle}>
-            აირჩიეთ ჯავშანი და ლაბორატორიული კვლევები
+            აირჩიეთ ჯავშანი და {selectedType === "laboratory" ? "ლაბორატორიული კვლევები" : "ინსტრუმენტული გამოკვლევები"}
           </Text>
 
           {/* Appointment Selection */}
@@ -385,11 +463,11 @@ export default function LaboratoryScreen() {
             style={styles.selectionButton}
             onPress={() => setShowTestModal(true)}
           >
-            <Ionicons name="flask-outline" size={20} color="#6B7280" />
+            <Ionicons name={selectedType === "laboratory" ? "flask-outline" : "pulse-outline"} size={20} color="#6B7280" />
             <Text style={[styles.selectionText, selectedTests.length > 0 && styles.selectionTextActive]}>
               {selectedTests.length > 0
-                ? `${selectedTests.length} კვლევა არჩეულია`
-                : "აირჩიეთ კვლევები"}
+                ? `${selectedTests.length} ${selectedType === "laboratory" ? "კვლევა" : "გამოკვლევა"} არჩეულია`
+                : `აირჩიეთ ${selectedType === "laboratory" ? "კვლევები" : "გამოკვლევები"}`}
             </Text>
             <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
           </TouchableOpacity>
@@ -423,7 +501,11 @@ export default function LaboratoryScreen() {
                 </Text>
               </View>
               <TouchableOpacity
-                style={[styles.prescribeButton, !selectedAppointment && styles.prescribeButtonDisabled]}
+                style={[
+                  styles.prescribeButton, 
+                  !selectedAppointment && styles.prescribeButtonDisabled,
+                  selectedType === "instrumental" && { backgroundColor: "#8B5CF6" }
+                ]}
                 onPress={handlePrescribe}
                 disabled={!selectedAppointment}
               >
@@ -527,7 +609,9 @@ export default function LaboratoryScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>აირჩიეთ კვლევები</Text>
+              <Text style={styles.modalTitle}>
+                აირჩიეთ {selectedType === "laboratory" ? "კვლევები" : "გამოკვლევები"}
+              </Text>
               <TouchableOpacity onPress={() => setShowTestModal(false)}>
                 <Ionicons name="close" size={24} color="#1F2937" />
               </TouchableOpacity>
@@ -545,7 +629,7 @@ export default function LaboratoryScreen() {
                   key={cat.id}
                   style={[
                     styles.categoryChip,
-                    selectedCategory === cat.id && styles.categoryChipActive,
+                    selectedCategory === cat.id && (selectedType === "instrumental" ? styles.categoryChipActiveInstrumental : styles.categoryChipActive),
                   ]}
                   onPress={() => setSelectedCategory(cat.id)}
                 >
@@ -566,7 +650,7 @@ export default function LaboratoryScreen() {
               <Ionicons name="search" size={20} color="#9CA3AF" />
               <TextInput
                 style={styles.modalSearchInput}
-                placeholder="კვლევის ძებნა..."
+                placeholder={selectedType === "laboratory" ? "კვლევის ძებნა..." : "გამოკვლევის ძებნა..."}
                 placeholderTextColor="#9CA3AF"
                 value={searchQuery}
                 onChangeText={setSearchQuery}
@@ -583,10 +667,10 @@ export default function LaboratoryScreen() {
             {/* Footer */}
             <View style={styles.modalFooter}>
               <Text style={styles.modalFooterText}>
-                არჩეულია: {selectedTests.length} კვლევა
+                არჩეულია: {selectedTests.length} {selectedType === "laboratory" ? "კვლევა" : "გამოკვლევა"}
               </Text>
               <TouchableOpacity
-                style={styles.modalDoneButton}
+                style={[styles.modalDoneButton, selectedType === "instrumental" && { backgroundColor: "#8B5CF6" }]}
                 onPress={() => setShowTestModal(false)}
               >
                 <Text style={styles.modalDoneButtonText}>მზადაა</Text>
@@ -655,6 +739,52 @@ const styles = StyleSheet.create({
   },
   headerRight: {
     width: 40,
+  },
+  typeTabsContainer: {
+    flexDirection: "row",
+    marginHorizontal: 20,
+    marginBottom: 16,
+    backgroundColor: "#F3F4F6",
+    borderRadius: 12,
+    padding: 4,
+  },
+  typeTab: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    borderRadius: 10,
+    gap: 6,
+  },
+  typeTabActive: {
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#F59E0B",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  typeTabActiveInstrumental: {
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#8B5CF6",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  typeTabText: {
+    fontSize: 13,
+    fontFamily: "Poppins-Medium",
+    color: "#6B7280",
+  },
+  typeTabTextActive: {
+    color: "#F59E0B",
+    fontFamily: "Poppins-SemiBold",
+  },
+  typeTabTextActiveInstrumental: {
+    color: "#8B5CF6",
+    fontFamily: "Poppins-SemiBold",
   },
   prescribeCard: {
     backgroundColor: "#FFFFFF",
@@ -909,7 +1039,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#F3F4F6",
   },
   categoryChipActive: {
-    backgroundColor: "#F59E0B",
+    backgroundColor: "#F59E0B", // Will be overridden dynamically for instrumental
+  },
+  categoryChipActiveInstrumental: {
+    backgroundColor: "#8B5CF6",
   },
   categoryChipText: {
     fontSize: 13,

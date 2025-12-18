@@ -387,33 +387,46 @@ export class ShopService {
   }
 
   async getOverview() {
-    const [rawLaboratory, rawEquipmentCategories, rawLaboratoryCategories] =
-      await Promise.all([
-        this.productModel
-          .find({
-            type: ShopProductType.LABORATORY,
-            isActive: true,
-          })
-          .sort({ order: 1, createdAt: -1 })
-          .limit(20)
-          .lean(),
-        this.categoryModel
-          .find({
-            type: ShopCategoryType.EQUIPMENT,
-            isActive: true,
-          })
-          .sort({ order: 1, createdAt: -1 })
-          .lean(),
-        this.categoryModel
-          .find({
-            type: ShopCategoryType.LABORATORY,
-            isActive: true,
-          })
-          .sort({ order: 1, createdAt: -1 })
-          .lean(),
-      ]);
+    const [
+      rawLaboratory,
+      rawEquipment,
+      rawEquipmentCategories,
+      rawLaboratoryCategories,
+    ] = await Promise.all([
+      this.productModel
+        .find({
+          type: ShopProductType.LABORATORY,
+          isActive: true,
+        })
+        .sort({ order: 1, createdAt: -1 })
+        .limit(50)
+        .lean(),
+      this.productModel
+        .find({
+          type: ShopProductType.EQUIPMENT,
+          isActive: true,
+        })
+        .sort({ order: 1, createdAt: -1 })
+        .limit(50)
+        .lean(),
+      this.categoryModel
+        .find({
+          type: ShopCategoryType.EQUIPMENT,
+          isActive: true,
+        })
+        .sort({ order: 1, createdAt: -1 })
+        .lean(),
+      this.categoryModel
+        .find({
+          type: ShopCategoryType.LABORATORY,
+          isActive: true,
+        })
+        .sort({ order: 1, createdAt: -1 })
+        .lean(),
+    ]);
     const laboratoryProducts =
       rawLaboratory as unknown as ProductLeanDocument[];
+    const equipmentProducts = rawEquipment as unknown as ProductLeanDocument[];
     const equipmentCategories =
       rawEquipmentCategories as unknown as CategoryLeanDocument[];
     const laboratoryCategories =
@@ -496,6 +509,9 @@ export class ShopService {
       success: true,
       data: {
         laboratoryProducts: laboratoryProducts.map((product) =>
+          this.formatProduct(product),
+        ),
+        equipmentProducts: equipmentProducts.map((product) =>
           this.formatProduct(product),
         ),
         laboratoryCategories: formattedLaboratoryCategories,
