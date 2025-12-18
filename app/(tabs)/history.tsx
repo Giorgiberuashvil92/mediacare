@@ -792,14 +792,9 @@ const History = () => {
                                     const isPdf = test.resultFile.type === 'application/pdf' || url.endsWith('.pdf');
                                     
                                     if (isPdf) {
-                                      // For PDFs, add fl_attachment to force download in browser
-                                      let downloadUrl = url;
-                                      if (url.includes('/raw/upload/')) {
-                                        downloadUrl = url.replace('/raw/upload/', '/raw/upload/fl_attachment/');
-                                      } else if (url.includes('/image/upload/')) {
-                                        downloadUrl = url.replace('/image/upload/', '/image/upload/fl_attachment/');
-                                      }
-                                      Linking.openURL(downloadUrl).catch(() =>
+                                      // Use Google Docs Viewer to display PDF
+                                      const googleDocsUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=false`;
+                                      Linking.openURL(googleDocsUrl).catch(() =>
                                         Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა")
                                       );
                                     } else {
