@@ -590,12 +590,32 @@ export class DoctorsService {
 
     // 5) დავაგენერიროთ bookedSlotsByDate (YYYY-MM-DD -> Set<HH:mm>)
     const bookedSlotsByDate: { [key: string]: Set<string> } = {};
+    
+    console.log('📅 [getDoctorAvailability] Processing booked appointments:', {
+      count: bookedAppointments.length,
+      appointments: bookedAppointments.map(apt => ({
+        id: (apt as any)._id?.toString(),
+        storedDate: apt.appointmentDate,
+        time: apt.appointmentTime,
+        status: apt.status,
+      })),
+    });
+    
     bookedAppointments.forEach((apt) => {
       const aptDate = new Date(apt.appointmentDate);
       const year = aptDate.getFullYear();
       const month = String(aptDate.getMonth() + 1).padStart(2, '0');
       const day = String(aptDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
+      
+      console.log('📅 [getDoctorAvailability] Appointment date parsing:', {
+        appointmentId: (apt as any)._id?.toString(),
+        storedDate: apt.appointmentDate,
+        isoString: aptDate.toISOString(),
+        localDateStr: dateStr,
+        utcDateStr: `${aptDate.getUTCFullYear()}-${String(aptDate.getUTCMonth() + 1).padStart(2, '0')}-${String(aptDate.getUTCDate()).padStart(2, '0')}`,
+        time: apt.appointmentTime,
+      });
 
       if (!bookedSlotsByDate[dateStr]) {
         bookedSlotsByDate[dateStr] = new Set();
@@ -609,6 +629,12 @@ export class DoctorsService {
         bookedSlotsByDate[dateStr].add(normalizedTime);
       }
     });
+    
+    console.log('📅 [getDoctorAvailability] Final bookedSlotsByDate:', 
+      Object.fromEntries(
+        Object.entries(bookedSlotsByDate).map(([k, v]) => [k, Array.from(v)])
+      )
+    );
 
     // 6) ქართული დღეების სახელები
     const dayNames = [
@@ -638,6 +664,14 @@ export class DoctorsService {
       const dateStr = `${year}-${month}-${day}`;
       const typeKey: 'video' | 'home-visit' = (avail.type as any) ?? 'video';
       const key = `${dateStr}|${typeKey}`;
+      
+      console.log('📅 [getDoctorAvailability] Availability date parsing:', {
+        storedDate: avail.date,
+        isoString: date.toISOString(),
+        localDateStr: dateStr,
+        utcDateStr: `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`,
+        type: typeKey,
+      });
 
       if (!availabilityByDateType[key]) {
         availabilityByDateType[key] = {

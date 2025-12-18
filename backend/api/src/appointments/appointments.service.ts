@@ -510,22 +510,28 @@ export class AppointmentsService {
       );
     }
 
-    // Parse and validate date
-    const appointmentDate = new Date(newDate);
+    // Parse and validate date - use UTC midnight to match availability dates
+    // newDate is in YYYY-MM-DD format (e.g., "2025-12-20")
+    const appointmentDate = new Date(newDate + 'T00:00:00.000Z');
+
+    console.log('🗓️ [Reschedule] Date parsing:', {
+      inputNewDate: newDate,
+      parsedDate: appointmentDate.toISOString(),
+      localDateStr: `${appointmentDate.getFullYear()}-${String(appointmentDate.getMonth() + 1).padStart(2, '0')}-${String(appointmentDate.getDate()).padStart(2, '0')}`,
+      utcDateStr: `${appointmentDate.getUTCFullYear()}-${String(appointmentDate.getUTCMonth() + 1).padStart(2, '0')}-${String(appointmentDate.getUTCDate()).padStart(2, '0')}`,
+    });
+
     if (isNaN(appointmentDate.getTime())) {
       throw new BadRequestException('Invalid appointment date');
     }
 
-    // Normalize date (remove time component)
-    const normalizedDate = new Date(appointmentDate);
-    normalizedDate.setHours(0, 0, 0, 0);
+    // normalizedDate is already at UTC midnight from the parsing above
+    const normalizedDate = appointmentDate;
 
-    // Create date range for MongoDB query (start and end of day)
-    // This handles timezone issues better than exact match
+    // Create date range for MongoDB query (start and end of day in UTC)
     const startOfDay = new Date(normalizedDate);
-    startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(normalizedDate);
-    endOfDay.setHours(23, 59, 59, 999);
+    endOfDay.setUTCHours(23, 59, 59, 999);
 
     // Validate time format
     const [hoursStr, minutesStr] = (newTime || '').split(':');
