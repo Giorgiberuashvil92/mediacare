@@ -1,4 +1,5 @@
-import { Image } from "expo-image";
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -8,9 +9,9 @@ const QUICK_SERVICES = [
   {
     id: "video",
     title: "ვიდეო კონსულტაცია",
-    description: "ონლაინ ექიმი 15 წთ-ში",
-    image:
-      "https://images.unsplash.com/photo-1584982751601-97dcc096659c?w=600&h=600&fit=crop&crop=center",
+    description: "ონლაინ ექიმთან კავშირი",
+    icon: "videocam",
+    gradient: ["#06B6D4", "#0891B2"],
     onPress: () =>
       router.push({
         pathname: "/(tabs)/doctor",
@@ -20,34 +21,25 @@ const QUICK_SERVICES = [
   {
     id: "lab",
     title: "ლაბორატორია",
-    description: "ანალიზები და ტესტები",
-    image:
-      "https://images.unsplash.com/photo-1581092580491-e0d23cbdf1dc?w=600&h=600&fit=crop&crop=center",
+    description: "ანალიზები და კვლევები",
+    icon: "flask",
+    gradient: ["#8B5CF6", "#7C3AED"],
     onPress: () => router.push("/(tabs)/medicine"),
-  },
-  {
-    id: "pharmacy",
-    title: "წამლები",
-    description: "მედიკამენტების მაღაზია",
-    image:
-      "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=600&h=600&fit=crop&crop=center",
-    // Route not yet in main tabs; keep navigation typed loosely
-    onPress: () => router.push("/(tabs)/medicine" as any),
   },
   {
     id: "home-visit",
     title: "ბინაზე გამოძახება",
     description: "ექიმი შენს მისამართზე",
-    image:
-      "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=600&h=600&fit=crop&crop=center&sat=-20",
+    icon: "home",
+    gradient: ["#F59E0B", "#D97706"],
     onPress: () => router.push("/screens/doctors/home-visit-doctors"),
   },
   {
     id: "advisor",
     title: "მრჩეველი",
     description: "შეგირჩევთ სწორ ექიმს",
-    image:
-      "https://images.unsplash.com/photo-1535916707207-35f97e715e1b?w=600&h=600&fit=crop&crop=center",
+    icon: "chatbubbles",
+    gradient: ["#10B981", "#059669"],
     onPress: () => router.push("/screens/advisor"),
   },
 ];
@@ -65,28 +57,45 @@ const Services = () => {
 
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom + 16 }]}>
-      <Text style={styles.title}>სწრაფი სერვისები</Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.title}>სწრაფი სერვისები</Text>
+      </View>
       <View style={styles.grid}>
-        {QUICK_SERVICES.map((service) => (
+        {QUICK_SERVICES.map((service, index) => (
           <TouchableOpacity
             key={service.id}
             onPress={() => handlePress(service.id, service.onPress)}
-            activeOpacity={0.9}
-            style={styles.serviceCard}
+            activeOpacity={0.85}
+            style={[
+              styles.serviceCard,
+              index % 2 === 0 ? styles.cardLeft : styles.cardRight,
+            ]}
           >
-            <View style={styles.iconWrapper}>
-              <Image
-                style={styles.serviceImage}
-                source={{ uri: service.image }}
-                contentFit="cover"
-              />
-            </View>
-            <Text style={styles.serviceTitle} numberOfLines={2}>
-              {service.title}
-            </Text>
-            <Text style={styles.serviceDescription} numberOfLines={2}>
-              {service.description}
-            </Text>
+            <LinearGradient
+              colors={service.gradient as [string, string]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.gradientBackground}
+            >
+              <View style={styles.cardContent}>
+                <View style={styles.iconContainer}>
+                  <Ionicons
+                    name={service.icon as any}
+                    size={28}
+                    color="#FFFFFF"
+                  />
+                </View>
+                <View style={styles.textContainer}>
+                  <Text style={styles.serviceTitle}>{service.title}</Text>
+                  <Text style={styles.serviceDescription}>
+                    {service.description}
+                  </Text>
+                </View>
+                <View style={styles.arrowContainer}>
+                  <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.7)" />
+                </View>
+              </View>
+            </LinearGradient>
           </TouchableOpacity>
         ))}
       </View>
@@ -124,18 +133,17 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     backgroundColor: "#F2F2F7",
     paddingBottom: 16,
-    scrollView: {
-      flex: 1,
-    },
-    contentContainer: {
-      paddingBottom: 16,
-    },
+  },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
   },
   title: {
-    fontSize: 16,
-    marginBottom: 8,
-    fontFamily: "Poppins-SemiBold",
-    color: "#333333",
+    fontSize: 18,
+    fontFamily: "Poppins-Bold",
+    color: "#1F2937",
   },
   grid: {
     flexDirection: "row",
@@ -143,42 +151,56 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   serviceCard: {
-    width: "30%",
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 14,
-    alignItems: "center",
+    width: "48%",
     marginBottom: 12,
-    gap: 6,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  iconWrapper: {
-    width: 52,
-    height: 52,
-    borderRadius: 999,
+    borderRadius: 20,
     overflow: "hidden",
-    marginBottom: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
   },
-  serviceImage: {
-    width: "100%",
-    height: "100%",
+  cardLeft: {
+    marginRight: "2%",
+  },
+  cardRight: {
+    marginLeft: "2%",
+  },
+  gradientBackground: {
+    borderRadius: 20,
+  },
+  cardContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    minHeight: 90,
+  },
+  iconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 14,
+    backgroundColor: "rgba(255, 255, 255, 0.25)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  textContainer: {
+    flex: 1,
+    marginLeft: 12,
   },
   serviceTitle: {
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: "Poppins-SemiBold",
-    color: "#0F172A",
-    textAlign: "center",
+    color: "#FFFFFF",
+    marginBottom: 2,
   },
   serviceDescription: {
     fontSize: 11,
     fontFamily: "Poppins-Regular",
-    color: "#64748B",
-    textAlign: "center",
+    color: "rgba(255, 255, 255, 0.85)",
+  },
+  arrowContainer: {
+    marginLeft: 4,
   },
   modalOverlay: {
     flex: 1,
