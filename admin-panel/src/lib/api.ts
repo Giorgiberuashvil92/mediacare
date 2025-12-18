@@ -18,7 +18,7 @@ export interface ApiResponse<T> {
 
 export interface User {
   id: string;
-  role: 'patient' | 'doctor';
+  role: 'patient' | 'doctor' | 'admin';
   name: string;
   email: string;
   phone?: string;
