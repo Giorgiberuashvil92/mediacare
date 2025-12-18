@@ -15,6 +15,9 @@ export class ShopProduct {
   @Prop({ trim: true, unique: true, sparse: true })
   icdCode?: string;
 
+  @Prop({ trim: true, unique: true, sparse: true })
+  uniqueCode?: string; // უნიკალური კოდი ლაბორატორიისთვის
+
   @Prop({ trim: true })
   description?: string;
 
