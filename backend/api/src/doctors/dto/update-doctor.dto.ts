@@ -45,6 +45,14 @@ export class UpdateDoctorDto {
   @IsOptional()
   followUpFee?: number;
 
+  @IsNumber()
+  @IsOptional()
+  videoConsultationFee?: number;
+
+  @IsNumber()
+  @IsOptional()
+  homeVisitFee?: number;
+
   @IsString()
   @IsOptional()
   about?: string;

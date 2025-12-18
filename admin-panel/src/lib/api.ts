@@ -39,6 +39,8 @@ export interface User {
   experience?: string;
   consultationFee?: number;
   followUpFee?: number;
+  videoConsultationFee?: number; // ვიდეო კონსულტაციის ფასი
+  homeVisitFee?: number; // ბინაზე ვიზიტის ფასი
   about?: string;
   location?: string;
   rating?: number;

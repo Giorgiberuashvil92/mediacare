@@ -32,6 +32,8 @@ export function EditDoctorForm({
     location: doctor.location || '',
     consultationFee: doctor.consultationFee?.toString() || '',
     followUpFee: doctor.followUpFee?.toString() || '',
+    videoConsultationFee: doctor.videoConsultationFee?.toString() || '',
+    homeVisitFee: doctor.homeVisitFee?.toString() || '',
     approvalStatus: doctor.approvalStatus || 'pending',
     isActive: doctor.isActive !== undefined ? doctor.isActive : true,
     gender: doctor.gender || 'male',
@@ -96,6 +98,12 @@ export function EditDoctorForm({
       }
       if (formData.followUpFee) {
         updateData.followUpFee = parseFloat(formData.followUpFee);
+      }
+      if (formData.videoConsultationFee) {
+        updateData.videoConsultationFee = parseFloat(formData.videoConsultationFee);
+      }
+      if (formData.homeVisitFee) {
+        updateData.homeVisitFee = parseFloat(formData.homeVisitFee);
       }
       if (formData.minWorkingDaysRequired) {
         updateData.minWorkingDaysRequired = parseInt(formData.minWorkingDaysRequired, 10);
@@ -272,8 +280,32 @@ export function EditDoctorForm({
             <InputGroup
               className="w-full sm:w-1/2"
               type="number"
+              name="videoConsultationFee"
+              label="ვიდეო კონსულტაციის ფასი (₾)"
+              placeholder="50"
+              value={formData.videoConsultationFee}
+              handleChange={handleChange}
+              height="sm"
+            />
+
+            <InputGroup
+              className="w-full sm:w-1/2"
+              type="number"
+              name="homeVisitFee"
+              label="ბინაზე ვიზიტის ფასი (₾)"
+              placeholder="100"
+              value={formData.homeVisitFee}
+              handleChange={handleChange}
+              height="sm"
+            />
+          </div>
+
+          <div className="mb-5.5 flex flex-col gap-5.5 sm:flex-row">
+            <InputGroup
+              className="w-full sm:w-1/2"
+              type="number"
               name="consultationFee"
-              label="კონსულტაციის საფასური ($)"
+              label="კონსულტაციის საფასური (₾)"
               placeholder="100"
               value={formData.consultationFee}
               handleChange={handleChange}
@@ -284,7 +316,7 @@ export function EditDoctorForm({
               className="w-full sm:w-1/2"
               type="number"
               name="followUpFee"
-              label="განმეორებითი კონსულტაციის საფასური ($)"
+              label="განმეორებითი კონსულტაციის საფასური (₾)"
               placeholder="50"
               value={formData.followUpFee}
               handleChange={handleChange}

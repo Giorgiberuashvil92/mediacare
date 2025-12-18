@@ -190,13 +190,33 @@ export function DoctorDetailsModal({
                       </p>
                     </div>
                   )}
+                  {doctor.videoConsultationFee !== undefined && (
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-dark-4 dark:text-dark-6">
+                        ვიდეო კონსულტაციის ფასი
+                      </label>
+                      <p className="text-dark dark:text-white">
+                        ₾{doctor.videoConsultationFee}
+                      </p>
+                    </div>
+                  )}
+                  {doctor.homeVisitFee !== undefined && (
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-dark-4 dark:text-dark-6">
+                        ბინაზე ვიზიტის ფასი
+                      </label>
+                      <p className="text-dark dark:text-white">
+                        ₾{doctor.homeVisitFee}
+                      </p>
+                    </div>
+                  )}
                   {doctor.consultationFee !== undefined && (
                     <div>
                       <label className="mb-1 block text-sm font-medium text-dark-4 dark:text-dark-6">
                         კონსულტაციის საფასური
                       </label>
                       <p className="text-dark dark:text-white">
-                        ${doctor.consultationFee}
+                        ₾{doctor.consultationFee}
                       </p>
                     </div>
                   )}
@@ -206,7 +226,7 @@ export function DoctorDetailsModal({
                         განმეორებითი კონსულტაციის საფასური
                       </label>
                       <p className="text-dark dark:text-white">
-                        ${doctor.followUpFee}
+                        ₾{doctor.followUpFee}
                       </p>
                     </div>
                   )}

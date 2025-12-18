@@ -42,6 +42,8 @@ export declare class User {
     experience?: string;
     consultationFee?: number;
     followUpFee?: number;
+    videoConsultationFee?: number;
+    homeVisitFee?: number;
     about?: string;
     location?: string;
     rating: number;

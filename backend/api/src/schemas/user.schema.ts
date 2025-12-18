@@ -100,6 +100,12 @@ export class User {
   followUpFee?: number;
 
   @Prop()
+  videoConsultationFee?: number; // ვიდეო კონსულტაციის ფასი
+
+  @Prop()
+  homeVisitFee?: number; // ბინაზე ვიზიტის ფასი
+
+  @Prop()
   about?: string;
 
   @Prop()
