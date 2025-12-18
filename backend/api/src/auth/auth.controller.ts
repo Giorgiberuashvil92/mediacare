@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
@@ -28,5 +28,11 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   async logout(@Body() refreshTokenDto: RefreshTokenDto) {
     return this.authService.logout(refreshTokenDto.refreshToken);
+  }
+
+  // DEV ONLY: Get admin token without password
+  @Get('dev-token')
+  async getDevToken() {
+    return this.authService.getDevAdminToken();
   }
 }

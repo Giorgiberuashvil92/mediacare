@@ -134,6 +134,35 @@ export class AuthService {
     };
   }
 
+  // DEV ONLY: Generate token for admin without password
+  async getDevAdminToken() {
+    const admin = await this.userModel.findOne({
+      email: 'admin@medicare.com',
+      role: UserRole.ADMIN,
+    });
+
+    if (!admin) {
+      throw new UnauthorizedException('Admin user not found');
+    }
+
+    const tokens = await this.generateTokens((admin._id as string).toString());
+
+    return {
+      success: true,
+      message: 'DEV: Admin token generated',
+      data: {
+        user: {
+          id: (admin._id as string).toString(),
+          role: admin.role,
+          name: admin.name,
+          email: admin.email,
+        },
+        token: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+      },
+    };
+  }
+
   async refreshToken(refreshToken: string) {
     // Find refresh token
     const tokenDoc = await this.refreshTokenModel
