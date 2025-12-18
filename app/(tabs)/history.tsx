@@ -786,18 +786,42 @@ const History = () => {
                             {test.resultFile && (
                               <TouchableOpacity
                                 style={styles.viewResultButton}
-                                onPress={() => {
+                                onPress={async () => {
                                   if (test.resultFile?.url) {
-                                    let url = test.resultFile.url;
-                                    // For PDFs, convert raw URL to image URL with page transformation for viewing
-                                    if (test.resultFile.type === 'application/pdf' || url.includes('/raw/upload/')) {
-                                      // Convert /raw/upload/ to /image/upload/ with pg_1 for first page preview
-                                      // Or use fl_attachment for download
-                                      url = url.replace('/raw/upload/', '/raw/upload/fl_attachment/');
+                                    const url = test.resultFile.url;
+                                    const isPdf = test.resultFile.type === 'application/pdf' || url.endsWith('.pdf');
+                                    
+                                    if (isPdf) {
+                                      try {
+                                        // Download PDF and open with native viewer
+                                        const filename = test.resultFile.name || `document_${Date.now()}.pdf`;
+                                        const fileUri = `${FileSystem.cacheDirectory}${filename}`;
+                                        
+                                        const downloadResult = await FileSystem.downloadAsync(url, fileUri);
+                                        
+                                        if (downloadResult.status === 200) {
+                                          const canShare = await Sharing.isAvailableAsync();
+                                          if (canShare) {
+                                            await Sharing.shareAsync(downloadResult.uri, {
+                                              mimeType: 'application/pdf',
+                                              UTI: 'com.adobe.pdf',
+                                            });
+                                          } else {
+                                            Alert.alert("შეცდომა", "გაზიარება მიუწვდომელია");
+                                          }
+                                        } else {
+                                          Alert.alert("შეცდომა", "ფაილის გადმოწერა ვერ მოხერხდა");
+                                        }
+                                      } catch (err) {
+                                        console.error("PDF download error:", err);
+                                        Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა");
+                                      }
+                                    } else {
+                                      // For non-PDFs, open in browser
+                                      Linking.openURL(url).catch(() =>
+                                        Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა")
+                                      );
                                     }
-                                    Linking.openURL(url).catch(() =>
-                                      Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა")
-                                    );
                                   }
                                 }}
                               >
