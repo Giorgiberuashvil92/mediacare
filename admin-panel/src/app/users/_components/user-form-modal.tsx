@@ -21,7 +21,7 @@ export default function UserFormModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    role: 'patient' as 'patient' | 'doctor',
+    role: 'patient' as 'patient' | 'doctor' | 'admin',
     name: '',
     email: '',
     password: '',
