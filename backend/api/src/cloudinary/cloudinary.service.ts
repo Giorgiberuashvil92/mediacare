@@ -43,17 +43,28 @@ export class CloudinaryService {
     const base64Data = buffer.toString('base64');
     const dataUri = `data:${mimeType || 'application/octet-stream'};base64,${base64Data}`;
 
-    // Generate clean public_id: decode URL encoding, remove extension, sanitize
+    // Generate clean public_id
     let publicId: string | undefined;
     if (originalFilename) {
       // Decode URL-encoded characters
-      let cleanName = decodeURIComponent(originalFilename);
-      // Remove file extension (Cloudinary adds it automatically)
-      cleanName = cleanName.replace(/\.[^.]+$/, '');
+      const cleanName = decodeURIComponent(originalFilename);
+
+      // Extract extension
+      const extMatch = cleanName.match(/\.([^.]+)$/);
+      const extension = extMatch ? extMatch[1] : '';
+
+      // Remove extension from name for cleaning
+      const nameWithoutExt = cleanName.replace(/\.[^.]+$/, '');
+
       // Replace spaces and special chars with underscores
-      cleanName = cleanName.replace(/[^a-zA-Z0-9_-]/g, '_');
-      // Add timestamp for uniqueness
-      publicId = `${Date.now()}_${cleanName}`;
+      const sanitizedName = nameWithoutExt.replace(/[^a-zA-Z0-9_-]/g, '_');
+
+      // Add timestamp for uniqueness, and add extension back for raw files
+      if (resourceType === 'raw' && extension) {
+        publicId = `${Date.now()}_${sanitizedName}.${extension}`;
+      } else {
+        publicId = `${Date.now()}_${sanitizedName}`;
+      }
     }
 
     try {
