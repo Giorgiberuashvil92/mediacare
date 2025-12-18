@@ -27,26 +27,44 @@ export class CloudinaryService {
     buffer: Buffer,
     options: UploadApiOptions = {},
     mimeType?: string,
+    originalFilename?: string,
   ): Promise<UploadApiResponse> {
     return new Promise((resolve, reject) => {
       // For PDFs and documents, use 'raw' resource_type
       // For images, use 'image'
       let resourceType = options.resource_type || 'auto';
+      const uploadOptions: UploadApiOptions = {
+        folder: 'mediacare',
+        ...options,
+      };
+
       if (
         mimeType === 'application/pdf' ||
         mimeType?.startsWith('application/')
       ) {
         resourceType = 'raw';
+        // For raw files, we need to include the extension in the filename
+        // Extract extension from original filename or mimeType
+        let extension = '';
+        if (originalFilename) {
+          const match = originalFilename.match(/\.([^.]+)$/);
+          if (match) extension = match[1];
+        } else if (mimeType === 'application/pdf') {
+          extension = 'pdf';
+        }
+        if (extension) {
+          // Generate a unique public_id with extension
+          const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
+          uploadOptions.public_id = `${uniqueId}.${extension}`;
+        }
       } else if (mimeType?.startsWith('image/')) {
         resourceType = 'image';
       }
 
+      uploadOptions.resource_type = resourceType;
+
       const stream = this.cloudinaryClient.uploader.upload_stream(
-        {
-          folder: 'mediacare',
-          resource_type: resourceType,
-          ...options,
-        },
+        uploadOptions,
         (error, result) => {
           if (error) {
             console.error('Cloudinary upload error:', error);

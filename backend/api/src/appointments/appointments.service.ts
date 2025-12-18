@@ -101,6 +101,7 @@ export class AppointmentsService {
         file.buffer,
         { folder: 'mediacare/appointment-docs' },
         file.mimetype,
+        file.originalname,
       );
 
       const doc = {
@@ -1061,6 +1062,7 @@ export class AppointmentsService {
       file.buffer,
       { folder: 'mediacare/laboratory-results' },
       file.mimetype,
+      file.originalname,
     );
 
     const resultFile = {
@@ -1141,6 +1143,7 @@ export class AppointmentsService {
       file.buffer,
       { folder: 'mediacare/external-lab-results' },
       file.mimetype,
+      file.originalname,
     );
     console.log('✅ Cloudinary upload result:', upload?.secure_url);
 
