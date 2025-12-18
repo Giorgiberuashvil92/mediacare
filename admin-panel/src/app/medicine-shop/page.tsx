@@ -204,6 +204,7 @@ export default function MedicineShopPage() {
     setProductForm({
       name: product.name,
       icdCode: product.icdCode || '',
+      uniqueCode: product.uniqueCode || '',
       type: product.type,
       description: product.description || '',
       price: product.price !== undefined ? String(product.price) : '',
