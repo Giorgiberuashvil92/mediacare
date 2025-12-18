@@ -44,11 +44,24 @@ export class CloudinaryService {
     const base64Data = buffer.toString('base64');
     const dataUri = `data:${mimeType || 'application/octet-stream'};base64,${base64Data}`;
 
+    // Generate clean public_id: decode URL encoding, remove extension, sanitize
+    let publicId: string | undefined;
+    if (originalFilename) {
+      // Decode URL-encoded characters
+      let cleanName = decodeURIComponent(originalFilename);
+      // Remove file extension (Cloudinary adds it automatically)
+      cleanName = cleanName.replace(/\.[^.]+$/, '');
+      // Replace spaces and special chars with underscores
+      cleanName = cleanName.replace(/[^a-zA-Z0-9_-]/g, '_');
+      // Add timestamp for uniqueness
+      publicId = `${Date.now()}_${cleanName}`;
+    }
+
     try {
       const result = await this.cloudinaryClient.uploader.upload(dataUri, {
         folder: 'mediacare',
         resource_type: resourceType,
-        public_id: originalFilename,
+        ...(publicId && { public_id: publicId }),
         ...options,
       });
 
