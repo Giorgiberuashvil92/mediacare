@@ -788,13 +788,8 @@ const History = () => {
                                 style={styles.viewResultButton}
                                 onPress={() => {
                                   if (test.resultFile?.url) {
-                                    let url = test.resultFile.url;
-                                    // For PDFs, use Google Docs Viewer for reliable viewing
-                                    if (test.resultFile.type === 'application/pdf' || url.endsWith('.pdf')) {
-                                      const encodedUrl = encodeURIComponent(url);
-                                      url = `https://docs.google.com/viewer?url=${encodedUrl}&embedded=true`;
-                                    }
-                                    Linking.openURL(url).catch(() =>
+                                    // Open directly - Cloudinary serves PDFs correctly now
+                                    Linking.openURL(test.resultFile.url).catch(() =>
                                       Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა")
                                     );
                                   }
