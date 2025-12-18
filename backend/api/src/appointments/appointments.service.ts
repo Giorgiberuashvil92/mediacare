@@ -1090,8 +1090,25 @@ export class AppointmentsService {
     file: Express.Multer.File,
     testName?: string,
   ) {
+    console.log('📤 uploadExternalLabResult called:', {
+      patientId,
+      appointmentId,
+      testName,
+      hasFile: !!file,
+      fileName: file?.originalname,
+      fileSize: file?.size,
+      fileMimeType: file?.mimetype,
+      hasBuffer: !!file?.buffer,
+      bufferLength: file?.buffer?.length,
+    });
+
     if (!file) {
       throw new BadRequestException('ფაილი აუცილებელია');
+    }
+
+    if (!file.buffer || file.buffer.length === 0) {
+      console.error('❌ File buffer is empty!');
+      throw new BadRequestException('ფაილი ცარიელია');
     }
 
     const allowedTypes = [
@@ -1117,10 +1134,12 @@ export class AppointmentsService {
     this.ensurePatientOwner(patientId, appointment);
 
     // Upload file to Cloudinary
+    console.log('📤 Uploading to Cloudinary...');
     const upload = await this.cloudinaryService.uploadBuffer(file.buffer, {
       folder: 'mediacare/external-lab-results',
       resource_type: 'auto',
     });
+    console.log('✅ Cloudinary upload result:', upload?.secure_url);
 
     const doc = {
       url: upload.secure_url,
