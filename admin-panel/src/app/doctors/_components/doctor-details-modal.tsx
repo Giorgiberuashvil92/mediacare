@@ -1,7 +1,7 @@
 'use client';
 
 import { apiService, User } from '@/lib/api';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 interface DoctorDetailsModalProps {
   doctorId: string;
@@ -104,6 +104,16 @@ export function DoctorDetailsModal({
                       </label>
                       <p className="text-dark dark:text-white">
                         {doctor.phone}
+                      </p>
+                    </div>
+                  )}
+                  {doctor.idNumber && (
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-dark-4 dark:text-dark-6">
+                        პირადი ნომერი
+                      </label>
+                      <p className="text-dark dark:text-white">
+                        {doctor.idNumber}
                       </p>
                     </div>
                   )}

@@ -23,6 +23,10 @@ export class UpdateDoctorDto {
 
   @IsString()
   @IsOptional()
+  idNumber?: string;
+
+  @IsString()
+  @IsOptional()
   specialization?: string;
 
   @IsString()

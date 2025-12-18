@@ -31,6 +31,7 @@ export interface User {
   createdAt?: string;
   updatedAt?: string;
   // Doctor specific
+  idNumber?: string; // Personal ID number (პირადი ნომერი)
   specialization?: string;
   licenseNumber?: string;
   licenseDocument?: string; // File path/URL for medical license (PDF or Image)

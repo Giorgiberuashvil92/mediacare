@@ -65,7 +65,7 @@ export default function RegisterScreen() {
   const [about, setAbout] = useState("");
   const [location, setLocation] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
-  const [gender, setGender] = useState<"male" | "female" | "other">("male");
+  const [gender, setGender] = useState<"male" | "female" | "other">("other");
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [tosModalVisible, setTosModalVisible] = useState(false);

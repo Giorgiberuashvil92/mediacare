@@ -39,6 +39,9 @@ export class User {
   phone?: string;
 
   @Prop()
+  idNumber?: string; // Personal ID number (პირადი ნომერი)
+
+  @Prop()
   dateOfBirth?: Date;
 
   @Prop({ enum: Gender })

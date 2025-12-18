@@ -24,6 +24,7 @@ export function EditDoctorForm({
     name: doctor.name || '',
     email: doctor.email || '',
     phone: doctor.phone || '',
+    idNumber: doctor.idNumber || '',
     specialization: doctor.specialization || '',
     degrees: doctor.degrees || '',
     experience: doctor.experience || '',
@@ -79,6 +80,7 @@ export function EditDoctorForm({
         name: formData.name.trim(),
         email: formData.email.trim(),
         phone: formData.phone.trim() || undefined,
+        idNumber: formData.idNumber.trim() || undefined,
         specialization: formData.specialization.trim() || undefined,
         degrees: formData.degrees.trim() || undefined,
         experience: formData.experience.trim() || undefined,
@@ -163,6 +165,19 @@ export function EditDoctorForm({
               height="sm"
             />
 
+            <InputGroup
+              className="w-full sm:w-1/2"
+              type="text"
+              name="idNumber"
+              label="პირადი ნომერი"
+              placeholder="01234567890"
+              value={formData.idNumber}
+              handleChange={handleChange}
+              height="sm"
+            />
+          </div>
+
+          <div className="mb-5.5 flex flex-col gap-5.5 sm:flex-row">
             <div className="w-full sm:w-1/2">
               <label className="mb-2.5 block text-sm font-medium text-dark dark:text-white">
                 სქესი
