@@ -192,6 +192,14 @@ const Appointment = () => {
   const [showEndPicker, setShowEndPicker] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [refreshing, setRefreshing] = useState(false);
+  
+  // Reschedule states
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [rescheduleLoading, setRescheduleLoading] = useState(false);
+  const [availableSlots, setAvailableSlots] = useState<{ date: string; time: string; }[]>([]);
+  const [selectedRescheduleDate, setSelectedRescheduleDate] = useState<string | null>(null);
+  const [selectedRescheduleTime, setSelectedRescheduleTime] = useState<string | null>(null);
+  const [loadingAvailability, setLoadingAvailability] = useState(false);
 
   // Load appointments from API
   useEffect(() => {
@@ -431,6 +439,91 @@ const Appointment = () => {
     await loadAppointments();
     setRefreshing(false);
   };
+
+  // Open reschedule modal and load doctor availability
+  const handleOpenReschedule = async (appointment: PatientAppointment) => {
+    setShowDetailsModal(false);
+    setShowRescheduleModal(true);
+    setSelectedRescheduleDate(null);
+    setSelectedRescheduleTime(null);
+    setLoadingAvailability(true);
+    
+    try {
+      // Get the doctor ID from the original appointment
+      const appointmentResponse = await apiService.getAppointmentById(appointment.id);
+      if (appointmentResponse.success && appointmentResponse.data) {
+        const doctorId = appointmentResponse.data.doctorId?._id || appointmentResponse.data.doctorId;
+        
+        // Load doctor availability
+        const availabilityResponse = await apiService.getDoctorAvailability(doctorId);
+        if (availabilityResponse.success && availabilityResponse.data) {
+          // Flatten availability into slots
+          const slots: { date: string; time: string }[] = [];
+          const availability = availabilityResponse.data;
+          
+          // Get next 14 days of available slots
+          const today = new Date();
+          for (let i = 1; i <= 14; i++) {
+            const date = new Date(today);
+            date.setDate(date.getDate() + i);
+            const dateStr = date.toISOString().split('T')[0];
+            const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+            
+            // Find availability for this day
+            const dayAvailability = availability.find((a: any) => a.dayOfWeek?.toLowerCase() === dayOfWeek);
+            if (dayAvailability?.slots) {
+              dayAvailability.slots.forEach((slot: any) => {
+                if (slot.available) {
+                  slots.push({ date: dateStr, time: slot.time });
+                }
+              });
+            }
+          }
+          setAvailableSlots(slots);
+        }
+      }
+    } catch (err) {
+      console.error('Error loading availability:', err);
+    } finally {
+      setLoadingAvailability(false);
+    }
+  };
+
+  // Handle reschedule confirmation
+  const handleReschedule = async () => {
+    if (!selectedAppointment || !selectedRescheduleDate || !selectedRescheduleTime) return;
+    
+    setRescheduleLoading(true);
+    try {
+      const response = await apiService.rescheduleAppointment(
+        selectedAppointment.id,
+        selectedRescheduleDate,
+        selectedRescheduleTime
+      );
+      
+      if (response.success) {
+        setShowRescheduleModal(false);
+        setSelectedRescheduleDate(null);
+        setSelectedRescheduleTime(null);
+        // Reload appointments to get updated data
+        await loadAppointments();
+      } else {
+        console.error('Reschedule failed:', response.message);
+      }
+    } catch (err) {
+      console.error('Reschedule error:', err);
+    } finally {
+      setRescheduleLoading(false);
+    }
+  };
+
+  // Get unique dates from available slots
+  const uniqueDates = [...new Set(availableSlots.map(s => s.date))];
+  
+  // Get times for selected date
+  const timesForSelectedDate = selectedRescheduleDate 
+    ? availableSlots.filter(s => s.date === selectedRescheduleDate).map(s => s.time)
+    : [];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -938,11 +1031,131 @@ const Appointment = () => {
             )}
 
             <View style={styles.modalFooter}>
+              {/* Show reschedule button only for scheduled/pending appointments */}
+              {selectedAppointment && 
+               (selectedAppointment.status === 'scheduled' || selectedAppointment.status === 'pending') && (
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.rescheduleButton]}
+                  onPress={() => handleOpenReschedule(selectedAppointment)}
+                >
+                  <Ionicons name="calendar-outline" size={18} color="#FFFFFF" />
+                  <Text style={[styles.modalButtonText, styles.rescheduleButtonText]}>გადაჯავშნა</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 style={styles.modalButton}
                 onPress={() => setShowDetailsModal(false)}
               >
                 <Text style={styles.modalButtonText}>დახურვა</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Reschedule Modal */}
+      <Modal
+        visible={showRescheduleModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowRescheduleModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>გადაჯავშნა</Text>
+              <TouchableOpacity
+                onPress={() => setShowRescheduleModal(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalBody}>
+              {loadingAvailability ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color="#06B6D4" />
+                  <Text style={styles.loadingText}>თავისუფალი დროების ჩატვირთვა...</Text>
+                </View>
+              ) : availableSlots.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <Ionicons name="calendar-outline" size={48} color="#9CA3AF" />
+                  <Text style={styles.emptyText}>თავისუფალი დრო არ მოიძებნა</Text>
+                </View>
+              ) : (
+                <>
+                  {/* Date Selection */}
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailLabel}>აირჩიეთ თარიღი</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dateScrollView}>
+                      {uniqueDates.map((date) => (
+                        <TouchableOpacity
+                          key={date}
+                          style={[
+                            styles.dateChip,
+                            selectedRescheduleDate === date && styles.dateChipSelected
+                          ]}
+                          onPress={() => {
+                            setSelectedRescheduleDate(date);
+                            setSelectedRescheduleTime(null);
+                          }}
+                        >
+                          <Text style={[
+                            styles.dateChipText,
+                            selectedRescheduleDate === date && styles.dateChipTextSelected
+                          ]}>
+                            {new Date(date).toLocaleDateString('ka-GE', { weekday: 'short', day: 'numeric', month: 'short' })}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+
+                  {/* Time Selection */}
+                  {selectedRescheduleDate && (
+                    <View style={styles.detailSection}>
+                      <Text style={styles.detailLabel}>აირჩიეთ დრო</Text>
+                      <View style={styles.timeGrid}>
+                        {timesForSelectedDate.map((time) => (
+                          <TouchableOpacity
+                            key={time}
+                            style={[
+                              styles.timeChip,
+                              selectedRescheduleTime === time && styles.timeChipSelected
+                            ]}
+                            onPress={() => setSelectedRescheduleTime(time)}
+                          >
+                            <Text style={[
+                              styles.timeChipText,
+                              selectedRescheduleTime === time && styles.timeChipTextSelected
+                            ]}>
+                              {time}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+                </>
+              )}
+            </ScrollView>
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={[
+                  styles.modalButton, 
+                  styles.rescheduleConfirmButton,
+                  (!selectedRescheduleDate || !selectedRescheduleTime) && styles.disabledButton
+                ]}
+                onPress={handleReschedule}
+                disabled={!selectedRescheduleDate || !selectedRescheduleTime || rescheduleLoading}
+              >
+                {rescheduleLoading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={[styles.modalButtonText, styles.rescheduleButtonText]}>დადასტურება</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -1646,6 +1859,83 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     borderRadius: 24,
+  },
+  // Reschedule styles
+  rescheduleButton: {
+    backgroundColor: "#8B5CF6",
+    flexDirection: "row",
+    gap: 8,
+  },
+  rescheduleButtonText: {
+    color: "#FFFFFF",
+  },
+  rescheduleConfirmButton: {
+    backgroundColor: "#06B6D4",
+  },
+  disabledButton: {
+    backgroundColor: "#D1D5DB",
+  },
+  dateScrollView: {
+    marginTop: 8,
+  },
+  dateChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: "#F3F4F6",
+    borderRadius: 20,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  dateChipSelected: {
+    backgroundColor: "#06B6D4",
+    borderColor: "#06B6D4",
+  },
+  dateChipText: {
+    fontSize: 13,
+    fontFamily: "Poppins-Medium",
+    color: "#4B5563",
+  },
+  dateChipTextSelected: {
+    color: "#FFFFFF",
+  },
+  timeGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 8,
+  },
+  timeChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: "#F3F4F6",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    minWidth: 70,
+    alignItems: "center",
+  },
+  timeChipSelected: {
+    backgroundColor: "#06B6D4",
+    borderColor: "#06B6D4",
+  },
+  timeChipText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#4B5563",
+  },
+  timeChipTextSelected: {
+    color: "#FFFFFF",
+  },
+  emptyContainer: {
+    alignItems: "center",
+    padding: 40,
+  },
+  emptyText: {
+    marginTop: 12,
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#9CA3AF",
   },
 });
 

@@ -32,6 +32,15 @@ const History = () => {
   const [checkingEligibility, setCheckingEligibility] = useState(false);
   const [followUpEligible, setFollowUpEligible] = useState<boolean | null>(null);
   const [uploadingResult, setUploadingResult] = useState<string | null>(null);
+  
+  // Reschedule states
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [rescheduleLoading, setRescheduleLoading] = useState(false);
+  const [availableDates, setAvailableDates] = useState<string[]>([]);
+  const [availableSlots, setAvailableSlots] = useState<{ time: string; available: boolean }[]>([]);
+  const [selectedRescheduleDate, setSelectedRescheduleDate] = useState<string | null>(null);
+  const [selectedRescheduleTime, setSelectedRescheduleTime] = useState<string | null>(null);
+  const [loadingAvailability, setLoadingAvailability] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated && user?.id) {

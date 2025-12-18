@@ -1170,6 +1170,28 @@ class ApiService {
     });
   }
 
+  async rescheduleAppointment(
+    appointmentId: string,
+    newDate: string,
+    newTime: string
+  ): Promise<{
+    success: boolean;
+    message?: string;
+    data?: any;
+  }> {
+    if (USE_MOCK_API) {
+      return Promise.resolve({
+        success: true,
+        message: 'ჯავშანი წარმატებით გადაინიშნა',
+      });
+    }
+
+    return this.apiCall(`/appointments/${appointmentId}/reschedule`, {
+      method: 'PUT',
+      body: JSON.stringify({ newDate, newTime }),
+    });
+  }
+
   async getAppointmentDocuments(appointmentId: string): Promise<{
     success: boolean;
     data: any[];
