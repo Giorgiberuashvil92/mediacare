@@ -1,8 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as DocumentPicker from "expo-document-picker";
-import { File as ExpoFile, Paths } from "expo-file-system";
 import { useRouter } from "expo-router";
-import * as Sharing from "expo-sharing";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -794,46 +792,16 @@ const History = () => {
                                     const isPdf = test.resultFile.type === 'application/pdf' || url.endsWith('.pdf');
                                     
                                     if (isPdf) {
-                                      try {
-                                        // Download PDF and open with native viewer
-                                        const filename = (test.resultFile.name || `document_${Date.now()}.pdf`).replace(/%20/g, '_');
-                                        const file = new ExpoFile(Paths.cache, filename);
-                                        
-                                        // Download file content
-                                        const response = await fetch(url);
-                                        if (!response.ok) {
-                                          throw new Error('Download failed');
-                                        }
-                                        const blob = await response.blob();
-                                        
-                                        // Convert blob to base64
-                                        const base64 = await new Promise<string>((resolve, reject) => {
-                                          const reader = new FileReader();
-                                          reader.onload = () => {
-                                            const result = reader.result as string;
-                                            resolve(result.split(',')[1]);
-                                          };
-                                          reader.onerror = reject;
-                                          reader.readAsDataURL(blob);
-                                        });
-                                        
-                                        // Write to file
-                                        await file.write(base64, { encoding: 'base64' });
-                                        
-                                        // Share the file
-                                        const canShare = await Sharing.isAvailableAsync();
-                                        if (canShare) {
-                                          await Sharing.shareAsync(file.uri, {
-                                            mimeType: 'application/pdf',
-                                            UTI: 'com.adobe.pdf',
-                                          });
-                                        } else {
-                                          Alert.alert("შეცდომა", "გაზიარება მიუწვდომელია");
-                                        }
-                                      } catch (err) {
-                                        console.error("PDF download error:", err);
-                                        Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა");
+                                      // For PDFs, add fl_attachment to force download in browser
+                                      let downloadUrl = url;
+                                      if (url.includes('/raw/upload/')) {
+                                        downloadUrl = url.replace('/raw/upload/', '/raw/upload/fl_attachment/');
+                                      } else if (url.includes('/image/upload/')) {
+                                        downloadUrl = url.replace('/image/upload/', '/image/upload/fl_attachment/');
                                       }
+                                      Linking.openURL(downloadUrl).catch(() =>
+                                        Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა")
+                                      );
                                     } else {
                                       // For non-PDFs, open in browser
                                       Linking.openURL(url).catch(() =>
