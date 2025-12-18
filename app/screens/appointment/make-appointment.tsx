@@ -57,6 +57,7 @@ const MakeAppointment = () => {
     (appointmentTypeParam as AppointmentType) || "video",
   );
   const [visitAddress, setVisitAddress] = useState("");
+  const [bookingFor, setBookingFor] = useState<"myself" | "other">("myself");
   const isLockedType = !!appointmentTypeParam;
 
   useEffect(() => {
@@ -184,6 +185,7 @@ const MakeAppointment = () => {
         consultationFee: consultationFee.toString(),
         appointmentType,
         visitAddress,
+        bookingFor,
       },
     });
   };
@@ -244,6 +246,68 @@ const MakeAppointment = () => {
                 </Text>
               </View>
             </View>
+          </View>
+        </View>
+
+        {/* Booking For Selection */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>ვისთვის ჯავშნავთ?</Text>
+          <View style={styles.bookingForContainer}>
+            <TouchableOpacity
+              style={[
+                styles.bookingForOption,
+                bookingFor === "myself" && styles.bookingForOptionActive,
+              ]}
+              onPress={() => setBookingFor("myself")}
+            >
+              <View style={[
+                styles.radioButton,
+                bookingFor === "myself" && styles.radioButtonActive,
+              ]}>
+                {bookingFor === "myself" && <View style={styles.radioButtonSelected} />}
+              </View>
+              <View style={styles.bookingForContent}>
+                <Ionicons 
+                  name="person" 
+                  size={24} 
+                  color={bookingFor === "myself" ? "#0EA5E9" : "#6B7280"} 
+                />
+                <Text style={[
+                  styles.bookingForText,
+                  bookingFor === "myself" && styles.bookingForTextActive,
+                ]}>
+                  ჩემთვის
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.bookingForOption,
+                bookingFor === "other" && styles.bookingForOptionActive,
+              ]}
+              onPress={() => setBookingFor("other")}
+            >
+              <View style={[
+                styles.radioButton,
+                bookingFor === "other" && styles.radioButtonActive,
+              ]}>
+                {bookingFor === "other" && <View style={styles.radioButtonSelected} />}
+              </View>
+              <View style={styles.bookingForContent}>
+                <Ionicons 
+                  name="people" 
+                  size={24} 
+                  color={bookingFor === "other" ? "#0EA5E9" : "#6B7280"} 
+                />
+                <Text style={[
+                  styles.bookingForText,
+                  bookingFor === "other" && styles.bookingForTextActive,
+                ]}>
+                  სხვისთვის
+                </Text>
+              </View>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -513,6 +577,41 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginLeft: 8,
+  },
+  bookingForContainer: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  bookingForOption: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 2,
+    borderColor: "#E5E7EB",
+  },
+  bookingForOptionActive: {
+    borderColor: "#0EA5E9",
+    backgroundColor: "#F0F9FF",
+  },
+  bookingForContent: {
+    flex: 1,
+    alignItems: "center",
+    gap: 8,
+  },
+  bookingForText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#6B7280",
+  },
+  bookingForTextActive: {
+    color: "#0EA5E9",
+    fontFamily: "Poppins-SemiBold",
+  },
+  radioButtonActive: {
+    borderColor: "#0EA5E9",
   },
   typeSelectorContainer: {
     flexDirection: "row",

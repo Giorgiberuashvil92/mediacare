@@ -50,15 +50,16 @@ const PatientDetails = () => {
   const [loading, setLoading] = useState(false);
   const [profileLoaded, setProfileLoaded] = useState(false);
 
-  const { appointmentType: appointmentTypeParam, visitAddress } =
+  const { appointmentType: appointmentTypeParam, visitAddress, bookingFor } =
     useLocalSearchParams();
   const appointmentType: AppointmentType =
     (appointmentTypeParam as AppointmentType) || "video";
+  const isBookingForOther = bookingFor === "other";
 
-  // Load user profile and auto-fill form data
+  // Load user profile and auto-fill form data (only if booking for myself)
   useEffect(() => {
     const loadProfile = async () => {
-      if (!user?.id || profileLoaded) return;
+      if (!user?.id || profileLoaded || isBookingForOther) return;
       
       try {
         const response = await apiService.getProfile();
@@ -538,11 +539,23 @@ const PatientDetails = () => {
         >
           <Ionicons name="arrow-back" size={24} color="#333333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>პაციენტის დეტალები</Text>
+        <Text style={styles.headerTitle}>
+          {isBookingForOther ? "სხვა პირის მონაცემები" : "თქვენი მონაცემები"}
+        </Text>
         <View style={styles.placeholder} />
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Booking For Hint */}
+        {isBookingForOther && (
+          <View style={styles.hintCard}>
+            <Ionicons name="information-circle" size={20} color="#0EA5E9" />
+            <Text style={styles.hintText}>
+              შეიყვანეთ იმ პირის მონაცემები, ვისთვისაც ჯავშნავთ ვიზიტს
+            </Text>
+          </View>
+        )}
+
         {/* Name Field */}
         <View style={styles.fieldContainer}>
           <Text style={styles.fieldLabel}>სახელი</Text>
@@ -803,6 +816,24 @@ const styles = StyleSheet.create({
   },
   placeholder: {
     width: 40,
+  },
+  hintCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F0F9FF",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: "#BAE6FD",
+  },
+  hintText: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#0369A1",
+    lineHeight: 20,
   },
   content: {
     flex: 1,
