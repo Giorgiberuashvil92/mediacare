@@ -113,7 +113,7 @@ export default function ProfileScreen() {
             ) : (
               <Image
                 source={{
-                  uri: `https://picsum.photos/seed/${user?.name || "patient"}/200/200`,
+                  uri: `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&size=200&background=06B6D4&color=fff`,
                 }}
                 style={styles.profileImage}
                 contentFit="cover"

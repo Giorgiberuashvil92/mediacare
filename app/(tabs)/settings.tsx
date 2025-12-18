@@ -56,7 +56,7 @@ export default function SettingsScreen() {
           <View style={styles.profileImageContainer}>
             <Image
               source={{
-                uri: `https://picsum.photos/seed/${user?.name || "patient"}/200/200`,
+                uri: user?.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&size=200&background=06B6D4&color=fff`,
               }}
               style={styles.profileImage}
               contentFit="cover"
@@ -70,9 +70,7 @@ export default function SettingsScreen() {
             <Text style={styles.userName}>
               {user ? user.name : "მომხმარებელი"}
             </Text>
-            <TouchableOpacity style={styles.editButton}>
-              <Ionicons name="pencil" size={16} color="#FFFFFF" />
-            </TouchableOpacity>
+            
           </View>
 
           <Text style={styles.userEmail}>
@@ -148,13 +146,7 @@ export default function SettingsScreen() {
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity> */}
 
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuIconContainer}>
-              <Ionicons name="notifications" size={20} color="#06B6D4" />
-            </View>
-            <Text style={styles.menuText}>შეტყობინებები</Text>
-            <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
-          </TouchableOpacity>
+         
 
           <TouchableOpacity
             style={styles.menuItem}
