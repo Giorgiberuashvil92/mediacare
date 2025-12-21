@@ -58,10 +58,11 @@ export default function LaboratoryScreen() {
   const [labTests, setLabTests] = useState<LabTest[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [prescribedTests, setPrescribedTests] = useState<PrescribedTest[]>([]);
+  const [filteredPrescribedTests, setFilteredPrescribedTests] = useState<PrescribedTest[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [preSelectedApplied, setPreSelectedApplied] = useState(false);
+  const [preSelectedApplied, setPreSelectedApplied] = useState<string | null>(null);
   
   // Type filter (laboratory vs instrumental)
   const [selectedType, setSelectedType] = useState<ExamType>("laboratory");
@@ -146,18 +147,33 @@ export default function LaboratoryScreen() {
       
       // Build appointments list for lab test assignment
       if (appointmentsResponse.success && Array.isArray(appointmentsResponse.data)) {
+        console.log('🏥 [Laboratory] Raw appointments response:', appointmentsResponse.data.slice(0, 2));
+        
         const allowedStatuses = ["scheduled", "confirmed", "in-progress", "completed"];
         const appointmentList: Appointment[] = appointmentsResponse.data
           .filter((apt: any) => allowedStatuses.includes(apt.status))
-          .map((apt: any): Appointment => ({
-            id: apt.id,
-            patientName: apt.patientName || "უცნობი პაციენტი",
-            patientId: apt.patientId || "",
-            date: apt.date || "",
-            time: apt.time || "",
-            type: apt.type || "video",
-            status: apt.status,
-          }));
+          .map((apt: any): Appointment => {
+            // Extract patientId - can be object or string
+            const patientId = apt.patientId?._id || apt.patientId || "";
+            
+            console.log('🏥 [Laboratory] Processing appointment:', {
+              id: apt.id,
+              patientName: apt.patientName,
+              rawPatientId: apt.patientId,
+              patientIdType: typeof apt.patientId,
+              extractedPatientId: patientId,
+            });
+            
+            return {
+              id: apt.id,
+              patientName: apt.patientName || "უცნობი პაციენტი",
+              patientId: patientId,
+              date: apt.date || "",
+              time: apt.time || "",
+              type: apt.type || "video",
+              status: apt.status,
+            };
+          });
         
         // Sort by date (newest first)
         appointmentList.sort((a, b) => {
@@ -169,13 +185,14 @@ export default function LaboratoryScreen() {
         setAppointments(appointmentList);
         
         // If came from active-patients screen with appointment - pre-select it
-        if (!preSelectedApplied && (params.appointmentId || params.patientId)) {
+        const currentParamsKey = params.appointmentId || params.patientId || params.patientName || null;
+        if (preSelectedApplied !== currentParamsKey && currentParamsKey) {
           // Prioritize appointmentId if provided
           if (params.appointmentId) {
             const matchingApt = appointmentList.find((a) => a.id === params.appointmentId);
             if (matchingApt) {
               setSelectedAppointment(matchingApt);
-              setPreSelectedApplied(true);
+              setPreSelectedApplied(currentParamsKey);
             }
           } else if (params.patientId || params.patientName) {
             // Fallback to patientId/patientName matching
@@ -184,24 +201,36 @@ export default function LaboratoryScreen() {
             );
             if (matchingApt) {
               setSelectedAppointment(matchingApt);
-              setPreSelectedApplied(true);
+              setPreSelectedApplied(currentParamsKey);
             }
           }
         }
       }
       
-      // Load prescribed tests from appointments
+      // Load all prescribed tests from appointments (will be filtered later)
       if (appointmentsResponse.success && Array.isArray(appointmentsResponse.data)) {
         const allPrescribed: PrescribedTest[] = [];
         appointmentsResponse.data.forEach((apt: any) => {
+          // Extract patientId - can be object or string
+          const aptPatientId = apt.patientId?._id || apt.patientId || "";
+          const aptPatientName = apt.patientName || "უცნობი პაციენტი";
+          
           if (apt.laboratoryTests && Array.isArray(apt.laboratoryTests)) {
+            console.log('🧪 [Laboratory] Processing lab tests for appointment:', {
+              aptId: apt.id,
+              patientName: aptPatientName,
+              rawPatientId: apt.patientId,
+              extractedPatientId: aptPatientId,
+              testsCount: apt.laboratoryTests.length,
+            });
+            
             apt.laboratoryTests.forEach((test: any) => {
               allPrescribed.push({
                 id: `${apt.id}-${test.productId}`,
                 testId: test.productId,
                 testName: test.productName,
-                patientId: apt.patientId || "",
-                patientName: apt.patientName || "უცნობი პაციენტი",
+                patientId: aptPatientId,
+                patientName: aptPatientName,
                 prescribedDate: apt.date || "",
                 doctorName: "თქვენ",
                 status: test.resultFile ? "completed" : (test.status || "pending"),
@@ -209,6 +238,8 @@ export default function LaboratoryScreen() {
             });
           }
         });
+        
+        console.log('🧪 [Laboratory] All prescribed tests loaded:', allPrescribed.length);
         setPrescribedTests(allPrescribed);
       }
     } catch (error) {
@@ -216,11 +247,86 @@ export default function LaboratoryScreen() {
     } finally {
       setLoading(false);
     }
-  }, [params.appointmentId, params.patientId, params.patientName, preSelectedApplied]);
+  }, [params.appointmentId, params.patientId, params.patientName]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Filter prescribed tests based on selected patient
+  useEffect(() => {
+    console.log('🔄 [Laboratory] useEffect triggered for filtering');
+    console.log('🔄 [Laboratory] Dependencies:', {
+      prescribedTestsLength: prescribedTests.length,
+      paramsPatientId: params.patientId,
+      paramsPatientName: params.patientName,
+      selectedAppointmentId: selectedAppointment?.id,
+      selectedAppointmentPatientId: selectedAppointment?.patientId,
+      preSelectedApplied: preSelectedApplied,
+    });
+    
+    // If user manually selected an appointment (not from params), ignore params
+    const useParamsFilter = preSelectedApplied && (params.patientId || params.patientName);
+    
+    // Use selectedAppointment if available, otherwise use params (only if pre-selection was applied)
+    const filterPatientId = selectedAppointment?.patientId || (useParamsFilter ? params.patientId : null);
+    const filterPatientName = selectedAppointment?.patientName || (useParamsFilter ? params.patientName : null);
+    
+    console.log('🧪 [Laboratory] Filter values:', {
+      filterPatientId,
+      filterPatientName,
+      hasFilter: !!(filterPatientId || filterPatientName),
+    });
+    
+    console.log('🧪 [Laboratory] All prescribed tests:', prescribedTests.map(t => ({
+      id: t.id,
+      name: t.testName,
+      patientId: t.patientId,
+      patientName: t.patientName,
+    })));
+    
+    if (filterPatientId || filterPatientName) {
+      const filtered = prescribedTests.filter((test) => {
+        const matchesId = filterPatientId && test.patientId === filterPatientId;
+        const matchesName = filterPatientName && test.patientName === filterPatientName;
+        const shouldInclude = matchesId || matchesName;
+        
+        if (!shouldInclude) {
+          console.log('❌ [Laboratory] Test excluded:', {
+            testName: test.testName,
+            testPatientId: test.patientId,
+            filterPatientId,
+            reason: 'patientId mismatch',
+          });
+        } else {
+          console.log('✅ [Laboratory] Test included:', {
+            testName: test.testName,
+            testPatientId: test.patientId,
+          });
+        }
+        
+        return shouldInclude;
+      });
+      
+      console.log('✨ [Laboratory] Final filtered tests:', filtered.length, 'out of', prescribedTests.length);
+      console.log('✨ [Laboratory] Setting filteredPrescribedTests to:', filtered.map(t => ({
+        id: t.id,
+        name: t.testName,
+        patientName: t.patientName,
+      })));
+      setFilteredPrescribedTests(filtered);
+    } else {
+      // If no filter, show all tests
+      console.log('🧪 [Laboratory] No filter applied, showing all tests:', prescribedTests.length);
+      setFilteredPrescribedTests(prescribedTests);
+    }
+  }, [prescribedTests, params.patientId, params.patientName, selectedAppointment]);
+
+  // Reset pre-selection when params change
+  useEffect(() => {
+    setPreSelectedApplied(null);
+    setSelectedAppointment(null);
+  }, [params.appointmentId, params.patientId, params.patientName]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -519,8 +625,8 @@ export default function LaboratoryScreen() {
         {/* Prescribed Tests History */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>დანიშნული კვლევები</Text>
-          {prescribedTests.length > 0 ? (
-            prescribedTests.map((item, index) => (
+          {filteredPrescribedTests.length > 0 ? (
+            filteredPrescribedTests.map((item, index) => (
               <View key={`${item.id}-${index}`}>{renderPrescribedItem({ item })}</View>
             ))
           ) : (
@@ -570,6 +676,13 @@ export default function LaboratoryScreen() {
                     selectedAppointment?.id === item.id && styles.patientItemSelected,
                   ]}
                   onPress={() => {
+                    console.log('🧪 [Laboratory] Appointment selected:', {
+                      id: item.id,
+                      patientId: item.patientId,
+                      patientName: item.patientName,
+                    });
+                    // Clear pre-selection flag to allow new selection
+                    setPreSelectedApplied(null);
                     setSelectedAppointment(item);
                     setShowAppointmentModal(false);
                   }}

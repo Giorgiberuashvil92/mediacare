@@ -37,7 +37,8 @@ export default function ScreensLayout() {
       <Stack.Screen name="profile/payment" />
       <Stack.Screen name="profile/newPayment" />
       <Stack.Screen name="profile/language" />
-      <Stack.Screen name="profile/helpCenter" />
+      <Stack.Screen name="profile/security" />
+      <Stack.Screen name="profile/help-center" />
       <Stack.Screen name="profile/terms/cancellation" />
       <Stack.Screen name="profile/terms/service" />
       <Stack.Screen name="profile/terms/privacy" />

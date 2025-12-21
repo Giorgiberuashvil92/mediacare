@@ -188,6 +188,9 @@ export class DoctorsService {
             problem: apt.patientDetails.problem,
           }
         : undefined,
+      // Include patient contact information from populated patientId
+      patientEmail: patient?.email,
+      patientPhone: patient?.phone,
     };
   }
 

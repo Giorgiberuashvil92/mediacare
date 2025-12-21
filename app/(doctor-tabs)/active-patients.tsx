@@ -283,8 +283,8 @@ export default function ActivePatientsScreen() {
             )}
           </TouchableOpacity>
 
-          {/* Lab Results */}
-          <TouchableOpacity
+          {/* Lab Results - Temporarily commented out */}
+          {/* <TouchableOpacity
             style={[
               styles.statusItem,
               !hasLabTests ? styles.statusItemGray : (labComplete ? styles.statusItemGreen : styles.statusItemYellow),
@@ -318,7 +318,7 @@ export default function ActivePatientsScreen() {
             {labPending && (
               <View style={[styles.alertDot, { backgroundColor: "#F59E0B" }]} />
             )}
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </View>
 
         {/* Action Buttons */}
@@ -332,12 +332,16 @@ export default function ActivePatientsScreen() {
             onPress={() => {
               router.push({
                 pathname: "/(doctor-tabs)/laboratory" as any,
-                params: { patientId: item.patientId, patientName: item.patientName },
+                params: { 
+                  patientId: item.patientId, 
+                  patientName: item.patientName,
+                  appointmentId: item.id,
+                },
               });
             }}
           >
             <Ionicons name="flask-outline" size={18} color="#F59E0B" />
-            <Text style={[styles.actionButtonText, { color: "#F59E0B" }]}>ლაბორატორიული კვლევები</Text>
+            <Text style={[styles.actionButtonText, { color: "#F59E0B" }]}>კვლევები</Text>
           </TouchableOpacity>
         </View>
       </TouchableOpacity>

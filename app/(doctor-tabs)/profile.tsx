@@ -347,7 +347,10 @@ export default function DoctorProfile() {
 
             <View style={styles.divider} />
 
-            <TouchableOpacity style={styles.menuItem}>
+            <TouchableOpacity 
+              style={styles.menuItem}
+              onPress={() => router.push({ pathname: "/screens/profile/help-center", params: { tab: "contact" } } as any)}
+            >
               <View style={styles.menuItemLeft}>
                 <View style={styles.menuIconContainer}>
                   <Ionicons name="mail" size={22} color="#10B981" />

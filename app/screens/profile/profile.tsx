@@ -228,7 +228,7 @@ export default function ProfileScreen() {
 
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => router.push("/screens/profile/helpCenter")}
+            onPress={() => router.push({ pathname: "/screens/profile/help-center" } as any)}
           >
             <View style={styles.menuIconContainer}>
               <Ionicons name="help-circle" size={20} color="#06B6D4" />

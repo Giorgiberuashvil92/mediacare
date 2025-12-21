@@ -49,11 +49,22 @@ export default function DoctorPatients() {
         );
       }
 
+      console.log('👥 Loading patients for doctor:', user?.id);
+      console.log('🌐 API Base URL:', apiService.getBaseURL());
+      
       const response = await apiService.getDoctorPatients();
+      
+      console.log('👥 Patients API response:', {
+        success: response.success,
+        dataLength: response.data?.length || 0,
+        data: response.data
+      });
 
       if (response.success && response.data) {
         setPatients(response.data);
+        console.log('👥 Patients loaded:', response.data.length);
       } else {
+        console.warn('👥 No patients data in response');
         setPatients([]);
       }
     } catch (err: any) {
