@@ -105,7 +105,10 @@ export default function DoctorDashboard() {
       if (scheduleResponse.success) {
         setTodaySchedule(scheduleResponse.data);
       }
-      if (availabilityResponse.success && Array.isArray(availabilityResponse.data)) {
+      if (
+        availabilityResponse.success &&
+        Array.isArray(availabilityResponse.data)
+      ) {
         setAvailability(availabilityResponse.data as any[]);
       }
     } catch (err) {
@@ -126,7 +129,7 @@ export default function DoctorDashboard() {
   useFocusEffect(
     useCallback(() => {
       void loadDashboardData();
-    }, [loadDashboardData]),
+    }, [loadDashboardData])
   );
 
   const onRefresh = useCallback(async () => {
@@ -145,7 +148,9 @@ export default function DoctorDashboard() {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <View
+          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+        >
           <Text style={{ fontSize: 16, color: "#6B7280" }}>
             დეშბორდის ჩატვირთვა...
           </Text>
@@ -157,7 +162,14 @@ export default function DoctorDashboard() {
   if (error) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 20 }}>
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 20,
+          }}
+        >
           <Text style={{ fontSize: 16, color: "#EF4444", marginBottom: 12 }}>
             {error}
           </Text>
@@ -167,12 +179,15 @@ export default function DoctorDashboard() {
               setLoading(true);
               const fetchDashboardData = async () => {
                 try {
-                  const [statsResponse, appointmentsResponse, scheduleResponse] =
-                    await Promise.all([
-                      apiService.getDoctorDashboardStats(),
-                      apiService.getDoctorDashboardAppointments(5),
-                      apiService.getDoctorDashboardSchedule(),
-                    ]);
+                  const [
+                    statsResponse,
+                    appointmentsResponse,
+                    scheduleResponse,
+                  ] = await Promise.all([
+                    apiService.getDoctorDashboardStats(),
+                    apiService.getDoctorDashboardAppointments(5),
+                    apiService.getDoctorDashboardSchedule(),
+                  ]);
 
                   if (statsResponse.success) {
                     setStats(statsResponse.data as any);
@@ -211,7 +226,9 @@ export default function DoctorDashboard() {
   if (!stats) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <View
+          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+        >
           <Text style={{ fontSize: 16, color: "#6B7280" }}>
             მონაცემები არ მოიძებნა
           </Text>
@@ -260,7 +277,9 @@ export default function DoctorDashboard() {
             {/* Active Patients - Video */}
             <TouchableOpacity
               style={[styles.quickActionCard, styles.quickActionVideo]}
-              onPress={() => router.push("/(doctor-tabs)/active-patients?type=video" as any)}
+              onPress={() =>
+                router.push("/(doctor-tabs)/active-patients?type=video" as any)
+              }
               activeOpacity={0.85}
             >
               <View style={styles.quickActionIconWrapper}>
@@ -273,7 +292,11 @@ export default function DoctorDashboard() {
             {/* Active Patients - Home Visit */}
             <TouchableOpacity
               style={[styles.quickActionCard, styles.quickActionHomeVisit]}
-              onPress={() => router.push("/(doctor-tabs)/active-patients?type=home-visit" as any)}
+              onPress={() =>
+                router.push(
+                  "/(doctor-tabs)/active-patients?type=home-visit" as any
+                )
+              }
               activeOpacity={0.85}
             >
               <View style={styles.quickActionIconWrapper}>
@@ -308,11 +331,15 @@ export default function DoctorDashboard() {
               onPress={() => router.push("/doctor/revenue-details" as any)}
               activeOpacity={0.85}
             >
-              <View style={[styles.statsCardIcon, { backgroundColor: "#E0F2FE" }]}>
+              <View
+                style={[styles.statsCardIcon, { backgroundColor: "#E0F2FE" }]}
+              >
                 <Ionicons name="videocam" size={22} color="#0EA5E9" />
               </View>
               <Text style={styles.statsCardValue}>
-                {stats?.videoConsultations?.thisMonth || stats?.appointments?.total || 0}
+                {stats?.videoConsultations?.thisMonth ||
+                  stats?.appointments?.total ||
+                  0}
               </Text>
               <Text style={styles.statsCardLabel}>ვიდეო კონსულტაციები</Text>
               <Text style={styles.statsCardSubLabel}>ამ თვეში</Text>
@@ -324,7 +351,9 @@ export default function DoctorDashboard() {
               onPress={() => router.push("/doctor/revenue-details" as any)}
               activeOpacity={0.85}
             >
-              <View style={[styles.statsCardIcon, { backgroundColor: "#DCFCE7" }]}>
+              <View
+                style={[styles.statsCardIcon, { backgroundColor: "#DCFCE7" }]}
+              >
                 <Ionicons name="home" size={22} color="#10B981" />
               </View>
               <Text style={styles.statsCardValue}>
@@ -346,8 +375,12 @@ export default function DoctorDashboard() {
                 <Ionicons name="stats-chart" size={24} color="#8B5CF6" />
               </View>
               <View>
-                <Text style={styles.detailedStatsTitle}>დეტალური სტატისტიკა</Text>
-                <Text style={styles.detailedStatsSubtitle}>ფინანსური, თვეების მიხედვით</Text>
+                <Text style={styles.detailedStatsTitle}>
+                  დეტალური სტატისტიკა
+                </Text>
+                <Text style={styles.detailedStatsSubtitle}>
+                  ფინანსური, თვეების მიხედვით
+                </Text>
               </View>
             </View>
             <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
@@ -488,7 +521,7 @@ export default function DoctorDashboard() {
                     {todaySchedule.dayOfWeek}
                   </Text>
                   <Text style={styles.scheduleCount}>
-                    {(todaySchedule.consultations?.length || 0)} ჯამში
+                    {todaySchedule.consultations?.length || 0} ჯამში
                   </Text>
                 </View>
               </View>
@@ -503,18 +536,25 @@ export default function DoctorDashboard() {
                   activeOpacity={0.8}
                   onPress={() =>
                     setScheduleFilter(
-                      scheduleFilter === "video" ? "all" : "video",
+                      scheduleFilter === "video" ? "all" : "video"
                     )
                   }
                 >
                   <View style={styles.scheduleTypeIconVideo}>
-                    <Ionicons name="videocam-outline" size={18} color="#0EA5E9" />
+                    <Ionicons
+                      name="videocam-outline"
+                      size={18}
+                      color="#0EA5E9"
+                    />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.scheduleTypeTitle}>ვიდეო კონსულტაციები</Text>
+                    <Text style={styles.scheduleTypeTitle}>
+                      ვიდეო კონსულტაციები
+                    </Text>
                     <Text style={styles.scheduleTypeSubtitle}>
-                      {(todaySchedule.video?.appointments || 0)} ჯავშანი •{" "}
-                      {(todaySchedule.video?.availableSlots?.length || 0)} თავისუფალი
+                      {todaySchedule.video?.appointments || 0} ჯავშანი •{" "}
+                      {todaySchedule.video?.availableSlots?.length || 0}{" "}
+                      თავისუფალი
                     </Text>
                   </View>
                 </TouchableOpacity>
@@ -528,7 +568,7 @@ export default function DoctorDashboard() {
                   activeOpacity={0.8}
                   onPress={() =>
                     setScheduleFilter(
-                      scheduleFilter === "home-visit" ? "all" : "home-visit",
+                      scheduleFilter === "home-visit" ? "all" : "home-visit"
                     )
                   }
                 >
@@ -536,10 +576,13 @@ export default function DoctorDashboard() {
                     <Ionicons name="home-outline" size={18} color="#16A34A" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.scheduleTypeTitle}>ბინაზე ვიზიტები</Text>
+                    <Text style={styles.scheduleTypeTitle}>
+                      ბინაზე ვიზიტები
+                    </Text>
                     <Text style={styles.scheduleTypeSubtitle}>
-                      {(todaySchedule.homeVisit?.appointments || 0)} ჯავშანი •{" "}
-                      {(todaySchedule.homeVisit?.availableSlots?.length || 0)} თავისუფალი
+                      {todaySchedule.homeVisit?.appointments || 0} ჯავშანი •{" "}
+                      {todaySchedule.homeVisit?.availableSlots?.length || 0}{" "}
+                      თავისუფალი
                     </Text>
                   </View>
                 </TouchableOpacity>
@@ -553,54 +596,64 @@ export default function DoctorDashboard() {
                   })
                   .slice(0, 3)
                   .map((consultation: any) => (
-              <View key={consultation.id} style={styles.consultationItem}>
-                <View style={styles.consultationTime}>
-                  <Ionicons name="time-outline" size={16} color="#6B7280" />
-                  <Text style={styles.consultationTimeText}>
-                    {consultation.time}
-                  </Text>
-                </View>
-                <View style={styles.consultationInfo}>
-                  <Text style={styles.consultationPatient}>
-                    {consultation.patientName}
-                  </Text>
-                  <Text style={styles.consultationDetails}>
-                    {consultation.patientAge} წლის •{" "}
-                    {getConsultationTypeLabel(consultation.type)}
-                  </Text>
-                  {consultation.symptoms && (
-                    <Text style={styles.consultationSymptoms}>
-                      {consultation.symptoms}
-                    </Text>
-                  )}
-                </View>
-                <View
-                  style={[
-                    styles.statusBadge,
-                    {
-                      backgroundColor: `${getStatusColor(
-                        consultation.status
-                      )}20`,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.statusText,
-                      { color: getStatusColor(consultation.status) },
-                    ]}
-                  >
-                    {getStatusLabel(consultation.status)}
-                  </Text>
-                </View>
-              </View>
-                ))}
-              
+                    <View key={consultation.id} style={styles.consultationItem}>
+                      <View style={styles.consultationTime}>
+                        <Ionicons
+                          name="time-outline"
+                          size={16}
+                          color="#6B7280"
+                        />
+                        <Text style={styles.consultationTimeText}>
+                          {consultation.time}
+                        </Text>
+                      </View>
+                      <View style={styles.consultationInfo}>
+                        <Text style={styles.consultationPatient}>
+                          {consultation.patientName}
+                        </Text>
+                        <Text style={styles.consultationDetails}>
+                          {consultation.patientAge} წლის •{" "}
+                          {getConsultationTypeLabel(consultation.type)}
+                        </Text>
+                        {consultation.symptoms && (
+                          <Text style={styles.consultationSymptoms}>
+                            {consultation.symptoms}
+                          </Text>
+                        )}
+                      </View>
+                      <View
+                        style={[
+                          styles.statusBadge,
+                          {
+                            backgroundColor: `${getStatusColor(
+                              consultation.status
+                            )}20`,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.statusText,
+                            { color: getStatusColor(consultation.status) },
+                          ]}
+                        >
+                          {getStatusLabel(consultation.status)}
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
+
               {/* Upcoming days list for selected type */}
               {upcomingDateKeys.length > 0 && (
                 <View style={styles.upcomingDaysSection}>
                   <Text style={styles.upcomingDaysTitle}>
-                    მომავალი დღეები ({scheduleFilter === "all" ? "ყველა ტიპი" : scheduleFilter === "video" ? "ვიდეო" : "ბინაზე"})
+                    მომავალი დღეები (
+                    {scheduleFilter === "all"
+                      ? "ყველა ტიპი"
+                      : scheduleFilter === "video"
+                      ? "ვიდეო"
+                      : "ბინაზე"}
+                    )
                   </Text>
                   {upcomingDateKeys.slice(0, 5).map((dateKey) => {
                     const items = groupedUpcomingByDate[dateKey] || [];
@@ -781,9 +834,7 @@ export default function DoctorDashboard() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                ხელმისაწვდომი საათები
-              </Text>
+              <Text style={styles.modalTitle}>ხელმისაწვდომი საათები</Text>
               <TouchableOpacity
                 style={styles.modalCloseButton}
                 onPress={() => setSlotsModalVisible(false)}

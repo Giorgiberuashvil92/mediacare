@@ -1,6 +1,6 @@
 import Feather from "@expo/vector-icons/Feather";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -31,15 +31,26 @@ interface ContactInfo {
 type TabType = "faq" | "contact";
 
 const HelpCenterScreen = () => {
-  const [activeTab, setActiveTab] = useState<TabType>("faq");
+  const params = useLocalSearchParams();
+  const [activeTab, setActiveTab] = useState<TabType>(
+    (params.tab as TabType) || "faq"
+  );
   const [expandedFAQ, setExpandedFAQ] = useState<number | null>(0);
   const [loading, setLoading] = useState(true);
   const [faqs, setFaqs] = useState<FAQItem[]>([]);
   const [contactInfo, setContactInfo] = useState<ContactInfo>({});
 
   useEffect(() => {
+    console.log("HelpCenterScreen mounted");
     loadHelpCenter();
   }, []);
+
+  // Update active tab when params change
+  useEffect(() => {
+    if (params.tab === "contact" || params.tab === "faq") {
+      setActiveTab(params.tab as TabType);
+    }
+  }, [params.tab]);
 
   const loadHelpCenter = async () => {
     try {
