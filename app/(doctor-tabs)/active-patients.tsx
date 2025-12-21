@@ -36,7 +36,7 @@ interface ActivePatient {
   appointmentDate: string;
   appointmentTime: string;
   status: "confirmed" | "in-progress" | "completed";
-  type: "video" | "home-visit";
+  type: "video" | "home-visit" | "followup";
   problem?: string;
   visitAddress?: string;
   // Form 100 status
@@ -68,20 +68,21 @@ export default function ActivePatientsScreen() {
 
   const loadPatients = useCallback(async () => {
     try {
-      // Get doctor's appointments from API (using dashboard endpoint with high limit)
       const response = await apiService.getDoctorDashboardAppointments(100);
       
       if (response.success && Array.isArray(response.data)) {
-        // Filter by type and relevant statuses (scheduled/confirmed, in-progress, completed)
         const relevantStatuses = ["scheduled", "confirmed", "in-progress", "completed"];
         const filtered = response.data
           .filter((apt: any) => {
-            const matchesType = apt.type === type;
+            // For followup appointments, check originalType instead of type
+            // For regular appointments, check type directly
+            const matchesType = apt.type === "followup" 
+              ? apt.originalType === type 
+              : apt.type === type;
             const isRelevant = relevantStatuses.includes(apt.status);
             return matchesType && isRelevant;
           })
           .map((apt: any): ActivePatient => {
-            // Log lab tests for debugging
             if (apt.laboratoryTests && apt.laboratoryTests.length > 0) {
               console.log('🧪 [ActivePatients] Lab tests for appointment:', apt._id || apt.id);
               console.log('🧪 [ActivePatients] Patient:', apt.patientName);
@@ -90,14 +91,6 @@ export default function ActivePatientsScreen() {
             
             // Extract lab tests from appointment
             const labTests: LabTest[] = (apt.laboratoryTests || []).map((test: any) => {
-              console.log('🧪 [ActivePatients] Processing test:', {
-                _id: test._id,
-                productId: test.productId,
-                productName: test.productName,
-                status: test.status,
-                resultFile: test.resultFile,
-                hasResultUrl: !!test.resultFile?.url,
-              });
               return {
                 id: test._id || test.productId,
                 productId: test.productId,
@@ -200,9 +193,14 @@ export default function ActivePatientsScreen() {
       <TouchableOpacity
         style={styles.patientCard}
         onPress={() => {
+          // If it's a followup consultation, navigate to patients (recurring) tab
+          // Otherwise, navigate to appointments (current) tab
+          const targetPath = item.type === "followup" 
+            ? "/(doctor-tabs)/patients" 
+            : "/(doctor-tabs)/appointments";
           router.push({
-            pathname: "/(doctor-tabs)/patient-details" as any,
-            params: { patientId: item.patientId },
+            pathname: targetPath as any,
+            params: { appointmentId: item.id },
           });
         }}
         activeOpacity={0.7}

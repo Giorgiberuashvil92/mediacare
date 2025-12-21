@@ -1272,7 +1272,32 @@ export class DoctorsService {
       appointments.length,
     );
 
-    // Format appointments for frontend
+    // First, find all follow-up appointment IDs (appointments that are referenced by other appointments' followUp.appointmentId)
+    // This needs to be done BEFORE fetching the main appointments list to ensure we catch all follow-ups
+    const allAppointments = await this.appointmentModel
+      .find({
+        doctorId: new mongoose.Types.ObjectId(doctorId),
+      })
+      .select('_id followUp')
+      .lean();
+
+    const followUpAppointmentIds = new Set<string>();
+    for (const apt of allAppointments) {
+      if (apt.followUp?.appointmentId) {
+        const followUpId = apt.followUp.appointmentId.toString();
+        const aptId = apt._id ? apt._id.toString() : String(apt._id);
+        followUpAppointmentIds.add(followUpId);
+        console.log(
+          `🔗 Found follow-up appointment: ${followUpId} referenced by appointment ${aptId}`,
+        );
+      }
+    }
+
+    console.log(
+      `📋 Total follow-up appointments found: ${followUpAppointmentIds.size}`,
+      Array.from(followUpAppointmentIds),
+    );
+
     console.log(
       '👨‍⚕️ DoctorsService.getDashboardAppointments - raw appointments sample:',
       appointments.length > 0
@@ -1289,9 +1314,22 @@ export class DoctorsService {
         : 'No appointments',
     );
 
-    const formattedAppointments = appointments.map((apt: any) =>
-      this.formatDashboardAppointment(apt),
-    );
+    const formattedAppointments = appointments.map((apt: any) => {
+      const formatted = this.formatDashboardAppointment(apt) as any;
+      // Check if this appointment is a follow-up (referenced by another appointment's followUp.appointmentId)
+      const aptId = apt._id ? apt._id.toString() : apt.id;
+      const isFollowUp = followUpAppointmentIds.has(aptId);
+      if (isFollowUp) {
+        console.log(
+          `✅ Marking appointment ${aptId} as followup (original type: ${apt.type})`,
+        );
+        // Store original type before changing to 'followup'
+        formatted.originalType =
+          apt.type === 'home-visit' ? 'home-visit' : 'video';
+        formatted.type = 'followup';
+      }
+      return formatted;
+    });
 
     console.log(
       '👨‍⚕️ DoctorsService.getDashboardAppointments - formatted appointments:',
@@ -1516,9 +1554,18 @@ export class DoctorsService {
 
     await appointment.save();
 
+    const formattedFollowUp = this.formatDashboardAppointment(
+      followUpAppointment,
+    ) as any;
+    // Mark as followup since this is a follow-up appointment
+    // Store original type before changing to 'followup'
+    formattedFollowUp.originalType =
+      appointmentType === AppointmentType.HOME_VISIT ? 'home-visit' : 'video';
+    formattedFollowUp.type = 'followup';
+
     return {
       success: true,
-      data: this.formatDashboardAppointment(followUpAppointment),
+      data: formattedFollowUp,
     };
   }
 

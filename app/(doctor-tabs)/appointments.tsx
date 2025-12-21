@@ -1,8 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import * as DocumentPicker from "expo-document-picker";
-import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -40,6 +40,7 @@ interface Medication {
 export default function DoctorAppointments() {
   const router = useRouter();
   const { user } = useAuth();
+  const params = useLocalSearchParams<{ appointmentId?: string }>();
   const FORM100_MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
   const createEmptyAppointmentData = () => ({
@@ -113,6 +114,9 @@ export default function DoctorAppointments() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Track if we've already opened an appointment from params to prevent reopening on refresh
+  const openedAppointmentIdRef = useRef<string | null>(null);
+
   // Appointment form state
   const [appointmentData, setAppointmentData] = useState(
     createEmptyAppointmentData
@@ -165,6 +169,27 @@ export default function DoctorAppointments() {
     fetchConsultations();
   }, []);
 
+  // Auto-open consultation details if appointmentId is provided
+  useEffect(() => {
+    if (params.appointmentId && consultations.length > 0) {
+      // Check if we've already opened this appointment to prevent reopening on refresh
+      if (openedAppointmentIdRef.current === params.appointmentId) {
+        return;
+      }
+      
+      const consultation = consultations.find(
+        (c) => c.id === params.appointmentId
+      );
+      if (consultation) {
+        openedAppointmentIdRef.current = params.appointmentId;
+        openAppointment(consultation);
+        // Remove appointmentId parameter after opening to prevent reopening
+        router.setParams({ appointmentId: undefined });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.appointmentId, consultations]);
+
   // Update current time every minute for countdown
   useEffect(() => {
     const interval = setInterval(() => {
@@ -209,9 +234,11 @@ export default function DoctorAppointments() {
     return diff > 0 && diff <= 30 * 60 * 1000; // 30 minutes
   };
 
-  // Filter consultations
+  // Filter consultations - exclude followup consultations (they should only appear in patients.tsx)
   const filteredConsultations = consultations
     .filter((consultation) => {
+      // Exclude followup consultations from current appointments page
+      const isNotFollowup = consultation.type !== "followup";
       const matchesStatus =
         filterStatus === "all" || consultation.status === filterStatus;
       const matchesType =
@@ -220,7 +247,7 @@ export default function DoctorAppointments() {
         .toLowerCase()
         .includes(searchQuery.toLowerCase());
 
-      return matchesStatus && matchesType && matchesSearch;
+      return isNotFollowup && matchesStatus && matchesType && matchesSearch;
     })
     .sort((a, b) => {
       // Sort by date and time - newest first
@@ -229,12 +256,13 @@ export default function DoctorAppointments() {
       return dateB - dateA; // Descending order (newest first)
     });
 
-  // Stats
+  // Stats - exclude followup consultations
+  const nonFollowupConsultations = consultations.filter((c) => c.type !== "followup");
   const stats = {
-    all: consultations.length,
-    completed: consultations.filter((c) => c.status === "completed").length,
-    scheduled: consultations.filter((c) => c.status === "scheduled").length,
-    inProgress: consultations.filter((c) => c.status === "in-progress").length,
+    all: nonFollowupConsultations.length,
+    completed: nonFollowupConsultations.filter((c) => c.status === "completed").length,
+    scheduled: nonFollowupConsultations.filter((c) => c.status === "scheduled").length,
+    inProgress: nonFollowupConsultations.filter((c) => c.status === "in-progress").length,
   };
 
   const updateConsultationState = (updated: Consultation) => {
@@ -2018,62 +2046,7 @@ export default function DoctorAppointments() {
                   </View>
                 )}
 
-                <View style={styles.formSection}>
-                  <Text style={styles.formLabel}>ფორმა 100 ფაილი</Text>
-                  {selectedConsultation?.form100?.pdfUrl ? (
-                    <TouchableOpacity
-                      style={styles.existingFileButton}
-                      onPress={() =>
-                        openForm100File(selectedConsultation.form100?.pdfUrl)
-                      }
-                    >
-                      <Ionicons
-                        name="document-text"
-                        size={18}
-                        color="#4C1D95"
-                      />
-                      <Text style={styles.existingFileText}>
-                        {selectedConsultation.form100?.fileName ||
-                          "არსებული ფაილის ნახვა"}
-                      </Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <Text style={styles.selectedFileHint}>
-                      ჯერ არ არის ატვირთული ფორმა 100
-                    </Text>
-                  )}
-                  <TouchableOpacity
-                    style={styles.uploadButton}
-                    onPress={handlePickForm100File}
-                  >
-                    <Ionicons
-                      name="cloud-upload-outline"
-                      size={18}
-                      color="#06B6D4"
-                    />
-                    <Text style={styles.uploadButtonText}>
-                      {form100File?.name || "აირჩიეთ PDF ან გამოსახულება"}
-                    </Text>
-                  </TouchableOpacity>
-                  {form100File ? (
-                    <>
-                      <Text style={styles.selectedFileHint}>
-                        ახალი ფაილი აიტვირთება შენახვისას
-                      </Text>
-                      <TouchableOpacity
-                        style={styles.removeFileButton}
-                        onPress={() => setForm100File(null)}
-                      >
-                        <Ionicons
-                          name="close-circle"
-                          size={16}
-                          color="#EF4444"
-                        />
-                        <Text style={styles.removeFileText}>ფაილის წაშლა</Text>
-                      </TouchableOpacity>
-                    </>
-                  ) : null}
-                </View>
+                
               </ScrollView>
 
               <View style={styles.modalFooter}>
@@ -2111,12 +2084,28 @@ export default function DoctorAppointments() {
             <Text style={styles.successModalMessage}>
               დანიშნულება წარმატებით დამატებულია
             </Text>
-            <TouchableOpacity
-              style={styles.successModalButton}
-              onPress={() => setShowSuccessModal(false)}
-            >
-              <Text style={styles.successModalButtonText}>კარგი</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: "row", gap: 12, width: "100%" }}>
+              <TouchableOpacity
+                style={[styles.successModalButton, { flex: 1 }]}
+                onPress={() => {
+                  setShowSuccessModal(false);
+                  // Navigate to patients tab (recurring appointments)
+                  router.push("/(doctor-tabs)/patients");
+                }}
+              >
+                <Text style={styles.successModalButtonText}>
+                  განმეორებითი
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.successModalButton, { flex: 1, backgroundColor: "#F3F4F6" }]}
+                onPress={() => setShowSuccessModal(false)}
+              >
+                <Text style={[styles.successModalButtonText, { color: "#6B7280" }]}>
+                  კარგი
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>

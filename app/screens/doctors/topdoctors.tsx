@@ -278,7 +278,7 @@ useEffect(() => {
                       })
                     }
                   >
-                    <Text style={styles.seeAllText}>See All</Text>
+                    <Text style={styles.seeAllText}>ყველას ნახვა</Text>
                   </TouchableOpacity>
                 </View>
 

@@ -1,8 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import * as DocumentPicker from "expo-document-picker";
-import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -40,6 +40,7 @@ interface Medication {
 export default function DoctorPatients() {
   const router = useRouter();
   const { user } = useAuth();
+  const params = useLocalSearchParams<{ appointmentId?: string }>();
   const FORM100_MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
   const createEmptyAppointmentData = () => ({
@@ -113,6 +114,9 @@ export default function DoctorPatients() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Track if we've already opened an appointment from params to prevent reopening on refresh
+  const openedAppointmentIdRef = useRef<string | null>(null);
+
   // Appointment form state
   const [appointmentData, setAppointmentData] = useState(
     createEmptyAppointmentData
@@ -165,6 +169,27 @@ export default function DoctorPatients() {
     fetchConsultations();
   }, []);
 
+  // Auto-open consultation details if appointmentId is provided
+  useEffect(() => {
+    if (params.appointmentId && consultations.length > 0) {
+      // Check if we've already opened this appointment to prevent reopening on refresh
+      if (openedAppointmentIdRef.current === params.appointmentId) {
+        return;
+      }
+      
+      const consultation = consultations.find(
+        (c) => c.id === params.appointmentId
+      );
+      if (consultation) {
+        openedAppointmentIdRef.current = params.appointmentId;
+        openAppointment(consultation);
+        // Remove appointmentId parameter after opening to prevent reopening
+        router.setParams({ appointmentId: undefined });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.appointmentId, consultations]);
+
   // Update current time every minute for countdown
   useEffect(() => {
     const interval = setInterval(() => {
@@ -216,8 +241,10 @@ export default function DoctorPatients() {
       const isFollowup = consultation.type === "followup";
       const matchesStatus =
         filterStatus === "all" || consultation.status === filterStatus;
+      // For followup consultations, check originalType for filtering
+      const originalType = (consultation as any).originalType || consultation.type;
       const matchesType =
-        filterType === "all" || consultation.type === filterType;
+        filterType === "all" || originalType === filterType;
       const matchesSearch = consultation.patientName
         .toLowerCase()
         .includes(searchQuery.toLowerCase());

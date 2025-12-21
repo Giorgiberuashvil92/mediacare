@@ -18,7 +18,7 @@ const SeeAll = ({ title, route }: SeeAllProps) => {
     <View style={styles.container}>
       <Text style={styles.title}>{title}</Text>
       <TouchableOpacity onPress={handleSeeAll}>
-        <Text style={styles.seeAll}>See All</Text>
+        <Text style={styles.seeAll}>ყველას ნახვა</Text>
       </TouchableOpacity>
     </View>
   );

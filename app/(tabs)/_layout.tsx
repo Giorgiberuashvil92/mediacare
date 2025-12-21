@@ -83,6 +83,13 @@ export default function TabLayout() {
           ),
         }}
       />
+      {/* Hidden screens - accessible via navigation but not shown in tab bar */}
+      <Tabs.Screen
+        name="medicine"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }
