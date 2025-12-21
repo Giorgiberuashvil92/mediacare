@@ -37,7 +37,7 @@ interface Medication {
   instructions?: string;
 }
 
-export default function DoctorPatients() {
+export default function DoctorAppointments() {
   const router = useRouter();
   const { user } = useAuth();
   const FORM100_MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -209,11 +209,9 @@ export default function DoctorPatients() {
     return diff > 0 && diff <= 30 * 60 * 1000; // 30 minutes
   };
 
-  // Filter consultations - only show followup consultations
+  // Filter consultations
   const filteredConsultations = consultations
     .filter((consultation) => {
-      // Only show followup consultations
-      const isFollowup = consultation.type === "followup";
       const matchesStatus =
         filterStatus === "all" || consultation.status === filterStatus;
       const matchesType =
@@ -222,7 +220,7 @@ export default function DoctorPatients() {
         .toLowerCase()
         .includes(searchQuery.toLowerCase());
 
-      return isFollowup && matchesStatus && matchesType && matchesSearch;
+      return matchesStatus && matchesType && matchesSearch;
     })
     .sort((a, b) => {
       // Sort by date and time - newest first
@@ -231,13 +229,12 @@ export default function DoctorPatients() {
       return dateB - dateA; // Descending order (newest first)
     });
 
-  // Stats - only count followup consultations
-  const followupConsultations = consultations.filter((c) => c.type === "followup");
+  // Stats
   const stats = {
-    all: followupConsultations.length,
-    completed: followupConsultations.filter((c) => c.status === "completed").length,
-    scheduled: followupConsultations.filter((c) => c.status === "scheduled").length,
-    inProgress: followupConsultations.filter((c) => c.status === "in-progress").length,
+    all: consultations.length,
+    completed: consultations.filter((c) => c.status === "completed").length,
+    scheduled: consultations.filter((c) => c.status === "scheduled").length,
+    inProgress: consultations.filter((c) => c.status === "in-progress").length,
   };
 
   const updateConsultationState = (updated: Consultation) => {
@@ -680,8 +677,8 @@ export default function DoctorPatients() {
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.title}>განმეორებითი კონსულტაციები</Text>
-            <Text style={styles.subtitle}>მხოლოდ განმეორებითი კონსულტაციები</Text>
+            <Text style={styles.title}>კონსულტაციები</Text>
+            <Text style={styles.subtitle}>ყველა დანიშვნა და კონსულტაცია</Text>
           </View>
         </View>
 

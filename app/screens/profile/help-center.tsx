@@ -1,7 +1,7 @@
 import Feather from "@expo/vector-icons/Feather";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Linking,
@@ -12,11 +12,13 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useAuth } from "../../contexts/AuthContext";
 import { apiService } from "../../services/api";
 
 interface FAQItem {
   question: string;
   answer: string;
+  role?: 'doctor' | 'patient'; // Role: doctor or patient
 }
 
 interface ContactInfo {
@@ -32,6 +34,7 @@ type TabType = "faq" | "contact";
 
 const HelpCenterScreen = () => {
   const params = useLocalSearchParams();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>(
     (params.tab as TabType) || "faq"
   );
@@ -40,10 +43,34 @@ const HelpCenterScreen = () => {
   const [faqs, setFaqs] = useState<FAQItem[]>([]);
   const [contactInfo, setContactInfo] = useState<ContactInfo>({});
 
+  const loadHelpCenter = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await apiService.getHelpCenter();
+      if (response.success && response.data) {
+        const allFaqs = response.data.faqs || [];
+        // Filter FAQs based on user role
+        const userRole = user?.role || 'patient';
+        const filteredFaqs = allFaqs.filter((faq: FAQItem) => {
+          // If FAQ has no role specified, show it to everyone
+          if (!faq.role) return true;
+          // Otherwise, show only FAQs matching user's role
+          return faq.role === userRole;
+        });
+        setFaqs(filteredFaqs);
+        setContactInfo(response.data.contactInfo || {});
+      }
+    } catch (error) {
+      console.error("Failed to load help center:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.role]);
+
   useEffect(() => {
     console.log("HelpCenterScreen mounted");
     loadHelpCenter();
-  }, []);
+  }, [loadHelpCenter]);
 
   // Update active tab when params change
   useEffect(() => {
@@ -52,20 +79,6 @@ const HelpCenterScreen = () => {
     }
   }, [params.tab]);
 
-  const loadHelpCenter = async () => {
-    try {
-      setLoading(true);
-      const response = await apiService.getHelpCenter();
-      if (response.success && response.data) {
-        setFaqs(response.data.faqs || []);
-        setContactInfo(response.data.contactInfo || {});
-      }
-    } catch (error) {
-      console.error("Failed to load help center:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleTabChange = (tab: TabType) => {
     setActiveTab(tab);

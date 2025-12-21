@@ -31,7 +31,7 @@ export default function DoctorTabsLayout() {
         <Tabs.Screen
           name="appointments"
           options={{
-            title: "ჯავშნები",
+            title: "მიმდინარე ",
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="calendar-outline" size={size} color={color} />
             ),
@@ -40,7 +40,7 @@ export default function DoctorTabsLayout() {
         <Tabs.Screen
           name="patients"
           options={{
-            title: "პაციენტები",
+            title: "განმეორებითი",
             tabBarIcon: ({ color, size }) => (
               <FontAwesome6 name="users" size={size} color={color} />
             ),

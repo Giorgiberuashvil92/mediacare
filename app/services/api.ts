@@ -1579,6 +1579,7 @@ class ApiService {
         answer: string;
         isActive?: boolean;
         order?: number;
+        role?: 'doctor' | 'patient'; // Role: doctor or patient
       }[];
       contactInfo: {
         phone?: string;

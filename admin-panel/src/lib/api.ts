@@ -800,7 +800,7 @@ class ApiService {
   }
 
   async getHelpCenterAdmin(): Promise<ApiResponse<{
-    faqs: { question: string; answer: string; isActive: boolean; order: number }[];
+    faqs: { question: string; answer: string; isActive: boolean; order: number; role?: 'doctor' | 'patient' }[];
     contactInfo: {
       phone?: string;
       whatsapp?: string;
@@ -820,7 +820,7 @@ class ApiService {
   }
 
   async updateHelpCenter(data: {
-    faqs?: { question: string; answer: string; isActive?: boolean; order?: number }[];
+    faqs?: { question: string; answer: string; isActive?: boolean; order?: number; role?: 'doctor' | 'patient' }[];
     contactInfo?: {
       phone?: string;
       whatsapp?: string;

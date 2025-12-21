@@ -16,6 +16,9 @@ export class FAQItem {
 
   @Prop({ default: 0 })
   order: number;
+
+  @Prop({ enum: ['doctor', 'patient'], required: false })
+  role?: 'doctor' | 'patient'; // Role: doctor or patient
 }
 
 // Contact Info subdocument

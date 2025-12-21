@@ -677,7 +677,7 @@ export default function DoctorAppointments() {
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.title}>კონსულტაციები</Text>
+            <Text style={styles.title}>მიმდინარე კონსულტაციები</Text>
             <Text style={styles.subtitle}>ყველა დანიშვნა და კონსულტაცია</Text>
           </View>
         </View>
@@ -703,6 +703,35 @@ export default function DoctorAppointments() {
 
         {/* Statistics */}
         <View style={styles.statsSection}>
+        <TouchableOpacity
+            style={[
+              styles.statCard,
+              filterStatus === "scheduled" && styles.statCardActive,
+            ]}
+            onPress={() => setFilterStatus("scheduled")}
+          >
+            <Ionicons
+              name="calendar"
+              size={24}
+              color={filterStatus === "scheduled" ? "#8B5CF6" : "#6B7280"}
+            />
+            <Text
+              style={[
+                styles.statValue,
+                filterStatus === "scheduled" && styles.statValueActive,
+              ]}
+            >
+              {stats.scheduled}
+            </Text>
+            <Text
+              style={[
+                styles.statLabel,
+                filterStatus === "scheduled" && styles.statLabelActive,
+              ]}
+            >
+              დანიშნული
+            </Text>
+          </TouchableOpacity>
           <TouchableOpacity
             style={[
               styles.statCard,
@@ -733,35 +762,7 @@ export default function DoctorAppointments() {
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[
-              styles.statCard,
-              filterStatus === "scheduled" && styles.statCardActive,
-            ]}
-            onPress={() => setFilterStatus("scheduled")}
-          >
-            <Ionicons
-              name="calendar"
-              size={24}
-              color={filterStatus === "scheduled" ? "#8B5CF6" : "#6B7280"}
-            />
-            <Text
-              style={[
-                styles.statValue,
-                filterStatus === "scheduled" && styles.statValueActive,
-              ]}
-            >
-              {stats.scheduled}
-            </Text>
-            <Text
-              style={[
-                styles.statLabel,
-                filterStatus === "scheduled" && styles.statLabelActive,
-              ]}
-            >
-              დანიშნული
-            </Text>
-          </TouchableOpacity>
+
         </View>
 
         {/* Type Filter */}

@@ -4,11 +4,14 @@ import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 import { apiService } from '@/lib/api';
 import { useEffect, useState } from 'react';
 
+type FAQRole = 'doctor' | 'patient';
+
 interface FAQItem {
   question: string;
   answer: string;
   isActive: boolean;
   order: number;
+  role?: FAQRole; // Role: doctor or patient
 }
 
 interface ContactInfo {
@@ -29,8 +32,9 @@ export default function HelpCenterPage() {
   const [submitting, setSubmitting] = useState(false);
   
   // New FAQ form
-  const [newFaq, setNewFaq] = useState({ question: '', answer: '' });
+  const [newFaq, setNewFaq] = useState({ question: '', answer: '', role: 'patient' as FAQRole });
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [filterRole, setFilterRole] = useState<'all' | FAQRole>('all');
 
   const loadHelpCenter = async () => {
     try {
@@ -85,7 +89,7 @@ export default function HelpCenterPage() {
       return;
     }
     setFaqs([...faqs, { ...newFaq, isActive: true, order: faqs.length }]);
-    setNewFaq({ question: '', answer: '' });
+    setNewFaq({ question: '', answer: '', role: 'patient' });
     setError(null);
   };
 
@@ -208,12 +212,58 @@ export default function HelpCenterPage() {
       {/* FAQ Section */}
       <div className="rounded-sm border border-stroke bg-white shadow-default">
         <div className="border-b border-stroke px-6.5 py-4">
-          <h3 className="font-medium text-black">FAQ - ხშირად დასმული კითხვები</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="font-medium text-black">FAQ - ხშირად დასმული კითხვები</h3>
+            {/* Role Filter */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setFilterRole('all')}
+                className={`rounded px-3 py-1.5 text-sm font-medium ${
+                  filterRole === 'all'
+                    ? 'bg-primary text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                ყველა
+              </button>
+              <button
+                onClick={() => setFilterRole('patient')}
+                className={`rounded px-3 py-1.5 text-sm font-medium ${
+                  filterRole === 'patient'
+                    ? 'bg-primary text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                პაციენტი
+              </button>
+              <button
+                onClick={() => setFilterRole('doctor')}
+                className={`rounded px-3 py-1.5 text-sm font-medium ${
+                  filterRole === 'doctor'
+                    ? 'bg-primary text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                ექიმი
+              </button>
+            </div>
+          </div>
         </div>
         <div className="p-6.5">
           {/* Add New FAQ */}
           <div className="mb-6 rounded-lg border border-stroke bg-gray-50 p-4">
             <h4 className="mb-4 font-medium text-black">ახალი კითხვის დამატება</h4>
+            <div className="mb-3">
+              <label className="mb-1.5 block text-sm text-gray-700">როლი</label>
+              <select
+                value={newFaq.role}
+                onChange={(e) => setNewFaq({ ...newFaq, role: e.target.value as FAQRole })}
+                className="w-full rounded border border-stroke bg-white px-4 py-2.5 text-black outline-none focus:border-primary"
+              >
+                <option value="patient">პაციენტი</option>
+                <option value="doctor">ექიმი</option>
+              </select>
+            </div>
             <div className="mb-3">
               <input
                 type="text"
@@ -241,17 +291,39 @@ export default function HelpCenterPage() {
           </div>
 
           {/* FAQ List */}
-          {faqs.length === 0 ? (
-            <p className="text-center text-gray-500">FAQ ჯერ არ არის დამატებული</p>
-          ) : (
-            <div className="space-y-4">
-              {faqs.map((faq, index) => (
+          {(() => {
+            const filteredFaqs = filterRole === 'all' 
+              ? faqs 
+              : faqs.filter(faq => faq.role === filterRole);
+            
+            return filteredFaqs.length === 0 ? (
+              <p className="text-center text-gray-500">
+                {filterRole === 'all' 
+                  ? 'FAQ ჯერ არ არის დამატებული' 
+                  : `${filterRole === 'doctor' ? 'ექიმის' : 'პაციენტის'} FAQ ჯერ არ არის დამატებული`}
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {filteredFaqs.map((faq, originalIndex) => {
+                  const index = faqs.findIndex(f => f === faq);
+                  return (
                 <div
                   key={index}
                   className={`rounded-lg border p-4 ${faq.isActive ? 'border-stroke bg-white' : 'border-red-200 bg-red-50'}`}
                 >
                   {editingIndex === index ? (
                     <div>
+                      <div className="mb-2">
+                        <label className="mb-1.5 block text-sm text-gray-700">როლი</label>
+                        <select
+                          value={faq.role || 'patient'}
+                          onChange={(e) => handleUpdateFaq(index, 'role', e.target.value as FAQRole)}
+                          className="w-full rounded border border-stroke px-3 py-2 text-black outline-none focus:border-primary"
+                        >
+                          <option value="patient">პაციენტი</option>
+                          <option value="doctor">ექიმი</option>
+                        </select>
+                      </div>
                       <input
                         type="text"
                         value={faq.question}
@@ -275,7 +347,18 @@ export default function HelpCenterPage() {
                     <div>
                       <div className="mb-2 flex items-start justify-between">
                         <div className="flex-1">
-                          <span className="mr-2 text-sm font-medium text-gray-500">#{index + 1}</span>
+                          <div className="mb-1 flex items-center gap-2">
+                            <span className="text-sm font-medium text-gray-500">#{index + 1}</span>
+                            {faq.role && (
+                              <span className={`rounded px-2 py-0.5 text-xs font-medium ${
+                                faq.role === 'doctor' 
+                                  ? 'bg-blue-100 text-blue-800' 
+                                  : 'bg-green-100 text-green-800'
+                              }`}>
+                                {faq.role === 'doctor' ? 'ექიმი' : 'პაციენტი'}
+                              </span>
+                            )}
+                          </div>
                           <span className="font-semibold text-black">{faq.question}</span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -320,9 +403,11 @@ export default function HelpCenterPage() {
                     </div>
                   )}
                 </div>
-              ))}
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       </div>
 

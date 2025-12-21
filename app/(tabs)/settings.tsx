@@ -246,7 +246,7 @@ export default function SettingsScreen() {
             <View style={styles.menuIconContainer}>
               <Ionicons name="help-circle" size={20} color="#06B6D4" />
             </View>
-            <Text style={styles.menuText}>დახმარების ცენტრი</Text>
+            <Text style={styles.menuText}>ხშირად დასმული კითხვები</Text>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity>
 

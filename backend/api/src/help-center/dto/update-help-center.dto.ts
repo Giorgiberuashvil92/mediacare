@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
+  IsEnum,
   IsNumber,
   IsOptional,
   IsString,
@@ -22,6 +23,10 @@ export class FAQItemDto {
   @IsNumber()
   @IsOptional()
   order?: number;
+
+  @IsEnum(['doctor', 'patient'])
+  @IsOptional()
+  role?: 'doctor' | 'patient'; // Role: doctor or patient
 }
 
 export class ContactInfoDto {
