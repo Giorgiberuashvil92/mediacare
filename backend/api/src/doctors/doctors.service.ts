@@ -299,6 +299,7 @@ export class DoctorsService {
       name: doctor.name,
       email: doctor.email,
       phone: doctor.phone,
+      idNumber: doctor.idNumber,
       specialization: doctor.specialization,
       rating: doctor.rating || 0,
       reviewCount: doctor.reviewCount || 0,
@@ -495,6 +496,7 @@ export class DoctorsService {
         name: doctor.name,
         email: doctor.email,
         phone: doctor.phone,
+        idNumber: doctor.idNumber,
         specialization: doctor.specialization,
         rating: doctor.rating || 0,
         reviewCount: doctor.reviewCount || 0,
@@ -929,6 +931,9 @@ export class DoctorsService {
     }
     if (updateDoctorDto.phone !== undefined) {
       doctor.phone = updateDoctorDto.phone;
+    }
+    if (updateDoctorDto.idNumber !== undefined) {
+      doctor.idNumber = updateDoctorDto.idNumber;
     }
     if (updateDoctorDto.specialization !== undefined) {
       doctor.specialization = updateDoctorDto.specialization;
