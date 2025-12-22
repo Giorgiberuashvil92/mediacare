@@ -13,6 +13,7 @@ interface Doctor {
   name: string;
   email?: string;
   phone?: string;
+  idNumber?: string;
   specialization: string;
   rating: number;
   reviewCount: number;
@@ -65,6 +66,7 @@ export default function DoctorsPage() {
             name: doctor.name || '',
             email: doctor.email,
             phone: doctor.phone,
+            idNumber: doctor.idNumber,
             specialization: doctor.specialization || '',
             rating: doctor.rating || 0,
             reviewCount: doctor.reviewCount || 0,
@@ -289,6 +291,12 @@ export default function DoctorsPage() {
                       <div className="flex items-center text-sm text-dark-4 dark:text-dark-6">
                         <span className="mr-2">📞</span>
                         {doctor.phone}
+                      </div>
+                    )}
+                    {doctor.idNumber && (
+                      <div className="flex items-center text-sm text-dark-4 dark:text-dark-6">
+                        <span className="mr-2">🆔</span>
+                        {doctor.idNumber}
                       </div>
                     )}
                     <div className="flex items-center text-sm text-dark-4 dark:text-dark-6">
