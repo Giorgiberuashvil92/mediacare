@@ -2,8 +2,9 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as DocumentPicker from "expo-document-picker";
 import { Image } from "expo-image";
+import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -70,6 +71,16 @@ export default function RegisterScreen() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [tosModalVisible, setTosModalVisible] = useState(false);
   const [hasAcceptedTos, setHasAcceptedTos] = useState(false);
+
+  const nameInputRef = useRef<TextInput>(null);
+  const emailInputRef = useRef<TextInput>(null);
+  const idNumberInputRef = useRef<TextInput>(null);
+  const phoneInputRef = useRef<TextInput>(null);
+  const degreesInputRef = useRef<TextInput>(null);
+  const experienceInputRef = useRef<TextInput>(null);
+  const locationInputRef = useRef<TextInput>(null);
+  const aboutInputRef = useRef<TextInput>(null);
+  const passwordInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     const loadSpecializations = async () => {
@@ -221,47 +232,58 @@ export default function RegisterScreen() {
 
   const handleProfileImagePick = async () => {
     try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ["image/jpeg", "image/jpg", "image/png", "image/webp"],
-        copyToCacheDirectory: true,
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (permission.status !== "granted") {
+      showToast.error("ფოტოებზე წვდომა საჭიროა", "შეცდომა");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+      selectionLimit: 1,
+    });
+
+    if (result.canceled) {
+      return;
+    }
+
+    const asset = result.assets[0];
+    const fileSize = asset.fileSize ?? 0;
+    const fileName = asset.fileName || "profile.jpg";
+    const fileType = asset.mimeType || "image/jpeg";
+
+    if (fileSize > 5 * 1024 * 1024) {
+      showToast.error("სურათის ზომა არ უნდა აღემატებოდეს 5MB-ს", "შეცდომა");
+      return;
+    }
+
+    setUploadingProfileImage(true);
+
+    if (apiService.isMockMode()) {
+      setProfileImage({
+        uri: asset.uri,
+        name: fileName,
+        type: fileType,
+        url: asset.uri,
+      });
+      showToast.success("სურათი აიტვირთა (mock)", "წარმატება");
+    } else {
+      const response = await apiService.uploadProfileImagePublic({
+        uri: asset.uri,
+        name: fileName,
+        type: fileType,
       });
 
-      if (result.canceled) {
-        return;
-      }
-
-      const file = result.assets[0];
-
-      if (file.size && file.size > 5 * 1024 * 1024) {
-        showToast.error("სურათის ზომა არ უნდა აღემატებოდეს 5MB-ს", "შეცდომა");
-        return;
-      }
-
-      setUploadingProfileImage(true);
-
-      if (apiService.isMockMode()) {
-        setProfileImage({
-          uri: file.uri,
-          name: file.name,
-          type: file.mimeType || "image/jpeg",
-          url: file.uri,
-        });
-        showToast.success("სურათი აიტვირთა (mock)", "წარმატება");
-      } else {
-        const response = await apiService.uploadProfileImagePublic({
-          uri: file.uri,
-          name: file.name,
-          type: file.mimeType || "image/jpeg",
-        });
-
-        setProfileImage({
-          uri: file.uri,
-          name: file.name,
-          type: file.mimeType || "image/jpeg",
-          url: response.url,
-        });
-        showToast.success("სურათი წარმატებით აიტვირთა", "წარმატება");
-      }
+      setProfileImage({
+        uri: asset.uri,
+        name: fileName,
+        type: fileType,
+        url: response.url,
+      });
+      showToast.success("სურათი წარმატებით აიტვირთა", "წარმატება");
+    }
     } catch (error) {
       console.error("Profile image pick error:", error);
       showToast.error(
@@ -274,7 +296,6 @@ export default function RegisterScreen() {
   };
 
   const handleSignup = async () => {
-    // Basic validation
     if (!name.trim() || !email.trim() || !password.trim() || !idNumber.trim()) {
       showToast.error(
         t("auth.register.validation.fillAll"),
@@ -417,7 +438,11 @@ export default function RegisterScreen() {
                 <Text style={styles.label}>
                   {t("auth.register.name.label")}
                 </Text>
-                <View style={styles.inputWrapper}>
+                <TouchableOpacity
+                  activeOpacity={1}
+                  style={styles.inputWrapper}
+                  onPress={() => nameInputRef.current?.focus()}
+                >
                   <Ionicons
                     name="person-outline"
                     size={20}
@@ -425,13 +450,14 @@ export default function RegisterScreen() {
                     style={styles.inputIcon}
                   />
                   <TextInput
+                    ref={nameInputRef}
                     style={styles.input}
                     placeholder={t("auth.register.name.placeholder")}
                     placeholderTextColor="#9CA3AF"
                     value={name}
                     onChangeText={setName}
                   />
-                </View>
+                </TouchableOpacity>
               </View>
 
               {/* Email Input */}
@@ -439,7 +465,11 @@ export default function RegisterScreen() {
                 <Text style={styles.label}>
                   {t("auth.register.email.label")}
                 </Text>
-                <View style={styles.inputWrapper}>
+                <TouchableOpacity
+                  activeOpacity={1}
+                  style={styles.inputWrapper}
+                  onPress={() => emailInputRef.current?.focus()}
+                >
                   <Ionicons
                     name="mail-outline"
                     size={20}
@@ -447,6 +477,7 @@ export default function RegisterScreen() {
                     style={styles.inputIcon}
                   />
                   <TextInput
+                    ref={emailInputRef}
                     style={styles.input}
                     placeholder={t("auth.register.email.placeholder")}
                     placeholderTextColor="#9CA3AF"
@@ -455,7 +486,7 @@ export default function RegisterScreen() {
                     keyboardType="email-address"
                     autoCapitalize="none"
                   />
-                </View>
+                </TouchableOpacity>
               </View>
 
               {/* ID Number Input */}
@@ -463,7 +494,11 @@ export default function RegisterScreen() {
                 <Text style={styles.label}>
                   {t("auth.register.idNumber.label")}
                 </Text>
-                <View style={styles.inputWrapper}>
+                <TouchableOpacity
+                  activeOpacity={1}
+                  style={styles.inputWrapper}
+                  onPress={() => idNumberInputRef.current?.focus()}
+                >
                   <Ionicons
                     name="card-outline"
                     size={20}
@@ -471,6 +506,7 @@ export default function RegisterScreen() {
                     style={styles.inputIcon}
                   />
                   <TextInput
+                    ref={idNumberInputRef}
                     style={styles.input}
                     placeholder={t("auth.register.idNumber.placeholder")}
                     placeholderTextColor="#9CA3AF"
@@ -478,7 +514,7 @@ export default function RegisterScreen() {
                     onChangeText={setIdNumber}
                     keyboardType="number-pad"
                   />
-                </View>
+                </TouchableOpacity>
               </View>
 
               {/* Phone Input */}
@@ -486,7 +522,11 @@ export default function RegisterScreen() {
                 <Text style={styles.label}>
                   {t("auth.register.phone.label")}
                 </Text>
-                <View style={styles.inputWrapper}>
+                <TouchableOpacity
+                  activeOpacity={1}
+                  style={styles.inputWrapper}
+                  onPress={() => phoneInputRef.current?.focus()}
+                >
                   <Ionicons
                     name="call-outline"
                     size={20}
@@ -494,6 +534,7 @@ export default function RegisterScreen() {
                     style={styles.inputIcon}
                   />
                   <TextInput
+                    ref={phoneInputRef}
                     style={styles.input}
                     placeholder={t("auth.register.phone.placeholder")}
                     placeholderTextColor="#9CA3AF"
@@ -501,7 +542,7 @@ export default function RegisterScreen() {
                     onChangeText={setPhone}
                     keyboardType="phone-pad"
                   />
-                </View>
+                </TouchableOpacity>
               </View>
 
               {/* Doctor specific fields */}
@@ -569,7 +610,11 @@ export default function RegisterScreen() {
                     <Text style={styles.label}>
                       {t("doctor.degrees.label")}
                     </Text>
-                    <View style={styles.inputWrapper}>
+                    <TouchableOpacity
+                      activeOpacity={1}
+                      style={styles.inputWrapper}
+                      onPress={() => degreesInputRef.current?.focus()}
+                    >
                       <Ionicons
                         name="school-outline"
                         size={20}
@@ -577,13 +622,14 @@ export default function RegisterScreen() {
                         style={styles.inputIcon}
                       />
                       <TextInput
+                        ref={degreesInputRef}
                         style={styles.input}
                         placeholder={t("doctor.degrees.placeholder")}
                         placeholderTextColor="#9CA3AF"
                         value={degrees}
                         onChangeText={setDegrees}
                       />
-                    </View>
+                    </TouchableOpacity>
                   </View>
 
                   {/* Experience Input */}
@@ -591,7 +637,11 @@ export default function RegisterScreen() {
                     <Text style={styles.label}>
                       {t("doctor.experience.label")}
                     </Text>
-                    <View style={styles.inputWrapper}>
+                    <TouchableOpacity
+                      activeOpacity={1}
+                      style={styles.inputWrapper}
+                      onPress={() => experienceInputRef.current?.focus()}
+                    >
                       <Ionicons
                         name="briefcase-outline"
                         size={20}
@@ -599,13 +649,14 @@ export default function RegisterScreen() {
                         style={styles.inputIcon}
                       />
                       <TextInput
+                        ref={experienceInputRef}
                         style={styles.input}
                         placeholder={t("doctor.experience.placeholder")}
                         placeholderTextColor="#9CA3AF"
                         value={experience}
                         onChangeText={setExperience}
                       />
-                    </View>
+                    </TouchableOpacity>
                   </View>
 
                   {/* Location Input */}
@@ -613,7 +664,11 @@ export default function RegisterScreen() {
                     <Text style={styles.label}>
                       {t("doctor.location.label")}
                     </Text>
-                    <View style={styles.inputWrapper}>
+                    <TouchableOpacity
+                      activeOpacity={1}
+                      style={styles.inputWrapper}
+                      onPress={() => locationInputRef.current?.focus()}
+                    >
                       <Ionicons
                         name="location-outline"
                         size={20}
@@ -621,13 +676,14 @@ export default function RegisterScreen() {
                         style={styles.inputIcon}
                       />
                       <TextInput
+                        ref={locationInputRef}
                         style={styles.input}
                         placeholder={t("doctor.location.placeholder")}
                         placeholderTextColor="#9CA3AF"
                         value={location}
                         onChangeText={setLocation}
                       />
-                    </View>
+                    </TouchableOpacity>
                   </View>
 
                   {/* Date of Birth */}
@@ -733,8 +789,13 @@ export default function RegisterScreen() {
                     <Text style={styles.label}>
                       {t("doctor.about.label")}
                     </Text>
-                    <View style={styles.textAreaWrapper}>
+                    <TouchableOpacity
+                      activeOpacity={1}
+                      style={styles.textAreaWrapper}
+                      onPress={() => aboutInputRef.current?.focus()}
+                    >
                       <TextInput
+                        ref={aboutInputRef}
                         style={styles.textArea}
                         placeholder={t("doctor.about.placeholder")}
                         placeholderTextColor="#9CA3AF"
@@ -744,7 +805,7 @@ export default function RegisterScreen() {
                         numberOfLines={4}
                         textAlignVertical="top"
                       />
-                    </View>
+                    </TouchableOpacity>
                   </View>
 
                   {/* License Document */}
@@ -881,7 +942,11 @@ export default function RegisterScreen() {
                 <Text style={styles.label}>
                   {t("auth.register.password.label")}
                 </Text>
-                <View style={styles.inputWrapper}>
+                <TouchableOpacity
+                  activeOpacity={1}
+                  style={styles.inputWrapper}
+                  onPress={() => passwordInputRef.current?.focus()}
+                >
                   <Ionicons
                     name="lock-closed-outline"
                     size={20}
@@ -889,6 +954,7 @@ export default function RegisterScreen() {
                     style={styles.inputIcon}
                   />
                   <TextInput
+                    ref={passwordInputRef}
                     style={styles.input}
                     secureTextEntry={!showPassword}
                     placeholder={t("auth.register.password.placeholder")}
@@ -906,7 +972,7 @@ export default function RegisterScreen() {
                       color="#9CA3AF"
                     />
                   </TouchableOpacity>
-                </View>
+                </TouchableOpacity>
               </View>
 
               {/* Terms of Service / Privacy Policy notice + checkbox */}
@@ -1113,9 +1179,7 @@ export default function RegisterScreen() {
                     {t("doctor.dob.modalCancel")}
                   </Text>
                 </TouchableOpacity>
-                <Text style={styles.datePickerModalTitle}>
-                  {t("doctor.dob.modalTitle")}
-                </Text>
+                
                 <TouchableOpacity
                   onPress={() => setShowDatePicker(false)}
                   style={styles.datePickerDoneButton}

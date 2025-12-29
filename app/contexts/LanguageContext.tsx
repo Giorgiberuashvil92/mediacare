@@ -125,7 +125,7 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "doctor.license.uploading": "ატვირთვა...",
     "doctor.specialization.modalTitle": "აირჩიე სპეციალიზაციები",
     "doctor.specialization.modalDone": "არჩევა დასრულებულია",
-    "doctor.dob.modalTitle": "აირჩიე დაბადების თარიღი",
+    "doctor.dob.modalTitle": "დაბადების თარიღი",
     "doctor.dob.modalCancel": "გაუქმება",
     "doctor.dob.modalDone": "დასრულება",
 
