@@ -1,12 +1,14 @@
 import { apiService } from "@/app/services/api";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import * as DocumentPicker from "expo-document-picker";
 import { Image } from "expo-image";
+import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,10 +16,10 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../../contexts/AuthContext";
-
 export default function EditProfileScreen() {
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -84,32 +86,25 @@ export default function EditProfileScreen() {
 
   const handleProfileImagePick = async () => {
     try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ["image/jpeg", "image/jpg", "image/png", "image/webp"],
-        copyToCacheDirectory: true,
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 1,
       });
 
-      if (result.canceled) {
-        return;
-      }
-
-      const file = result.assets[0];
-
-      if (file.size && file.size > 5 * 1024 * 1024) {
-        Alert.alert("შეცდომა", "სურათის ზომა არ უნდა აღემატებოდეს 5MB-ს");
-        return;
-      }
+      if (!result.assets || result.assets.length === 0) return;
 
       setUploadingProfileImage(true);
 
       if (apiService.isMockMode()) {
-        setProfileImage(file.uri);
+        setProfileImage(result.assets[0].uri);
         Alert.alert("წარმატება", "სურათი აიტვირთა (mock)");
       } else {
         const uploadResponse = await apiService.uploadProfileImagePublic({
-          uri: file.uri,
-          name: file.name,
-          type: file.mimeType || "image/jpeg",
+          uri: result.assets[0].uri,
+          name: result.assets[0].fileName || "profile.jpg",
+          type: result.assets[0].mimeType || "image/jpeg",
         });
 
         console.log("📸 [EditProfile] uploadResponse:", uploadResponse);
@@ -220,201 +215,224 @@ export default function EditProfileScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Ionicons name="chevron-back" size={20} color="#1F2937" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>პროფილი</Text>
-        <View style={styles.placeholder} />
-      </View>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
+      >
+        <View style={styles.flex}>
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+              <Ionicons name="chevron-back" size={20} color="#1F2937" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>პროფილი</Text>
+            <View style={styles.placeholder} />
+          </View>
 
-      {/* Content */}
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.formSection}>
-          {/* Profile Image */}
-          <View style={styles.profileImageSection}>
-            <View style={styles.profileImageContainer}>
-              {profileImage ? (
-                <Image
-                  source={{ uri: profileImage }}
-                  style={styles.profileImage}
-                  contentFit="cover"
-                />
-              ) : (
-                <View style={styles.profileImagePlaceholder}>
-                  <Ionicons name="person" size={48} color="#9CA3AF" />
+          {/* Content */}
+          <ScrollView
+            style={styles.content}
+            contentContainerStyle={[
+              styles.scrollContent,
+              { paddingBottom: (insets.bottom || 0) + 140 },
+            ]}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.formSection}>
+              {/* Profile Image */}
+              <View style={styles.profileImageSection}>
+                <View style={styles.profileImageContainer}>
+                  {profileImage ? (
+                    <Image
+                      source={{ uri: profileImage }}
+                      style={styles.profileImage}
+                      contentFit="cover"
+                    />
+                  ) : (
+                    <View style={styles.profileImagePlaceholder}>
+                      <Ionicons name="person" size={48} color="#9CA3AF" />
+                    </View>
+                  )}
+                  <TouchableOpacity
+                    style={styles.changePhotoButton}
+                    onPress={handleProfileImagePick}
+                    disabled={uploadingProfileImage}
+                  >
+                    {uploadingProfileImage ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Ionicons name="camera" size={20} color="#FFFFFF" />
+                    )}
+                  </TouchableOpacity>
                 </View>
-              )}
-              <TouchableOpacity
-                style={styles.changePhotoButton}
-                onPress={handleProfileImagePick}
-                disabled={uploadingProfileImage}
-              >
-                {uploadingProfileImage ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Ionicons name="camera" size={20} color="#FFFFFF" />
-                )}
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.profileImageHint}>
-              დააჭირეთ კამერას პროფილის ფოტოს შესაცვლელად
-            </Text>
-          </View>
+                <Text style={styles.profileImageHint}>
+                  დააჭირეთ კამერას პროფილის ფოტოს შესაცვლელად
+                </Text>
+              </View>
 
-          {/* Name */}
-          <View style={styles.formItem}>
-            <View style={styles.labelContainer}>
-              <Ionicons name="person-outline" size={20} color="#06B6D4" />
-              <Text style={styles.label}>სახელი</Text>
-            </View>
-            <View style={styles.input}>
-              <TextInput
-                style={styles.textInput}
-                placeholder="შეიყვანეთ სახელი"
-                placeholderTextColor="#9CA3AF"
-                value={name}
-                onChangeText={setName}
-              />
-            </View>
-          </View>
-
-          {/* Email */}
-          <View style={styles.formItem}>
-            <View style={styles.labelContainer}>
-              <Ionicons name="mail-outline" size={20} color="#06B6D4" />
-              <Text style={styles.label}>ელ. ფოსტა</Text>
-            </View>
-            <View style={styles.input}>
-              <TextInput
-                style={styles.textInput}
-                placeholder="შეიყვანეთ ელ. ფოსტა"
-                placeholderTextColor="#9CA3AF"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-            </View>
-          </View>
-
-          {/* Phone */}
-          <View style={styles.formItem}>
-            <View style={styles.labelContainer}>
-              <Ionicons name="call-outline" size={20} color="#06B6D4" />
-              <Text style={styles.label}>ტელეფონი</Text>
-            </View>
-            <View style={styles.input}>
-              <TextInput
-                style={styles.textInput}
-                placeholder="შეიყვანეთ ტელეფონი"
-                placeholderTextColor="#9CA3AF"
-                value={phone}
-                onChangeText={setPhone}
-                keyboardType="phone-pad"
-              />
-            </View>
-          </View>
-
-          {/* About */}
-          <View style={styles.formItem}>
-            <View style={styles.labelContainer}>
-              <Ionicons name="information-circle-outline" size={20} color="#06B6D4" />
-              <Text style={styles.label}>შესახებ</Text>
-            </View>
-            <View style={[styles.input, styles.textAreaInput]}>
-              <TextInput
-                style={[styles.textInput, styles.textArea]}
-                placeholder="დაწერეთ თქვენს შესახებ..."
-                placeholderTextColor="#9CA3AF"
-                value={about}
-                onChangeText={setAbout}
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-              />
-            </View>
-          </View>
-
-          {/* Doctor Specific Fields */}
-          {isDoctor && (
-            <>
-              {/* Consultation Fee */}
+              {/* Name */}
               <View style={styles.formItem}>
                 <View style={styles.labelContainer}>
-                  <Ionicons name="cash-outline" size={20} color="#10B981" />
-                  <Text style={styles.label}>კონსულტაციის ფასი (₾)</Text>
+                  <Ionicons name="person-outline" size={20} color="#06B6D4" />
+                  <Text style={styles.label}>სახელი</Text>
                 </View>
                 <View style={styles.input}>
                   <TextInput
                     style={styles.textInput}
-                    placeholder="მაგ: 50"
+                    placeholder="შეიყვანეთ სახელი"
                     placeholderTextColor="#9CA3AF"
-                    value={consultationFee}
-                    onChangeText={setConsultationFee}
-                    keyboardType="numeric"
+                    value={name}
+                    onChangeText={setName}
                   />
                 </View>
               </View>
 
-              {/* Experience */}
+              {/* Email */}
               <View style={styles.formItem}>
                 <View style={styles.labelContainer}>
-                  <Ionicons name="briefcase-outline" size={20} color="#8B5CF6" />
-                  <Text style={styles.label}>გამოცდილება</Text>
+                  <Ionicons name="mail-outline" size={20} color="#06B6D4" />
+                  <Text style={styles.label}>ელ. ფოსტა</Text>
                 </View>
                 <View style={styles.input}>
                   <TextInput
                     style={styles.textInput}
-                    placeholder="მაგ: 10 წელი"
+                    placeholder="შეიყვანეთ ელ. ფოსტა"
                     placeholderTextColor="#9CA3AF"
-                    value={experience}
-                    onChangeText={setExperience}
+                    value={email}
+                    onChangeText={setEmail}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
                   />
                 </View>
               </View>
 
-              {/* Location */}
+              {/* Phone */}
               <View style={styles.formItem}>
                 <View style={styles.labelContainer}>
-                  <Ionicons name="location-outline" size={20} color="#F59E0B" />
-                  <Text style={styles.label}>მისამართი</Text>
+                  <Ionicons name="call-outline" size={20} color="#06B6D4" />
+                  <Text style={styles.label}>ტელეფონი</Text>
                 </View>
                 <View style={styles.input}>
                   <TextInput
                     style={styles.textInput}
-                    placeholder="მაგ: თბილისი, ვაკე"
+                    placeholder="შეიყვანეთ ტელეფონი"
                     placeholderTextColor="#9CA3AF"
-                    value={location}
-                    onChangeText={setLocation}
+                    value={phone}
+                    onChangeText={setPhone}
+                    keyboardType="phone-pad"
                   />
                 </View>
               </View>
 
-              {/* Degrees */}
+              {/* About */}
               <View style={styles.formItem}>
                 <View style={styles.labelContainer}>
-                  <Ionicons name="school-outline" size={20} color="#06B6D4" />
-                  <Text style={styles.label}>კვალიფიკაცია / ხარისხი</Text>
+                  <Ionicons name="information-circle-outline" size={20} color="#06B6D4" />
+                  <Text style={styles.label}>შესახებ</Text>
                 </View>
                 <View style={[styles.input, styles.textAreaInput]}>
                   <TextInput
                     style={[styles.textInput, styles.textArea]}
-                    placeholder="მაგ: მედიცინის დოქტორი, თსსუ"
+                    placeholder="დაწერეთ თქვენს შესახებ..."
                     placeholderTextColor="#9CA3AF"
-                    value={degrees}
-                    onChangeText={setDegrees}
+                    value={about}
+                    onChangeText={setAbout}
                     multiline
-                    numberOfLines={3}
+                    numberOfLines={4}
                     textAlignVertical="top"
                   />
                 </View>
               </View>
-            </>
-          )}
 
-          {/* Save Button */}
+              {/* Doctor Specific Fields */}
+              {isDoctor && (
+                <>
+                  {/* Consultation Fee */}
+                  <View style={styles.formItem}>
+                    <View style={styles.labelContainer}>
+                      <Ionicons name="cash-outline" size={20} color="#10B981" />
+                      <Text style={styles.label}>კონსულტაციის ფასი (₾)</Text>
+                    </View>
+                    <View style={styles.input}>
+                      <TextInput
+                        style={styles.textInput}
+                        placeholder="მაგ: 50"
+                        placeholderTextColor="#9CA3AF"
+                        value={consultationFee}
+                        onChangeText={setConsultationFee}
+                        keyboardType="numeric"
+                      />
+                    </View>
+                  </View>
+
+                  {/* Experience */}
+                  <View style={styles.formItem}>
+                    <View style={styles.labelContainer}>
+                      <Ionicons name="briefcase-outline" size={20} color="#8B5CF6" />
+                      <Text style={styles.label}>გამოცდილება</Text>
+                    </View>
+                    <View style={styles.input}>
+                      <TextInput
+                        style={styles.textInput}
+                        placeholder="მაგ: 10 წელი"
+                        placeholderTextColor="#9CA3AF"
+                        value={experience}
+                        onChangeText={setExperience}
+                      />
+                    </View>
+                  </View>
+
+                  {/* Location */}
+                  <View style={styles.formItem}>
+                    <View style={styles.labelContainer}>
+                      <Ionicons name="location-outline" size={20} color="#F59E0B" />
+                      <Text style={styles.label}>მისამართი</Text>
+                    </View>
+                    <View style={styles.input}>
+                      <TextInput
+                        style={styles.textInput}
+                        placeholder="მაგ: თბილისი, ვაკე"
+                        placeholderTextColor="#9CA3AF"
+                        value={location}
+                        onChangeText={setLocation}
+                      />
+                    </View>
+                  </View>
+
+                  {/* Degrees */}
+                  <View style={styles.formItem}>
+                    <View style={styles.labelContainer}>
+                      <Ionicons name="school-outline" size={20} color="#06B6D4" />
+                      <Text style={styles.label}>კვალიფიკაცია / ხარისხი</Text>
+                    </View>
+                    <View style={[styles.input, styles.textAreaInput]}>
+                      <TextInput
+                        style={[styles.textInput, styles.textArea]}
+                        placeholder="მაგ: მედიცინის დოქტორი, თსსუ"
+                        placeholderTextColor="#9CA3AF"
+                        value={degrees}
+                        onChangeText={setDegrees}
+                        multiline
+                        numberOfLines={3}
+                        textAlignVertical="top"
+                      />
+                    </View>
+                  </View>
+                </>
+              )}
+            </View>
+          </ScrollView>
+        </View>
+
+        {/* Sticky Footer Save Button above keyboard */}
+        <View
+          style={[
+            styles.footer,
+            { paddingBottom: (insets.bottom || 12) + 12 },
+          ]}
+        >
           <TouchableOpacity
             style={[styles.saveButton, savingProfile && styles.saveButtonDisabled]}
             onPress={handleSave}
@@ -427,7 +445,7 @@ export default function EditProfileScreen() {
             )}
           </TouchableOpacity>
         </View>
-      </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -436,6 +454,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F8F9FA",
+  },
+  flex: {
+    flex: 1,
   },
   header: {
     flexDirection: "row",
@@ -480,6 +501,9 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 120,
   },
   formSection: {
     paddingHorizontal: 20,
@@ -526,6 +550,13 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins-Regular",
     color: "#6B7280",
     textAlign: "center",
+  },
+  footer: {
+    backgroundColor: "#FFFFFF",
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
+    paddingHorizontal: 20,
+    paddingTop: 12,
   },
   formItem: {
     marginBottom: 24,

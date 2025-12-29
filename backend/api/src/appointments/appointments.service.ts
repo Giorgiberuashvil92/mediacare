@@ -30,7 +30,6 @@ export class AppointmentsService {
     private availabilityModel: mongoose.Model<any>,
     private readonly cloudinaryService: CloudinaryService,
   ) {
-    // Clean up expired blocked appointments every minute
     setInterval(() => {
       this.cleanupExpiredBlocks();
     }, 60000); // 1 minute

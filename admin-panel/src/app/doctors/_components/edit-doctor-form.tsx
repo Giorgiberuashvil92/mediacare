@@ -25,7 +25,10 @@ export function EditDoctorForm({
     email: doctor.email || '',
     phone: doctor.phone || '',
     idNumber: doctor.idNumber || '',
-    specialization: doctor.specialization || '',
+    specializations: (doctor.specialization || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
     degrees: doctor.degrees || '',
     experience: doctor.experience || '',
     about: doctor.about || '',
@@ -72,6 +75,17 @@ export function EditDoctorForm({
     setFormData((prev) => ({ ...prev, [name]: checked }));
   };
 
+  const handleSpecializationToggle = (value: string) => {
+    setFormData((prev) => {
+      const exists = prev.specializations.includes(value);
+      const next = exists
+        ? prev.specializations.filter((v) => v !== value)
+        : [...prev.specializations, value];
+      return { ...prev, specializations: next };
+    });
+    setError(null);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -83,7 +97,11 @@ export function EditDoctorForm({
         email: formData.email.trim(),
         phone: formData.phone.trim() || undefined,
         idNumber: formData.idNumber.trim() || undefined,
-        specialization: formData.specialization.trim() || undefined,
+        specialization:
+          formData.specializations
+            .map((s) => s.trim())
+            .filter(Boolean)
+            .join(', ') || undefined,
         degrees: formData.degrees.trim() || undefined,
         experience: formData.experience.trim() || undefined,
         about: formData.about.trim() || undefined,
@@ -206,7 +224,7 @@ export function EditDoctorForm({
           <div className="mb-5.5 flex flex-col gap-5.5 sm:flex-row">
             <div className="w-full sm:w-1/2">
               <label className="mb-2.5 block text-sm font-medium text-dark dark:text-white">
-                სპეციალიზაცია
+                სპეციალიზაცია (მრავალი არჩევანი)
               </label>
               {loadingSpecializations ? (
                 <div className="flex items-center gap-2">
@@ -218,26 +236,36 @@ export function EditDoctorForm({
                   type="text"
                   name="specialization"
                   label="სპეციალიზაცია"
-                  placeholder="შეიყვანე სპეციალიზაცია"
-                  value={formData.specialization}
-                  handleChange={handleChange}
+                  placeholder="სპეციალიზაციები არ არის ხელმისაწვდომი"
+                  value=""
+                  handleChange={() => {}}
                   height="sm"
+                  disabled
                 />
               ) : (
-                <select
-                  name="specialization"
-                  value={formData.specialization}
-                  onChange={handleChange}
-                  className="w-full rounded-lg border border-stroke bg-transparent px-5 py-3 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
-                >
-                  <option value="">აირჩიე სპეციალიზაცია</option>
-                  {specializations.map((spec) => (
-                    <option key={spec._id} value={spec.name}>
-                      {spec.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {specializations.map((spec) => {
+                    const checked = formData.specializations.includes(spec.name);
+                    return (
+                      <label
+                        key={spec._id}
+                        className="flex items-center gap-2 rounded-lg border border-stroke px-3 py-2 text-sm text-dark transition hover:border-primary dark:border-dark-3 dark:text-white dark:hover:border-primary"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => handleSpecializationToggle(spec.name)}
+                          className="h-4 w-4 rounded border-stroke text-primary focus:ring-primary dark:border-dark-3"
+                        />
+                        <span>{spec.name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
               )}
+              <p className="mt-2 text-xs text-dark-4 dark:text-dark-6">
+                მონიშნე ერთზე მეტი საჭიროების შემთხვევაში.
+              </p>
             </div>
 
             <InputGroup

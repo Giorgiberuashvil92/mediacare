@@ -19,7 +19,7 @@ export function AddDoctorForm({ onSuccess, onCancel }: AddDoctorFormProps) {
     email: '',
     password: '',
     phone: '',
-    specialization: '',
+    specializations: [] as string[],
     degrees: '',
     experience: '',
     about: '',
@@ -66,6 +66,17 @@ export function AddDoctorForm({ onSuccess, onCancel }: AddDoctorFormProps) {
     setError(null);
   };
 
+  const handleSpecializationToggle = (value: string) => {
+    setFormData((prev) => {
+      const exists = prev.specializations.includes(value);
+      const next = exists
+        ? prev.specializations.filter((v) => v !== value)
+        : [...prev.specializations, value];
+      return { ...prev, specializations: next };
+    });
+    setError(null);
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     setLicenseFile(file ?? null);
@@ -82,6 +93,11 @@ export function AddDoctorForm({ onSuccess, onCancel }: AddDoctorFormProps) {
     e.preventDefault();
     setError(null);
     setSuccess(null);
+
+    if (formData.specializations.length === 0) {
+      setError('აირჩიე მინიმუმ ერთი სპეციალიზაცია.');
+      return;
+    }
 
     if (!licenseFile) {
       setError('გთხოვთ ატვირთოთ ექიმის სამედიცინო ლიცენზია (PDF).');
@@ -114,7 +130,7 @@ export function AddDoctorForm({ onSuccess, onCancel }: AddDoctorFormProps) {
         phone: formData.phone || undefined,
         dateOfBirth: formData.dateOfBirth || undefined,
         gender: formData.gender,
-        specialization: formData.specialization,
+        specialization: formData.specializations.join(', ') || undefined,
         degrees: formData.degrees || undefined,
         experience: formData.experience || undefined,
         about: formData.about || undefined,
@@ -137,7 +153,7 @@ export function AddDoctorForm({ onSuccess, onCancel }: AddDoctorFormProps) {
           email: '',
           password: '',
           phone: '',
-          specialization: '',
+          specializations: [],
           degrees: '',
           experience: '',
           about: '',
@@ -240,34 +256,40 @@ export function AddDoctorForm({ onSuccess, onCancel }: AddDoctorFormProps) {
           <div className="mb-5.5 flex flex-col gap-5.5 sm:flex-row">
             <div className="w-full sm:w-1/2">
               <label className="mb-2.5 block text-sm font-medium text-dark dark:text-white">
-                სპეციალიზაცია
+                სპეციალიზაცია (აირჩიე ერთზე მეტი)
               </label>
               {isLoadingSpecializations ? (
                 <div className="rounded-lg border border-dashed border-stroke px-5 py-3 text-sm text-dark-4 dark:border-dark-3 dark:text-dark-6">
                   სპეციალიზაციები იტვირთება...
                 </div>
               ) : activeSpecializations.length > 0 ? (
-                <select
-                  name="specialization"
-                  value={formData.specialization}
-                  onChange={handleChange}
-                  required
-                  className="w-full rounded-lg border border-stroke bg-transparent px-5 py-3 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
-                >
-                  <option value="" disabled>
-                    აირჩიე სპეციალიზაცია
-                  </option>
-                  {activeSpecializations.map((spec) => (
-                    <option key={spec._id} value={spec.name}>
-                      {spec.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {activeSpecializations.map((spec) => {
+                    const checked = formData.specializations.includes(spec.name);
+                    return (
+                      <label
+                        key={spec._id}
+                        className="flex items-center gap-2 rounded-lg border border-stroke px-3 py-2 text-sm text-dark transition hover:border-primary dark:border-dark-3 dark:text-white dark:hover:border-primary"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => handleSpecializationToggle(spec.name)}
+                          className="h-4 w-4 rounded border-stroke text-primary focus:ring-primary dark:border-dark-3"
+                        />
+                        <span>{spec.name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
               ) : (
                 <div className="rounded-lg border border-dashed border-stroke px-5 py-3 text-sm text-dark-4 dark:border-dark-3 dark:text-dark-6">
                   სპეციალიზაციები არ არის ხელმისაწვდომი. ჯერ შექმენი ერთი.
                 </div>
               )}
+              <p className="mt-2 text-xs text-dark-4 dark:text-dark-6">
+                მინიმუმ ერთი მაინც მონიშნე.
+              </p>
             </div>
 
             <InputGroup

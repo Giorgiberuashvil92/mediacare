@@ -17,7 +17,6 @@ export default function SplashScreen() {
   AsyncStorage.removeItem("hasCompletedOnboarding");
   const checkInitialRoute = async () => {
     try {
-      // დაველოდოთ AuthContext-ის ჩატვირთვას
       if (authLoading) {
         return;
       }

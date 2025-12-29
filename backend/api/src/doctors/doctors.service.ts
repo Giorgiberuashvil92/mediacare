@@ -867,7 +867,7 @@ export class DoctorsService {
         );
         if (conflicts.length > 0) {
           throw new BadRequestException(
-            `Conflicting time slots with ${otherType} availability: ${conflicts.join(
+            `არჩეული დროები უკვე გამოყენებულია ${otherType} ტიპის ჯავშნების შესახებ: ${conflicts.join(
               ', ',
             )}`,
           );

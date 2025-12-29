@@ -24,7 +24,7 @@ const QUICK_SERVICES = [
     description: "ანალიზები და კვლევები",
     icon: "flask",
     gradient: ["#8B5CF6", "#7C3AED"],
-    onPress: () => router.push("/(tabs)/medicine"),
+    onPress: () => router.push("/(tabs)/lab"),
   },
   {
     id: "home-visit",
