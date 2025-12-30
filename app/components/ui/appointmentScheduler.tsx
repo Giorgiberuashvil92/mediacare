@@ -138,8 +138,10 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
       const diffMs = slotDateTime.getTime() - now.getTime();
       const diffHours = diffMs / (1000 * 60 * 60);
       
-      // Must be at least 2 hours in advance
-      return diffHours >= 2;
+      // ონლაინის შემთხვევაში: 2 საათით ადრე
+      // ბინაზე ვიზიტისას: 12 საათით ადრე
+      const requiredHours = mode === "video" ? 2 : 12;
+      return diffHours >= requiredHours;
     } catch (error) {
       console.error("Error calculating time difference:", error);
       return false;
@@ -149,11 +151,12 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
   const handleTimeSelect = (time: string) => {
     if (!selectedDate) return;
     
-    // Check if booking is allowed (at least 2 hours in advance)
+    // Check if booking is allowed (at least 2 hours for video, 12 hours for home-visit)
     if (!canBookTimeSlot(selectedDate, time)) {
+      const requiredHours = mode === "video" ? 2 : 12;
       Alert.alert(
         "დრო არ არის ხელმისაწვდომი",
-        "ჯავშნის გაკეთება შესაძლებელია მინიმუმ 2 საათით ადრე. გთხოვთ აირჩიოთ სხვა დრო."
+        `ჯავშნის გაკეთება შესაძლებელია მინიმუმ ${requiredHours} საათით ადრე. გთხოვთ აირჩიოთ სხვა დრო.`
       );
       return;
     }
@@ -433,11 +436,12 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
         onPress={async () => {
           if (!selectedDate || !selectedTime || !doctorId) return;
 
-          // Validate: booking must be at least 2 hours in advance
+          // Validate: booking must be at least 2 hours for video, 12 hours for home-visit
           if (!canBookTimeSlot(selectedDate, selectedTime)) {
+            const requiredHours = mode === "video" ? 2 : 12;
             Alert.alert(
               "დრო არ არის ხელმისაწვდომი",
-              "ჯავშნის გაკეთება შესაძლებელია მინიმუმ 2 საათით ადრე. გთხოვთ აირჩიოთ სხვა დრო."
+              `ჯავშნის გაკეთება შესაძლებელია მინიმუმ ${requiredHours} საათით ადრე. გთხოვთ აირჩიოთ სხვა დრო.`
             );
             return;
           }

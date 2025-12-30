@@ -12,6 +12,12 @@ export enum AppointmentStatus {
   BLOCKED = 'blocked', // დროებით დაბლოკილი time slot
 }
 
+export enum AppointmentSubStatus {
+  SCHEDULED = 'scheduled', // დანიშნული
+  CONDUCTED = 'conducted', // ჩატარებული
+  DOCUMENTS_PENDING = 'documents-pending', // დოკუმენტებია ასატვირთი
+}
+
 export enum PaymentStatus {
   PENDING = 'pending',
   PAID = 'paid',
@@ -45,6 +51,21 @@ export class Appointment {
 
   @Prop({ enum: AppointmentStatus, default: AppointmentStatus.PENDING })
   status: AppointmentStatus;
+
+  @Prop({ enum: AppointmentSubStatus })
+  subStatus?: AppointmentSubStatus; // ქვე-სტატუსი დანიშნული კონსულტაციებისთვის
+
+  @Prop()
+  patientJoinedAt?: Date; // პაციენტის შესვლის დრო ვიდეო კონსულტაციაში
+
+  @Prop()
+  doctorJoinedAt?: Date; // ექიმის შესვლის დრო ვიდეო კონსულტაციაში
+
+  @Prop()
+  completedAt?: Date; // კონსულტაციის დასრულების დრო (ორივე მხარე leave call-ს რომ დააჭერს)
+
+  @Prop()
+  homeVisitCompletedAt?: Date; // ბინაზე კონსულტაციის დასრულების დრო (პაციენტის მიერ)
 
   @Prop({ required: true })
   consultationFee: number;
@@ -212,8 +233,63 @@ export class Appointment {
     };
   }[];
 
+  @Prop({
+    type: [
+      {
+        productId: { type: String, required: true },
+        productName: { type: String, required: true },
+        notes: String,
+        assignedAt: { type: Date, default: Date.now },
+        clinicId: String,
+        clinicName: String,
+        booked: { type: Boolean, default: false },
+        resultFile: { type: mongoose.Schema.Types.Mixed },
+      },
+    ],
+    default: [],
+    _id: false,
+  })
+  instrumentalTests?: {
+    productId: string;
+    productName: string;
+    notes?: string;
+    assignedAt?: Date;
+    clinicId?: string;
+    clinicName?: string;
+    booked?: boolean;
+    resultFile?: any;
+  }[];
+
   @Prop()
   expiresAt?: Date; // დროებით blocked appointments-ებისთვის
+
+  @Prop({
+    type: {
+      requestedBy: { type: String, enum: ['doctor', 'patient'] },
+      requestedDate: Date,
+      requestedTime: String,
+      reason: String,
+      status: {
+        type: String,
+        enum: ['pending', 'approved', 'rejected'],
+        default: 'pending',
+      },
+      requestedAt: { type: Date, default: Date.now },
+      respondedAt: Date,
+      respondedBy: String,
+    },
+    _id: false,
+  })
+  rescheduleRequest?: {
+    requestedBy?: 'doctor' | 'patient';
+    requestedDate?: Date;
+    requestedTime?: string;
+    reason?: string;
+    status?: 'pending' | 'approved' | 'rejected';
+    requestedAt?: Date;
+    respondedAt?: Date;
+    respondedBy?: string;
+  };
 
   @Prop()
   createdAt?: Date;

@@ -16,8 +16,10 @@ import { PatientGuard } from '../auth/guards/patient.guard';
 import { CreateFollowUpDto } from '../doctors/dto/create-follow-up.dto';
 import { DoctorGuard } from '../doctors/guards/doctor.guard';
 import { AppointmentsService } from './appointments.service';
+import { AssignInstrumentalTestsDto } from './dto/assign-instrumental-tests.dto';
 import { AssignLaboratoryTestsDto } from './dto/assign-laboratory-tests.dto';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
+import { RescheduleRequestDto } from './dto/reschedule-request.dto';
 
 @Controller('appointments')
 export class AppointmentsController {
@@ -115,7 +117,56 @@ export class AppointmentsController {
     );
   }
 
-  // Reschedule appointment (admin, doctor, or patient can reschedule)
+  // Cancel appointment (patient can cancel)
+  // IMPORTANT: This must come BEFORE @Get(':id') to avoid route conflicts
+  @Put(':id/cancel')
+  @UseGuards(JwtAuthGuard, PatientGuard)
+  async cancelAppointment(
+    @CurrentUser() user: { sub: string },
+    @Param('id') appointmentId: string,
+  ) {
+    return this.appointmentsService.cancelAppointment(user.sub, appointmentId);
+  }
+
+  // Request reschedule (doctor or patient can request)
+  // IMPORTANT: This must come BEFORE @Get(':id') to avoid route conflicts
+  @Post(':id/reschedule-request')
+  @UseGuards(JwtAuthGuard)
+  async requestReschedule(
+    @CurrentUser() user: { sub: string },
+    @Param('id') appointmentId: string,
+    @Body() dto: RescheduleRequestDto,
+  ) {
+    return this.appointmentsService.requestReschedule(
+      user.sub,
+      appointmentId,
+      dto.newDate,
+      dto.newTime,
+      dto.reason,
+    );
+  }
+
+  // Approve reschedule request
+  @Put(':id/reschedule-approve')
+  @UseGuards(JwtAuthGuard)
+  async approveReschedule(
+    @CurrentUser() user: { sub: string },
+    @Param('id') appointmentId: string,
+  ) {
+    return this.appointmentsService.approveReschedule(user.sub, appointmentId);
+  }
+
+  // Reject reschedule request
+  @Put(':id/reschedule-reject')
+  @UseGuards(JwtAuthGuard)
+  async rejectReschedule(
+    @CurrentUser() user: { sub: string },
+    @Param('id') appointmentId: string,
+  ) {
+    return this.appointmentsService.rejectReschedule(user.sub, appointmentId);
+  }
+
+  // Reschedule appointment (admin, doctor, or patient can reschedule - legacy, kept for backward compatibility)
   // IMPORTANT: This must come BEFORE @Get(':id') to avoid route conflicts
   @Put(':id/reschedule')
   @UseGuards(JwtAuthGuard)
@@ -159,6 +210,36 @@ export class AppointmentsController {
       user.sub,
       appointmentId,
       dto.tests,
+    );
+  }
+
+  @Put(':id/instrumental-tests')
+  @UseGuards(JwtAuthGuard, DoctorGuard)
+  async assignInstrumentalTests(
+    @CurrentUser() user: { sub: string },
+    @Param('id') appointmentId: string,
+    @Body() dto: AssignInstrumentalTestsDto,
+  ) {
+    return this.appointmentsService.assignInstrumentalTests(
+      user.sub,
+      appointmentId,
+      dto.tests,
+    );
+  }
+
+  // Patient books instrumental test by selecting clinic
+  // IMPORTANT: This must come BEFORE @Put(':id/instrumental-tests') to avoid route conflicts
+  @Put(':id/instrumental-tests/book')
+  @UseGuards(JwtAuthGuard, PatientGuard)
+  async bookInstrumentalTest(
+    @CurrentUser() user: { sub: string },
+    @Param('id') appointmentId: string,
+    @Body() body: { productId: string; clinicId: string; clinicName: string },
+  ) {
+    return this.appointmentsService.bookInstrumentalTest(
+      user.sub,
+      appointmentId,
+      body,
     );
   }
 
@@ -206,6 +287,39 @@ export class AppointmentsController {
     @Param('id') appointmentId: string,
   ) {
     return this.appointmentsService.generateAgoraToken(user.sub, appointmentId);
+  }
+
+  // Join video call (track when patient/doctor joins)
+  @Post(':id/join')
+  @UseGuards(JwtAuthGuard)
+  async joinCall(
+    @CurrentUser() user: { sub: string },
+    @Param('id') appointmentId: string,
+  ) {
+    return this.appointmentsService.joinCall(user.sub, appointmentId);
+  }
+
+  // Complete video consultation (after both parties leave)
+  @Post(':id/complete')
+  @UseGuards(JwtAuthGuard, DoctorGuard)
+  async completeConsultation(
+    @CurrentUser() user: { sub: string },
+    @Param('id') appointmentId: string,
+  ) {
+    return this.appointmentsService.completeConsultation(
+      user.sub,
+      appointmentId,
+    );
+  }
+
+  // Mark home visit as completed (by patient)
+  @Post(':id/home-visit-complete')
+  @UseGuards(JwtAuthGuard, PatientGuard)
+  async completeHomeVisit(
+    @CurrentUser() user: { sub: string },
+    @Param('id') appointmentId: string,
+  ) {
+    return this.appointmentsService.completeHomeVisit(user.sub, appointmentId);
   }
 
   // ორივეს შეუძლია ნახოს appointment-ის დეტალები

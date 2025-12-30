@@ -5,7 +5,7 @@ export const NAV_DATA = [
     label: "MEDICARE ADMIN",
     items: [
       {
-        title: "Dashboard",
+        title: "მთავარი",
         icon: Icons.HomeIcon,
         items: [
           {
@@ -15,25 +15,25 @@ export const NAV_DATA = [
         ],
       },
       {
-        title: "Users",
+        title: "მომხმარებლები",
         url: "/users",
         icon: Icons.User,
         items: [],
       },
       {
-        title: "Doctors",
+        title: "ექიმები",
         url: "/doctors",
         icon: Icons.User,
         items: [],
       },
       {
-        title: "Appointments",
+        title: "ჯავშნები",
         url: "/appointments",
         icon: Icons.Calendar,
         items: [],
       },
       {
-        title: "Specializations",
+        title: "სპეციალიზაციები",
         url: "/specializations",
         icon: Icons.FourCircle,
         items: [],
@@ -45,7 +45,7 @@ export const NAV_DATA = [
         items: [],
       },
       {
-        title: "Laboratory",
+        title: "ლაბორატორია",
         url: "/medicine-shop",
         icon: Icons.FourCircle,
         items: [],
@@ -63,7 +63,7 @@ export const NAV_DATA = [
         items: [],
       },
       {
-        title: "Settings",
+        title: "პარამეტრები",
         url: "/settings",
         icon: Icons.Alphabet,
         items: [],

@@ -104,6 +104,22 @@ export interface Consultation {
   form100?: Form100Info;
   patientDetails?: PatientDetails; // Full patient details for Form 100 generation
   laboratoryTests?: any[]; // Laboratory tests assigned to this appointment
+  instrumentalTests?: any[]; // Instrumental tests assigned to this appointment
+  rescheduleRequest?: {
+    requestedBy?: 'doctor' | 'patient';
+    requestedDate?: string;
+    requestedTime?: string;
+    reason?: string;
+    status?: 'pending' | 'approved' | 'rejected';
+    requestedAt?: string;
+    respondedAt?: string;
+    respondedBy?: string;
+  };
+  subStatus?: 'scheduled' | 'conducted' | 'documents-pending';
+  patientJoinedAt?: string;
+  doctorJoinedAt?: string;
+  completedAt?: string;
+  homeVisitCompletedAt?: string;
 }
 
 export interface Schedule {
@@ -503,7 +519,7 @@ export const getConsultationTypeLabel = (
 export const getStatusLabel = (status: Consultation["status"]): string => {
   switch (status) {
     case "completed":
-      return "შესრულებული";
+      return "დასრულებული";
     case "scheduled":
       return "დანიშნული";
     case "cancelled":

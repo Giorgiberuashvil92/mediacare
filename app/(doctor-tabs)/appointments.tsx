@@ -79,6 +79,15 @@ export default function DoctorAppointments() {
   const [loadingFollowUpAvailability, setLoadingFollowUpAvailability] =
     useState(false);
 
+  // Reschedule states
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [rescheduleLoading, setRescheduleLoading] = useState(false);
+  const [selectedRescheduleDate, setSelectedRescheduleDate] = useState<string | null>(null);
+  const [selectedRescheduleTime, setSelectedRescheduleTime] = useState<string | null>(null);
+  const [rescheduleReason, setRescheduleReason] = useState("");
+  const [availableSlots, setAvailableSlots] = useState<{ date: string; time: string }[]>([]);
+  const [loadingAvailability, setLoadingAvailability] = useState(false);
+
   // Laboratory tests state
   const [laboratoryProducts, setLaboratoryProducts] = useState<ShopProduct[]>(
     []
@@ -101,12 +110,20 @@ export default function DoctorAppointments() {
       };
     }[]
   >([]);
+  const [selectedInstrumentalTests, setSelectedInstrumentalTests] = useState<
+    {
+      productId: string;
+      productName: string;
+      notes?: string;
+    }[]
+  >([]);
   const [loadingLaboratoryData, setLoadingLaboratoryData] = useState(false);
 
   const resetAppointmentForm = () => {
     setAppointmentData(createEmptyAppointmentData());
     setForm100File(null);
     setSelectedLaboratoryTests([]);
+    setSelectedInstrumentalTests([]);
   };
   const [currentTime, setCurrentTime] = useState(new Date());
   const [consultations, setConsultations] = useState<Consultation[]>([]);
@@ -234,6 +251,19 @@ export default function DoctorAppointments() {
     return diff > 0 && diff <= 30 * 60 * 1000; // 30 minutes
   };
 
+  // Check if join button should be active (5 minutes before, active for 30 minutes)
+  const isJoinButtonActive = (consultation: Consultation) => {
+    if (consultation.status !== "scheduled" && consultation.status !== "in-progress") return false;
+    const consultationDateTime = new Date(
+      `${consultation.date}T${consultation.time}`
+    );
+    const diff = consultationDateTime.getTime() - currentTime.getTime();
+    const fiveMinutesInMs = 5 * 60 * 1000;
+    const thirtyMinutesInMs = 30 * 60 * 1000;
+    // Active from 5 minutes before until 30 minutes after
+    return diff <= fiveMinutesInMs && diff >= -thirtyMinutesInMs;
+  };
+
   // Filter consultations - exclude followup consultations (they should only appear in patients.tsx)
   const filteredConsultations = consultations
     .filter((consultation) => {
@@ -338,13 +368,39 @@ export default function DoctorAppointments() {
 
       if (appointmentResponse.success && appointmentResponse.data) {
         const appointment = appointmentResponse.data as any;
-        // Merge patient contact info from populated patientId
+        // Format reschedule request date if exists
+        let rescheduleRequestDate = undefined;
+        if (appointment.rescheduleRequest?.requestedDate) {
+          const reqDate = new Date(appointment.rescheduleRequest.requestedDate);
+          const year = reqDate.getFullYear();
+          const month = String(reqDate.getMonth() + 1).padStart(2, '0');
+          const day = String(reqDate.getDate()).padStart(2, '0');
+          rescheduleRequestDate = `${year}-${month}-${day}`;
+        }
+
         const updatedConsultation = {
           ...consultation,
           patientPhone:
             appointment.patientId?.phone || (consultation as any).patientPhone,
           patientEmail:
             appointment.patientId?.email || (consultation as any).patientEmail,
+          instrumentalTests: appointment.instrumentalTests || (consultation as any).instrumentalTests,
+          laboratoryTests: appointment.laboratoryTests || (consultation as any).laboratoryTests,
+          rescheduleRequest: appointment.rescheduleRequest ? {
+            requestedBy: appointment.rescheduleRequest.requestedBy,
+            requestedDate: rescheduleRequestDate,
+            requestedTime: appointment.rescheduleRequest.requestedTime,
+            reason: appointment.rescheduleRequest.reason,
+            status: appointment.rescheduleRequest.status,
+            requestedAt: appointment.rescheduleRequest.requestedAt,
+            respondedAt: appointment.rescheduleRequest.respondedAt,
+            respondedBy: appointment.rescheduleRequest.respondedBy,
+          } : undefined,
+          subStatus: appointment.subStatus,
+          patientJoinedAt: appointment.patientJoinedAt,
+          doctorJoinedAt: appointment.doctorJoinedAt,
+          completedAt: appointment.completedAt,
+          homeVisitCompletedAt: appointment.homeVisitCompletedAt,
         };
         setSelectedConsultation(updatedConsultation as Consultation);
       }
@@ -354,6 +410,131 @@ export default function DoctorAppointments() {
     } finally {
       setLoadingDetails(false);
     }
+  };
+
+  // Handle reschedule request (doctor requests reschedule)
+  const handleOpenReschedule = async (consultation: Consultation) => {
+    setSelectedConsultation(consultation);
+    setShowRescheduleModal(true);
+    setSelectedRescheduleDate(null);
+    setSelectedRescheduleTime(null);
+    setRescheduleReason("");
+
+    // Load doctor availability - get doctorId from appointment
+    try {
+      setLoadingAvailability(true);
+      const appointmentResponse = await apiService.getAppointmentById(consultation.id);
+      if (appointmentResponse.success && appointmentResponse.data) {
+        const appointment = appointmentResponse.data as any;
+        const doctorId = appointment.doctorId?._id || appointment.doctorId || user?.id;
+        
+        if (doctorId) {
+          const response = await apiService.getDoctorAvailability(
+            doctorId.toString(),
+            consultation.type as "video" | "home-visit"
+          );
+          if (response.success && response.data) {
+            const slots = (response.data as any[]).flatMap((slot: any) => {
+              const date = new Date(slot.date);
+              const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+              return (slot.timeSlots || []).map((time: string) => ({
+                date: dateStr,
+                time,
+              }));
+            });
+            setAvailableSlots(slots);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load availability:", err);
+      Alert.alert("შეცდომა", "ხელმისაწვდომი დროების ჩატვირთვა ვერ მოხერხდა");
+    } finally {
+      setLoadingAvailability(false);
+    }
+  };
+
+  const handleRequestReschedule = async () => {
+    if (!selectedConsultation || !selectedRescheduleDate || !selectedRescheduleTime) return;
+
+    setRescheduleLoading(true);
+    try {
+      const response = await apiService.requestReschedule(
+        selectedConsultation.id,
+        selectedRescheduleDate,
+        selectedRescheduleTime,
+        rescheduleReason || undefined
+      );
+
+      if (response.success) {
+        setShowRescheduleModal(false);
+        setSelectedRescheduleDate(null);
+        setSelectedRescheduleTime(null);
+        setRescheduleReason("");
+        await fetchConsultations();
+        Alert.alert("წარმატება", "გადაჯავშნის მოთხოვნა გაიგზავნა პაციენტთან");
+      } else {
+        Alert.alert("შეცდომა", response.message || "გადაჯავშნა ვერ მოხერხდა");
+      }
+    } catch (err: any) {
+      console.error("Reschedule error:", err);
+      Alert.alert("შეცდომა", err.message || "გადაჯავშნა ვერ მოხერხდა");
+    } finally {
+      setRescheduleLoading(false);
+    }
+  };
+
+  // Handle approve reschedule request (when patient requested)
+  const handleApproveReschedule = async (appointmentId: string) => {
+    try {
+      const response = await apiService.approveReschedule(appointmentId);
+      if (response.success) {
+        await fetchConsultations();
+        // Reload details if modal is open
+        if (selectedConsultation?.id === appointmentId) {
+          await openDetails(selectedConsultation);
+        }
+        Alert.alert("წარმატება", "გადაჯავშნა დამტკიცდა");
+      } else {
+        Alert.alert("შეცდომა", response.message || "დამტკიცება ვერ მოხერხდა");
+      }
+    } catch (err: any) {
+      console.error("Approve reschedule error:", err);
+      Alert.alert("შეცდომა", err.message || "დამტკიცება ვერ მოხერხდა");
+    }
+  };
+
+  // Handle reject reschedule request (when patient requested)
+  const handleRejectReschedule = async (appointmentId: string) => {
+    Alert.alert(
+      "გადაჯავშნის უარყოფა",
+      "დარწმუნებული ხართ რომ გსურთ გადაჯავშნის მოთხოვნის უარყოფა?",
+      [
+        { text: "გაუქმება", style: "cancel" },
+        {
+          text: "უარყოფა",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const response = await apiService.rejectReschedule(appointmentId);
+              if (response.success) {
+                await fetchConsultations();
+                // Reload details if modal is open
+                if (selectedConsultation?.id === appointmentId) {
+                  await openDetails(selectedConsultation);
+                }
+                Alert.alert("წარმატება", "გადაჯავშნის მოთხოვნა უარყოფილია");
+              } else {
+                Alert.alert("შეცდომა", response.message || "უარყოფა ვერ მოხერხდა");
+              }
+            } catch (err: any) {
+              console.error("Reject reschedule error:", err);
+              Alert.alert("შეცდომა", err.message || "უარყოფა ვერ მოხერხდა");
+            }
+          },
+        },
+      ]
+    );
   };
 
   const openAppointment = async (consultation: Consultation) => {
@@ -408,6 +589,19 @@ export default function DoctorAppointments() {
       );
     } else {
       setSelectedLaboratoryTests([]);
+    }
+
+    // Load existing instrumental tests if appointment has them
+    if ((consultation as any).instrumentalTests) {
+      setSelectedInstrumentalTests(
+        (consultation as any).instrumentalTests.map((test: any) => ({
+          productId: test.productId,
+          productName: test.productName,
+          notes: test.notes,
+        }))
+      );
+    } else {
+      setSelectedInstrumentalTests([]);
     }
 
     // Load laboratory products and clinics (available when completing appointment)
@@ -516,6 +710,27 @@ export default function DoctorAppointments() {
           Alert.alert(
             "შეცდომა",
             "ლაბორატორიული კვლევების დამატება ვერ მოხერხდა"
+          );
+        }
+      }
+
+      // Save instrumental tests (no booking/clinic logic needed)
+      if (selectedInstrumentalTests.length > 0) {
+        try {
+          const testsToSend = selectedInstrumentalTests.map((test) => ({
+            productId: test.productId,
+            productName: test.productName,
+            notes: test.notes,
+          }));
+          await apiService.assignInstrumentalTests(
+            selectedConsultation.id,
+            testsToSend
+          );
+        } catch (err) {
+          console.error("Failed to assign instrumental tests:", err);
+          Alert.alert(
+            "შეცდომა",
+            "ინსტრუმენტული კვლევების დამატება ვერ მოხერხდა"
           );
         }
       }
@@ -786,7 +1001,7 @@ export default function DoctorAppointments() {
                 filterStatus === "completed" && styles.statLabelActive,
               ]}
             >
-              შესრულებული
+              დასრულებული
             </Text>
           </TouchableOpacity>
 
@@ -979,7 +1194,7 @@ export default function DoctorAppointments() {
                 {(consultation.status === "scheduled" ||
                   consultation.status === "in-progress") && (
                   <View style={styles.reminderSection}>
-                    {getTimeUntilConsultation(consultation) && (
+                    {getTimeUntilConsultation(consultation) ? (
                       <View
                         style={[
                           styles.reminderBadge,
@@ -1013,14 +1228,29 @@ export default function DoctorAppointments() {
                           <View style={styles.urgentDot} />
                         )}
                       </View>
+                    ) : (
+                      <View style={styles.reminderBadge}>
+                        <Ionicons name="time-outline" size={16} color="#6B7280" />
+                        <Text style={[styles.reminderText, { color: "#6B7280" }]}>
+                          კონსულტაციამდე დარჩა {Math.abs(Math.floor((new Date(`${consultation.date}T${consultation.time}`).getTime() - currentTime.getTime()) / (1000 * 60)))} წუთი
+                        </Text>
+                      </View>
                     )}
                     <TouchableOpacity
                       style={[
                         styles.joinCallButton,
                         isConsultationSoon(consultation) &&
                           styles.joinCallButtonPulsing,
+                        !isJoinButtonActive(consultation) && styles.joinCallButtonDisabled,
                       ]}
-                      onPress={() => {
+                      onPress={async () => {
+                        if (!isJoinButtonActive(consultation)) return;
+                        // Track join time
+                        try {
+                          await apiService.joinCall(consultation.id);
+                        } catch (err) {
+                          console.error("Failed to track join time:", err);
+                        }
                         router.push({
                           pathname: "/screens/video-call",
                           params: {
@@ -1030,17 +1260,43 @@ export default function DoctorAppointments() {
                           },
                         });
                       }}
+                      disabled={!isJoinButtonActive(consultation)}
                     >
-                      <Ionicons name="videocam" size={20} color="#FFFFFF" />
-                      <Text style={styles.joinCallText}>
+                      <Ionicons 
+                        name="videocam" 
+                        size={20} 
+                        color={isJoinButtonActive(consultation) ? "#FFFFFF" : "#9CA3AF"} 
+                      />
+                      <Text style={[
+                        styles.joinCallText,
+                        !isJoinButtonActive(consultation) && { color: "#9CA3AF" }
+                      ]}>
                         შესვლა კონსულტაციაზე
                       </Text>
-                      <Ionicons
-                        name="arrow-forward"
-                        size={16}
-                        color="#FFFFFF"
-                      />
+                      {isJoinButtonActive(consultation) && (
+                        <Ionicons
+                          name="arrow-forward"
+                          size={16}
+                          color="#FFFFFF"
+                        />
+                      )}
                     </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* Reschedule Request Status - if patient requested reschedule */}
+                {consultation.rescheduleRequest?.status === 'pending' && 
+                 consultation.rescheduleRequest?.requestedBy === 'patient' && (
+                  <View style={styles.rescheduleRequestCardInline}>
+                    <View style={styles.rescheduleRequestHeader}>
+                      <Ionicons name="calendar-outline" size={16} color="#8B5CF6" />
+                      <Text style={styles.rescheduleRequestTitleInline}>
+                        პაციენტმა მოითხოვა გადაჯავშნა
+                      </Text>
+                    </View>
+                    <Text style={styles.rescheduleRequestTextInline}>
+                      {consultation.rescheduleRequest.requestedDate} {consultation.rescheduleRequest.requestedTime}
+                    </Text>
                   </View>
                 )}
 
@@ -1082,22 +1338,42 @@ export default function DoctorAppointments() {
                     </TouchableOpacity>
                   )}
 
-                  {consultation.status !== "cancelled" && (
+                  {/* Reschedule button - only for scheduled appointments and if no pending request */}
+                  {consultation.status === "scheduled" && 
+                   !(consultation.rescheduleRequest?.status === 'pending') && (
                     <TouchableOpacity
-                      style={styles.statusActionButton}
-                      onPress={() =>
-                        handleStatusUpdate(consultation, "cancelled")
-                      }
-                      disabled={
-                        statusActionLoading === `${consultation.id}-cancelled`
-                      }
+                      style={styles.statusActionButtonReschedule}
+                      onPress={() => handleOpenReschedule(consultation)}
                     >
-                      <Ionicons name="close" size={16} color="#DC2626" />
-                      <Text
-                        style={[styles.statusActionText, { color: "#DC2626" }]}
-                      >
-                        გაუქმება
-                      </Text>
+                      <Ionicons name="calendar-outline" size={16} color="#8B5CF6" />
+                      <Text style={styles.statusActionTextReschedule}>გადაჯავშნა</Text>
+                    </TouchableOpacity>
+                  )}
+
+                  {/* Complete consultation button - for video consultations after both parties joined */}
+                  {consultation.type === "video" &&
+                   consultation.status === "scheduled" &&
+                   consultation.patientJoinedAt &&
+                   consultation.doctorJoinedAt &&
+                   consultation.subStatus !== "conducted" && (
+                    <TouchableOpacity
+                      style={styles.statusActionButtonComplete}
+                      onPress={async () => {
+                        try {
+                          const response = await apiService.completeConsultation(consultation.id);
+                          if (response.success) {
+                            Alert.alert("წარმატება", "კონსულტაცია მონიშნულია როგორც ჩატარებული");
+                            await fetchConsultations();
+                          } else {
+                            Alert.alert("შეცდომა", response.message || "ოპერაცია ვერ მოხერხდა");
+                          }
+                        } catch (err: any) {
+                          Alert.alert("შეცდომა", err.message || "ოპერაცია ვერ მოხერხდა");
+                        }
+                      }}
+                    >
+                      <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                      <Text style={styles.statusActionTextComplete}>ჩატარებულია</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -1401,6 +1677,54 @@ export default function DoctorAppointments() {
                     </View>
                   )}
 
+        {selectedConsultation.instrumentalTests &&
+          (selectedConsultation as any).instrumentalTests.length > 0 && (
+            <View style={styles.detailSection}>
+              <Text style={styles.detailLabel}>ინსტრუმენტული კვლევები</Text>
+              {(selectedConsultation as any).instrumentalTests.map((test: any) => (
+                <View key={test.productId} style={styles.laboratoryTestCard}>
+                  <View style={styles.laboratoryTestHeader}>
+                    <Ionicons name="pulse-outline" size={18} color="#8B5CF6" />
+                    <View style={styles.laboratoryTestInfo}>
+                      <Text style={styles.laboratoryTestName}>
+                        {test.productName}
+                      </Text>
+                      {test.notes && (
+                        <Text style={styles.laboratoryTestMeta}>
+                          შენიშვნა: {test.notes}
+                        </Text>
+                      )}
+                      {test.resultFile?.name && (
+                        <Text style={styles.laboratoryTestMeta}>
+                          ატვირთული შედეგი • {test.resultFile.name}
+                        </Text>
+                      )}
+                    </View>
+                    {test.resultFile?.url && (
+                      <TouchableOpacity
+                        style={styles.viewResultPill}
+                        onPress={() => {
+                          Linking.openURL(test.resultFile.url).catch(() =>
+                            Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა")
+                          );
+                        }}
+                      >
+                        <Ionicons
+                          name="document-text-outline"
+                          size={14}
+                          color="#8B5CF6"
+                        />
+                        <Text style={styles.viewResultPillText}>
+                          შედეგის ნახვა
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+
                 {selectedConsultation.consultationSummary?.notes && (
                   <View style={styles.detailSection}>
                     <Text style={styles.detailLabel}>შენიშვნები</Text>
@@ -1479,6 +1803,76 @@ export default function DoctorAppointments() {
                     </Text>
                   </View>
                 </View>
+
+                {/* Reschedule Request Status - if patient requested reschedule */}
+                {selectedConsultation.rescheduleRequest?.status === 'pending' && 
+                 selectedConsultation.rescheduleRequest?.requestedBy === 'patient' && (
+                  <View style={styles.rescheduleRequestCard}>
+                    <View style={styles.rescheduleRequestHeader}>
+                      <Ionicons name="calendar-outline" size={20} color="#8B5CF6" />
+                      <Text style={styles.rescheduleRequestTitle}>
+                        პაციენტმა მოითხოვა გადაჯავშნა
+                      </Text>
+                    </View>
+                    <Text style={styles.rescheduleRequestText}>
+                      ახალი თარიღი: {selectedConsultation.rescheduleRequest.requestedDate} {selectedConsultation.rescheduleRequest.requestedTime}
+                    </Text>
+                    {selectedConsultation.rescheduleRequest.reason && (
+                      <Text style={styles.rescheduleRequestReason}>
+                        მიზეზი: {selectedConsultation.rescheduleRequest.reason}
+                      </Text>
+                    )}
+                    <View style={styles.rescheduleRequestActions}>
+                      <TouchableOpacity
+                        style={[styles.approveButton, styles.actionButton]}
+                        onPress={() => handleApproveReschedule(selectedConsultation.id)}
+                      >
+                        <Ionicons name="checkmark-circle" size={18} color="#10B981" />
+                        <Text style={styles.approveButtonText}>დამტკიცება</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.rejectButton, styles.actionButton]}
+                        onPress={() => handleRejectReschedule(selectedConsultation.id)}
+                      >
+                        <Ionicons name="close-circle" size={18} color="#EF4444" />
+                        <Text style={styles.rejectButtonText}>უარყოფა</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+
+                {/* Reschedule Request Status - if doctor requested reschedule */}
+                {selectedConsultation.rescheduleRequest?.status === 'pending' && 
+                 selectedConsultation.rescheduleRequest?.requestedBy === 'doctor' && (
+                  <View style={styles.rescheduleRequestCard}>
+                    <View style={styles.rescheduleRequestHeader}>
+                      <Ionicons name="calendar-outline" size={20} color="#8B5CF6" />
+                      <Text style={styles.rescheduleRequestTitle}>
+                        გადაჯავშნის მოთხოვნა გაიგზავნა
+                      </Text>
+                    </View>
+                    <Text style={styles.rescheduleRequestText}>
+                      ახალი თარიღი: {selectedConsultation.rescheduleRequest.requestedDate} {selectedConsultation.rescheduleRequest.requestedTime}
+                    </Text>
+                    <Text style={styles.rescheduleRequestStatus}>
+                      პაციენტის პასუხის მოლოდინში...
+                    </Text>
+                  </View>
+                )}
+
+                {/* Reschedule button - only for scheduled appointments and if no pending request */}
+                {(selectedConsultation.status === "scheduled") && 
+                 !(selectedConsultation.rescheduleRequest?.status === 'pending') && (
+                  <View style={styles.detailSection}>
+                    <TouchableOpacity
+                      style={styles.rescheduleButton}
+                      onPress={() => handleOpenReschedule(selectedConsultation)}
+                    >
+                      <Ionicons name="calendar-outline" size={18} color="#8B5CF6" />
+                      <Text style={styles.rescheduleButtonText}>გადაჯავშნის მოთხოვნა</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </ScrollView>
             ) : null}
 
@@ -2046,6 +2440,88 @@ export default function DoctorAppointments() {
                   </View>
                 )}
 
+                {/* Instrumental Tests */}
+                {(selectedConsultation?.status === "completed" ||
+                  selectedConsultation?.status === "scheduled" ||
+                  selectedConsultation?.status === "in-progress") && (
+                  <View style={styles.formSection}>
+                    <View style={styles.medicationsHeader}>
+                      <Text style={styles.formLabel}>ინსტრუმენტული კვლევები</Text>
+                      <TouchableOpacity
+                        style={styles.addMedicationButton}
+                        onPress={() => {
+                          Alert.alert("პროდუქტის არჩევა", "აირჩიე ინსტრუმენტული კვლევა", [
+                            ...laboratoryProducts.map((product) => ({
+                              text: product.name,
+                              onPress: () => {
+                                setSelectedInstrumentalTests([
+                                  ...selectedInstrumentalTests,
+                                  {
+                                    productId: product.id,
+                                    productName: product.name,
+                                  },
+                                ]);
+                              },
+                            })),
+                            {
+                              text: "თანხის/შენიშვნის შეყვანა",
+                              onPress: () => {},
+                              style: "default",
+                            },
+                            { text: "გაუქმება", style: "cancel" },
+                          ]);
+                        }}
+                      >
+                        <Ionicons name="add-circle" size={20} color="#8B5CF6" />
+                        <Text style={styles.addMedicationText}>დამატება</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {selectedInstrumentalTests.map((test, index) => (
+                      <View key={index} style={styles.medicationCard}>
+                        <View style={styles.medicationCardHeader}>
+                          <Ionicons
+                            name="pulse-outline"
+                            size={20}
+                            color="#8B5CF6"
+                          />
+                          <View style={{ flex: 1, marginLeft: 8 }}>
+                            <Text style={styles.medicationNameInput}>
+                              {test.productName}
+                            </Text>
+                            <TextInput
+                              style={styles.textInput}
+                              placeholder="შენიშვნა (ಐচ্ছಿಕო)"
+                              placeholderTextColor="#9CA3AF"
+                              value={test.notes || ""}
+                              onChangeText={(text) => {
+                                const next = [...selectedInstrumentalTests];
+                                next[index] = { ...next[index], notes: text };
+                                setSelectedInstrumentalTests(next);
+                              }}
+                            />
+                          </View>
+                          <TouchableOpacity
+                            onPress={() => {
+                              setSelectedInstrumentalTests(
+                                selectedInstrumentalTests.filter(
+                                  (_, i) => i !== index
+                                )
+                              );
+                            }}
+                          >
+                            <Ionicons
+                              name="close-circle"
+                              size={20}
+                              color="#EF4444"
+                            />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
                 
               </ScrollView>
 
@@ -2204,6 +2680,146 @@ export default function DoctorAppointments() {
             </ScrollView>
           </View>
         </View>
+      </Modal>
+
+      {/* Reschedule Modal */}
+      <Modal
+        visible={showRescheduleModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowRescheduleModal(false)}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+        >
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>გადაჯავშნის მოთხოვნა</Text>
+              <TouchableOpacity
+                onPress={() => setShowRescheduleModal(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalBody}>
+              {loadingAvailability ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color="#06B6D4" />
+                  <Text style={styles.loadingText}>ხელმისაწვდომი დროების ჩატვირთვა...</Text>
+                </View>
+              ) : (
+                <>
+                  {/* Date Selection */}
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailLabel}>აირჩიეთ თარიღი</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dateScrollView}>
+                      {Array.from(new Set(availableSlots.map(s => s.date))).map((date) => (
+                        <TouchableOpacity
+                          key={date}
+                          style={[
+                            styles.dateChip,
+                            selectedRescheduleDate === date && styles.dateChipSelected,
+                          ]}
+                          onPress={() => {
+                            setSelectedRescheduleDate(date);
+                            setSelectedRescheduleTime(null);
+                          }}
+                        >
+                          <Text
+                            style={[
+                              styles.dateChipText,
+                              selectedRescheduleDate === date && styles.dateChipTextSelected,
+                            ]}
+                          >
+                            {new Date(date).toLocaleDateString("ka-GE", {
+                              weekday: "short",
+                              day: "numeric",
+                              month: "short",
+                            })}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+
+                  {/* Time Selection */}
+                  {selectedRescheduleDate && (
+                    <View style={styles.detailSection}>
+                      <Text style={styles.detailLabel}>აირჩიეთ დრო</Text>
+                      <View style={styles.timeSlotsGrid}>
+                        {availableSlots
+                          .filter(s => s.date === selectedRescheduleDate)
+                          .map((slot) => (
+                            <TouchableOpacity
+                              key={slot.time}
+                              style={[
+                                styles.timeChip,
+                                selectedRescheduleTime === slot.time && styles.timeChipSelected,
+                              ]}
+                              onPress={() => setSelectedRescheduleTime(slot.time)}
+                            >
+                              <Text
+                                style={[
+                                  styles.timeChipText,
+                                  selectedRescheduleTime === slot.time && styles.timeChipTextSelected,
+                                ]}
+                              >
+                                {slot.time}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Reason (Optional) */}
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailLabel}>მიზეზი (არასავალდებულო)</Text>
+                    <TextInput
+                      style={styles.reasonInput}
+                      placeholder="მიუთითეთ გადაჯავშნის მიზეზი..."
+                      placeholderTextColor="#9CA3AF"
+                      value={rescheduleReason}
+                      onChangeText={setRescheduleReason}
+                      multiline
+                      numberOfLines={3}
+                    />
+                  </View>
+                </>
+              )}
+            </ScrollView>
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={() => setShowRescheduleModal(false)}
+              >
+                <Text style={styles.modalButtonText}>გაუქმება</Text>
+              </TouchableOpacity>
+              <TouchableOpacity  
+                style={[
+                  styles.rescheduleSubmitButton,
+                  (!selectedRescheduleDate || !selectedRescheduleTime || rescheduleLoading) && styles.disabledButton,
+                ]}
+                onPress={handleRequestReschedule}
+                disabled={!selectedRescheduleDate || !selectedRescheduleTime || rescheduleLoading}
+              >
+                {rescheduleLoading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    
+                    <Text style={styles.rescheduleSubmitButtonText}>მოთხოვნის გაგზავნა</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -2618,6 +3234,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#EF4444",
     shadowColor: "#EF4444",
   },
+  joinCallButtonDisabled: {
+    backgroundColor: "#F3F4F6",
+    opacity: 0.6,
+  },
   joinCallText: {
     fontSize: 15,
     fontFamily: "Poppins-Bold",
@@ -2645,6 +3265,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "flex-end",
+  },
+  modalContainer: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: "90%",
+    overflow: "hidden",
   },
   modalContent: {
     backgroundColor: "#FFFFFF",
@@ -2758,6 +3385,21 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins-SemiBold",
     color: "#FFFFFF",
   },
+  rescheduleSubmitButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: "#8B5CF6",
+  },
+  rescheduleSubmitButtonText: {
+    fontSize: 16,
+    fontFamily: "Poppins-SemiBold",
+    color: "#FFFFFF",
+  },
   formSection: {
     marginBottom: 20,
   },
@@ -2829,6 +3471,60 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: "Poppins-SemiBold",
     color: "#FFFFFF",
+  },
+  statusActionButtonReschedule: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: "#F3F4F6",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  statusActionTextReschedule: {
+    fontSize: 13,
+    fontFamily: "Poppins-SemiBold",
+    color: "#8B5CF6",
+  },
+  statusActionButtonComplete: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: "#D1FAE5",
+    borderWidth: 1,
+    borderColor: "#10B981",
+  },
+  statusActionTextComplete: {
+    fontSize: 13,
+    fontFamily: "Poppins-SemiBold",
+    color: "#10B981",
+  },
+  rescheduleRequestCardInline: {
+    backgroundColor: "#FEF3C7",
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: "#8B5CF6",
+  },
+  rescheduleRequestTitleInline: {
+    fontSize: 13,
+    fontFamily: "Poppins-SemiBold",
+    color: "#1F2937",
+    marginLeft: 4,
+  },
+  rescheduleRequestTextInline: {
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+    marginTop: 4,
   },
   textInput: {
     backgroundColor: "#F9FAFB",
@@ -3262,5 +3958,165 @@ const styles = StyleSheet.create({
     color: "#6B7280",
     marginTop: 12,
     textAlign: "center",
+  },
+  rescheduleRequestCard: {
+    backgroundColor: "#F3F4F6",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  rescheduleRequestHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+  },
+  rescheduleRequestTitle: {
+    fontSize: 15,
+    fontFamily: "Poppins-SemiBold",
+    color: "#1F2937",
+  },
+  rescheduleRequestText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+    marginBottom: 4,
+  },
+  rescheduleRequestReason: {
+    fontSize: 13,
+    fontFamily: "Poppins-Regular",
+    color: "#9CA3AF",
+    marginBottom: 12,
+    fontStyle: "italic",
+  },
+  rescheduleRequestStatus: {
+    fontSize: 13,
+    fontFamily: "Poppins-Medium",
+    color: "#F59E0B",
+    marginTop: 8,
+  },
+  rescheduleRequestActions: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 12,
+  },
+  approveButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#D1FAE5",
+    paddingVertical: 12,
+    borderRadius: 10,
+    gap: 6,
+  },
+  approveButtonText: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#10B981",
+  },
+  rejectButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FEE2E2",
+    paddingVertical: 12,
+    borderRadius: 10,
+    gap: 6,
+  },
+  rejectButtonText: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#EF4444",
+  },
+  rescheduleButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F3F4F6",
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  rescheduleButtonText: {
+    fontSize: 15,
+    fontFamily: "Poppins-SemiBold",
+    color: "#8B5CF6",
+  },
+  dateScrollView: {
+    marginTop: 8,
+  },
+  dateChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: "#F3F4F6",
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  dateChipSelected: {
+    backgroundColor: "#8B5CF6",
+    borderColor: "#8B5CF6",
+  },
+  dateChipText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#6B7280",
+  },
+  dateChipTextSelected: {
+    color: "#FFFFFF",
+    fontFamily: "Poppins-SemiBold",
+  },
+  timeSlotsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 8,
+  },
+  timeChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: "#F3F4F6",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  timeChipSelected: {
+    backgroundColor: "#8B5CF6",
+    borderColor: "#8B5CF6",
+  },
+  timeChipText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#6B7280",
+  },
+  timeChipTextSelected: {
+    color: "#FFFFFF",
+    fontFamily: "Poppins-SemiBold",
+  },
+  reasonInput: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#1F2937",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    minHeight: 80,
+    textAlignVertical: "top",
+    marginTop: 8,
+  },
+  disabledButton: {
+    backgroundColor: "#D1D5DB",
+  },
+  actionButton: {
+    gap: 6,
   },
 });

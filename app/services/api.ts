@@ -994,6 +994,31 @@ class ApiService {
     });
   }
 
+  async assignInstrumentalTests(
+    appointmentId: string,
+    tests: {
+      productId: string;
+      productName: string;
+      notes?: string;
+    }[],
+  ): Promise<{
+    success: boolean;
+    message?: string;
+    data?: any;
+  }> {
+    if (USE_MOCK_API) {
+      return Promise.resolve({
+        success: true,
+        message: 'ინსტრუმენტული კვლევები წარმატებით დაემატა',
+      });
+    }
+
+    return this.apiCall(`/appointments/${appointmentId}/instrumental-tests`, {
+      method: 'PUT',
+      body: JSON.stringify({ tests }),
+    });
+  }
+
   async bookLaboratoryTest(
     appointmentId: string,
     data: {
@@ -1014,6 +1039,31 @@ class ApiService {
     }
 
     return this.apiCall(`/appointments/${appointmentId}/laboratory-tests/book`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async bookInstrumentalTest(
+    appointmentId: string,
+    data: {
+      productId: string;
+      clinicId: string;
+      clinicName: string;
+    },
+  ): Promise<{
+    success: boolean;
+    message?: string;
+    data?: any;
+  }> {
+    if (USE_MOCK_API) {
+      return Promise.resolve({
+        success: true,
+        message: 'ინსტრუმენტული კვლევა წარმატებით დაჯავშნა',
+      });
+    }
+
+    return this.apiCall(`/appointments/${appointmentId}/instrumental-tests/book`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
@@ -1133,6 +1183,23 @@ class ApiService {
     });
   }
 
+  async cancelAppointment(appointmentId: string): Promise<{
+    success: boolean;
+    message?: string;
+    data?: any;
+  }> {
+    if (USE_MOCK_API) {
+      return Promise.resolve({
+        success: true,
+        message: 'ჯავშანი წარმატებით გაუქმდა',
+      });
+    }
+
+    return this.apiCall(`/appointments/${appointmentId}/cancel`, {
+      method: 'PUT',
+    });
+  }
+
   // Block time slot temporarily
   async blockTimeSlot(blockData: {
     doctorId: string;
@@ -1168,6 +1235,121 @@ class ApiService {
 
     return this.apiCall(`/appointments/${appointmentId}`, {
       method: 'GET',
+    });
+  }
+
+  async requestReschedule(
+    appointmentId: string,
+    newDate: string,
+    newTime: string,
+    reason?: string,
+  ): Promise<{
+    success: boolean;
+    message?: string;
+    data?: any;
+  }> {
+    if (USE_MOCK_API) {
+      return Promise.resolve({
+        success: true,
+        message: 'გადაჯავშნის მოთხოვნა გაიგზავნა',
+      });
+    }
+
+    return this.apiCall(`/appointments/${appointmentId}/reschedule-request`, {
+      method: 'POST',
+      body: JSON.stringify({
+        newDate,
+        newTime,
+        reason,
+      }),
+    });
+  }
+
+  async approveReschedule(appointmentId: string): Promise<{
+    success: boolean;
+    message?: string;
+    data?: any;
+  }> {
+    if (USE_MOCK_API) {
+      return Promise.resolve({
+        success: true,
+        message: 'გადაჯავშნა დამტკიცდა',
+      });
+    }
+
+    return this.apiCall(`/appointments/${appointmentId}/reschedule-approve`, {
+      method: 'PUT',
+    });
+  }
+
+  async rejectReschedule(appointmentId: string): Promise<{
+    success: boolean;
+    message?: string;
+    data?: any;
+  }> {
+    if (USE_MOCK_API) {
+      return Promise.resolve({
+        success: true,
+        message: 'გადაჯავშნის მოთხოვნა უარყოფილია',
+      });
+    }
+
+    return this.apiCall(`/appointments/${appointmentId}/reschedule-reject`, {
+      method: 'PUT',
+    });
+  }
+
+  // Join video call - track when patient or doctor joins
+  async joinCall(appointmentId: string): Promise<{
+    success: boolean;
+    message?: string;
+    data?: any;
+  }> {
+    if (USE_MOCK_API) {
+      return Promise.resolve({
+        success: true,
+        message: 'Join time recorded (mock)',
+      });
+    }
+
+    return this.apiCall(`/appointments/${appointmentId}/join`, {
+      method: 'POST',
+    });
+  }
+
+  // Complete video consultation - called by doctor after both parties leave
+  async completeConsultation(appointmentId: string): Promise<{
+    success: boolean;
+    message?: string;
+    data?: any;
+  }> {
+    if (USE_MOCK_API) {
+      return Promise.resolve({
+        success: true,
+        message: 'Consultation marked as conducted (mock)',
+      });
+    }
+
+    return this.apiCall(`/appointments/${appointmentId}/complete`, {
+      method: 'POST',
+    });
+  }
+
+  // Complete home visit - called by patient
+  async completeHomeVisit(appointmentId: string): Promise<{
+    success: boolean;
+    message?: string;
+    data?: any;
+  }> {
+    if (USE_MOCK_API) {
+      return Promise.resolve({
+        success: true,
+        message: 'Home visit marked as completed (mock)',
+      });
+    }
+
+    return this.apiCall(`/appointments/${appointmentId}/home-visit-complete`, {
+      method: 'POST',
     });
   }
 

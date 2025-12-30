@@ -1,14 +1,18 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  FlatList,
+  Alert,
+  Platform,
+  ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useCart } from "../../contexts/CartContext";
@@ -21,13 +25,20 @@ const SelectClinic = () => {
     productPrice: string;
     productImage?: string;
     productDescription?: string;
-    appointmentId?: string; // For booking laboratory test from appointment history
+    appointmentId?: string; // For booking test from appointment history
+    testType?: "laboratory" | "instrumental"; // Type of test being booked
   }>();
 
   const [clinics, setClinics] = useState<Clinic[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedClinic, setSelectedClinic] = useState<string | null>(null);
+  const [collectionType, setCollectionType] = useState<"clinic" | "home">("clinic");
+  const [homeAddress, setHomeAddress] = useState("");
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedTime, setSelectedTime] = useState<Date>(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const { addToCart } = useCart();
 
   useEffect(() => {
@@ -52,30 +63,90 @@ const SelectClinic = () => {
 
   const handleSelectClinic = (clinic: Clinic) => {
     setSelectedClinic(clinic.id);
+    setCollectionType("clinic");
+  };
+
+  const handleSelectHomeCollection = () => {
+    setCollectionType("home");
+    setSelectedClinic(null);
+  };
+
+  const formatDate = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  const formatTime = (date: Date) => {
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    return `${hours}:${minutes}`;
   };
 
   const handleAddToCart = async () => {
-    if (!selectedClinic) {
+    if (collectionType === "clinic" && !selectedClinic) {
+      Alert.alert("შეცდომა", "გთხოვთ აირჩიოთ კლინიკა");
       return;
     }
 
-    const selectedClinicData = clinics.find((c) => c.id === selectedClinic);
-    if (!selectedClinicData) {
+    if (collectionType === "home") {
+      if (!homeAddress.trim()) {
+        Alert.alert("შეცდომა", "გთხოვთ შეიყვანოთ მისამართი");
+        return;
+      }
+      // Validate date is not in the past
+      const now = new Date();
+      const selectedDateTime = new Date(selectedDate);
+      selectedDateTime.setHours(selectedTime.getHours());
+      selectedDateTime.setMinutes(selectedTime.getMinutes());
+      if (selectedDateTime < now) {
+        Alert.alert("შეცდომა", "გთხოვთ აირჩიოთ მომავალი თარიღი და დრო");
+        return;
+      }
+    }
+
+    const selectedClinicData = collectionType === "clinic" 
+      ? clinics.find((c) => c.id === selectedClinic)
+      : null;
+    
+    if (collectionType === "clinic" && !selectedClinicData) {
       return;
     }
 
-    // If this is booking from appointment history, update the appointment's laboratory test
+    // If this is booking from appointment history, update the appointment's test
+    // Note: Home collection is not available for appointment history bookings
     if (params.appointmentId) {
+      if (collectionType === "home") {
+        Alert.alert("შეცდომა", "სახლში გამოძახება არ არის ხელმისაწვდომი ჯავშნიდან. გთხოვთ აირჩიოთ კლინიკა.");
+        return;
+      }
+      
+      if (!selectedClinicData) {
+        Alert.alert("შეცდომა", "გთხოვთ აირჩიოთ კლინიკა");
+        return;
+      }
+
       try {
-        await apiService.bookLaboratoryTest(params.appointmentId, {
-          productId: params.productId,
-          clinicId: selectedClinicData.id,
-          clinicName: selectedClinicData.name,
-        });
+        const isInstrumental = params.testType === "instrumental";
+        
+        if (isInstrumental) {
+          await apiService.bookInstrumentalTest(params.appointmentId, {
+            productId: params.productId,
+            clinicId: selectedClinicData.id,
+            clinicName: selectedClinicData.name,
+          });
+        } else {
+          await apiService.bookLaboratoryTest(params.appointmentId, {
+            productId: params.productId,
+            clinicId: selectedClinicData.id,
+            clinicName: selectedClinicData.name,
+          });
+        }
         router.back();
         return;
       } catch (err) {
-        console.error("Failed to book laboratory test:", err);
+        console.error(`Failed to book ${params.testType || "laboratory"} test:`, err);
         // Fall through to add to cart as fallback
       }
     }
@@ -88,8 +159,13 @@ const SelectClinic = () => {
       price: price,
       weight: "1", // Default for laboratory products
       image: params.productImage,
-      clinic: selectedClinicData.name,
-      clinicId: selectedClinicData.id,
+      clinic: collectionType === "clinic" ? selectedClinicData!.name : "სახლში გამოძახება",
+      clinicId: collectionType === "clinic" ? selectedClinicData!.id : "home-collection",
+      homeCollection: collectionType === "home" ? {
+        address: homeAddress,
+        date: formatDate(selectedDate),
+        time: formatTime(selectedTime),
+      } : undefined,
     });
 
     router.back();
@@ -124,13 +200,111 @@ const SelectClinic = () => {
         </View>
       </LinearGradient>
 
-      <View style={styles.content}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.infoCard}>
-          <Text style={styles.infoTitle}>აირჩიეთ კლინიკა</Text>
+          <Text style={styles.infoTitle}>აირჩიეთ ვარიანტი</Text>
           <Text style={styles.infoSubtitle}>
-            აირჩიეთ კლინიკა სადაც გსურთ გაკეთდეს &quot;{params.productName}&quot;
+            აირჩიეთ კლინიკა ან სახლში გამოძახება &quot;{params.productName}&quot;-ისთვის
           </Text>
         </View>
+
+        {/* Collection Type Selection */}
+        <View style={styles.collectionTypeContainer}>
+          <TouchableOpacity
+            style={[
+              styles.collectionTypeCard,
+              collectionType === "clinic" && styles.collectionTypeCardActive,
+            ]}
+            onPress={() => {
+              setCollectionType("clinic");
+              setSelectedClinic(null);
+            }}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name="business"
+              size={24}
+              color={collectionType === "clinic" ? "#06B6D4" : "#64748B"}
+            />
+            <Text
+              style={[
+                styles.collectionTypeText,
+                collectionType === "clinic" && styles.collectionTypeTextActive,
+              ]}
+            >
+              კლინიკაში
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.collectionTypeCard,
+              collectionType === "home" && styles.collectionTypeCardActive,
+            ]}
+            onPress={handleSelectHomeCollection}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name="home"
+              size={24}
+              color={collectionType === "home" ? "#06B6D4" : "#64748B"}
+            />
+            <Text
+              style={[
+                styles.collectionTypeText,
+                collectionType === "home" && styles.collectionTypeTextActive,
+              ]}
+            >
+              სახლში გამოძახება
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Home Collection Form */}
+        {collectionType === "home" && (
+          <View style={styles.homeCollectionForm}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>მისამართი *</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                value={homeAddress}
+                onChangeText={setHomeAddress}
+                placeholder="შეიყვანეთ სრული მისამართი"
+                placeholderTextColor="#94A3B8"
+                multiline
+                numberOfLines={3}
+              />
+            </View>
+
+            <View style={styles.row}>
+              <View style={[styles.inputGroup, styles.halfWidth]}>
+                <Text style={styles.inputLabel}>თარიღი *</Text>
+                <TouchableOpacity
+                  style={styles.dateTimeButton}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <Ionicons name="calendar-outline" size={20} color="#06B6D4" />
+                  <Text style={styles.dateTimeText}>
+                    {formatDate(selectedDate)}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={[styles.inputGroup, styles.halfWidth]}>
+                <Text style={styles.inputLabel}>დრო *</Text>
+                <TouchableOpacity
+                  style={styles.dateTimeButton}
+                  onPress={() => setShowTimePicker(true)}
+                >
+                  <Ionicons name="time-outline" size={20} color="#06B6D4" />
+                  <Text style={styles.dateTimeText}>
+                    {formatTime(selectedTime)}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
 
         {error && (
           <View style={styles.errorContainer}>
@@ -142,65 +316,67 @@ const SelectClinic = () => {
           </View>
         )}
 
-        {clinics.length === 0 && !loading && !error ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="business-outline" size={64} color="#CBD5E1" />
-            <Text style={styles.emptyTitle}>კლინიკა არ მოიძებნა</Text>
-            <Text style={styles.emptySubtitle}>
-              ამჟამად არ არის ხელმისაწვდომი კლინიკები
-            </Text>
-          </View>
-        ) : (
-          <FlatList
-            data={clinics}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.clinicsList}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={[
-                  styles.clinicCard,
-                  selectedClinic === item.id && styles.clinicCardSelected,
-                ]}
-                onPress={() => handleSelectClinic(item)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.clinicCardContent}>
-                  <View style={styles.clinicIconContainer}>
-                    <Ionicons
-                      name="business"
-                      size={24}
-                      color={selectedClinic === item.id ? "#06B6D4" : "#64748B"}
-                    />
-                  </View>
-                  <View style={styles.clinicInfo}>
-                    <Text style={styles.clinicName}>{item.name}</Text>
-                    {item.address && (
-                      <View style={styles.clinicDetailRow}>
-                        <Ionicons name="location-outline" size={14} color="#94A3B8" />
-                        <Text style={styles.clinicDetailText}>{item.address}</Text>
+        {/* Clinics List - Only show when clinic type is selected */}
+        {collectionType === "clinic" && (
+          <>
+            {clinics.length === 0 && !loading && !error ? (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="business-outline" size={64} color="#CBD5E1" />
+                <Text style={styles.emptyTitle}>კლინიკა არ მოიძებნა</Text>
+                <Text style={styles.emptySubtitle}>
+                  ამჟამად არ არის ხელმისაწვდომი კლინიკები
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.clinicsList}>
+                {clinics.map((item) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[
+                      styles.clinicCard,
+                      selectedClinic === item.id && styles.clinicCardSelected,
+                    ]}
+                    onPress={() => handleSelectClinic(item)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.clinicCardContent}>
+                      <View style={styles.clinicIconContainer}>
+                        <Ionicons
+                          name="business"
+                          size={24}
+                          color={selectedClinic === item.id ? "#06B6D4" : "#64748B"}
+                        />
                       </View>
-                    )}
-                    {item.phone && (
-                      <View style={styles.clinicDetailRow}>
-                        <Ionicons name="call-outline" size={14} color="#94A3B8" />
-                        <Text style={styles.clinicDetailText}>{item.phone}</Text>
+                      <View style={styles.clinicInfo}>
+                        <Text style={styles.clinicName}>{item.name}</Text>
+                        {item.address && (
+                          <View style={styles.clinicDetailRow}>
+                            <Ionicons name="location-outline" size={14} color="#94A3B8" />
+                            <Text style={styles.clinicDetailText}>{item.address}</Text>
+                          </View>
+                        )}
+                        {item.phone && (
+                          <View style={styles.clinicDetailRow}>
+                            <Ionicons name="call-outline" size={14} color="#94A3B8" />
+                            <Text style={styles.clinicDetailText}>{item.phone}</Text>
+                          </View>
+                        )}
                       </View>
-                    )}
-                  </View>
-                  {selectedClinic === item.id && (
-                    <View style={styles.checkIcon}>
-                      <Ionicons name="checkmark-circle" size={24} color="#06B6D4" />
+                      {selectedClinic === item.id && (
+                        <View style={styles.checkIcon}>
+                          <Ionicons name="checkmark-circle" size={24} color="#06B6D4" />
+                        </View>
+                      )}
                     </View>
-                  )}
-                </View>
-              </TouchableOpacity>
+                  </TouchableOpacity>
+                ))}
+              </View>
             )}
-            showsVerticalScrollIndicator={false}
-          />
+          </>
         )}
-      </View>
+      </ScrollView>
 
-      {selectedClinic && (
+      {(selectedClinic || collectionType === "home") && (
         <View style={styles.bottomBar}>
           <TouchableOpacity
             style={styles.addButton}
@@ -210,6 +386,95 @@ const SelectClinic = () => {
             <Ionicons name="add-circle" size={20} color="#FFFFFF" />
             <Text style={styles.addButtonText}>კალათაში დამატება</Text>
           </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Date Picker */}
+      {showDatePicker && Platform.OS === "android" && (
+        <DateTimePicker
+          value={selectedDate}
+          mode="date"
+          display="default"
+          onChange={(event: any, date?: Date) => {
+            setShowDatePicker(false);
+            if (date) {
+              setSelectedDate(date);
+            }
+          }}
+          minimumDate={new Date()}
+        />
+      )}
+
+      {/* Time Picker */}
+      {showTimePicker && Platform.OS === "android" && (
+        <DateTimePicker
+          value={selectedTime}
+          mode="time"
+          display="default"
+          onChange={(event: any, date?: Date) => {
+            setShowTimePicker(false);
+            if (date) {
+              setSelectedTime(date);
+            }
+          }}
+        />
+      )}
+
+      {/* iOS Date/Time Picker Modal */}
+      {Platform.OS === "ios" && (showDatePicker || showTimePicker) && (
+        <View style={styles.pickerModalOverlay}>
+          <View style={styles.pickerModalContainer}>
+            <View style={styles.pickerModalHeader}>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowDatePicker(false);
+                  setShowTimePicker(false);
+                }}
+                style={styles.pickerCancelButton}
+              >
+                <Text style={styles.pickerCancelText}>გაუქმება</Text>
+              </TouchableOpacity>
+              <Text style={styles.pickerModalTitle}>
+                {showDatePicker ? "თარიღის არჩევა" : "დროის არჩევა"}
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowDatePicker(false);
+                  setShowTimePicker(false);
+                }}
+                style={styles.pickerDoneButton}
+              >
+                <Text style={styles.pickerDoneText}>დადასტურება</Text>
+              </TouchableOpacity>
+            </View>
+            {showDatePicker && (
+              <DateTimePicker
+                value={selectedDate}
+                mode="date"
+                display="spinner"
+                onChange={(event: any, date?: Date) => {
+                  if (date) {
+                    setSelectedDate(date);
+                  }
+                }}
+                minimumDate={new Date()}
+                style={styles.picker}
+              />
+            )}
+            {showTimePicker && (
+              <DateTimePicker
+                value={selectedTime}
+                mode="time"
+                display="spinner"
+                onChange={(event: any, date?: Date) => {
+                  if (date) {
+                    setSelectedTime(date);
+                  }
+                }}
+                style={styles.picker}
+              />
+            )}
+          </View>
         </View>
       )}
     </SafeAreaView>
@@ -336,6 +601,145 @@ const styles = StyleSheet.create({
   },
   clinicsList: {
     paddingBottom: 100,
+  },
+  collectionTypeContainer: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 16,
+  },
+  collectionTypeCard: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#E5E7EB",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  collectionTypeCardActive: {
+    borderColor: "#06B6D4",
+    backgroundColor: "#F0FDFA",
+  },
+  collectionTypeText: {
+    marginTop: 8,
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#64748B",
+  },
+  collectionTypeTextActive: {
+    color: "#06B6D4",
+  },
+  homeCollectionForm: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#1F2937",
+    marginBottom: 8,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#1F2937",
+    backgroundColor: "#FFFFFF",
+  },
+  textArea: {
+    height: 80,
+    textAlignVertical: "top",
+  },
+  row: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  halfWidth: {
+    flex: 1,
+  },
+  dateTimeButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: "#FFFFFF",
+  },
+  dateTimeText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#1F2937",
+  },
+  pickerModalOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
+  },
+  pickerModalContainer: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: 20,
+  },
+  pickerModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+  },
+  pickerCancelButton: {
+    paddingVertical: 8,
+  },
+  pickerCancelText: {
+    fontSize: 16,
+    fontFamily: "Poppins-Regular",
+    color: "#64748B",
+  },
+  pickerModalTitle: {
+    fontSize: 18,
+    fontFamily: "Poppins-SemiBold",
+    color: "#1F2937",
+  },
+  pickerDoneButton: {
+    paddingVertical: 8,
+  },
+  pickerDoneText: {
+    fontSize: 16,
+    fontFamily: "Poppins-SemiBold",
+    color: "#06B6D4",
+  },
+  picker: {
+    height: 200,
   },
   clinicCard: {
     backgroundColor: "#FFFFFF",

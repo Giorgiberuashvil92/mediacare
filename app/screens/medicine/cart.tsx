@@ -80,28 +80,36 @@ const Cart = () => {
                 {/* Product Details */}
                 <View style={styles.productDetails}>
                   <Text style={styles.productName}>{item.name}</Text>
-                  <Text style={styles.productWeight}>{item.weight}</Text>
-                  <Text style={styles.productPrice}>${item.price}</Text>
+                  {item.clinic || item.clinicId ? (
+                    <Text style={styles.productWeight}>{item.clinic || "კვლევა"}</Text>
+                  ) : (
+                    <Text style={styles.productWeight}>{item.weight}</Text>
+                  )}
+                  <Text style={styles.productPrice}>
+                    ${item.clinic || item.clinicId ? item.price : item.price * item.quantity}
+                  </Text>
                 </View>
 
-                {/* Quantity Controls */}
-                <View style={styles.quantityControls}>
-                  <TouchableOpacity
-                    style={styles.quantityButton}
-                    onPress={() => updateQuantity(item.id, item.quantity - 1)}
-                  >
-                    <Ionicons name="remove" size={16} color="#20BEB8" />
-                  </TouchableOpacity>
+                {/* Quantity Controls - Only for medicine products, not for tests */}
+                {!item.clinic && !item.clinicId && (
+                  <View style={styles.quantityControls}>
+                    <TouchableOpacity
+                      style={styles.quantityButton}
+                      onPress={() => updateQuantity(item.id, item.quantity - 1)}
+                    >
+                      <Ionicons name="remove" size={16} color="#20BEB8" />
+                    </TouchableOpacity>
 
-                  <Text style={styles.quantityText}>{item.quantity}</Text>
+                    <Text style={styles.quantityText}>{item.quantity}</Text>
 
-                  <TouchableOpacity
-                    style={styles.quantityButton}
-                    onPress={() => updateQuantity(item.id, item.quantity + 1)}
-                  >
-                    <Ionicons name="add" size={16} color="#20BEB8" />
-                  </TouchableOpacity>
-                </View>
+                    <TouchableOpacity
+                      style={styles.quantityButton}
+                      onPress={() => updateQuantity(item.id, item.quantity + 1)}
+                    >
+                      <Ionicons name="add" size={16} color="#20BEB8" />
+                    </TouchableOpacity>
+                  </View>
+                )}
 
                 {/* Delete Button */}
                 <TouchableOpacity
@@ -138,7 +146,7 @@ const Cart = () => {
             <View style={styles.divider} />
 
             <View style={styles.summaryRow}>
-              <Text style={styles.totalLabel}>Total amount</Text>
+              <Text style={styles.totalLabel}>ჯამური თანხა</Text>
               <Text style={styles.totalValue}>${getTotalPrice()}</Text>
             </View>
           </View>

@@ -405,6 +405,49 @@ const History = () => {
                     </View>
                   )}
 
+                  {/* Instrumental Tests Indicator */}
+                  {visit.instrumentalTests && visit.instrumentalTests.length > 0 && (
+                    <View style={styles.labTestsContainer}>
+                      <View style={styles.labTestsHeader}>
+                        <Ionicons name="pulse" size={16} color="#8B5CF6" />
+                        <Text style={styles.labTestsLabel}>
+                          ინსტრუმენტული კვლევები
+                        </Text>
+                      </View>
+                      <View style={styles.labTestsBadges}>
+                        <View style={styles.labTestBadge}>
+                          <Text style={styles.labTestBadgeText}>
+                            {visit.instrumentalTests.length} კვლევა
+                          </Text>
+                        </View>
+                        {(() => {
+                          const withResults = visit.instrumentalTests.filter((t: any) => t.resultFile?.url).length;
+                          const pending = visit.instrumentalTests.length - withResults;
+                          return (
+                            <>
+                              {withResults > 0 && (
+                                <View style={[styles.labTestBadge, styles.labTestBadgeSuccess]}>
+                                  <Ionicons name="checkmark-circle" size={12} color="#10B981" />
+                                  <Text style={[styles.labTestBadgeText, styles.labTestBadgeTextSuccess]}>
+                                    {withResults} პასუხი
+                                  </Text>
+                                </View>
+                              )}
+                              {pending > 0 && (
+                                <View style={[styles.labTestBadge, styles.labTestBadgePending]}>
+                                  <Ionicons name="time-outline" size={12} color="#F59E0B" />
+                                  <Text style={[styles.labTestBadgeText, styles.labTestBadgeTextPending]}>
+                                    {pending} მოლოდინში
+                                  </Text>
+                                </View>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </View>
+                    </View>
+                  )}
+
                   {/* Laboratory Tests Indicator */}
                   {visit.laboratoryTests && visit.laboratoryTests.length > 0 && (
                     <View style={styles.labTestsContainer}>
@@ -650,6 +693,118 @@ const History = () => {
                     <Text style={styles.notesText}>{selectedVisit.notes}</Text>
                   </View>
                 )}
+
+                {/* Instrumental Tests */}
+                {selectedVisit.instrumentalTests &&
+                  selectedVisit.instrumentalTests.length > 0 && (
+                    <View style={styles.detailSection}>
+                      <Text style={styles.detailLabel}>
+                        დანიშნული ინსტრუმენტული კვლევები
+                      </Text>
+                      {selectedVisit.instrumentalTests.map(
+                        (test: any, index: number) => (
+                          <View key={index} style={styles.laboratoryTestCard}>
+                            <View style={styles.laboratoryTestHeader}>
+                              <Ionicons
+                                name="pulse-outline"
+                                size={20}
+                                color="#8B5CF6"
+                              />
+                              <View style={styles.laboratoryTestInfo}>
+                                <Text style={styles.laboratoryTestName}>
+                                  {test.productName}
+                                </Text>
+                                {test.clinicName && (
+                                  <Text style={styles.laboratoryTestClinic}>
+                                    კლინიკა: {test.clinicName}
+                                  </Text>
+                                )}
+                                {test.notes && (
+                                  <Text style={styles.laboratoryTestClinic}>
+                                    შენიშვნა: {test.notes}
+                                  </Text>
+                                )}
+                              </View>
+                            </View>
+                            {!test.booked && (
+                              <TouchableOpacity
+                                style={styles.bookTestButton}
+                                onPress={() => {
+                                  // Close modal before navigating
+                                  setShowDetailsModal(false);
+                                  // Navigate to clinic selection for this test
+                                  router.push({
+                                    pathname: "/screens/lab/select-clinic",
+                                    params: {
+                                      productId: test.productId,
+                                      productName: test.productName,
+                                      productPrice: "0", // Price will be fetched from product
+                                      appointmentId: selectedVisit.id,
+                                      testType: "instrumental", // Indicate this is for instrumental test
+                                    },
+                                  });
+                                }}
+                              >
+                                <Ionicons
+                                  name="calendar-outline"
+                                  size={16}
+                                  color="#FFFFFF"
+                                />
+                                <Text style={styles.bookTestButtonText}>
+                                  დაჯავშნა
+                                </Text>
+                              </TouchableOpacity>
+                            )}
+                            {test.booked && (
+                              <View style={styles.bookedBadge}>
+                                <Ionicons
+                                  name="checkmark-circle"
+                                  size={16}
+                                  color="#10B981"
+                                />
+                                <Text style={styles.bookedBadgeText}>
+                                  დაჯავშნილია
+                                </Text>
+                              </View>
+                            )}
+                            {test.resultFile && (
+                              <TouchableOpacity
+                                style={styles.viewResultButton}
+                                onPress={async () => {
+                                  if (test.resultFile?.url) {
+                                    const url = test.resultFile.url;
+                                    const isPdf = test.resultFile.type === 'application/pdf' || url.endsWith('.pdf');
+                                    
+                                    if (isPdf) {
+                                      // Use Google Docs Viewer to display PDF
+                                      const googleDocsUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=false`;
+                                      Linking.openURL(googleDocsUrl).catch(() =>
+                                        Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა")
+                                      );
+                                    } else {
+                                      // For non-PDFs, open in browser
+                                      Linking.openURL(url).catch(() =>
+                                        Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა")
+                                      );
+                                    }
+                                  }
+                                }}
+                              >
+                                <Ionicons
+                                  name="document-text-outline"
+                                  size={16}
+                                  color="#8B5CF6"
+                                />
+                                <Text style={styles.viewResultButtonText}>
+                                  შედეგის ნახვა
+                                </Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        )
+                      )}
+                    </View>
+                  )}
 
                 {/* Laboratory Tests */}
                 {selectedVisit.laboratoryTests &&
@@ -1073,6 +1228,7 @@ const mapAppointmentToVisit = (appointment: any) => {
     followUp: appointment.followUp,
     form100: appointment.form100,
     laboratoryTests: appointment.laboratoryTests || [],
+    instrumentalTests: appointment.instrumentalTests || [],
     status,
     statusLabel: STATUS_LABELS[status],
   };
@@ -1121,10 +1277,15 @@ const isPastAppointment = (visit: any) => {
     return true;
   }
 
-  // Include appointments with laboratory tests assigned by doctor, even if not completed
+  // Include appointments with laboratory tests or instrumental tests assigned by doctor, even if not completed
   // (doctor has interacted with the appointment)
   if (visit.laboratoryTests && Array.isArray(visit.laboratoryTests) && visit.laboratoryTests.length > 0) {
     console.log('✅ [isPastAppointment] Has lab tests -> history:', visit.id, visit.appointmentDate);
+    return true;
+  }
+  
+  if (visit.instrumentalTests && Array.isArray(visit.instrumentalTests) && visit.instrumentalTests.length > 0) {
+    console.log('✅ [isPastAppointment] Has instrumental tests -> history:', visit.id, visit.appointmentDate);
     return true;
   }
 

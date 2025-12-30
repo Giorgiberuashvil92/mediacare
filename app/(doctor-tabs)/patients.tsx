@@ -788,7 +788,7 @@ export default function DoctorPatients() {
                 filterStatus === "completed" && styles.statLabelActive,
               ]}
             >
-              შესრულებული
+              დასრულებული
             </Text>
           </TouchableOpacity>
 

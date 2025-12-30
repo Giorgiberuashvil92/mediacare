@@ -131,7 +131,7 @@ export default function AppointmentsDetails() {
               <Text style={styles.appointmentStatValue}>
                 {stats.completed}
               </Text>
-              <Text style={styles.appointmentStatLabel}>შესრულებული</Text>
+              <Text style={styles.appointmentStatLabel}>დასრულებული</Text>
             </View>
             <View style={styles.appointmentStatItem}>
               <View
@@ -201,7 +201,7 @@ export default function AppointmentsDetails() {
                 <Text style={styles.statusValue}>
                   {stats.completed}
                 </Text>
-                <Text style={styles.statusLabel}>შესრულებული</Text>
+                <Text style={styles.statusLabel}>დასრულებული</Text>
                 <Text style={styles.statusPercentage}>
                   {stats.total > 0
                     ? Math.round((stats.completed / stats.total) * 100)

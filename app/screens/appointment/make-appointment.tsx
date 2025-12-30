@@ -153,15 +153,16 @@ const MakeAppointment = () => {
   )} | ${selectedTime}`;
 
   const handleMakeAppointment = async () => {
-    // Client-side guard: at least 2 hours before selected time
+    // Client-side guard: at least 2 hours before for video, 12 hours for home-visit
     if (selectedDate && selectedTime) {
       const candidate = new Date(`${selectedDate}T${selectedTime}:00`);
       const now = new Date();
-      const twoHoursMs = 2 * 60 * 60 * 1000;
-      if (candidate.getTime() - now.getTime() < twoHoursMs) {
+      const requiredHours = appointmentType === "home-visit" ? 12 : 2;
+      const requiredMs = requiredHours * 60 * 60 * 1000;
+      if (candidate.getTime() - now.getTime() < requiredMs) {
         Alert.alert(
           "შეზღუდვა",
-          "ჯავშნის გაკეთება შესაძლებელია მინიმუმ 2 საათით ადრე.",
+          `ჯავშნის გაკეთება შესაძლებელია მინიმუმ ${requiredHours} საათით ადრე.`,
         );
         return;
       }

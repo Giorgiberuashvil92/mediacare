@@ -15,6 +15,7 @@ import {
   Appointment,
   AppointmentDocument,
   AppointmentStatus,
+  AppointmentSubStatus,
   AppointmentType,
   PaymentStatus,
 } from './schemas/appointment.schema';
@@ -32,7 +33,7 @@ export class AppointmentsService {
   ) {
     setInterval(() => {
       this.cleanupExpiredBlocks();
-    }, 60000); // 1 minute
+    }, 60000);
   }
 
   private ensurePatientOwner(patientId: string, apt: AppointmentDocument) {
@@ -211,11 +212,15 @@ export class AppointmentsService {
     appointmentDateTime.setHours(hours, minutes, 0, 0);
 
     const now = new Date();
-    const twoHoursInMs = 2 * 60 * 60 * 1000;
+    // ონლაინის შემთხვევაში: 2 საათით ადრე
+    // ბინაზე ვიზიტისას: 12 საათით ადრე
+    const requiredHours =
+      createAppointmentDto.type === AppointmentType.VIDEO ? 2 : 12;
+    const requiredMs = requiredHours * 60 * 60 * 1000;
 
-    if (appointmentDateTime.getTime() - now.getTime() < twoHoursInMs) {
+    if (appointmentDateTime.getTime() - now.getTime() < requiredMs) {
       throw new BadRequestException(
-        'ჯავშნის გაკეთება შესაძლებელია მინიმუმ 2 საათით ადრე',
+        `ჯავშნის გაკეთება შესაძლებელია მინიმუმ ${requiredHours} საათით ადრე`,
       );
     }
 
@@ -246,13 +251,6 @@ export class AppointmentsService {
 
     const availability =
       await this.availabilityModel.findOne(availabilityQuery);
-
-    console.log('🔍 createAppointment - Availability found:', {
-      found: !!availability,
-      availabilityDate: availability?.date,
-      availabilityTimeSlots: availability?.timeSlots,
-      timeSlotsLength: availability?.timeSlots?.length || 0,
-    });
 
     if (!availability) {
       const typeLabel =
@@ -650,6 +648,306 @@ export class AppointmentsService {
     };
   }
 
+  async cancelAppointment(patientId: string, appointmentId: string) {
+    const appointment = await this.appointmentModel.findById(
+      new mongoose.Types.ObjectId(appointmentId),
+    );
+
+    if (!appointment) {
+      throw new NotFoundException('Appointment not found');
+    }
+
+    // Check if patient owns the appointment
+    if (appointment.patientId.toString() !== patientId.toString()) {
+      throw new UnauthorizedException(
+        'Not authorized to cancel this appointment',
+      );
+    }
+
+    // Check if appointment can be cancelled (not completed or already cancelled)
+    if (appointment.status === AppointmentStatus.COMPLETED) {
+      throw new BadRequestException('Cannot cancel completed appointment');
+    }
+
+    if (appointment.status === AppointmentStatus.CANCELLED) {
+      throw new BadRequestException('Appointment is already cancelled');
+    }
+
+    // Update appointment status to cancelled
+    appointment.status = AppointmentStatus.CANCELLED;
+    await appointment.save();
+
+    // Note: The time slot will automatically become available again because
+    // getDoctorAvailability() filters out cancelled appointments (status: { $ne: 'cancelled' })
+    // So the slot will be freed up in the doctor's schedule automatically
+
+    return {
+      success: true,
+      message: 'ჯავშანი წარმატებით გაუქმდა',
+      data: appointment,
+    };
+  }
+
+  async requestReschedule(
+    userId: string,
+    appointmentId: string,
+    newDate: string,
+    newTime: string,
+    reason?: string,
+  ) {
+    const appointment = await this.appointmentModel.findById(
+      new mongoose.Types.ObjectId(appointmentId),
+    );
+
+    if (!appointment) {
+      throw new NotFoundException('Appointment not found');
+    }
+
+    // Check if user is doctor or patient
+    const isDoctor = appointment.doctorId.toString() === userId.toString();
+    const isPatient = appointment.patientId.toString() === userId.toString();
+
+    if (!isDoctor && !isPatient) {
+      throw new UnauthorizedException(
+        'Not authorized to request reschedule for this appointment',
+      );
+    }
+
+    // Check if appointment can be rescheduled
+    if (
+      appointment.status === AppointmentStatus.COMPLETED ||
+      appointment.status === AppointmentStatus.CANCELLED
+    ) {
+      throw new BadRequestException(
+        'Cannot reschedule completed or cancelled appointment',
+      );
+    }
+
+    // Check if there's already a pending reschedule request
+    if (
+      appointment.rescheduleRequest &&
+      appointment.rescheduleRequest.status === 'pending'
+    ) {
+      throw new BadRequestException(
+        'There is already a pending reschedule request for this appointment',
+      );
+    }
+
+    // Parse and validate date
+    const appointmentDate = new Date(newDate + 'T00:00:00.000Z');
+    if (isNaN(appointmentDate.getTime())) {
+      throw new BadRequestException('Invalid appointment date');
+    }
+
+    const normalizedDate = appointmentDate;
+    const startOfDay = new Date(normalizedDate);
+    const endOfDay = new Date(normalizedDate);
+    endOfDay.setUTCHours(23, 59, 59, 999);
+
+    // Validate time format
+    const [hoursStr, minutesStr] = (newTime || '').split(':');
+    const hours = Number(hoursStr);
+    const minutes = Number(minutesStr);
+
+    if (
+      Number.isNaN(hours) ||
+      Number.isNaN(minutes) ||
+      hours < 0 ||
+      hours > 23 ||
+      minutes < 0 ||
+      minutes > 59
+    ) {
+      throw new BadRequestException('Invalid appointment time');
+    }
+
+    // Build full appointment DateTime
+    const appointmentDateTime = new Date(appointmentDate);
+    appointmentDateTime.setHours(hours, minutes, 0, 0);
+
+    const now = new Date();
+    if (appointmentDateTime.getTime() < now.getTime()) {
+      throw new BadRequestException(
+        'ახალი თარიღი და დრო არ შეიძლება იყოს წარსულში',
+      );
+    }
+
+    // Check doctor's availability
+    let availability = await this.availabilityModel.findOne({
+      doctorId: appointment.doctorId,
+      date: {
+        $gte: startOfDay,
+        $lte: endOfDay,
+      },
+      type: appointment.type,
+      isAvailable: true,
+    });
+
+    // If doctor doesn't have this time in schedule, add it
+    if (!availability) {
+      // Create new availability entry
+      availability = await this.availabilityModel.create({
+        doctorId: appointment.doctorId,
+        date: normalizedDate,
+        type: appointment.type,
+        isAvailable: true,
+        timeSlots: [newTime],
+      });
+    } else if (
+      !availability.timeSlots ||
+      !availability.timeSlots.includes(newTime)
+    ) {
+      // Add time slot if it doesn't exist
+      if (!availability.timeSlots) {
+        availability.timeSlots = [];
+      }
+      availability.timeSlots.push(newTime);
+      availability.timeSlots.sort();
+      await availability.save();
+    }
+
+    // Check if the new time slot is already booked
+    const existingAppointment = await this.appointmentModel.findOne({
+      doctorId: appointment.doctorId,
+      appointmentDate: normalizedDate,
+      appointmentTime: newTime,
+      type: appointment.type,
+      status: {
+        $in: [
+          AppointmentStatus.PENDING,
+          AppointmentStatus.CONFIRMED,
+          AppointmentStatus.IN_PROGRESS,
+        ],
+      },
+      _id: { $ne: new mongoose.Types.ObjectId(appointmentId) },
+    });
+
+    if (existingAppointment) {
+      throw new BadRequestException('Selected time slot is already booked');
+    }
+
+    // Create reschedule request
+    appointment.rescheduleRequest = {
+      requestedBy: isDoctor ? 'doctor' : 'patient',
+      requestedDate: normalizedDate,
+      requestedTime: newTime,
+      reason: reason,
+      status: 'pending',
+      requestedAt: new Date(),
+    };
+
+    await appointment.save();
+
+    return {
+      success: true,
+      message: 'გადაჯავშნის მოთხოვნა გაიგზავნა',
+      data: appointment,
+    };
+  }
+
+  async approveReschedule(userId: string, appointmentId: string) {
+    const appointment = await this.appointmentModel.findById(
+      new mongoose.Types.ObjectId(appointmentId),
+    );
+
+    if (!appointment) {
+      throw new NotFoundException('Appointment not found');
+    }
+
+    if (!appointment.rescheduleRequest) {
+      throw new BadRequestException('No reschedule request found');
+    }
+
+    if (appointment.rescheduleRequest.status !== 'pending') {
+      throw new BadRequestException('Reschedule request is not pending');
+    }
+
+    // Check if user is the other party (not the one who requested)
+    const isDoctor = appointment.doctorId.toString() === userId.toString();
+    const isPatient = appointment.patientId.toString() === userId.toString();
+
+    if (!isDoctor && !isPatient) {
+      throw new UnauthorizedException(
+        'Not authorized to approve this reschedule request',
+      );
+    }
+
+    // Check if user is trying to approve their own request
+    if (
+      (isDoctor && appointment.rescheduleRequest.requestedBy === 'doctor') ||
+      (isPatient && appointment.rescheduleRequest.requestedBy === 'patient')
+    ) {
+      throw new BadRequestException(
+        'Cannot approve your own reschedule request',
+      );
+    }
+
+    // Update appointment date and time
+    appointment.appointmentDate = appointment.rescheduleRequest.requestedDate!;
+    appointment.appointmentTime = appointment.rescheduleRequest.requestedTime!;
+    appointment.rescheduleRequest.status = 'approved';
+    appointment.rescheduleRequest.respondedAt = new Date();
+    appointment.rescheduleRequest.respondedBy = isDoctor ? 'doctor' : 'patient';
+
+    await appointment.save();
+
+    return {
+      success: true,
+      message: 'გადაჯავშნა დამტკიცდა',
+      data: appointment,
+    };
+  }
+
+  async rejectReschedule(userId: string, appointmentId: string) {
+    const appointment = await this.appointmentModel.findById(
+      new mongoose.Types.ObjectId(appointmentId),
+    );
+
+    if (!appointment) {
+      throw new NotFoundException('Appointment not found');
+    }
+
+    if (!appointment.rescheduleRequest) {
+      throw new BadRequestException('No reschedule request found');
+    }
+
+    if (appointment.rescheduleRequest.status !== 'pending') {
+      throw new BadRequestException('Reschedule request is not pending');
+    }
+
+    // Check if user is the other party
+    const isDoctor = appointment.doctorId.toString() === userId.toString();
+    const isPatient = appointment.patientId.toString() === userId.toString();
+
+    if (!isDoctor && !isPatient) {
+      throw new UnauthorizedException(
+        'Not authorized to reject this reschedule request',
+      );
+    }
+
+    // Check if user is trying to reject their own request
+    if (
+      (isDoctor && appointment.rescheduleRequest.requestedBy === 'doctor') ||
+      (isPatient && appointment.rescheduleRequest.requestedBy === 'patient')
+    ) {
+      throw new BadRequestException(
+        'Cannot reject your own reschedule request',
+      );
+    }
+
+    // Mark request as rejected
+    appointment.rescheduleRequest.status = 'rejected';
+    appointment.rescheduleRequest.respondedAt = new Date();
+    appointment.rescheduleRequest.respondedBy = isDoctor ? 'doctor' : 'patient';
+
+    await appointment.save();
+
+    return {
+      success: true,
+      message: 'გადაჯავშნის მოთხოვნა უარყოფილია',
+      data: appointment,
+    };
+  }
+
   // Helper function to calculate working days (excluding weekends)
   private calculateWorkingDays(startDate: Date, days: number): Date {
     const currentDate = new Date(startDate);
@@ -948,6 +1246,61 @@ export class AppointmentsService {
     };
   }
 
+  async assignInstrumentalTests(
+    doctorId: string,
+    appointmentId: string,
+    tests: Array<{
+      productId: string;
+      productName: string;
+      notes?: string;
+    }>,
+  ) {
+    const appointment = await this.appointmentModel.findById(
+      new mongoose.Types.ObjectId(appointmentId),
+    );
+
+    if (!appointment) {
+      throw new NotFoundException('Appointment not found');
+    }
+
+    if (appointment.doctorId.toString() !== doctorId.toString()) {
+      throw new UnauthorizedException(
+        'Not authorized to assign tests to this appointment',
+      );
+    }
+
+    const allowedStatuses = [
+      AppointmentStatus.CONFIRMED,
+      AppointmentStatus.IN_PROGRESS,
+      AppointmentStatus.COMPLETED,
+    ];
+    if (!allowedStatuses.includes(appointment.status)) {
+      throw new BadRequestException(
+        'ინსტრუმენტული კვლევები მხოლოდ დადასტურებულ, მიმდინარე ან დასრულებულ ჯავშნებზე შეიძლება დაინიშნოს',
+      );
+    }
+
+    if (!appointment.instrumentalTests) {
+      appointment.instrumentalTests = [];
+    }
+
+    const newTests = tests.map((test) => ({
+      productId: test.productId,
+      productName: test.productName,
+      notes: test.notes,
+      assignedAt: new Date(),
+    }));
+
+    appointment.instrumentalTests.push(...newTests);
+    await appointment.save();
+
+    return {
+      success: true,
+      message: 'ინსტრუმენტული კვლევები წარმატებით დაემატა',
+      data: appointment,
+    };
+  }
+
   async bookLaboratoryTest(
     patientId: string,
     appointmentId: string,
@@ -1009,6 +1362,71 @@ export class AppointmentsService {
     return {
       success: true,
       message: 'ლაბორატორიული კვლევა წარმატებით დაჯავშნა',
+      data: appointment,
+    };
+  }
+
+  async bookInstrumentalTest(
+    patientId: string,
+    appointmentId: string,
+    data: {
+      productId: string;
+      clinicId: string;
+      clinicName: string;
+    },
+  ) {
+    const appointment = await this.appointmentModel.findById(
+      new mongoose.Types.ObjectId(appointmentId),
+    );
+
+    if (!appointment) {
+      throw new NotFoundException('Appointment not found');
+    }
+
+    // Check if patient owns this appointment
+    if (appointment.patientId.toString() !== patientId.toString()) {
+      throw new UnauthorizedException(
+        'Not authorized to book tests for this appointment',
+      );
+    }
+
+    // Check if appointment is completed
+    if (appointment.status !== AppointmentStatus.COMPLETED) {
+      throw new BadRequestException(
+        'Instrumental tests can only be booked for completed appointments',
+      );
+    }
+
+    // Find the instrumental test
+    if (
+      !appointment.instrumentalTests ||
+      appointment.instrumentalTests.length === 0
+    ) {
+      throw new NotFoundException(
+        'No instrumental tests found for this appointment',
+      );
+    }
+
+    const testIndex = appointment.instrumentalTests.findIndex(
+      (test) => test.productId === data.productId && !test.booked,
+    );
+
+    if (testIndex === -1) {
+      throw new NotFoundException(
+        'Instrumental test not found or already booked',
+      );
+    }
+
+    // Update the test with clinic and mark as booked
+    appointment.instrumentalTests[testIndex].clinicId = data.clinicId;
+    appointment.instrumentalTests[testIndex].clinicName = data.clinicName;
+    appointment.instrumentalTests[testIndex].booked = true;
+
+    await appointment.save();
+
+    return {
+      success: true,
+      message: 'ინსტრუმენტული კვლევა წარმატებით დაჯავშნა',
       data: appointment,
     };
   }
@@ -1243,6 +1661,124 @@ export class AppointmentsService {
         uid,
         expirationTime: expirationTimeInSeconds,
       },
+    };
+  }
+
+  // Join video call - track when patient or doctor joins
+  async joinCall(userId: string, appointmentId: string) {
+    const appointment = await this.appointmentModel.findById(
+      new mongoose.Types.ObjectId(appointmentId),
+    );
+
+    if (!appointment) {
+      throw new NotFoundException('Appointment not found');
+    }
+
+    const isDoctor = appointment.doctorId.toString() === userId.toString();
+    const isPatient = appointment.patientId.toString() === userId.toString();
+
+    if (!isDoctor && !isPatient) {
+      throw new UnauthorizedException('Not authorized for this appointment');
+    }
+
+    // Update join time based on role
+    if (isDoctor && !appointment.doctorJoinedAt) {
+      appointment.doctorJoinedAt = new Date();
+    } else if (isPatient && !appointment.patientJoinedAt) {
+      appointment.patientJoinedAt = new Date();
+    }
+
+    await appointment.save();
+
+    return {
+      success: true,
+      message: 'Join time recorded',
+      data: appointment,
+    };
+  }
+
+  // Complete video consultation - called by doctor after both parties leave
+  async completeConsultation(userId: string, appointmentId: string) {
+    const appointment = await this.appointmentModel.findById(
+      new mongoose.Types.ObjectId(appointmentId),
+    );
+
+    if (!appointment) {
+      throw new NotFoundException('Appointment not found');
+    }
+
+    if (appointment.doctorId.toString() !== userId.toString()) {
+      throw new UnauthorizedException('Only doctor can complete consultation');
+    }
+
+    if (appointment.type !== AppointmentType.VIDEO) {
+      throw new BadRequestException(
+        'This endpoint is only for video consultations',
+      );
+    }
+
+    // Check if both parties joined
+    if (!appointment.patientJoinedAt || !appointment.doctorJoinedAt) {
+      throw new BadRequestException(
+        'Both parties must join before completing consultation',
+      );
+    }
+
+    // Check if already completed
+    if (appointment.completedAt) {
+      throw new BadRequestException('Consultation already completed');
+    }
+
+    // Mark as completed and set subStatus to conducted
+    appointment.completedAt = new Date();
+    appointment.subStatus = AppointmentSubStatus.CONDUCTED;
+    appointment.status = AppointmentStatus.CONFIRMED; // Keep as confirmed, subStatus shows it's conducted
+
+    await appointment.save();
+
+    return {
+      success: true,
+      message: 'Consultation marked as conducted',
+      data: appointment,
+    };
+  }
+
+  // Complete home visit - called by patient
+  async completeHomeVisit(userId: string, appointmentId: string) {
+    const appointment = await this.appointmentModel.findById(
+      new mongoose.Types.ObjectId(appointmentId),
+    );
+
+    if (!appointment) {
+      throw new NotFoundException('Appointment not found');
+    }
+
+    if (appointment.patientId.toString() !== userId.toString()) {
+      throw new UnauthorizedException(
+        'Only patient can mark home visit as completed',
+      );
+    }
+
+    if (appointment.type !== AppointmentType.HOME_VISIT) {
+      throw new BadRequestException('This endpoint is only for home visits');
+    }
+
+    // Check if already completed
+    if (appointment.homeVisitCompletedAt) {
+      throw new BadRequestException('Home visit already marked as completed');
+    }
+
+    // Mark as completed and set subStatus to conducted
+    appointment.homeVisitCompletedAt = new Date();
+    appointment.subStatus = AppointmentSubStatus.CONDUCTED;
+    appointment.status = AppointmentStatus.CONFIRMED; // Keep as confirmed, subStatus shows it's conducted
+
+    await appointment.save();
+
+    return {
+      success: true,
+      message: 'Home visit marked as completed',
+      data: appointment,
     };
   }
 }

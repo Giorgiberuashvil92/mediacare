@@ -9,6 +9,11 @@ export interface CartItem {
   image?: string;
   clinic?: string; // Clinic name for laboratory products
   clinicId?: string; // Clinic ID for laboratory products
+  homeCollection?: {
+    address: string;
+    date: string;
+    time: string;
+  }; // Home collection details
 }
 
 interface CartContextType {

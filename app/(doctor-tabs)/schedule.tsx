@@ -397,8 +397,11 @@ export default function DoctorSchedule() {
       const diffMs = slotDateTime.getTime() - now.getTime();
       const diffHours = diffMs / (1000 * 60 * 60);
       
-      // თუ დარჩენილია მინიმუმ 2.5 საათი, შეუძლია დამატება
-      return diffHours >= 2.5;
+      // ონლაინის შემთხვევაში: 2 საათით ადრე
+      // ბინაზე ვიზიტისას: 12 საათით ადრე
+      const requiredHours = mode === "video" ? 2 : 12;
+      
+      return diffHours >= requiredHours;
     } catch (error) {
       console.error("Error calculating time difference:", error);
       return false;

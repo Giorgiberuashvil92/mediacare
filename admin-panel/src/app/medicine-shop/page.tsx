@@ -153,6 +153,7 @@ export default function MedicineShopPage() {
       const payload = {
         name: productForm.name,
         icdCode: productForm.icdCode || undefined,
+        uniqueCode: productForm.uniqueCode || undefined,
         type: productForm.type,
         description: productForm.description || undefined,
         price: productForm.price ? Number(productForm.price) : undefined,
@@ -566,7 +567,7 @@ export default function MedicineShopPage() {
 
                   <div>
                     <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
-                      ICD კოდი (უნიკალური)
+                      ICD კოდი (არასავალდებულო)
                     </label>
                     <input
                       type="text"
@@ -581,7 +582,7 @@ export default function MedicineShopPage() {
 
                   <div>
                     <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
-                      უნიკალური კოდი
+                      NCSP კოდი / უნიკალური კოდი (არასავალდებულო)
                     </label>
                     <input
                       type="text"

@@ -4,7 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -471,7 +473,7 @@ export default function LaboratoryScreen() {
       case "pending": return "მოლოდინში";
       case "in-cart": return "კალათაში";
       case "paid": return "გადახდილი";
-      case "completed": return "შესრულებული";
+      case "completed": return "დასრულებული";
       default: return status;
     }
   };
@@ -609,7 +611,13 @@ export default function LaboratoryScreen() {
           {/* Appointment Selection */}
           <TouchableOpacity
             style={styles.selectionButton}
-            onPress={() => setShowAppointmentModal(true)}
+            onPress={() => {
+              // Disable if came from dashboard (has params)
+              if (!params.appointmentId && !params.patientId && !params.patientName) {
+                setShowAppointmentModal(true);
+              }
+            }}
+            disabled={!!(params.appointmentId || params.patientId || params.patientName)}
           >
             <Ionicons name="calendar-outline" size={20} color="#6B7280" />
             <Text style={[styles.selectionText, selectedAppointment && styles.selectionTextActive]}>
@@ -617,7 +625,9 @@ export default function LaboratoryScreen() {
                 ? `${selectedAppointment.patientName} • ${selectedAppointment.date} ${selectedAppointment.time}`
                 : "აირჩიეთ ჯავშანი"}
             </Text>
-            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+            {!(params.appointmentId || params.patientId || params.patientName) && (
+              <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+            )}
           </TouchableOpacity>
 
           {/* Tests Selection */}
@@ -700,7 +710,11 @@ export default function LaboratoryScreen() {
         transparent
         onRequestClose={() => setShowAppointmentModal(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+        >
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>აირჩიეთ ჯავშანი</Text>
@@ -784,7 +798,7 @@ export default function LaboratoryScreen() {
               }
             />
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Test Selection Modal */}
@@ -794,7 +808,11 @@ export default function LaboratoryScreen() {
         transparent
         onRequestClose={() => setShowTestModal(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+        >
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
@@ -865,7 +883,7 @@ export default function LaboratoryScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );

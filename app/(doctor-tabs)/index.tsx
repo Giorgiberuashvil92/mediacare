@@ -1,7 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Modal,
   RefreshControl,
@@ -44,6 +44,49 @@ export default function DoctorDashboard() {
   const [slotsModalDate, setSlotsModalDate] = useState<string | null>(null);
   const [slotsModalTimes, setSlotsModalTimes] = useState<string[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+
+  const getTypeMeta = (type?: string) => {
+    switch (type) {
+      case "home-visit":
+        return {
+          label: "ბინაზე ვიზიტი",
+          color: "#8B5CF6", // იასამნისფერი
+          bg: "#F4F1FF",
+          chipColor: "#EDE9FE",
+        };
+      case "video":
+      default:
+        return {
+          label: "ონლაინ კონსულტაცია",
+          color: "#0EA5E9",
+          bg: "#E0F2FE",
+          chipColor: "#0EA5E933",
+        };
+    }
+  };
+
+  const upcomingConsultation = useMemo(() => {
+    if (!recentConsultations?.length) return null;
+
+    const now = new Date();
+
+    const parseDateTime = (date: string, time: string) => {
+      const dateTime = new Date(`${date}T${time}`);
+      return isNaN(dateTime.getTime()) ? null : dateTime;
+    };
+
+    const upcoming = recentConsultations
+      .filter((c) => c.status === "scheduled" || c.status === "in-progress")
+      .map((c) => {
+        const dt = parseDateTime(c.date, c.time);
+        return dt ? { ...c, dateTime: dt } : null;
+      })
+      .filter((c): c is Consultation & { dateTime: Date } => !!c)
+      .filter((c) => c.dateTime >= now)
+      .sort((a, b) => a.dateTime.getTime() - b.dateTime.getTime());
+
+    return upcoming[0] || null;
+  }, [recentConsultations]);
 
   // Group upcoming available hours (doctor's schedule) by date for the selected type
   const groupedUpcomingByDate = (() => {
@@ -137,13 +180,6 @@ export default function DoctorDashboard() {
     await loadDashboardData();
     setRefreshing(false);
   }, [loadDashboardData]);
-
-  // Calculate percentages
-  const appointmentCompletionRate = stats
-    ? Math.round(
-        (stats.appointments.completed / stats.appointments.total) * 100
-      )
-    : 0;
 
   if (loading) {
     return (
@@ -257,6 +293,99 @@ export default function DoctorDashboard() {
           </TouchableOpacity>
         </View>
 
+        {upcomingConsultation && (
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() =>
+              router.push(
+                {
+                  pathname: "/(doctor-tabs)/appointments" as any,
+                  params: { id: upcomingConsultation.id },
+                } as any,
+              )
+            }
+            style={[
+              styles.upcomingCard,
+              { backgroundColor: getTypeMeta(upcomingConsultation.type).bg },
+            ]}
+          >
+            <View style={styles.upcomingRow}>
+              <View style={styles.upcomingLeft}>
+                <View style={styles.upcomingBadgeRow}>
+                  <View
+                    style={[
+                      styles.upcomingBadge,
+                      { backgroundColor: getTypeMeta(upcomingConsultation.type).chipColor },
+                    ]}
+                  >
+                    <Ionicons
+                      name={upcomingConsultation.type === "home-visit" ? "home" : "videocam"}
+                      size={16}
+                      color={getTypeMeta(upcomingConsultation.type).color}
+                    />
+                    <Text
+                      style={[
+                        styles.upcomingBadgeText,
+                        { color: getTypeMeta(upcomingConsultation.type).color },
+                      ]}
+                    >
+                      {getTypeMeta(upcomingConsultation.type).label}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={styles.upcomingTitle}>
+                  დღეს გაქვთ კონსულტაცია {upcomingConsultation.patientName}-თან
+                </Text>
+                <Text style={styles.upcomingSubtitle}>
+                  {new Date(upcomingConsultation.dateTime).toLocaleDateString("ka-GE", {
+                    weekday: "long",
+                    month: "short",
+                    day: "numeric",
+                  })}
+                  , {upcomingConsultation.time}
+                </Text>
+
+                <View style={styles.upcomingMetaRow}>
+                  <View style={styles.upcomingMetaPill}>
+                    <Ionicons
+                      name="time-outline"
+                      size={16}
+                      color={getTypeMeta(upcomingConsultation.type).color}
+                    />
+                    <Text style={styles.upcomingMetaText}>{upcomingConsultation.time}</Text>
+                  </View>
+                  <View style={styles.upcomingMetaPill}>
+                    <Ionicons
+                      name="person-outline"
+                      size={16}
+                      color={getTypeMeta(upcomingConsultation.type).color}
+                    />
+                    <Text style={styles.upcomingMetaText}>
+                      {upcomingConsultation.type === "home-visit" ? "ბინაზე ვიზიტი" : "ონლაინ"}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.upcomingRight}>
+                <View
+                  style={[
+                    styles.upcomingAvatar,
+                    { borderColor: getTypeMeta(upcomingConsultation.type).color },
+                  ]}
+                >
+                  <Ionicons
+                    name="calendar"
+                    size={28}
+                    color={getTypeMeta(upcomingConsultation.type).color}
+                  />
+                </View>
+              </View>
+            </View>
+          </TouchableOpacity>
+        )}
+
         {/* Quick Actions */}
         <View style={styles.quickActionsSection}>
           <Text style={styles.quickActionsTitle}>სწრაფი მოქმედებები</Text>
@@ -322,70 +451,7 @@ export default function DoctorDashboard() {
         </View>
 
         {/* Quick Stats */}
-        <View style={styles.statsCardsSection}>
-          <Text style={styles.statsCardsTitle}>სტატისტიკა</Text>
-          <View style={styles.statsCardsRow}>
-            {/* Video Consultations */}
-            <TouchableOpacity
-              style={styles.statsCard}
-              onPress={() => router.push("/doctor/revenue-details" as any)}
-              activeOpacity={0.85}
-            >
-              <View
-                style={[styles.statsCardIcon, { backgroundColor: "#E0F2FE" }]}
-              >
-                <Ionicons name="videocam" size={22} color="#0EA5E9" />
-              </View>
-              <Text style={styles.statsCardValue}>
-                {stats?.videoConsultations?.thisMonth ||
-                  stats?.appointments?.total ||
-                  0}
-              </Text>
-              <Text style={styles.statsCardLabel}>ვიდეო კონსულტაციები</Text>
-              <Text style={styles.statsCardSubLabel}>ამ თვეში</Text>
-            </TouchableOpacity>
-
-            {/* Home Visits */}
-            <TouchableOpacity
-              style={styles.statsCard}
-              onPress={() => router.push("/doctor/revenue-details" as any)}
-              activeOpacity={0.85}
-            >
-              <View
-                style={[styles.statsCardIcon, { backgroundColor: "#DCFCE7" }]}
-              >
-                <Ionicons name="home" size={22} color="#10B981" />
-              </View>
-              <Text style={styles.statsCardValue}>
-                {stats?.homeVisits?.thisMonth || 0}
-              </Text>
-              <Text style={styles.statsCardLabel}>ბინაზე ვიზიტები</Text>
-              <Text style={styles.statsCardSubLabel}>ამ თვეში</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Detailed Statistics Button */}
-          <TouchableOpacity
-            style={styles.detailedStatsButton}
-            onPress={() => router.push("/doctor/revenue-details" as any)}
-            activeOpacity={0.85}
-          >
-            <View style={styles.detailedStatsLeft}>
-              <View style={styles.detailedStatsIcon}>
-                <Ionicons name="stats-chart" size={24} color="#8B5CF6" />
-              </View>
-              <View>
-                <Text style={styles.detailedStatsTitle}>
-                  დეტალური სტატისტიკა
-                </Text>
-                <Text style={styles.detailedStatsSubtitle}>
-                  ფინანსური, თვეების მიხედვით
-                </Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-          </TouchableOpacity>
-        </View>
+       
 
         {/* My Available Schedule */}
         {selectedDates.length > 0 && (
@@ -874,7 +940,7 @@ export default function DoctorDashboard() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create<any>({
   container: {
     flex: 1,
     backgroundColor: "#F8F9FA",
@@ -886,6 +952,101 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 10,
     paddingBottom: 20,
+  },
+  // Upcoming banner
+  upcomingCard: {
+    marginHorizontal: 20,
+    marginBottom: 16,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  upcomingRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  upcomingLeft: {
+    flex: 1,
+    gap: 6,
+  },
+  upcomingRight: {
+    width: 120,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  upcomingBadgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  upcomingBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+  },
+  upcomingBadgeText: {
+    fontSize: 12,
+    fontFamily: "Poppins-SemiBold",
+  },
+  upcomingStatus: {
+    fontSize: 12,
+    fontFamily: "Poppins-Medium",
+    color: "#111827",
+  },
+  upcomingTitle: {
+    fontSize: 16,
+    fontFamily: "Poppins-Bold",
+    color: "#111827",
+  },
+  upcomingSubtitle: {
+    fontSize: 13,
+    fontFamily: "Poppins-Regular",
+    color: "#4B5563",
+  },
+  upcomingMetaRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 6,
+  },
+  upcomingMetaPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    backgroundColor: "rgba(15, 118, 110, 0.06)",
+  },
+  upcomingMetaText: {
+    fontSize: 12,
+    fontFamily: "Poppins-Medium",
+    color: "#111827",
+  },
+  upcomingAvatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 2,
+    backgroundColor: "#FFFFFF",
+    justifyContent: "center",
+    alignItems: "center",
+    borderColor: "#0EA5E9",
+  },
+  upcomingRightLabel: {
+    fontSize: 12,
+    color: "#6B7280",
+    fontFamily: "Poppins-Medium",
+  },
+  upcomingRightValue: {
+    fontSize: 11,
+    color: "#111827",
+    fontFamily: "Poppins-Regular",
+    textAlign: "center",
   },
   // Quick Actions
   quickActionsSection: {

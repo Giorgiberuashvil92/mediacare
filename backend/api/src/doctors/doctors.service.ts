@@ -283,18 +283,56 @@ export class DoctorsService {
     }
 
     // Get doctors
-    const [doctors, total] = await Promise.all([
-      this.userModel
-        .find(filter)
-        .select('-password')
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      this.userModel.countDocuments(filter),
-    ]);
+    const doctors = await this.userModel
+      .find(filter)
+      .select('-password')
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    // Filter doctors who have availability (at least one available time slot in the future)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Get all doctor IDs
+    const doctorIds = doctors.map((doctor) => (doctor._id as any).toString());
+
+    // Find all doctors who have availability in the future
+    // First, find availability records that match our criteria
+    const availabilityRecords = await this.availabilityModel
+      .find({
+        doctorId: {
+          $in: doctorIds.map((id) => new mongoose.Types.ObjectId(id)),
+        },
+        date: { $gte: today },
+        isAvailable: true,
+        timeSlots: { $exists: true, $ne: [] },
+      })
+      .select('doctorId timeSlots')
+      .lean();
+
+    // Filter to only include records with non-empty timeSlots array
+    const doctorsWithAvailability = availabilityRecords
+      .filter(
+        (record) =>
+          record.timeSlots &&
+          Array.isArray(record.timeSlots) &&
+          record.timeSlots.length > 0,
+      )
+      .map((record) => record.doctorId);
+
+    // Convert to string array for comparison
+    const availableDoctorIds = new Set(
+      doctorsWithAvailability.map((id) => id.toString()),
+    );
+
+    // Filter doctors to only include those with availability
+    const availableDoctors = doctors.filter((doctor) =>
+      availableDoctorIds.has((doctor._id as any).toString()),
+    );
 
     // Format doctors
-    const formattedDoctors = doctors.map((doctor) => ({
+    const formattedDoctors = availableDoctors.map((doctor) => ({
       id: (doctor._id as string).toString(),
       name: doctor.name,
       email: doctor.email,
@@ -318,6 +356,9 @@ export class DoctorsService {
       isTopRated: doctor.isTopRated || false,
     }));
 
+    // Update total count to reflect only doctors with availability
+    const totalWithAvailability = formattedDoctors.length;
+
     return {
       success: true,
       data: {
@@ -325,8 +366,8 @@ export class DoctorsService {
         pagination: {
           page,
           limit,
-          total,
-          totalPages: Math.ceil(total / limit),
+          total: totalWithAvailability,
+          totalPages: Math.ceil(totalWithAvailability / limit),
         },
       },
     };

@@ -4,20 +4,20 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    FlatList,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  FlatList,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
-    MedicineShopOverview,
-    ShopProduct,
-    apiService,
+  MedicineShopOverview,
+  ShopProduct,
+  apiService,
 } from "../services/api";
 
 const fallbackOverview: MedicineShopOverview = {
@@ -33,6 +33,7 @@ const Lab = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"laboratory" | "immunological">("laboratory");
 
   useEffect(() => {
     loadOverview();
@@ -53,10 +54,19 @@ const Lab = () => {
     }
   };
 
-  const { laboratoryProducts, laboratoryCategories } =
+  const { laboratoryProducts, laboratoryCategories, equipmentProducts, equipmentCategories } =
     overview || fallbackOverview;
 
-  const filteredProducts = laboratoryProducts.filter((product) => {
+  // Determine which products to show based on active tab
+  const currentProducts = (activeTab === "laboratory" 
+    ? laboratoryProducts 
+    : equipmentProducts) || [];
+  
+  const currentCategories = (activeTab === "laboratory"
+    ? laboratoryCategories
+    : equipmentCategories) || [];
+
+  const filteredProducts = currentProducts.filter((product) => {
     const matchesSearch =
       !searchQuery ||
       product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -100,6 +110,48 @@ const Lab = () => {
         </View>
       </LinearGradient>
 
+      {/* Tabs */}
+      <View style={styles.tabsContainer}>
+        <TouchableOpacity
+          style={[
+            styles.tab,
+            activeTab === "laboratory" && styles.tabActive,
+          ]}
+          onPress={() => {
+            setActiveTab("laboratory");
+            setSelectedCategory(null);
+          }}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === "laboratory" && styles.tabTextActive,
+            ]}
+          >
+            ლაბორატორიული 
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.tab,
+            activeTab === "immunological" && styles.tabActive,
+          ]}
+          onPress={() => {
+            setActiveTab("immunological");
+            setSelectedCategory(null);
+          }}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === "immunological" && styles.tabTextActive,
+            ]}
+          >
+            იმუნოლოგიური
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Search Bar */}
       <View style={styles.searchContainer}>
         <View style={styles.searchBar}>
@@ -125,7 +177,7 @@ const Lab = () => {
       </View>
 
       {/* Categories Filter */}
-      {laboratoryCategories && laboratoryCategories.length > 0 && (
+      {currentCategories && currentCategories.length > 0 && (
         <View style={styles.categoriesContainer}>
           <ScrollView
             horizontal
@@ -148,7 +200,7 @@ const Lab = () => {
                 ყველა
               </Text>
             </TouchableOpacity>
-            {laboratoryCategories.map((category) => (
+            {currentCategories.map((category) => (
               <TouchableOpacity
                 key={category.id}
                 style={[
@@ -165,7 +217,7 @@ const Lab = () => {
                       styles.categoryChipTextActive,
                   ]}
                 >
-                  {category.name}
+                  {String(category.name || "")}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -224,7 +276,7 @@ const ProductCard = ({ product }: { product: ShopProduct }) => {
           pathname: "/screens/lab/product/[id]",
           params: {
             id: product.id,
-            name: product.name,
+            name: product.name || "",
             description: product.description || "",
             price: product.price?.toString() || "0",
             discountPercent: product.discountPercent?.toString() || "",
@@ -235,7 +287,7 @@ const ProductCard = ({ product }: { product: ShopProduct }) => {
       }
     >
       <View style={styles.productImageContainer}>
-        {product.imageUrl && !imageError ? (
+        {Boolean(product.imageUrl) && !imageError ? (
           <Image
             source={{ uri: product.imageUrl }}
             style={styles.productImage}
@@ -247,10 +299,10 @@ const ProductCard = ({ product }: { product: ShopProduct }) => {
             <Ionicons name="flask-outline" size={32} color="#06B6D4" />
           </View>
         )}
-        {product.discountPercent && (
+        {Boolean(product.discountPercent) && (
           <View style={styles.discountBadge}>
             <Text style={styles.discountText}>
-              -{product.discountPercent}%
+              -{String(product.discountPercent || 0)}%
             </Text>
           </View>
         )}
@@ -258,22 +310,22 @@ const ProductCard = ({ product }: { product: ShopProduct }) => {
 
       <View style={styles.productContent}>
         <Text style={styles.productName} numberOfLines={2}>
-          {product.name}
+          {String(product.name || "")}
         </Text>
-        {product.description && (
+        {Boolean(product.description) && (
           <Text style={styles.productDescription} numberOfLines={2}>
-            {product.description}
+            {String(product.description || "")}
           </Text>
         )}
 
         <View style={styles.productFooter}>
           <View>
             <Text style={styles.productPrice}>
-              ₾{product.price?.toFixed(2) || "0.00"}
+              ₾{Number(product.price || 0).toFixed(2)}
             </Text>
-            {product.discountPercent && product.price && (
+            {Boolean(product.discountPercent) && Boolean(product.price) && (
               <Text style={styles.productOriginalPrice}>
-                ₾{((product.price * 100) / (100 - product.discountPercent)).toFixed(2)}
+                ₾{((Number(product.price || 0) * 100) / (100 - (Number(product.discountPercent || 0)))).toFixed(2)}
               </Text>
             )}
           </View>
@@ -284,10 +336,10 @@ const ProductCard = ({ product }: { product: ShopProduct }) => {
                 pathname: "/screens/lab/select-clinic",
                 params: {
                   productId: product.id,
-                  productName: product.name,
+                  productName: product.name || "",
                   productPrice: product.price?.toString() || "0",
-                  productImage: product.imageUrl,
-                  productDescription: product.description,
+                  productImage: product.imageUrl || "",
+                  productDescription: product.description || "",
                 },
               })
             }
@@ -346,6 +398,36 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255, 255, 255, 0.2)",
     justifyContent: "center",
     alignItems: "center",
+  },
+  tabsContainer: {
+    flexDirection: "row",
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 8,
+    gap: 8,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1.5,
+    borderColor: "#E5E7EB",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tabActive: {
+    backgroundColor: "#06B6D4",
+    borderColor: "#06B6D4",
+  },
+  tabText: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#64748B",
+  },
+  tabTextActive: {
+    color: "#FFFFFF",
   },
   searchContainer: {
     paddingHorizontal: 20,

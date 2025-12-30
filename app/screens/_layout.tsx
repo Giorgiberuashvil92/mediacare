@@ -51,6 +51,15 @@ export default function ScreensLayout() {
           animation: "slide_from_bottom",
         }}
       />
+
+      {/* Appointment Waiting Route */}
+      <Stack.Screen 
+        name="appointment-waiting" 
+        options={{
+          presentation: "card",
+          animation: "slide_from_right",
+        }}
+      />
     </Stack>
   );
 }

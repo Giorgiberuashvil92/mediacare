@@ -64,24 +64,40 @@ const Doctor = () => {
   const [doctors, setDoctors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [specializations, setSpecializations] = useState<any[]>([]);
 
-  // Filter options
-  const filterOptions = [
-    { id: "all", label: "ყველა" },
-    { id: "Cardiology", label: "კარდიოლოგი" },
-    { id: "Neurology", label: "ნევროლოგი" },
-    { id: "Orthopedics", label: "ორთოპედი" },
-    { id: "Pediatrics", label: "პედიატრი" },
-    { id: "Gynecology", label: "გინეკოლოგი" },
-    { id: "Allergy", label: "ალერგოლოგი" },
-    { id: "Dentist", label: "სტომატოლოგი" },
-    { id: "Urology", label: "უროლოგი" },
-    { id: "Gastrology", label: "გასტროენტეროლოგი" },
-  ];
+  // Filter options - will be populated from API
+  const filterOptions = useMemo(() => {
+    const options = [{ id: "all", label: "ყველა" }];
+    if (specializations && specializations.length > 0) {
+      const activeSpecializations = specializations
+        .filter((spec) => spec.isActive !== false)
+        .map((spec) => ({
+          id: spec.name || spec._id,
+          label: spec.name || "უცნობი",
+        }));
+      options.push(...activeSpecializations);
+    }
+    return options;
+  }, [specializations]);
 
   useEffect(() => {
+    loadSpecializations();
     loadDoctors();
   }, []);
+
+  const loadSpecializations = async () => {
+    try {
+      const response = await apiService.getSpecializations();
+      if (response.success) {
+        setSpecializations(response.data || []);
+      }
+    } catch (err: any) {
+      console.error("Failed to load specializations:", err);
+      // If API fails, keep empty array - filterOptions will only show "ყველა"
+      setSpecializations([]);
+    }
+  };
 
   const loadDoctors = async () => {
     try {

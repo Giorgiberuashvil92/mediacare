@@ -46,7 +46,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="lab"
         options={{
-          title: "ლაბორატორია",
+          title: "კვლევები",
           headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="flask-outline" size={size} color={color} />
