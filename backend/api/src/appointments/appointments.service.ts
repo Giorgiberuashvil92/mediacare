@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { RtcRole, RtcTokenBuilder } from 'agora-access-token';
-import mongoose from 'mongoose';
+import mongoose, { ConnectionStates } from 'mongoose';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { Availability } from '../doctors/schemas/availability.schema';
 import { User, UserRole } from '../schemas/user.schema';
@@ -32,7 +32,7 @@ export class AppointmentsService {
     private readonly cloudinaryService: CloudinaryService,
   ) {
     setInterval(() => {
-      this.cleanupExpiredBlocks();
+      void this.cleanupExpiredBlocks();
     }, 60000);
   }
 
@@ -379,6 +379,13 @@ export class AppointmentsService {
   // Clean up expired blocked appointments
   private async cleanupExpiredBlocks() {
     try {
+      // Check MongoDB connection before attempting cleanup
+      const connectionState = mongoose.connection.readyState;
+      if (connectionState !== ConnectionStates.connected) {
+        // Only proceed if state is connected
+        return;
+      }
+
       const now = new Date();
       const result = await this.appointmentModel.deleteMany({
         status: AppointmentStatus.BLOCKED,
@@ -391,7 +398,14 @@ export class AppointmentsService {
         );
       }
     } catch (error) {
-      console.error('Error cleaning up expired blocks:', error);
+      // Only log if it's not a connection error to avoid spam
+      if (
+        error instanceof Error &&
+        !error.message.includes('ENOTFOUND') &&
+        !error.message.includes('MongoServerSelectionError')
+      ) {
+        console.error('Error cleaning up expired blocks:', error);
+      }
     }
   }
 
