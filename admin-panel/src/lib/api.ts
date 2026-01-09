@@ -1,14 +1,14 @@
 // API Service for Medicare Admin Panel
 const API_BASE_URL = 
   process.env.NEXT_PUBLIC_API_URL || 
-  'https://mediacare-production.up.railway.app';
-  // 'http://localhost:4000';
+  // 'https://mediacare-production.up.railway.app';
+  'http://localhost:4000';
 
 // DEVELOPMENT MODE: Skip auth and use static token
 const DISABLE_AUTH = true;
 // This token should be a valid JWT for an admin user (get it from /auth/dev-token)
 // Production token - expires in 24h, refresh via: https://mediacare-production.up.railway.app/auth/dev-token 
-const DEV_STATIC_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTQzYjEyNTMwYzQwOTI0ODA2YTI0YTYiLCJpYXQiOjE3Njc5NDU5MjEsImV4cCI6MTc2ODAzMjMyMX0.O2zejsky9sQW5V1BzcaGtwnwFJ4Y1bVTEC5Ol-74cKk","refreshToken":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTQzYjEyNTMwYzQwOTI0ODA2YTI0YTYiLCJpYXQiOjE3Njc5NDU5MjEsImV4cCI6MTc2ODU1MDcyMX0.sR-MYQkIk8xS65OY8o3qOXfKMKHOViq9hsZgUStcNa4';
+const DEV_STATIC_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTQzYjEyNTMwYzQwOTI0ODA2YTI0YTYiLCJpYXQiOjE3Njc5NDk1NzEsImV4cCI6MTc2ODU1NDM3MX0.t_LtNaU1wxgmt3668BiOY4kPLm3P2s6GXTfW2fvV9TE';
 
 export interface ApiResponse<T> {
   success: boolean;
