@@ -56,6 +56,15 @@ export default function DoctorTabsLayout() {
           }}
         />
         <Tabs.Screen
+          name="chat"
+          options={{
+            title: "ჩატი",
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="chatbubbles-outline" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="profile"
           options={{
             title: "პროფილი",
@@ -65,12 +74,6 @@ export default function DoctorTabsLayout() {
           }}
         />
         {/* Hidden screens - accessible via navigation but not shown in tab bar */}
-        <Tabs.Screen
-          name="chat"
-          options={{
-            href: null,
-          }}
-        />
         <Tabs.Screen
           name="active-patients"
           options={{

@@ -64,6 +64,16 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="chat"
+        options={{
+          title: "ჩატი",
+          headerShown: false,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="chatbubbles-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="history"
         options={{
           title: "ისტორია",

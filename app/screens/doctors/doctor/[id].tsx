@@ -290,7 +290,19 @@ const DoctorDetail = () => {
 
       <View style={styles.buttonContainer}>
         <TouchableOpacity
-          style={styles.appointmentButton}
+          style={[styles.actionButton, styles.chatButton]}
+          onPress={() => {
+            router.push({
+              pathname: "/screens/chat/[doctorId]" as any,
+              params: { doctorId: doctor.id },
+            });
+          }}
+        >
+          <Ionicons name="chatbubbles-outline" size={20} color="#06B6D4" />
+          <Text style={styles.chatButtonText}>ჩატი</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionButton, styles.appointmentButton]}
           onPress={() => setShowAppointmentScheduler(true)}
         >
           <Text style={styles.buttonText}>ჯავშნის გაკეთება</Text>
@@ -495,17 +507,35 @@ const styles = StyleSheet.create({
     color: "#20BEB8",
   },
   buttonContainer: {
+    flexDirection: "row",
+    gap: 12,
     paddingHorizontal: 20,
     paddingVertical: 16,
     backgroundColor: "#FFFFFF",
     borderTopWidth: 1,
     borderTopColor: "#E5E5EA",
   },
-  appointmentButton: {
-    backgroundColor: "#22C55E",
+  actionButton: {
+    flex: 1,
     borderRadius: 999,
     paddingVertical: 16,
     alignItems: "center",
+    justifyContent: "center",
+  },
+  chatButton: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 2,
+    borderColor: "#06B6D4",
+    flexDirection: "row",
+    gap: 8,
+  },
+  chatButtonText: {
+    fontSize: 16,
+    fontFamily: "Poppins-SemiBold",
+    color: "#06B6D4",
+  },
+  appointmentButton: {
+    backgroundColor: "#22C55E",
     shadowColor: "#22C55E",
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.25,
