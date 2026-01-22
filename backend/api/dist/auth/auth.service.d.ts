@@ -4,11 +4,15 @@ import { RefreshTokenDocument } from '../schemas/refresh-token.schema';
 import { ApprovalStatus, UserDocument, UserRole } from '../schemas/user.schema';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { PhoneVerificationService } from './phone-verification.service';
+import { NotificationsService } from '../notifications/notifications.service';
 export declare class AuthService {
     private userModel;
     private refreshTokenModel;
     private jwtService;
-    constructor(userModel: mongoose.Model<UserDocument>, refreshTokenModel: mongoose.Model<RefreshTokenDocument>, jwtService: JwtService);
+    private phoneVerificationService;
+    private notificationsService;
+    constructor(userModel: mongoose.Model<UserDocument>, refreshTokenModel: mongoose.Model<RefreshTokenDocument>, jwtService: JwtService, phoneVerificationService: PhoneVerificationService, notificationsService: NotificationsService);
     register(registerDto: RegisterDto): Promise<{
         success: boolean;
         message: string;

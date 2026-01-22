@@ -35,8 +35,11 @@ export default function RoleSelectionScreen() {
         router.replace("/(tabs)");
       }
     } else {
-      // If not authenticated, go to register
-      router.push("/screens/auth/register");
+      // If not authenticated, go directly to register
+      router.push({
+        pathname: "/screens/auth/register",
+        params: { role: selectedRole },
+      });
     }
   };
 

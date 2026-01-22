@@ -1,13 +1,13 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { ADMIN_DEV_TOKEN } from '@/lib/dev-token';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://mediacare-production.up.railway.app';
 
 export async function GET() {
   try {
-    // Get token from cookies (server-side)
     const cookieStore = await cookies();
-    const token = cookieStore.get('accessToken')?.value;
+    const token = cookieStore.get('accessToken')?.value ?? ADMIN_DEV_TOKEN;
 
     if (!token) {
       return NextResponse.json(

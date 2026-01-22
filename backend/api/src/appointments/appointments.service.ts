@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { RtcRole, RtcTokenBuilder } from 'agora-access-token';
-import mongoose, { ConnectionStates } from 'mongoose';
+import mongoose from 'mongoose';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { Availability } from '../doctors/schemas/availability.schema';
 import { User, UserRole } from '../schemas/user.schema';
@@ -379,11 +379,9 @@ export class AppointmentsService {
   // Clean up expired blocked appointments
   private async cleanupExpiredBlocks() {
     try {
-      // Check MongoDB connection before attempting cleanup
-      const connectionState = mongoose.connection.readyState;
-      if (connectionState !== ConnectionStates.connected) {
-        // Only proceed if state is connected
-        return;
+      const conn = mongoose.connection;
+      if (!conn || conn.readyState !== 1) {
+        return; // 1 = connected
       }
 
       const now = new Date();

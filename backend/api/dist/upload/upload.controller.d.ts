@@ -27,4 +27,14 @@ export declare class UploadController {
             mimeType: string;
         };
     };
+    uploadIdentification(file: Express.Multer.File): {
+        success: boolean;
+        message: string;
+        data: {
+            filePath: string;
+            fileName: string;
+            fileSize: number;
+            mimeType: string;
+        };
+    };
 }

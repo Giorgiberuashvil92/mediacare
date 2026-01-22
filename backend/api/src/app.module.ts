@@ -12,6 +12,7 @@ import { AuthModule } from './auth/auth.module';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { DoctorsModule } from './doctors/doctors.module';
 import { HelpCenterModule } from './help-center/help-center.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { ProfileModule } from './profile/profile.module';
 import { ShopModule } from './shop/shop.module';
 import { SpecializationsModule } from './specializations/specializations.module';
@@ -53,6 +54,7 @@ const moduleImports: Array<
   ShopModule,
   AdvisorsModule,
   HelpCenterModule,
+  NotificationsModule,
 ];
 
 @Module({

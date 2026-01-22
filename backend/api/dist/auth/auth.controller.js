@@ -18,10 +18,14 @@ const auth_service_1 = require("./auth.service");
 const login_dto_1 = require("./dto/login.dto");
 const refresh_token_dto_1 = require("./dto/refresh-token.dto");
 const register_dto_1 = require("./dto/register.dto");
+const send_verification_code_dto_1 = require("./dto/send-verification-code.dto");
+const verify_phone_dto_1 = require("./dto/verify-phone.dto");
+const phone_verification_service_1 = require("./phone-verification.service");
 const jwt_auth_guard_1 = require("./guards/jwt-auth.guard");
 let AuthController = class AuthController {
-    constructor(authService) {
+    constructor(authService, phoneVerificationService) {
         this.authService = authService;
+        this.phoneVerificationService = phoneVerificationService;
     }
     async register(registerDto) {
         return this.authService.register(registerDto);
@@ -37,6 +41,12 @@ let AuthController = class AuthController {
     }
     async getDevToken() {
         return this.authService.getDevAdminToken();
+    }
+    async sendVerificationCode(dto) {
+        return this.phoneVerificationService.sendVerificationCode(dto.phone);
+    }
+    async verifyPhone(dto) {
+        return this.phoneVerificationService.verifyCode(dto.phone, dto.code);
     }
 };
 exports.AuthController = AuthController;
@@ -75,8 +85,23 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "getDevToken", null);
+__decorate([
+    (0, common_1.Post)('send-verification-code'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [send_verification_code_dto_1.SendVerificationCodeDto]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "sendVerificationCode", null);
+__decorate([
+    (0, common_1.Post)('verify-phone'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [verify_phone_dto_1.VerifyPhoneDto]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "verifyPhone", null);
 exports.AuthController = AuthController = __decorate([
     (0, common_1.Controller)('auth'),
-    __metadata("design:paramtypes", [auth_service_1.AuthService])
+    __metadata("design:paramtypes", [auth_service_1.AuthService,
+        phone_verification_service_1.PhoneVerificationService])
 ], AuthController);
 //# sourceMappingURL=auth.controller.js.map

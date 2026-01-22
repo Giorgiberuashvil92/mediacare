@@ -1,14 +1,13 @@
 // API Service for Medicare Admin Panel
+import { ADMIN_DEV_TOKEN } from './dev-token';
+
 const API_BASE_URL = 
   process.env.NEXT_PUBLIC_API_URL || 
-  'https://mediacare-production.up.railway.app';
-  // 'http://localhost:4000';
+  // 'https://mediacare-production.up.railway.app';
+  'http://localhost:4000';
 
-// DEVELOPMENT MODE: Skip auth and use static token
+// DEVELOPMENT MODE: Skip auth and use static token (from dev-token.ts)
 const DISABLE_AUTH = true;
-// This token should be a valid JWT for an admin user (get it from /auth/dev-token)
-// Production token - expires in 24h, refresh via: https://mediacare-production.up.railway.app/auth/dev-token 
-const DEV_STATIC_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTQzYjEyNTMwYzQwOTI0ODA2YTI0YTYiLCJpYXQiOjE3Njc5NDk1NzEsImV4cCI6MTc2ODU1NDM3MX0.t_LtNaU1wxgmt3668BiOY4kPLm3P2s6GXTfW2fvV9TE';
 
 export interface ApiResponse<T> {
   success: boolean;
@@ -25,6 +24,7 @@ export interface User {
   dateOfBirth?: string;
   gender?: 'male' | 'female' | 'other';
   profileImage?: string;
+  identificationDocument?: string; // პირადობა/პასპორტი PDF path or URL
   isVerified: boolean;
   isActive: boolean;
   approvalStatus?: 'pending' | 'approved' | 'rejected';
@@ -129,6 +129,26 @@ export interface Clinic {
   updatedAt?: string;
 }
 
+export interface Notification {
+  id: string;
+  type: 'user_registered' | 'user_updated' | 'doctor_approved' | 'doctor_rejected' | 'appointment_created' | 'appointment_cancelled' | 'system_alert';
+  title: string;
+  message: string;
+  priority: 'low' | 'medium' | 'high';
+  read: boolean;
+  readAt?: string;
+  userId?: {
+    id: string;
+    name: string;
+    email: string;
+    profileImage?: string;
+    role: string;
+  };
+  metadata?: Record<string, any>;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 class ApiService {
   private baseURL: string;
   private token: string | null = null;
@@ -145,8 +165,8 @@ class ApiService {
       'Content-Type': 'application/json',
     };
 
-    // Use static token in dev mode if available
-    const tokenToUse = DISABLE_AUTH && DEV_STATIC_TOKEN ? DEV_STATIC_TOKEN : this.token;
+    // Use static token in dev mode if available (curl .../auth/dev-token → put in dev-token.ts)
+    const tokenToUse = DISABLE_AUTH && ADMIN_DEV_TOKEN ? ADMIN_DEV_TOKEN : this.token;
     
     if (tokenToUse) {
       headers['Authorization'] = `Bearer ${tokenToUse}`;
@@ -171,18 +191,24 @@ class ApiService {
       const errorData = await response.json().catch(() => ({}));
       const errorMessage =
         errorData.message || `HTTP error! status: ${response.status}`;
-      
-      // If unauthorized (401), clear token and redirect to login
+
       if (response.status === 401) {
-        this.setToken(null);
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('user');
-          window.location.href = '/auth/sign-in';
+        const useDevToken = DISABLE_AUTH && ADMIN_DEV_TOKEN;
+        if (!useDevToken) {
+          this.setToken(null);
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+            localStorage.removeItem('user');
+            window.location.href = '/auth/sign-in';
+          }
+        } else {
+          console.warn(
+            '[API] 401 with dev token – token may be expired. Update ADMIN_DEV_TOKEN (curl .../auth/dev-token).',
+          );
         }
       }
-      
+
       throw new Error(errorMessage);
     }
     return response.json();
@@ -224,6 +250,29 @@ class ApiService {
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
     }
+  }
+
+  async sendPhoneVerificationCode(phone: string): Promise<{ success: boolean; message: string }> {
+    const response = await fetch(`${this.baseURL}/auth/send-verification-code`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ phone }),
+    });
+
+    return this.handleResponse<{ success: boolean; message: string }>(response);
+  }
+
+  async verifyPhoneCode(
+    phone: string,
+    code: string,
+  ): Promise<{ success: boolean; message: string; verified: boolean }> {
+    const response = await fetch(`${this.baseURL}/auth/verify-phone`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ phone, code }),
+    });
+
+    return this.handleResponse<{ success: boolean; message: string; verified: boolean }>(response);
   }
 
   // Users endpoints
@@ -269,6 +318,7 @@ class ApiService {
     phone?: string;
     dateOfBirth?: string;
     gender?: 'male' | 'female' | 'other';
+    isActive?: boolean;
     specialization?: string;
     degrees?: string;
     experience?: string;
@@ -342,7 +392,7 @@ class ApiService {
     specialization?: string;
     location?: string;
     search?: string;
-    status?: 'pending' | 'approved' | 'rejected' | 'all';
+    status?: 'pending' | 'approved' | 'rejected' | 'all' | 'awaiting_schedule';
   }): Promise<ApiResponse<{ doctors: any[]; pagination: any }>> {
     const queryParams = new URLSearchParams();
     if (params?.page) queryParams.append('page', params.page.toString());
@@ -1088,6 +1138,52 @@ class ApiService {
     });
 
     return this.handleResponse<ApiResponse<T>>(response);
+  }
+
+  // Notifications endpoints
+  async getNotifications(params?: {
+    limit?: number;
+    skip?: number;
+    unreadOnly?: boolean;
+    type?: string;
+  }): Promise<
+    ApiResponse<{
+      notifications: Notification[];
+      pagination: {
+        total: number;
+        limit: number;
+        skip: number;
+        totalPages: number;
+      };
+      unreadCount: number;
+    }>
+  > {
+    const queryParams = new URLSearchParams();
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.skip) queryParams.append('skip', params.skip.toString());
+    if (params?.unreadOnly) queryParams.append('unreadOnly', 'true');
+    if (params?.type) queryParams.append('type', params.type);
+
+    const queryString = queryParams.toString();
+    const endpoint = `/notifications${queryString ? `?${queryString}` : ''}`;
+
+    return this.apiCall(endpoint);
+  }
+
+  async getUnreadNotificationCount(): Promise<ApiResponse<{ count: number }>> {
+    return this.apiCall('/notifications/unread-count');
+  }
+
+  async markNotificationAsRead(notificationId: string): Promise<ApiResponse<void>> {
+    return this.apiCall(`/notifications/mark-read/${notificationId}`, {
+      method: 'POST',
+    });
+  }
+
+  async markAllNotificationsAsRead(): Promise<ApiResponse<void>> {
+    return this.apiCall('/notifications/mark-all-read', {
+      method: 'POST',
+    });
   }
 }
 

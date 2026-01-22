@@ -1,34 +1,10 @@
-import { Type } from 'class-transformer';
 import {
   IsEmail,
   IsEnum,
   IsOptional,
   IsString,
-  ValidateNested,
 } from 'class-validator';
 import { Gender } from '../../schemas/user.schema';
-
-class AddressDto {
-  @IsString()
-  @IsOptional()
-  street?: string;
-
-  @IsString()
-  @IsOptional()
-  city?: string;
-
-  @IsString()
-  @IsOptional()
-  state?: string;
-
-  @IsString()
-  @IsOptional()
-  zipCode?: string;
-
-  @IsString()
-  @IsOptional()
-  country?: string;
-}
 
 export class UpdateProfileDto {
   @IsString()
@@ -50,10 +26,9 @@ export class UpdateProfileDto {
   @IsOptional()
   gender?: Gender;
 
-  @ValidateNested()
-  @Type(() => AddressDto)
+  @IsString()
   @IsOptional()
-  address?: AddressDto;
+  address?: string;
 
   @IsString()
   @IsOptional()

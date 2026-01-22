@@ -4,6 +4,7 @@ import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 import { apiService, User } from '@/lib/api';
 import { useEffect, useState } from 'react';
 import UserFormModal from './_components/user-form-modal';
+import DeleteUserModal from './_components/delete-user-modal';
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -18,7 +19,9 @@ export default function UsersPage() {
   const limit = 10;
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -78,15 +81,25 @@ export default function UsersPage() {
     setCurrentPage(1);
   };
 
-  const handleDeleteUser = async (userId: string) => {
-    if (!confirm('დარწმუნებული ხართ რომ გსურთ ამ მომხმარებლის წაშლა?')) {
-      return;
-    }
+  const handleDeleteClick = (user: User) => {
+    setUserToDelete(user);
+    setShowDeleteModal(true);
+  };
 
-    setDeletingUserId(userId);
+  const handleDeleteConfirm = async (hardDelete: boolean) => {
+    if (!userToDelete) return;
+
+    setDeletingUserId(userToDelete.id);
     try {
-      await apiService.deleteUser(userId);
+      if (hardDelete) {
+        await apiService.hardDeleteUser(userToDelete.id);
+      } else {
+        await apiService.deleteUser(userToDelete.id);
+      }
+      setShowDeleteModal(false);
+      setUserToDelete(null);
       await loadUsers();
+      setError(null);
     } catch (err: any) {
       setError(err.message || 'შეცდომა მოხდა წაშლისას');
     } finally {
@@ -185,13 +198,25 @@ export default function UsersPage() {
               <thead>
                 <tr className="border-b border-stroke dark:border-dark-3">
                   <th className="p-4 text-left font-medium text-dark dark:text-white">
+                    ფოტო
+                  </th>
+                  <th className="p-4 text-left font-medium text-dark dark:text-white">
                     სახელი
                   </th>
                   <th className="p-4 text-left font-medium text-dark dark:text-white">
                     ელ. ფოსტა
                   </th>
                   <th className="p-4 text-left font-medium text-dark dark:text-white">
+                    ტელეფონი
+                  </th>
+                  <th className="p-4 text-left font-medium text-dark dark:text-white">
+                    პირადობა/პასპორტი
+                  </th>
+                  <th className="p-4 text-left font-medium text-dark dark:text-white">
                     როლი
+                  </th>
+                  <th className="p-4 text-left font-medium text-dark dark:text-white">
+                    სპეციალობა
                   </th>
                   <th className="p-4 text-left font-medium text-dark dark:text-white">
                     სტატუსი
@@ -207,7 +232,7 @@ export default function UsersPage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center">
+                    <td colSpan={10} className="p-8 text-center">
                       <div className="flex items-center justify-center">
                         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
                       </div>
@@ -215,71 +240,146 @@ export default function UsersPage() {
                   </tr>
                 ) : users.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-4 text-center text-dark-4">
+                    <td colSpan={10} className="p-4 text-center text-dark-4">
                       მომხმარებლები არ მოიძებნა
                     </td>
                   </tr>
                 ) : (
-                  users.map((user) => (
-                    <tr
-                      key={user.id}
-                      className="border-b border-stroke dark:border-dark-3 hover:bg-gray-50 dark:hover:bg-dark-3"
-                    >
-                      <td className="p-4 text-dark dark:text-white">
-                        {user.name}
-                      </td>
-                      <td className="p-4 text-dark-4 dark:text-dark-6">
-                        {user.email}
-                      </td>
-                      <td className="p-4">
-                        <span
-                          className={`rounded-full px-3 py-1 text-xs font-medium ${
-                            user.role === 'doctor'
-                              ? 'bg-primary/10 text-primary'
-                              : 'bg-success/10 text-success'
-                          }`}
-                        >
-                          {user.role === 'doctor' ? 'ექიმი' : 'პაციენტი'}
-                        </span>
-                      </td>
-                      <td className="p-4">
-                        <span
-                          className={`rounded-full px-3 py-1 text-xs font-medium ${
-                            user.isActive
-                              ? 'bg-success/10 text-success'
-                              : 'bg-danger/10 text-danger'
-                          }`}
-                        >
-                          {user.isActive ? 'აქტიური' : 'არააქტიური'}
-                        </span>
-                      </td>
-                      <td className="p-4 text-dark-4 dark:text-dark-6">
-                        {user.createdAt
-                          ? new Date(user.createdAt).toLocaleDateString('ka-GE')
-                          : '-'}
-                      </td>
-                      <td className="p-4">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => {
-                              setSelectedUser(user);
-                              setShowEditModal(true);
-                            }}
-                            className="rounded-lg bg-primary/10 px-3 py-1 text-xs font-medium text-primary transition hover:bg-primary/20"
+                  users.map((user) => {
+                    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+                    const photoSrc = user.profileImage
+                      ? user.profileImage.startsWith('http')
+                        ? user.profileImage
+                        : `${apiBase}/${user.profileImage}`
+                      : null;
+                    const idDocUrl = user.identificationDocument
+                      ? user.identificationDocument.startsWith('http')
+                        ? user.identificationDocument
+                        : `${apiBase}/${user.identificationDocument}`
+                      : null;
+                    return (
+                      <tr
+                        key={user.id}
+                        className="border-b border-stroke dark:border-dark-3 hover:bg-gray-50 dark:hover:bg-dark-3"
+                      >
+                        <td className="p-4">
+                          {photoSrc ? (
+                            <img
+                              src={photoSrc}
+                              alt={user.name}
+                              className="h-10 w-10 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div
+                              className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/20 text-sm font-medium text-primary"
+                              title={user.name}
+                            >
+                              {(user.name || '?').charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                        </td>
+                        <td className="p-4 text-dark dark:text-white">
+                          {user.name}
+                        </td>
+                        <td className="p-4 text-dark-4 dark:text-dark-6">
+                          {user.email}
+                        </td>
+                        <td className="p-4 text-dark-4 dark:text-dark-6">
+                          {user.phone || '-'}
+                        </td>
+                        <td className="p-4">
+                          {idDocUrl ? (
+                            <a
+                              href={idDocUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 rounded-lg bg-primary/10 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/20"
+                            >
+                              <svg
+                                className="h-4 w-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                                />
+                              </svg>
+                              გახსნა
+                            </a>
+                          ) : (
+                            <span className="text-dark-4 dark:text-dark-6">-</span>
+                          )}
+                        </td>
+                        <td className="p-4">
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-medium ${
+                              user.role === 'doctor'
+                                ? 'bg-primary/10 text-primary'
+                                : 'bg-success/10 text-success'
+                            }`}
                           >
-                            რედაქტირება
-                          </button>
-                          <button
-                            onClick={() => handleDeleteUser(user.id)}
-                            disabled={deletingUserId === user.id}
-                            className="rounded-lg bg-danger/10 px-3 py-1 text-xs font-medium text-danger transition hover:bg-danger/20 disabled:opacity-50"
+                            {user.role === 'doctor' ? 'ექიმი' : 'პაციენტი'}
+                          </span>
+                        </td>
+                        <td className="p-4 text-dark-4 dark:text-dark-6">
+                          {user.role === 'doctor' && user.specialization ? (
+                            <div className="flex flex-wrap gap-1">
+                              {user.specialization.split(',').map((spec, idx) => (
+                                <span
+                                  key={idx}
+                                  className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+                                >
+                                  {spec.trim()}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-dark-4 dark:text-dark-6">-</span>
+                          )}
+                        </td>
+                        <td className="p-4">
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-medium ${
+                              user.isActive
+                                ? 'bg-success/10 text-success'
+                                : 'bg-danger/10 text-danger'
+                            }`}
                           >
-                            {deletingUserId === user.id ? 'წაშლა...' : 'წაშლა'}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                            {user.isActive ? 'აქტიური' : 'არააქტიური'}
+                          </span>
+                        </td>
+                        <td className="p-4 text-dark-4 dark:text-dark-6">
+                          {user.createdAt
+                            ? new Date(user.createdAt).toLocaleDateString('ka-GE')
+                            : '-'}
+                        </td>
+                        <td className="p-4">
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => {
+                                setSelectedUser(user);
+                                setShowEditModal(true);
+                              }}
+                              className="rounded-lg bg-primary/10 px-3 py-1 text-xs font-medium text-primary transition hover:bg-primary/20"
+                            >
+                              რედაქტირება
+                            </button>
+                            <button
+                              onClick={() => handleDeleteClick(user)}
+                              disabled={deletingUserId === user.id}
+                              className="rounded-lg bg-danger/10 px-3 py-1 text-xs font-medium text-danger transition hover:bg-danger/20 disabled:opacity-50"
+                            >
+                              {deletingUserId === user.id ? 'წაშლა...' : 'წაშლა'}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -358,6 +458,19 @@ export default function UsersPage() {
         onSuccess={handleModalSuccess}
         user={selectedUser}
         mode="edit"
+      />
+
+      {/* Delete Modal */}
+      <DeleteUserModal
+        isOpen={showDeleteModal}
+        onClose={() => {
+          setShowDeleteModal(false);
+          setUserToDelete(null);
+        }}
+        onConfirm={handleDeleteConfirm}
+        userName={userToDelete?.name || ''}
+        userEmail={userToDelete?.email || ''}
+        isDeleting={deletingUserId === userToDelete?.id}
       />
     </>
   );

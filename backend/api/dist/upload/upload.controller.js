@@ -110,6 +110,25 @@ let UploadController = class UploadController {
             },
         };
     }
+    uploadIdentification(file) {
+        if (!file) {
+            throw new common_1.BadRequestException('No file uploaded');
+        }
+        if (!this.uploadService.validateLicenseFile(file)) {
+            throw new common_1.BadRequestException('Invalid file. Only PDF, JPG, JPEG, PNG files up to 5MB are allowed.');
+        }
+        const filePath = this.uploadService.saveIdentificationDocument(file);
+        return {
+            success: true,
+            message: 'File uploaded successfully',
+            data: {
+                filePath,
+                fileName: file.originalname,
+                fileSize: file.size,
+                mimeType: file.mimetype,
+            },
+        };
+    }
 };
 exports.UploadController = UploadController;
 __decorate([
@@ -120,6 +139,14 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], UploadController.prototype, "uploadLicense", null);
+__decorate([
+    (0, common_1.Post)('identification'),
+    (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file')),
+    __param(0, (0, common_1.UploadedFile)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], UploadController.prototype, "uploadIdentification", null);
 exports.UploadController = UploadController = __decorate([
     (0, common_1.Controller)('upload'),
     __metadata("design:paramtypes", [upload_service_1.UploadService])

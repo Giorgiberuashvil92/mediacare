@@ -1,15 +1,15 @@
 import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Put,
-  Query,
-  UploadedFile,
-  UseGuards,
-  UseInterceptors,
+    Body,
+    Controller,
+    Get,
+    Param,
+    Patch,
+    Post,
+    Put,
+    Query,
+    UploadedFile,
+    UseGuards,
+    UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -29,6 +29,7 @@ export class DoctorsController {
 
   @Get()
   async getAllDoctors(@Query() query: GetDoctorsDto) {
+    console.log('📥 [DoctorsController] Received query:', query);
     return this.doctorsService.getAllDoctors(query);
   }
 

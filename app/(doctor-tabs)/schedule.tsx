@@ -19,6 +19,9 @@ const AVAILABLE_HOURS = Array.from({ length: 24 }, (_, h) =>
   `${String(h).padStart(2, "0")}:00`
 );
 
+// გრაფიკის რედაქტირება მხოლოდ ადმინის მხრიდან. ექიმს ხედავს მხოლოდ წაკითხვის რეჟიმში.
+const SCHEDULE_EDIT_DISABLED = true;
+
 export default function DoctorSchedule() {
   const { user } = useAuth();
 
@@ -212,6 +215,7 @@ export default function DoctorSchedule() {
   };
 
   const toggleDateSelection = async (date: Date) => {
+    if (SCHEDULE_EDIT_DISABLED) return;
     const dateStr = formatDate(date);
     const currentSelected = getCurrentModeSelectedDates();
 
@@ -350,6 +354,7 @@ export default function DoctorSchedule() {
   };
 
   const openTimeSelector = (date: Date) => {
+    if (SCHEDULE_EDIT_DISABLED) return;
     setCurrentEditDate(formatDate(date));
     setShowTimeModal(true);
   };
@@ -675,16 +680,47 @@ export default function DoctorSchedule() {
           </View>
         </View>
 
+        {SCHEDULE_EDIT_DISABLED && (
+          <View
+            style={{
+              marginHorizontal: 20,
+              marginBottom: 16,
+              padding: 14,
+              backgroundColor: "#FEF3C7",
+              borderRadius: 12,
+              borderLeftWidth: 4,
+              borderLeftColor: "#F59E0B",
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 14,
+                color: "#92400E",
+                lineHeight: 20,
+                fontWeight: "500",
+              }}
+            >
+              გრაფიკის ცვლილება მხოლოდ ადმინის მხრიდან შესაძლებელია.
+              გთხოვთ დაელოდოთ „აქტიური“ სტატუსის მინიჭებას და ადმინის მიერ
+              გრაფიკის დაყენებას. აპლიკაციის სრული გამოყენება ამ სტატუსის
+              მინიჭების შემდეგ შესაძლებელია.
+            </Text>
+          </View>
+        )}
+
         {/* Instructions */}
         <View style={styles.instructionsCard}>
           <View style={styles.instructionIconContainer}>
             <Ionicons name="information-circle" size={24} color="#06B6D4" />
           </View>
           <View style={styles.instructionContent}>
-            <Text style={styles.instructionTitle}>როგორ გამოვიყენოთ?</Text>
+            <Text style={styles.instructionTitle}>
+              {SCHEDULE_EDIT_DISABLED ? "წაკითხვის რეჟიმი" : "როგორ გამოვიყენოთ?"}
+            </Text>
             <Text style={styles.instructionText}>
-              1. აირჩიეთ დღეები კალენდარიდან{"\n"}2. თითოეულ დღეს დააჭირეთ
-              საათების შესარჩევად{"\n"}3. შეინახეთ თქვენი განრიგი
+              {SCHEDULE_EDIT_DISABLED
+                ? "განრიგის ნახვა მხოლოდ წაკითხვის რეჟიმში. რედაქტირება მხოლოდ ადმინის მხრიდან."
+                : "1. აირჩიეთ დღეები კალენდარიდან\n2. თითოეულ დღეს დააჭირეთ საათების შესარჩევად\n3. შეინახეთ თქვენი განრიგი"}
             </Text>
           </View>
         </View>
@@ -699,16 +735,18 @@ export default function DoctorSchedule() {
                   new Set([...videoSelectedDates, ...homeVisitSelectedDates])
                 ).length}
               </Text>
-              <TouchableOpacity
-                onPress={() => {
-                  setVideoSelectedDates([]);
-                  setHomeVisitSelectedDates([]);
-                  setVideoSchedules({});
-                  setHomeVisitSchedules({});
-                }}
-              >
-                <Text style={styles.clearText}>გასუფთავება</Text>
-              </TouchableOpacity>
+              {!SCHEDULE_EDIT_DISABLED && (
+                <TouchableOpacity
+                  onPress={() => {
+                    setVideoSelectedDates([]);
+                    setHomeVisitSelectedDates([]);
+                    setVideoSchedules({});
+                    setHomeVisitSchedules({});
+                  }}
+                >
+                  <Text style={styles.clearText}>გასუფთავება</Text>
+                </TouchableOpacity>
+              )}
             </View>
             <View style={styles.summaryStats}>
               <View style={styles.statItem}>
@@ -818,7 +856,7 @@ export default function DoctorSchedule() {
                         </View>
                       )}
                     </TouchableOpacity>
-                    {isSelected && (
+                    {isSelected && !SCHEDULE_EDIT_DISABLED && (
                       <TouchableOpacity
                         style={styles.configureButton}
                         onPress={() => openTimeSelector(date)}
@@ -834,6 +872,14 @@ export default function DoctorSchedule() {
                             : "საათის არჩევა"}
                         </Text>
                       </TouchableOpacity>
+                    )}
+                    {isSelected && SCHEDULE_EDIT_DISABLED && hasSchedule && (
+                      <View style={[styles.configureButton, { opacity: 0.9 }]}>
+                        <Ionicons name="eye-outline" size={16} color="#FFFFFF" />
+                        <Text style={styles.configureButtonText}>
+                          {currentSchedules[dateStr].length} საათი
+                        </Text>
+                      </View>
                     )}
                   </View>
                 );
@@ -899,7 +945,7 @@ export default function DoctorSchedule() {
                         </View>
                       )}
                     </TouchableOpacity>
-                    {isSelected && (
+                    {isSelected && !SCHEDULE_EDIT_DISABLED && (
                       <TouchableOpacity
                         style={styles.configureButton}
                         onPress={() => openTimeSelector(date)}
@@ -916,6 +962,14 @@ export default function DoctorSchedule() {
                         </Text>
                       </TouchableOpacity>
                     )}
+                    {isSelected && SCHEDULE_EDIT_DISABLED && hasSchedule && (
+                      <View style={[styles.configureButton, { opacity: 0.9 }]}>
+                        <Ionicons name="eye-outline" size={16} color="#FFFFFF" />
+                        <Text style={styles.configureButtonText}>
+                          {currentSchedules[dateStr].length} საათი
+                        </Text>
+                      </View>
+                    )}
                   </View>
                 );
               })}
@@ -924,8 +978,8 @@ export default function DoctorSchedule() {
         </View>
       </ScrollView>
 
-      {/* Floating Save Button */}
-      {!saveSuccess && !hasSaved && (
+      {/* Floating Save Button — hidden when edit disabled (admin-only) */}
+      {!SCHEDULE_EDIT_DISABLED && !saveSuccess && !hasSaved && (
           <TouchableOpacity
             style={[
               styles.floatingButton,

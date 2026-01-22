@@ -15,6 +15,11 @@ export enum ApprovalStatus {
   REJECTED = 'rejected',
 }
 
+export enum DoctorStatus {
+  AWAITING_SCHEDULE = 'awaiting_schedule', // დამტკიცებულია, მაგრამ გრაფიკი არ აქვს
+  ACTIVE = 'active', // გრაფიკი აქვს, პაციენტებზე ჩანს
+}
+
 export enum Gender {
   MALE = 'male',
   FEMALE = 'female',
@@ -50,23 +55,11 @@ export class User {
   @Prop()
   profileImage?: string;
 
-  @Prop({
-    type: {
-      street: String,
-      city: String,
-      state: String,
-      zipCode: String,
-      country: String,
-    },
-    _id: false,
-  })
-  address?: {
-    street?: string;
-    city?: string;
-    state?: string;
-    zipCode?: string;
-    country?: string;
-  };
+  @Prop()
+  address?: string; // Address as string (can be extended to object later if needed)
+
+  @Prop()
+  identificationDocument?: string; // File path/URL for identification document (PDF or Image) - for patients and doctors
 
   @Prop()
   licenseNumber?: string;
@@ -79,6 +72,10 @@ export class User {
 
   @Prop({ enum: ApprovalStatus, default: ApprovalStatus.PENDING })
   approvalStatus: ApprovalStatus;
+
+  // Doctor specific status (for workflow: awaiting_schedule -> active)
+  @Prop({ enum: DoctorStatus })
+  doctorStatus?: DoctorStatus;
 
   // Doctor specific fields
   @Prop()

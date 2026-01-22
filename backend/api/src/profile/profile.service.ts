@@ -107,7 +107,7 @@ export class ProfileService {
       updateData.gender = updateProfileDto.gender;
     }
     if (updateProfileDto.address !== undefined) {
-      updateData.address = updateProfileDto.address as any;
+      updateData.address = updateProfileDto.address.trim();
     }
     if (updateProfileDto.profileImage !== undefined) {
       console.log(

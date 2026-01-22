@@ -10,6 +10,10 @@ export declare enum ApprovalStatus {
     APPROVED = "approved",
     REJECTED = "rejected"
 }
+export declare enum DoctorStatus {
+    AWAITING_SCHEDULE = "awaiting_schedule",
+    ACTIVE = "active"
+}
 export declare enum Gender {
     MALE = "male",
     FEMALE = "female",
@@ -25,17 +29,13 @@ export declare class User {
     dateOfBirth?: Date;
     gender?: Gender;
     profileImage?: string;
-    address?: {
-        street?: string;
-        city?: string;
-        state?: string;
-        zipCode?: string;
-        country?: string;
-    };
+    address?: string;
+    identificationDocument?: string;
     licenseNumber?: string;
     isVerified: boolean;
     isActive: boolean;
     approvalStatus: ApprovalStatus;
+    doctorStatus?: DoctorStatus;
     specialization?: string;
     licenseDocument?: string;
     degrees?: string;

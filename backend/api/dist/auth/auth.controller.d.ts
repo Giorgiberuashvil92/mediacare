@@ -2,9 +2,13 @@ import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
+import { SendVerificationCodeDto } from './dto/send-verification-code.dto';
+import { VerifyPhoneDto } from './dto/verify-phone.dto';
+import { PhoneVerificationService } from './phone-verification.service';
 export declare class AuthController {
     private readonly authService;
-    constructor(authService: AuthService);
+    private readonly phoneVerificationService;
+    constructor(authService: AuthService, phoneVerificationService: PhoneVerificationService);
     register(registerDto: RegisterDto): Promise<{
         success: boolean;
         message: string;
@@ -64,5 +68,14 @@ export declare class AuthController {
             token: string;
             refreshToken: string;
         };
+    }>;
+    sendVerificationCode(dto: SendVerificationCodeDto): Promise<{
+        success: boolean;
+        message: string;
+    }>;
+    verifyPhone(dto: VerifyPhoneDto): Promise<{
+        success: boolean;
+        message: string;
+        verified: boolean;
     }>;
 }
