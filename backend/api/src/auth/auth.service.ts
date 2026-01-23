@@ -1,6 +1,8 @@
 import {
   BadRequestException,
   ConflictException,
+  forwardRef,
+  Inject,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -20,6 +22,9 @@ import {
 } from '../schemas/user.schema';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { PhoneVerificationService } from './phone-verification.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType, NotificationPriority } from '../schemas/notification.schema';
 
 @Injectable()
 export class AuthService {
@@ -28,7 +33,17 @@ export class AuthService {
     @InjectModel(RefreshToken.name)
     private refreshTokenModel: mongoose.Model<RefreshTokenDocument>,
     private jwtService: JwtService,
-  ) {}
+    private phoneVerificationService: PhoneVerificationService,
+    @Inject(forwardRef(() => NotificationsService))
+    private notificationsService: NotificationsService,
+  ) {
+    // Verify NotificationsService is injected
+    if (!this.notificationsService) {
+      console.error('❌ NotificationsService is not injected!');
+    } else {
+      console.log('✅ NotificationsService is successfully injected');
+    }
+  }
 
   async register(registerDto: RegisterDto) {
     const {
@@ -37,12 +52,42 @@ export class AuthService {
       role,
       dateOfBirth,
       minWorkingDaysRequired,
+      phone,
       ...userData
     } = registerDto;
 
     const existingUser = await this.userModel.findOne({ email });
     if (existingUser) {
       throw new ConflictException('User with this email already exists');
+    }
+
+    // Phone verification temporarily disabled
+    // TODO: Re-enable phone verification when SMS service is fully configured
+    // if (phone) {
+    //   const isVerified = await this.phoneVerificationService.isPhoneVerified(phone);
+    //   if (!isVerified) {
+    //     throw new BadRequestException(
+    //       'Phone number must be verified before registration. Please verify your phone number first.',
+    //     );
+    //   }
+
+    //   // Check if phone is already registered
+    //   const existingPhoneUser = await this.userModel.findOne({ phone });
+    //   if (existingPhoneUser) {
+    //     throw new ConflictException('User with this phone number already exists');
+    //   }
+    // } else {
+    //   throw new BadRequestException('Phone number is required');
+    // }
+
+    // Check if phone is already registered (without verification requirement)
+    if (phone) {
+      const existingPhoneUser = await this.userModel.findOne({ phone });
+      if (existingPhoneUser) {
+        throw new ConflictException('User with this phone number already exists');
+      }
+    } else {
+      throw new BadRequestException('Phone number is required');
     }
 
     // Validate profile image for doctors
@@ -57,7 +102,8 @@ export class AuthService {
     // Convert dateOfBirth string to Date if provided
     const dateOfBirthDate = dateOfBirth ? new Date(dateOfBirth) : undefined;
 
-    const user = new this.userModel({
+    // Prepare user data
+    const userDataToSave: any = {
       ...userData,
       email,
       password: hashedPassword,
@@ -68,9 +114,77 @@ export class AuthService {
       approvalStatus: isDoctor
         ? ApprovalStatus.PENDING
         : ApprovalStatus.APPROVED,
-    });
+    };
+
+    // Add address if provided (as string)
+    if (registerDto.address) {
+      userDataToSave.address = registerDto.address.trim();
+    }
+
+    // Add identification document if provided (for patients and doctors)
+    if (registerDto.identificationDocument) {
+      userDataToSave.identificationDocument = registerDto.identificationDocument;
+    }
+
+    const user = new this.userModel(userDataToSave);
 
     const savedUser = await user.save();
+
+    // Create notification for admin users
+    try {
+      // Check if NotificationsService is available
+      if (!this.notificationsService) {
+        console.error('❌ NotificationsService is null or undefined!');
+        throw new Error('NotificationsService is not available');
+      }
+      
+      const roleLabel = role === UserRole.DOCTOR ? 'ექიმი' : 'პაციენტი';
+      console.log('🔔 Creating notification for user registration:', {
+        userId: (savedUser._id as string).toString(),
+        userName: savedUser.name,
+        userEmail: savedUser.email,
+        role: savedUser.role,
+        notificationsServiceExists: !!this.notificationsService,
+      });
+      
+      const notification = await this.notificationsService.createNotification({
+        type: NotificationType.USER_REGISTERED,
+        title: `ახალი ${roleLabel} დარეგისტრირდა`,
+        message: `${savedUser.name} (${savedUser.email}) დარეგისტრირდა როგორც ${roleLabel}`,
+        priority: NotificationPriority.HIGH,
+        userId: (savedUser._id as string).toString(),
+        targetUserId: null, // null means it's a system-wide notification for all admins
+        metadata: {
+          userId: (savedUser._id as string).toString(),
+          userName: savedUser.name,
+          userEmail: savedUser.email,
+          userRole: savedUser.role,
+          userPhone: savedUser.phone,
+          registrationDate: new Date(),
+        },
+      });
+      
+      console.log('✅ Notification created successfully:', {
+        notificationId: notification._id,
+        title: notification.title,
+        targetUserId: notification.targetUserId,
+      });
+    } catch (error) {
+      // Don't fail registration if notification creation fails
+      console.error('❌ Failed to create notification:', error);
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        errorType: error?.constructor?.name,
+        errorString: String(error),
+      });
+      // Log full error object
+      if (error instanceof Error) {
+        console.error('Error name:', error.name);
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+      }
+    }
 
     // Generate tokens
     const tokens = await this.generateTokens(

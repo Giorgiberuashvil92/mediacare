@@ -7,6 +7,7 @@ export class UploadService {
   private readonly uploadDir = path.join(process.cwd(), 'uploads', 'licenses');
   private readonly imagesDir = path.join(process.cwd(), 'uploads', 'images');
   private readonly formsDir = path.join(process.cwd(), 'uploads', 'forms');
+  private readonly identificationDir = path.join(process.cwd(), 'uploads', 'identification');
 
   constructor() {
     // Ensure upload directories exist
@@ -18,6 +19,9 @@ export class UploadService {
     }
     if (!fs.existsSync(this.formsDir)) {
       fs.mkdirSync(this.formsDir, { recursive: true });
+    }
+    if (!fs.existsSync(this.identificationDir)) {
+      fs.mkdirSync(this.identificationDir, { recursive: true });
     }
   }
 
@@ -34,6 +38,32 @@ export class UploadService {
   }
 
   deleteLicenseDocument(filePath: string): void {
+    const fullPath = path.join(process.cwd(), filePath);
+    if (fs.existsSync(fullPath)) {
+      fs.unlinkSync(fullPath);
+    }
+  }
+
+  saveIdentificationDocument(file: Express.Multer.File): string {
+    // Validate file
+    if (!this.validateLicenseFile(file)) {
+      throw new BadRequestException(
+        'Invalid file. Only PDF, JPG, JPEG, PNG files up to 5MB are allowed.',
+      );
+    }
+
+    const timestamp = Date.now();
+    const fileName = `${timestamp}-${file.originalname}`;
+    const filePath = path.join(this.identificationDir, fileName);
+
+    // Save file
+    fs.writeFileSync(filePath, file.buffer);
+
+    // Return relative path
+    return `uploads/identification/${fileName}`;
+  }
+
+  deleteIdentificationDocument(filePath: string): void {
     const fullPath = path.join(process.cwd(), filePath);
     if (fs.existsSync(fullPath)) {
       fs.unlinkSync(fullPath);

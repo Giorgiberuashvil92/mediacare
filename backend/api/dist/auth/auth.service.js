@@ -53,17 +53,37 @@ const bcrypt = __importStar(require("bcrypt"));
 const mongoose = __importStar(require("mongoose"));
 const refresh_token_schema_1 = require("../schemas/refresh-token.schema");
 const user_schema_1 = require("../schemas/user.schema");
+const phone_verification_service_1 = require("./phone-verification.service");
+const notifications_service_1 = require("../notifications/notifications.service");
+const notification_schema_1 = require("../schemas/notification.schema");
 let AuthService = class AuthService {
-    constructor(userModel, refreshTokenModel, jwtService) {
+    constructor(userModel, refreshTokenModel, jwtService, phoneVerificationService, notificationsService) {
         this.userModel = userModel;
         this.refreshTokenModel = refreshTokenModel;
         this.jwtService = jwtService;
+        this.phoneVerificationService = phoneVerificationService;
+        this.notificationsService = notificationsService;
+        if (!this.notificationsService) {
+            console.error('❌ NotificationsService is not injected!');
+        }
+        else {
+            console.log('✅ NotificationsService is successfully injected');
+        }
     }
     async register(registerDto) {
-        const { email, password, role, dateOfBirth, minWorkingDaysRequired, ...userData } = registerDto;
+        const { email, password, role, dateOfBirth, minWorkingDaysRequired, phone, ...userData } = registerDto;
         const existingUser = await this.userModel.findOne({ email });
         if (existingUser) {
             throw new common_1.ConflictException('User with this email already exists');
+        }
+        if (phone) {
+            const existingPhoneUser = await this.userModel.findOne({ phone });
+            if (existingPhoneUser) {
+                throw new common_1.ConflictException('User with this phone number already exists');
+            }
+        }
+        else {
+            throw new common_1.BadRequestException('Phone number is required');
         }
         if (role === user_schema_1.UserRole.DOCTOR && !registerDto.profileImage) {
             throw new common_1.BadRequestException('Profile image is required for doctors');
@@ -71,7 +91,7 @@ let AuthService = class AuthService {
         const hashedPassword = await bcrypt.hash(password, 10);
         const isDoctor = role === user_schema_1.UserRole.DOCTOR;
         const dateOfBirthDate = dateOfBirth ? new Date(dateOfBirth) : undefined;
-        const user = new this.userModel({
+        const userDataToSave = {
             ...userData,
             email,
             password: hashedPassword,
@@ -82,8 +102,64 @@ let AuthService = class AuthService {
             approvalStatus: isDoctor
                 ? user_schema_1.ApprovalStatus.PENDING
                 : user_schema_1.ApprovalStatus.APPROVED,
-        });
+        };
+        if (registerDto.address) {
+            userDataToSave.address = registerDto.address.trim();
+        }
+        if (registerDto.identificationDocument) {
+            userDataToSave.identificationDocument = registerDto.identificationDocument;
+        }
+        const user = new this.userModel(userDataToSave);
         const savedUser = await user.save();
+        try {
+            if (!this.notificationsService) {
+                console.error('❌ NotificationsService is null or undefined!');
+                throw new Error('NotificationsService is not available');
+            }
+            const roleLabel = role === user_schema_1.UserRole.DOCTOR ? 'ექიმი' : 'პაციენტი';
+            console.log('🔔 Creating notification for user registration:', {
+                userId: savedUser._id.toString(),
+                userName: savedUser.name,
+                userEmail: savedUser.email,
+                role: savedUser.role,
+                notificationsServiceExists: !!this.notificationsService,
+            });
+            const notification = await this.notificationsService.createNotification({
+                type: notification_schema_1.NotificationType.USER_REGISTERED,
+                title: `ახალი ${roleLabel} დარეგისტრირდა`,
+                message: `${savedUser.name} (${savedUser.email}) დარეგისტრირდა როგორც ${roleLabel}`,
+                priority: notification_schema_1.NotificationPriority.HIGH,
+                userId: savedUser._id.toString(),
+                targetUserId: null,
+                metadata: {
+                    userId: savedUser._id.toString(),
+                    userName: savedUser.name,
+                    userEmail: savedUser.email,
+                    userRole: savedUser.role,
+                    userPhone: savedUser.phone,
+                    registrationDate: new Date(),
+                },
+            });
+            console.log('✅ Notification created successfully:', {
+                notificationId: notification._id,
+                title: notification.title,
+                targetUserId: notification.targetUserId,
+            });
+        }
+        catch (error) {
+            console.error('❌ Failed to create notification:', error);
+            console.error('Error details:', {
+                message: error instanceof Error ? error.message : String(error),
+                stack: error instanceof Error ? error.stack : undefined,
+                errorType: error?.constructor?.name,
+                errorString: String(error),
+            });
+            if (error instanceof Error) {
+                console.error('Error name:', error.name);
+                console.error('Error message:', error.message);
+                console.error('Error stack:', error.stack);
+            }
+        }
         const tokens = await this.generateTokens(savedUser._id.toString());
         return {
             success: true,
@@ -212,6 +288,9 @@ exports.AuthService = AuthService = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, mongoose_1.InjectModel)(user_schema_1.User.name)),
     __param(1, (0, mongoose_1.InjectModel)(refresh_token_schema_1.RefreshToken.name)),
-    __metadata("design:paramtypes", [mongoose.Model, mongoose.Model, jwt_1.JwtService])
+    __param(4, (0, common_1.Inject)((0, common_1.forwardRef)(() => notifications_service_1.NotificationsService))),
+    __metadata("design:paramtypes", [mongoose.Model, mongoose.Model, jwt_1.JwtService,
+        phone_verification_service_1.PhoneVerificationService,
+        notifications_service_1.NotificationsService])
 ], AuthService);
 //# sourceMappingURL=auth.service.js.map

@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsEmail,
   IsEnum,
   IsNotEmpty,
@@ -13,6 +14,10 @@ export class CreateUserDto {
   @IsEnum(UserRole)
   role: UserRole;
 
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
   @IsNotEmpty()
   @IsString()
   name: string;
@@ -26,9 +31,9 @@ export class CreateUserDto {
   @MinLength(6)
   password: string;
 
-  @IsOptional()
+  @IsNotEmpty()
   @IsString()
-  phone?: string;
+  phone: string;
 
   @IsOptional()
   dateOfBirth?: string;

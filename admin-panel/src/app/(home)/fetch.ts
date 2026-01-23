@@ -1,31 +1,43 @@
 import { cookies, headers } from 'next/headers';
+import { ADMIN_DEV_TOKEN } from '@/lib/dev-token';
 
-const API_BASE_URL = 'https://mediacare-production.up.railway.app'; // || 'http://localhost:4000';
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
+const FALLBACK_OVERVIEW = {
+  users: { value: 0, growthRate: 0 },
+  patients: { value: 0, growthRate: 0 },
+  doctors: { value: 0, growthRate: 0 },
+  pendingDoctors: { value: 0, growthRate: 0 },
+};
 
 export async function getOverviewData() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get('accessToken')?.value ?? ADMIN_DEV_TOKEN;
+
+  if (!token) {
+    return FALLBACK_OVERVIEW;
+  }
+
   try {
-    // Get token from cookies (server-side)
-    const cookieStore = await cookies();
-    const token = cookieStore.get('accessToken')?.value;
-
-    if (!token) {
-      throw new Error('No token provided');
-    }
-
-    // Get headers to forward cookies
     const headersList = await headers();
     const response = await fetch(`${API_BASE_URL}/admin/stats`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-        'Cookie': headersList.get('cookie') || '',
+        Authorization: `Bearer ${token}`,
+        Cookie: headersList.get('cookie') || '',
       },
-      cache: 'no-store', // Ensure fresh data on each request
+      cache: 'no-store',
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      if (response.status === 401) {
+        console.warn('[getOverviewData] 401 Unauthorized – token invalid or expired. Using fallback.');
+      } else {
+        console.warn(`[getOverviewData] HTTP ${response.status}. Using fallback.`);
+      }
+      return FALLBACK_OVERVIEW;
     }
 
     const data = await response.json();
@@ -62,25 +74,7 @@ export async function getOverviewData() {
     console.error('Failed to fetch overview data:', error);
   }
 
-  // Fallback to default values if API fails
-  return {
-    users: {
-      value: 0,
-      growthRate: 0,
-    },
-    patients: {
-      value: 0,
-      growthRate: 0,
-    },
-    doctors: {
-      value: 0,
-      growthRate: 0,
-    },
-    pendingDoctors: {
-      value: 0,
-      growthRate: 0,
-    },
-  };
+  return FALLBACK_OVERVIEW;
 }
 
 export async function getChatsData() {

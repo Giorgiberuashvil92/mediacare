@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UserSchema = exports.User = exports.Gender = exports.ApprovalStatus = exports.UserRole = void 0;
+exports.UserSchema = exports.User = exports.Gender = exports.DoctorStatus = exports.ApprovalStatus = exports.UserRole = void 0;
 const mongoose_1 = require("@nestjs/mongoose");
 var UserRole;
 (function (UserRole) {
@@ -23,6 +23,11 @@ var ApprovalStatus;
     ApprovalStatus["APPROVED"] = "approved";
     ApprovalStatus["REJECTED"] = "rejected";
 })(ApprovalStatus || (exports.ApprovalStatus = ApprovalStatus = {}));
+var DoctorStatus;
+(function (DoctorStatus) {
+    DoctorStatus["AWAITING_SCHEDULE"] = "awaiting_schedule";
+    DoctorStatus["ACTIVE"] = "active";
+})(DoctorStatus || (exports.DoctorStatus = DoctorStatus = {}));
 var Gender;
 (function (Gender) {
     Gender["MALE"] = "male";
@@ -69,18 +74,13 @@ __decorate([
     __metadata("design:type", String)
 ], User.prototype, "profileImage", void 0);
 __decorate([
-    (0, mongoose_1.Prop)({
-        type: {
-            street: String,
-            city: String,
-            state: String,
-            zipCode: String,
-            country: String,
-        },
-        _id: false,
-    }),
-    __metadata("design:type", Object)
+    (0, mongoose_1.Prop)(),
+    __metadata("design:type", String)
 ], User.prototype, "address", void 0);
+__decorate([
+    (0, mongoose_1.Prop)(),
+    __metadata("design:type", String)
+], User.prototype, "identificationDocument", void 0);
 __decorate([
     (0, mongoose_1.Prop)(),
     __metadata("design:type", String)
@@ -97,6 +97,10 @@ __decorate([
     (0, mongoose_1.Prop)({ enum: ApprovalStatus, default: ApprovalStatus.PENDING }),
     __metadata("design:type", String)
 ], User.prototype, "approvalStatus", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ enum: DoctorStatus }),
+    __metadata("design:type", String)
+], User.prototype, "doctorStatus", void 0);
 __decorate([
     (0, mongoose_1.Prop)(),
     __metadata("design:type", String)

@@ -63,6 +63,12 @@ export const NAV_DATA = [
         items: [],
       },
       {
+        title: "შეტყობინებები",
+        url: "/notifications",
+        icon: Icons.BellIcon,
+        items: [],
+      },
+      {
         title: "პარამეტრები",
         url: "/settings",
         icon: Icons.Alphabet,

@@ -39,21 +39,20 @@ const getDefaultBaseUrl = () => {
     (Constants.manifest as any)?.extra?.API_URL ||
     (Constants.manifest as any)?.extra?.apiUrl;
 
+  const expoHostIp = getExpoHostIp();
+  const isLocalUrl = (u: string) =>
+    !u || u.includes('localhost') || u.includes('127.0.0.1');
+  // When using local backend, prefer expoHostIp on device (localhost fails there)
+  if (isLocalUrl(envUrl) && expoHostIp) {
+    return `http://${expoHostIp}:4000`;
+  }
   if (envUrl) {
     return envUrl;
   }
-
-  const expoHostIp = getExpoHostIp();
-  console.log('🔍 expoHostIp:', expoHostIp);
   if (expoHostIp) {
-    return `https://${expoHostIp}:4000`;
-    // return `http://${expoHostIp}:4000`;
+    return `http://${expoHostIp}:4000`;
   }
-
-  // For development, handle different platforms
-  
-  // Production - use Railway URL
-  return "https://mediacare-production.up.railway.app";
+  return "http://localhost:4000";
 };
 
 const API_BASE_URL = getDefaultBaseUrl();
@@ -79,6 +78,7 @@ export interface RegisterRequest {
   name: string;
   role: "doctor" | "patient";
   idNumber: string;
+  phone: string;
   specialization?: string;
   licenseDocument?: string;
   profileImage?: string;
@@ -341,6 +341,58 @@ class ApiService {
     }
 
     return data;
+  }
+
+  async sendPhoneVerificationCode(phone: string): Promise<{ success: boolean; message: string }> {
+    if (USE_MOCK_API) {
+      // In mock mode, always succeed
+      console.log(`[MOCK] Verification code would be sent to ${phone}`);
+      return Promise.resolve({
+        success: true,
+        message: "Verification code sent successfully (mock)",
+      });
+    }
+
+    const response = await fetch(`${this.baseURL}/auth/send-verification-code`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ phone }),
+    });
+
+    return this.handleResponse<{ success: boolean; message: string }>(response);
+  }
+
+  async verifyPhoneCode(
+    phone: string,
+    code: string,
+  ): Promise<{ success: boolean; message: string; verified: boolean }> {
+    if (USE_MOCK_API) {
+      // In mock mode, accept any 6-digit code
+      if (code.length === 6 && /^\d{6}$/.test(code)) {
+        return Promise.resolve({
+          success: true,
+          message: "Phone verified successfully (mock)",
+          verified: true,
+        });
+      }
+      return Promise.resolve({
+        success: false,
+        message: "Invalid verification code (mock)",
+        verified: false,
+      });
+    }
+
+    const response = await fetch(`${this.baseURL}/auth/verify-phone`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ phone, code }),
+    });
+
+    return this.handleResponse<{ success: boolean; message: string; verified: boolean }>(response);
   }
 
   async uploadProfileImagePublic(

@@ -26,8 +26,8 @@ export class RegisterDto {
   password: string;
 
   @IsString()
-  @IsOptional()
-  phone?: string;
+  @IsNotEmpty()
+  phone: string;
 
   @IsString()
   @IsNotEmpty()
@@ -43,6 +43,16 @@ export class RegisterDto {
   @IsString()
   @IsOptional()
   profileImage?: string;
+
+  // Patient specific fields
+  @IsOptional()
+  @IsString()
+  address?: string;
+
+  // Identification document (for patients and doctors)
+  @IsString()
+  @IsOptional()
+  identificationDocument?: string; // File path for uploaded identification document
 
   // Doctor specific fields
   @IsString()

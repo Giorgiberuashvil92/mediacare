@@ -173,6 +173,20 @@ export function AvailabilityManager({
   };
 
   const handleDeleteDay = (date: string, type: 'video' | 'home-visit') => {
+    const typeLabel = type === 'video' ? 'ვიდეო' : 'ბინაზე';
+    const dateStr = new Date(date).toLocaleDateString('ka-GE', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      weekday: 'long',
+    });
+    if (
+      !window.confirm(
+        `დარწმუნებული ხართ, რომ გსურთ ამ დღის (${dateStr}, ${typeLabel}) განრიგის წაშლა? ცვლილება ძალაში შევა „შენახვის“ დაჭერის შემდეგ.`,
+      )
+    ) {
+      return;
+    }
     setAvailability(
       availability.filter(
         (day) => !(day.date === date && day.type === type),

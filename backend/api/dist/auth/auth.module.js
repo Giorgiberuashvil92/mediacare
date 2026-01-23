@@ -9,10 +9,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthModule = void 0;
 const common_1 = require("@nestjs/common");
 const mongoose_1 = require("@nestjs/mongoose");
+const phone_verification_schema_1 = require("../schemas/phone-verification.schema");
 const refresh_token_schema_1 = require("../schemas/refresh-token.schema");
 const user_schema_1 = require("../schemas/user.schema");
+const notifications_module_1 = require("../notifications/notifications.module");
 const auth_controller_1 = require("./auth.controller");
 const auth_service_1 = require("./auth.service");
+const phone_verification_service_1 = require("./phone-verification.service");
+const sms_service_1 = require("./sms.service");
 const jwt_auth_guard_1 = require("./guards/jwt-auth.guard");
 const patient_guard_1 = require("./guards/patient.guard");
 const roles_guard_1 = require("./guards/roles.guard");
@@ -25,11 +29,20 @@ exports.AuthModule = AuthModule = __decorate([
             mongoose_1.MongooseModule.forFeature([
                 { name: user_schema_1.User.name, schema: user_schema_1.UserSchema },
                 { name: refresh_token_schema_1.RefreshToken.name, schema: refresh_token_schema_1.RefreshTokenSchema },
+                { name: phone_verification_schema_1.PhoneVerification.name, schema: phone_verification_schema_1.PhoneVerificationSchema },
             ]),
+            (0, common_1.forwardRef)(() => notifications_module_1.NotificationsModule),
         ],
         controllers: [auth_controller_1.AuthController],
-        providers: [auth_service_1.AuthService, jwt_auth_guard_1.JwtAuthGuard, patient_guard_1.PatientGuard, roles_guard_1.RolesGuard],
-        exports: [auth_service_1.AuthService, jwt_auth_guard_1.JwtAuthGuard, patient_guard_1.PatientGuard, roles_guard_1.RolesGuard],
+        providers: [
+            auth_service_1.AuthService,
+            phone_verification_service_1.PhoneVerificationService,
+            sms_service_1.SmsService,
+            jwt_auth_guard_1.JwtAuthGuard,
+            patient_guard_1.PatientGuard,
+            roles_guard_1.RolesGuard,
+        ],
+        exports: [auth_service_1.AuthService, phone_verification_service_1.PhoneVerificationService, jwt_auth_guard_1.JwtAuthGuard, patient_guard_1.PatientGuard, roles_guard_1.RolesGuard],
     })
 ], AuthModule);
 //# sourceMappingURL=auth.module.js.map

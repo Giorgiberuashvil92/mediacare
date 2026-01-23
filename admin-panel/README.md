@@ -40,6 +40,16 @@ yarn dev
 
 And voila! You're now ready to start developing. **Happy coding**!
 
+### Medicare Admin – Dev token
+
+Overview and stats use an admin JWT. Get a token:
+
+```bash
+curl https://mediacare-production.up.railway.app/auth/dev-token
+```
+
+Put the `token` value into `src/lib/dev-token.ts` as `ADMIN_DEV_TOKEN`, then push. Refresh when it expires (24h).
+
 ## Highlighted Features
 **200+ Next.js Dashboard Ul Components and Templates** - includes a variety of prebuilt **Ul elements, components, pages, and examples** crafted with a high-quality design.
 Additionally, features seamless **essential integrations and extensive functionalities**.

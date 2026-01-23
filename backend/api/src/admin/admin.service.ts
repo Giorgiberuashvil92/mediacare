@@ -85,6 +85,7 @@ export class AdminService {
         dateOfBirth: user.dateOfBirth,
         gender: user.gender,
         profileImage: user.profileImage,
+        identificationDocument: user.identificationDocument,
         isVerified: user.isVerified || false,
         isActive: user.isActive !== undefined ? user.isActive : true,
         approvalStatus: user.approvalStatus,
@@ -101,6 +102,7 @@ export class AdminService {
           location: user.location,
           rating: user.rating || 0,
           reviewCount: user.reviewCount || 0,
+          licenseDocument: user.licenseDocument,
         }),
       };
     });
@@ -362,6 +364,14 @@ export class AdminService {
       updateData.isActive = isActive;
     }
 
+    // When doctor is approved by admin, set status to awaiting_schedule
+    // They will move to 'active' only after selecting a schedule
+    if (approvalStatus === ApprovalStatus.APPROVED) {
+      updateData.doctorStatus = 'awaiting_schedule';
+    } else if (approvalStatus === ApprovalStatus.REJECTED) {
+      updateData.doctorStatus = null;
+    }
+
     const doctor = await this.userModel.findByIdAndUpdate(
       doctorId,
       updateData,
@@ -388,7 +398,30 @@ export class AdminService {
       type: 'video' | 'home-visit';
     }>,
   ) {
-    const mongoose = await import('mongoose');
+    if (!mongoose.Types.ObjectId.isValid(doctorId)) {
+      throw new BadRequestException('Invalid doctor ID format');
+    }
+
+    const doctor = await this.userModel
+      .findOne({
+        _id: new mongoose.Types.ObjectId(doctorId),
+        role: 'doctor',
+      })
+      .lean();
+
+    if (!doctor) {
+      throw new NotFoundException('Doctor not found');
+    }
+
+    if (
+      (doctor as any).approvalStatus !== ApprovalStatus.APPROVED ||
+      !(doctor as any).isActive
+    ) {
+      throw new BadRequestException(
+        'გრაფიკის დაყენება მხოლოდ „აქტიური“ სტატუსის მქონე ექიმებისთვის შესაძლებელია. გთხოვთ ჯერ დაამტკიცოთ ექიმი და მანიჭოთ „აქტიური“ სტატუსი.',
+      );
+    }
+
     const results = [];
 
     for (const slot of availability) {
@@ -413,6 +446,19 @@ export class AdminService {
 
       results.push(availabilityDoc);
     }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const futureAvailability = await this.availabilityModel.findOne({
+      doctorId: new mongoose.Types.ObjectId(doctorId),
+      date: { $gte: today },
+      timeSlots: { $exists: true, $ne: [] },
+    });
+
+    await this.userModel.findByIdAndUpdate(doctorId, {
+      doctorStatus: futureAvailability ? 'active' : 'awaiting_schedule',
+    });
 
     return {
       success: true,
@@ -490,10 +536,22 @@ export class AdminService {
       throw new BadRequestException('Email already exists');
     }
 
+    // Check if phone already exists
+    if (createUserDto.phone) {
+      const existingPhoneUser = await this.userModel.findOne({
+        phone: createUserDto.phone,
+      });
+
+      if (existingPhoneUser) {
+        throw new BadRequestException('Phone number already exists');
+      }
+    }
+
     // Hash password
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
 
     // Prepare user data
+    const isPatient = createUserDto.role === UserRole.PATIENT;
     const userData: any = {
       role: createUserDto.role,
       name: createUserDto.name,
@@ -501,7 +559,7 @@ export class AdminService {
       password: hashedPassword,
       phone: createUserDto.phone,
       gender: createUserDto.gender,
-      isActive: true,
+      isActive: isPatient ? (createUserDto.isActive ?? true) : true,
       isVerified: false,
       approvalStatus:
         createUserDto.role === UserRole.DOCTOR

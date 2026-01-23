@@ -26,6 +26,7 @@ interface Doctor {
   licenseDocument?: string;
   isActive: boolean;
   approvalStatus: 'pending' | 'approved' | 'rejected';
+  doctorStatus?: 'awaiting_schedule' | 'active';
   isTopRated?: boolean;
   minScheduleDate?: string;
 }
@@ -35,7 +36,7 @@ export default function DoctorsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<'pending' | 'approved' | 'rejected'>('pending');
+  const [statusFilter, setStatusFilter] = useState<'pending' | 'approved' | 'rejected' | 'awaiting_schedule'>('pending');
   const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
   const [selectedDoctor, setSelectedDoctor] = useState<User | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -53,11 +54,13 @@ export default function DoctorsPage() {
   const loadDoctors = async () => {
     try {
       setLoading(true);
+      console.log('🔍 Loading doctors with status filter:', statusFilter);
       const response = await apiService.getDoctors({
         page: 1,
         limit: 50,
         status: statusFilter,
       });
+      console.log('📥 Doctors API response:', response);
       if (response.success) {
         // Map all fields from backend response
         const mappedDoctors = response.data.doctors.map((doctor: any) => {
@@ -79,14 +82,19 @@ export default function DoctorsPage() {
             licenseDocument: doctor.licenseDocument,
             isActive: doctor.isActive !== undefined ? doctor.isActive : false,
             approvalStatus: (doctor.approvalStatus || 'pending') as 'pending' | 'approved' | 'rejected',
+            doctorStatus: doctor.doctorStatus as 'awaiting_schedule' | 'active' | undefined,
             isTopRated: doctor.isTopRated ?? false,
             minScheduleDate: doctor.minScheduleDate ? doctor.minScheduleDate.split('T')[0] : '',
           };
           return mapped;
         });
+        console.log('✅ Mapped doctors:', mappedDoctors);
         setDoctors(mappedDoctors);
+      } else {
+        console.log('❌ API response not successful:', response);
       }
     } catch (err: any) {
+      console.error('❌ Error loading doctors:', err);
       setError(err.message || 'ექიმების ჩატვირთვა ვერ მოხერხდა');
     } finally {
       setLoading(false);
@@ -128,10 +136,7 @@ export default function DoctorsPage() {
   const handleApproveDoctor = async (doctorId: string) => {
     try {
       setLoading(true);
-      await apiService.updateDoctor(doctorId, {
-        approvalStatus: 'approved',
-        isActive: true,
-      });
+      await apiService.updateDoctorApproval(doctorId, 'approved', true);
       loadDoctors();
     } catch (err: any) {
       setError(err.message || 'ექიმის დამტკიცება ვერ მოხერხდა');
@@ -143,10 +148,7 @@ export default function DoctorsPage() {
   const handleRejectDoctor = async (doctorId: string) => {
     try {
       setLoading(true);
-      await apiService.updateDoctor(doctorId, {
-        approvalStatus: 'rejected',
-        isActive: false,
-      });
+      await apiService.updateDoctorApproval(doctorId, 'rejected', false);
       loadDoctors();
     } catch (err: any) {
       setError(err.message || 'ექიმის უარყოფა ვერ მოხერხდა');
@@ -203,10 +205,11 @@ export default function DoctorsPage() {
             </button>
           </div>
 
-          <div className="mb-4 flex gap-2">
+          <div className="mb-4 flex flex-wrap gap-2">
             {[
               { label: 'განხილვის მოლოდინში', value: 'pending' as const },
-              { label: 'დამტკიცებული', value: 'approved' as const },
+              { label: 'გრაფიკის არჩევაში', value: 'awaiting_schedule' as const },
+              { label: 'დამტკიცებული (აქტიური)', value: 'approved' as const },
               { label: 'უარყოფილი', value: 'rejected' as const },
             ].map((filter) => (
               <button
@@ -303,24 +306,43 @@ export default function DoctorsPage() {
                       <span className="mr-2">⭐</span>
                       {doctor.rating.toFixed(1)} ({doctor.reviewCount} შეფასება)
                     </div>
-                    <div className="flex items-center text-sm">
-                      <span className="mr-2 text-dark-4 dark:text-dark-6">📄</span>
-                      <span className="text-dark-4 dark:text-dark-6">სტატუსი:</span>
-                      <span
-                        className={`ml-2 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                          doctor.approvalStatus === 'approved'
-                            ? 'bg-green-500 text-white dark:bg-green-600'
-                            : doctor.approvalStatus === 'rejected'
-                            ? 'bg-red-500 text-white dark:bg-red-600'
-                            : 'bg-yellow-500 text-white dark:bg-yellow-600'
-                        }`}
-                      >
-                        {doctor.approvalStatus === 'pending'
-                          ? 'განხილვის მოლოდინში'
-                          : doctor.approvalStatus === 'approved'
-                          ? 'დამტკიცებული'
-                          : 'უარყოფილი'}
-                      </span>
+                    <div className="space-y-1">
+                      <div className="flex items-center text-sm">
+                        <span className="mr-2 text-dark-4 dark:text-dark-6">📄</span>
+                        <span className="text-dark-4 dark:text-dark-6">დადასტურება:</span>
+                        <span
+                          className={`ml-2 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                            doctor.approvalStatus === 'approved'
+                              ? 'bg-green-500 text-white dark:bg-green-600'
+                              : doctor.approvalStatus === 'rejected'
+                              ? 'bg-red-500 text-white dark:bg-red-600'
+                              : 'bg-yellow-500 text-white dark:bg-yellow-600'
+                          }`}
+                        >
+                          {doctor.approvalStatus === 'pending'
+                            ? 'განხილვის მოლოდინში'
+                            : doctor.approvalStatus === 'approved'
+                            ? 'დამტკიცებული'
+                            : 'უარყოფილი'}
+                        </span>
+                      </div>
+                      {doctor.doctorStatus && doctor.approvalStatus === 'approved' && (
+                        <div className="flex items-center text-sm">
+                          <span className="mr-2 text-dark-4 dark:text-dark-6">🗓️</span>
+                          <span className="text-dark-4 dark:text-dark-6">გრაფიკი:</span>
+                          <span
+                            className={`ml-2 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                              doctor.doctorStatus === 'active'
+                                ? 'bg-blue-500 text-white dark:bg-blue-600'
+                                : 'bg-orange-500 text-white dark:bg-orange-600'
+                            }`}
+                          >
+                            {doctor.doctorStatus === 'active'
+                              ? '✓ არჩეული (პაციენტებზე ჩანს)'
+                              : '⏳ არჩევაში (პაციენტებზე არ ჩანს)'}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
 

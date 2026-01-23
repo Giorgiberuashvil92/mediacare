@@ -3,7 +3,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import * as DocumentPicker from "expo-document-picker";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -27,6 +27,7 @@ import { showToast } from "../../utils/toast";
 export default function RegisterScreen() {
   const { userRole, register } = useAuth();
   const { t } = useLanguage();
+  const params = useLocalSearchParams();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -72,6 +73,24 @@ export default function RegisterScreen() {
   const [tosModalVisible, setTosModalVisible] = useState(false);
   const [hasAcceptedTos, setHasAcceptedTos] = useState(false);
 
+  // Phone verification states
+  const [verificationCode, setVerificationCode] = useState("");
+  const [isPhoneVerified, setIsPhoneVerified] = useState(false);
+  const [sendingCode, setSendingCode] = useState(false);
+  const [verifyingCode, setVerifyingCode] = useState(false);
+  const [verificationError, setVerificationError] = useState<string | null>(null);
+  const verificationCodeInputRef = useRef<TextInput>(null);
+
+  // Patient specific fields
+  const [address, setAddress] = useState("");
+  const [identificationDocument, setIdentificationDocument] = useState<{
+    uri: string;
+    name: string;
+    type: string;
+    filePath?: string;
+  } | null>(null);
+  const [uploadingIdentificationDocument, setUploadingIdentificationDocument] = useState(false);
+
   const nameInputRef = useRef<TextInput>(null);
   const emailInputRef = useRef<TextInput>(null);
   const idNumberInputRef = useRef<TextInput>(null);
@@ -81,6 +100,7 @@ export default function RegisterScreen() {
   const locationInputRef = useRef<TextInput>(null);
   const aboutInputRef = useRef<TextInput>(null);
   const passwordInputRef = useRef<TextInput>(null);
+  const addressInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     const loadSpecializations = async () => {
@@ -295,6 +315,134 @@ export default function RegisterScreen() {
     }
   };
 
+  const handleIdentificationDocumentPick = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["application/pdf", "image/jpeg", "image/jpg", "image/png"],
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled) {
+        return;
+      }
+
+      const file = result.assets[0];
+
+      // Check file size (max 5MB)
+      if (file.size && file.size > 5 * 1024 * 1024) {
+        showToast.error("ფაილის ზომა არ უნდა აღემატებოდეს 5MB-ს", "შეცდომა");
+        return;
+      }
+
+      // Upload (mock or real)
+      setUploadingIdentificationDocument(true);
+      if (apiService.isMockMode()) {
+        setIdentificationDocument({
+          uri: file.uri,
+          name: file.name,
+          type: file.mimeType || "application/pdf",
+          filePath: "/uploads/identification/mock-id.pdf",
+        });
+        showToast.success("ფაილი წარმატებით აიტვირთა (mock)", "წარმატება");
+      } else {
+        const formData = new FormData();
+        formData.append("file", {
+          uri: file.uri,
+          name: file.name,
+          type: file.mimeType || "application/pdf",
+        } as any);
+
+        const response = await fetch(
+          `${apiService.getBaseURL()}/upload/identification`,
+          {
+            method: "POST",
+            body: formData,
+            headers: {
+              "Content-Type": "multipart/form-data",
+            },
+          }
+        );
+
+        const data = await response.json();
+
+        if (data.success) {
+          setIdentificationDocument({
+            uri: file.uri,
+            name: file.name,
+            type: file.mimeType || "application/pdf",
+            filePath: data.data.filePath,
+          });
+          showToast.success("ფაილი წარმატებით აიტვირთა", "წარმატება");
+        } else {
+          throw new Error(data.message || "ფაილის ატვირთვა ვერ მოხერხდა");
+        }
+      }
+    } catch (error) {
+      console.error("Identification document pick error:", error);
+      showToast.error(
+        error instanceof Error ? error.message : "ფაილის ატვირთვა ვერ მოხერხდა",
+        "შეცდომა"
+      );
+    } finally {
+      setUploadingIdentificationDocument(false);
+    }
+  };
+
+  const handleSendVerificationCode = async () => {
+    if (!phone.trim()) {
+      showToast.error("გთხოვთ შეიყვანოთ ტელეფონის ნომერი", "შეცდომა");
+      return;
+    }
+
+    try {
+      setSendingCode(true);
+      setVerificationError(null);
+      const response = await apiService.sendPhoneVerificationCode(phone.trim());
+      if (response.success) {
+        showToast.success("ვერიფიკაციის კოდი გაიგზავნა", "წარმატება");
+      } else {
+        throw new Error(response.message || "ვერ მოხერხდა კოდის გაგზავნა");
+      }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "ვერ მოხერხდა კოდის გაგზავნა";
+      setVerificationError(errorMessage);
+      showToast.error(errorMessage, "შეცდომა");
+    } finally {
+      setSendingCode(false);
+    }
+  };
+
+  const handleVerifyCode = async () => {
+    if (!verificationCode.trim() || verificationCode.length !== 6) {
+      showToast.error("გთხოვთ შეიყვანოთ 6-ნიშნა კოდი", "შეცდომა");
+      return;
+    }
+
+    try {
+      setVerifyingCode(true);
+      setVerificationError(null);
+      const response = await apiService.verifyPhoneCode(phone.trim(), verificationCode.trim());
+      if (response.success && response.verified) {
+        setIsPhoneVerified(true);
+        showToast.success("ტელეფონი წარმატებით დადასტდა", "წარმატება");
+      } else {
+        throw new Error(response.message || "არასწორი ვერიფიკაციის კოდი");
+      }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "ვერიფიკაცია ვერ მოხერხდა";
+      setVerificationError(errorMessage);
+      showToast.error(errorMessage, "შეცდომა");
+    } finally {
+      setVerifyingCode(false);
+    }
+  };
+
   const handleSignup = async () => {
     if (!name.trim() || !email.trim() || !password.trim() || !idNumber.trim()) {
       showToast.error(
@@ -303,6 +451,18 @@ export default function RegisterScreen() {
       );
       return;
     }
+
+    if (!phone.trim()) {
+      showToast.error("ტელეფონის ნომერი აუცილებელია", "შეცდომა");
+      return;
+    }
+
+    // Phone verification temporarily disabled
+    // TODO: Re-enable phone verification when SMS service is fully configured
+    // if (!isPhoneVerified) {
+    //   showToast.error("გთხოვთ დადასტუროთ ტელეფონის ნომერი", "შეცდომა");
+    //   return;
+    // }
 
     if (!hasAcceptedTos) {
       showToast.error(
@@ -343,21 +503,52 @@ export default function RegisterScreen() {
       // Add phone for all users
       if (phone.trim()) registerData.phone = phone.trim();
 
+      // Add common fields for all users
+      if (dateOfBirth && dateOfBirth.trim()) {
+        registerData.dateOfBirth = dateOfBirth.trim();
+      }
+      if (gender) {
+        registerData.gender = gender;
+      }
+      if (profileImage?.url) {
+        registerData.profileImage = profileImage.url;
+      }
+
+      // Add patient specific fields
+      if (selectedRole === "patient") {
+        // Only add address if it's not empty
+        if (address && address.trim()) {
+          registerData.address = address.trim();
+        }
+        if (identificationDocument?.filePath) {
+          registerData.identificationDocument = identificationDocument.filePath;
+        }
+      }
+
       // Add doctor specific fields
       if (selectedRole === "doctor") {
-        registerData.specialization = selectedSpecializations.join(", ");
-        registerData.licenseDocument = licenseDocument?.filePath;
-        if (profileImage?.url) {
-          registerData.profileImage = profileImage.url;
+        if (selectedSpecializations.length > 0) {
+          registerData.specialization = selectedSpecializations.join(", ");
+        }
+        if (licenseDocument?.filePath) {
+          registerData.licenseDocument = licenseDocument.filePath;
+        }
+        if (identificationDocument?.filePath) {
+          registerData.identificationDocument = identificationDocument.filePath;
         }
         // Add additional fields matching admin panel
-        if (degrees.trim()) registerData.degrees = degrees.trim();
-        if (experience.trim()) registerData.experience = experience.trim();
-        if (about.trim()) registerData.about = about.trim();
-        if (location.trim()) registerData.location = location.trim();
-        if (dateOfBirth.trim()) registerData.dateOfBirth = dateOfBirth.trim();
-        
-        registerData.gender = gender;
+        if (degrees && degrees.trim()) {
+          registerData.degrees = degrees.trim();
+        }
+        if (experience && experience.trim()) {
+          registerData.experience = experience.trim();
+        }
+        if (about && about.trim()) {
+          registerData.about = about.trim();
+        }
+        if (location && location.trim()) {
+          registerData.location = location.trim();
+        }
       }
 
       await register(registerData);
@@ -456,6 +647,10 @@ export default function RegisterScreen() {
                     placeholderTextColor="#9CA3AF"
                     value={name}
                     onChangeText={setName}
+                    textContentType="none"
+                    autoComplete="off"
+                    autoCorrect={false}
+                    keyboardType="default"
                   />
                 </TouchableOpacity>
               </View>
@@ -483,17 +678,22 @@ export default function RegisterScreen() {
                     placeholderTextColor="#9CA3AF"
                     value={email}
                     onChangeText={setEmail}
-                    keyboardType="email-address"
+                    textContentType="none"
+                    autoComplete="off"
                     autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="email-address"
                   />
                 </TouchableOpacity>
               </View>
 
               {/* ID Number Input */}
               <View style={styles.inputContainer}>
-                <Text style={styles.label}>
-                  {t("auth.register.idNumber.label")}
-                </Text>
+                <View style={styles.labelRow}>
+                  <Text style={styles.label}>
+                    {t("auth.register.idNumber.label")}
+                  </Text>
+                </View>
                 <TouchableOpacity
                   activeOpacity={1}
                   style={styles.inputWrapper}
@@ -512,7 +712,10 @@ export default function RegisterScreen() {
                     placeholderTextColor="#9CA3AF"
                     value={idNumber}
                     onChangeText={setIdNumber}
-                    keyboardType="number-pad"
+                    textContentType="none"
+                    autoComplete="off"
+                    autoCorrect={false}
+                    keyboardType="default"
                   />
                 </TouchableOpacity>
               </View>
@@ -520,7 +723,7 @@ export default function RegisterScreen() {
               {/* Phone Input */}
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>
-                  {t("auth.register.phone.label")}
+                  {t("auth.register.phone.label")} *
                 </Text>
                 <TouchableOpacity
                   activeOpacity={1}
@@ -540,10 +743,338 @@ export default function RegisterScreen() {
                     placeholderTextColor="#9CA3AF"
                     value={phone}
                     onChangeText={setPhone}
+                    textContentType="none"
+                    autoComplete="off"
+                    autoCorrect={false}
                     keyboardType="phone-pad"
                   />
                 </TouchableOpacity>
+
+                {/* Phone Verification Section - Temporarily Disabled */}
+                {/* TODO: Re-enable phone verification when SMS service is fully configured */}
+                {/* {!isPhoneVerified && phone.trim() && (
+                  <View style={styles.verificationContainer}>
+                    <View style={styles.verificationInputRow}>
+                      <TextInput
+                        ref={verificationCodeInputRef}
+                        style={styles.verificationCodeInput}
+                        placeholder="000000"
+                        placeholderTextColor="#9CA3AF"
+                        value={verificationCode}
+                        onChangeText={(text) => {
+                          const numericText = text.replace(/[^0-9]/g, "").slice(0, 6);
+                          setVerificationCode(numericText);
+                          setVerificationError(null);
+                        }}
+                        textContentType="oneTimeCode"
+                        autoComplete="one-time-code"
+                        keyboardType="number-pad"
+                        maxLength={6}
+                        autoCorrect={false}
+                      />
+                      <TouchableOpacity
+                        style={[
+                          styles.verifyButton,
+                          verifyingCode && styles.verifyButtonDisabled,
+                        ]}
+                        onPress={handleVerifyCode}
+                        disabled={verifyingCode || verificationCode.length !== 6}
+                      >
+                        {verifyingCode ? (
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                          <Text style={styles.verifyButtonText}>დადასტურება</Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.sendCodeButton,
+                        sendingCode && styles.sendCodeButtonDisabled,
+                      ]}
+                      onPress={handleSendVerificationCode}
+                      disabled={sendingCode}
+                    >
+                      {sendingCode ? (
+                        <ActivityIndicator size="small" color="#06B6D4" />
+                      ) : (
+                        <>
+                          <Ionicons name="send-outline" size={16} color="#06B6D4" />
+                          <Text style={styles.sendCodeButtonText}>
+                            კოდის გაგზავნა
+                          </Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+
+                    {verificationError && (
+                      <Text style={styles.verificationError}>{verificationError}</Text>
+                    )}
+                  </View>
+                )} */}
               </View>
+
+              {/* Patient specific fields */}
+              {!isDoctor && (
+                <>
+                  {/* Gender Selection */}
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.label}>
+                      სქესი
+                    </Text>
+                    <View style={styles.genderContainer}>
+                      <TouchableOpacity
+                        style={[
+                          styles.genderOption,
+                          gender === "male" && styles.genderOptionSelected,
+                        ]}
+                        onPress={() => setGender("male")}
+                      >
+                        <Ionicons
+                          name="male"
+                          size={20}
+                          color={gender === "male" ? "#06B6D4" : "#6B7280"}
+                        />
+                        <Text
+                          style={[
+                            styles.genderText,
+                            gender === "male" && styles.genderTextSelected,
+                          ]}
+                        >
+                          კაცი
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          styles.genderOption,
+                          gender === "female" && styles.genderOptionSelected,
+                        ]}
+                        onPress={() => setGender("female")}
+                      >
+                        <Ionicons
+                          name="female"
+                          size={20}
+                          color={gender === "female" ? "#06B6D4" : "#6B7280"}
+                        />
+                        <Text
+                          style={[
+                            styles.genderText,
+                            gender === "female" && styles.genderTextSelected,
+                          ]}
+                        >
+                          ქალი
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          styles.genderOption,
+                          gender === "other" && styles.genderOptionSelected,
+                        ]}
+                        onPress={() => setGender("other")}
+                      >
+                        <Ionicons
+                          name="person-outline"
+                          size={20}
+                          color={gender === "other" ? "#06B6D4" : "#6B7280"}
+                        />
+                        <Text
+                          style={[
+                            styles.genderText,
+                            gender === "other" && styles.genderTextSelected,
+                          ]}
+                        >
+                          სხვა
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* Address Input */}
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.label}>
+                      მისამართი
+                    </Text>
+                    <TouchableOpacity
+                      activeOpacity={1}
+                      style={styles.inputWrapper}
+                      onPress={() => addressInputRef.current?.focus()}
+                    >
+                      <Ionicons
+                        name="location-outline"
+                        size={20}
+                        color="#9CA3AF"
+                        style={styles.inputIcon}
+                      />
+                      <TextInput
+                        ref={addressInputRef}
+                        style={styles.input}
+                        placeholder="შეიყვანეთ მისამართი"
+                        placeholderTextColor="#9CA3AF"
+                        value={address}
+                        onChangeText={setAddress}
+                        textContentType="none"
+                        autoComplete="off"
+                        autoCorrect={false}
+                        keyboardType="default"
+                      />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Date of Birth */}
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.label}>
+                      დაბადების თარიღი
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.inputWrapper}
+                      onPress={openDatePicker}
+                    >
+                      <Ionicons
+                        name="calendar-outline"
+                        size={20}
+                        color="#9CA3AF"
+                        style={styles.inputIcon}
+                      />
+                      <Text
+                        style={[
+                          styles.input,
+                          !dateOfBirth && styles.inputPlaceholder,
+                        ]}
+                      >
+                        {dateOfBirth || "აირჩიეთ თარიღი"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Profile Image */}
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.label}>
+                      პროფილის სურათი
+                    </Text>
+                    <View style={styles.profileCard}>
+                      <View style={styles.profilePreview}>
+                        {profileImage?.uri ? (
+                          <Image
+                            source={{ uri: profileImage.uri }}
+                            style={styles.profilePreviewImage}
+                            contentFit="cover"
+                          />
+                        ) : (
+                          <View style={styles.profilePlaceholder}>
+                            <Ionicons name="person-circle-outline" size={36} color="#9CA3AF" />
+                            <Text style={styles.profilePlaceholderText}>პროფილის ფოტო</Text>
+                          </View>
+                        )}
+                      </View>
+
+                      <View style={styles.profileActions}>
+                        <TouchableOpacity
+                          style={[
+                            styles.filePickerButton,
+                            profileImage && styles.filePickerButtonActive,
+                          ]}
+                          onPress={handleProfileImagePick}
+                          disabled={uploadingProfileImage}
+                        >
+                          <Ionicons
+                            name={
+                              profileImage
+                                ? "checkmark-circle"
+                                : "cloud-upload-outline"
+                            }
+                            size={20}
+                            color={profileImage ? "#10B981" : "#9CA3AF"}
+                            style={styles.inputIcon}
+                          />
+                          {uploadingProfileImage ? (
+                            <View style={styles.uploadingContainer}>
+                              <ActivityIndicator size="small" color="#06B6D4" />
+                              <Text style={styles.uploadingText}>
+                                სურათი იტვირთება...
+                              </Text>
+                            </View>
+                          ) : (
+                            <Text
+                              style={[
+                                styles.filePickerText,
+                                profileImage && styles.filePickerTextActive,
+                              ]}
+                            >
+                              {profileImage
+                                ? profileImage.name
+                                : "აირჩიე პროფილის სურათი"}
+                            </Text>
+                          )}
+                          <Ionicons
+                            name="image-outline"
+                            size={20}
+                            color="#9CA3AF"
+                          />
+                        </TouchableOpacity>
+                        <Text style={styles.profileHint}>
+                          დაშვებულია JPG/PNG/WebP • მაქს 5MB
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Identification Document */}
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.label}>
+                      იდენტიფიკაციის დოკუმენტი
+                    </Text>
+                    <TouchableOpacity
+                      style={[
+                        styles.filePickerButton,
+                        identificationDocument && styles.filePickerButtonActive,
+                      ]}
+                      onPress={handleIdentificationDocumentPick}
+                      disabled={uploadingIdentificationDocument}
+                    >
+                      <Ionicons
+                        name={
+                          identificationDocument
+                            ? "checkmark-circle"
+                            : "cloud-upload-outline"
+                        }
+                        size={20}
+                        color={identificationDocument ? "#10B981" : "#9CA3AF"}
+                        style={styles.inputIcon}
+                      />
+                      {uploadingIdentificationDocument ? (
+                        <View style={styles.uploadingContainer}>
+                          <ActivityIndicator size="small" color="#06B6D4" />
+                          <Text style={styles.uploadingText}>
+                            {t("doctor.license.uploading")}
+                          </Text>
+                        </View>
+                      ) : (
+                        <Text
+                          style={[
+                            styles.filePickerText,
+                            identificationDocument && styles.filePickerTextActive,
+                          ]}
+                        >
+                          {identificationDocument
+                            ? identificationDocument.name
+                            : "აირჩიე იდენტიფიკაციის დოკუმენტი"}
+                        </Text>
+                      )}
+                      <Ionicons
+                        name="document-attach-outline"
+                        size={20}
+                        color="#9CA3AF"
+                      />
+                    </TouchableOpacity>
+                    {identificationDocument && (
+                      <Text style={styles.fileHelper}>
+                        დოკუმენტი წარმატებით აიტვირთა
+                      </Text>
+                    )}
+                  </View>
+                </>
+              )}
 
               {/* Doctor specific fields */}
               {isDoctor && (
@@ -628,6 +1159,10 @@ export default function RegisterScreen() {
                         placeholderTextColor="#9CA3AF"
                         value={degrees}
                         onChangeText={setDegrees}
+                        textContentType="none"
+                        autoComplete="off"
+                        autoCorrect={false}
+                        keyboardType="default"
                       />
                     </TouchableOpacity>
                   </View>
@@ -655,6 +1190,10 @@ export default function RegisterScreen() {
                         placeholderTextColor="#9CA3AF"
                         value={experience}
                         onChangeText={setExperience}
+                        textContentType="none"
+                        autoComplete="off"
+                        autoCorrect={false}
+                        keyboardType="default"
                       />
                     </TouchableOpacity>
                   </View>
@@ -682,6 +1221,10 @@ export default function RegisterScreen() {
                         placeholderTextColor="#9CA3AF"
                         value={location}
                         onChangeText={setLocation}
+                        textContentType="none"
+                        autoComplete="off"
+                        autoCorrect={false}
+                        keyboardType="default"
                       />
                     </TouchableOpacity>
                   </View>
@@ -804,6 +1347,10 @@ export default function RegisterScreen() {
                         multiline
                         numberOfLines={4}
                         textAlignVertical="top"
+                        textContentType="none"
+                        autoComplete="off"
+                        autoCorrect={false}
+                        keyboardType="default"
                       />
                     </TouchableOpacity>
                   </View>
@@ -859,6 +1406,61 @@ export default function RegisterScreen() {
                     {licenseDocument && (
                       <Text style={styles.fileHelper}>
                         {t("doctor.license.success")}
+                      </Text>
+                    )}
+                  </View>
+
+                  {/* Identification Document */}
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.label}>
+                      იდენტიფიკაციის დოკუმენტი
+                    </Text>
+                    <TouchableOpacity
+                      style={[
+                        styles.filePickerButton,
+                        identificationDocument && styles.filePickerButtonActive,
+                      ]}
+                      onPress={handleIdentificationDocumentPick}
+                      disabled={uploadingIdentificationDocument}
+                    >
+                      <Ionicons
+                        name={
+                          identificationDocument
+                            ? "checkmark-circle"
+                            : "cloud-upload-outline"
+                        }
+                        size={20}
+                        color={identificationDocument ? "#10B981" : "#9CA3AF"}
+                        style={styles.inputIcon}
+                      />
+                      {uploadingIdentificationDocument ? (
+                        <View style={styles.uploadingContainer}>
+                          <ActivityIndicator size="small" color="#06B6D4" />
+                          <Text style={styles.uploadingText}>
+                            {t("doctor.license.uploading")}
+                          </Text>
+                        </View>
+                      ) : (
+                        <Text
+                          style={[
+                            styles.filePickerText,
+                            identificationDocument && styles.filePickerTextActive,
+                          ]}
+                        >
+                          {identificationDocument
+                            ? identificationDocument.name
+                            : "აირჩიე იდენტიფიკაციის დოკუმენტი"}
+                        </Text>
+                      )}
+                      <Ionicons
+                        name="document-attach-outline"
+                        size={20}
+                        color="#9CA3AF"
+                      />
+                    </TouchableOpacity>
+                    {identificationDocument && (
+                      <Text style={styles.fileHelper}>
+                        დოკუმენტი წარმატებით აიტვირთა
                       </Text>
                     )}
                   </View>
@@ -961,6 +1563,10 @@ export default function RegisterScreen() {
                     placeholderTextColor="#9CA3AF"
                     value={password}
                     onChangeText={setPassword}
+                    textContentType="none"
+                    autoComplete="off"
+                    autoCorrect={false}
+                    keyboardType="default"
                   />
                   <TouchableOpacity
                     onPress={() => setShowPassword(!showPassword)}
@@ -1302,6 +1908,15 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins-Medium",
     color: "#1F2937",
     marginBottom: 4,
+  },
+  labelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
+  infoIconButton: {
+    padding: 4,
   },
   inputWrapper: {
     flexDirection: "row",
@@ -1805,5 +2420,89 @@ const styles = StyleSheet.create({
   datePicker: {
     width: "100%",
     height: 200,
+  },
+  verifiedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#F0FDF4",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  verifiedText: {
+    fontSize: 12,
+    fontFamily: "Poppins-Medium",
+    color: "#10B981",
+  },
+  inputWrapperVerified: {
+    borderColor: "#10B981",
+    backgroundColor: "#F0FDF4",
+  },
+  verificationContainer: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: "#F9FAFB",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  verificationInputRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 8,
+  },
+  verificationCodeInput: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 18,
+    fontFamily: "Poppins-SemiBold",
+    color: "#1F2937",
+    textAlign: "center",
+    letterSpacing: 4,
+  },
+  verifyButton: {
+    backgroundColor: "#06B6D4",
+    borderRadius: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    minWidth: 120,
+  },
+  verifyButtonDisabled: {
+    opacity: 0.6,
+  },
+  verifyButtonText: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#FFFFFF",
+  },
+  sendCodeButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+  },
+  sendCodeButtonDisabled: {
+    opacity: 0.6,
+  },
+  sendCodeButtonText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#06B6D4",
+  },
+  verificationError: {
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: "#EF4444",
+    marginTop: 4,
+    textAlign: "center",
   },
 });
