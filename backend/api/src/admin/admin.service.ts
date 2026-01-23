@@ -204,6 +204,15 @@ export class AdminService {
     });
 
     if (existingAdmin) {
+      // Ensure admin is active and verified
+      if (!existingAdmin.isActive || !existingAdmin.isVerified) {
+        await this.userModel.findByIdAndUpdate(existingAdmin._id, {
+          isActive: true,
+          isVerified: true,
+          approvalStatus: ApprovalStatus.APPROVED,
+        });
+      }
+
       return {
         success: true,
         message: 'Super admin already exists',

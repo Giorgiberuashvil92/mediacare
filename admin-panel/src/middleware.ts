@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
 // DEVELOPMENT MODE: Auth disabled
-const DISABLE_AUTH = true;
+const DISABLE_AUTH = false;
 
 export function middleware(request: NextRequest) {
   // Skip all auth checks if disabled

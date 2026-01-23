@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
 // DEVELOPMENT MODE: Skip auth
-const DISABLE_AUTH = true;
+const DISABLE_AUTH = false;
 const FAKE_ADMIN_USER: User = {
   id: 'dev-admin',
   name: 'Dev Admin',
