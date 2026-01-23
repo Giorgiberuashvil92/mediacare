@@ -8,7 +8,7 @@ const API_BASE_URL =
 const DISABLE_AUTH = true;
 // This token should be a valid JWT for an admin user (get it from /auth/dev-token)
 // Production token - expires in 24h, refresh via: https://mediacare-production.up.railway.app/auth/dev-token 
-const DEV_STATIC_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTQzYjEyNTMwYzQwOTI0ODA2YTI0YTYiLCJpYXQiOjE3Njc5NDk1NzEsImV4cCI6MTc2ODU1NDM3MX0.t_LtNaU1wxgmt3668BiOY4kPLm3P2s6GXTfW2fvV9TE';
+const DEV_STATIC_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTQzYjEyNTMwYzQwOTI0ODA2YTI0YTYiLCJpYXQiOjE3NjkyMDMzNjEsImV4cCI6MTc2OTgwODE2MX0.27B_mqMAxQO97Jskf9clsfykfoj5AVyDlpti7W83Lts';
 
 export interface ApiResponse<T> {
   success: boolean;
