@@ -4,4 +4,4 @@
  * Put the "token" value here and push. Refresh when expired (24h).
  */
 export const ADMIN_DEV_TOKEN =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTQzYjEyNTMwYzQwOTI0ODA2YTI0YTYiLCJpYXQiOjE3NjkyMDMzNjEsImV4cCI6MTc2OTgwODE2MX0.27B_mqMAxQO97Jskf9clsfykfoj5AVyDlpti7W83Lts';
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTQzYjEyNTMwYzQwOTI0ODA2YTI0YTYiLCJpYXQiOjE3NjkyMDQ0OTEsImV4cCI6MTc2OTgwOTI5MX0.Ptx7We9mwasmLhe1oqK5OGNVbxVKiAAi-LYVj_K_bcY';
