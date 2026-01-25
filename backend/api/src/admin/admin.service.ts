@@ -82,9 +82,11 @@ export class AdminService {
         name: user.name,
         email: user.email,
         phone: user.phone,
+        idNumber: user.idNumber,
         dateOfBirth: user.dateOfBirth,
         gender: user.gender,
         profileImage: user.profileImage,
+        address: user.address,
         identificationDocument: user.identificationDocument,
         isVerified: user.isVerified || false,
         isActive: user.isActive !== undefined ? user.isActive : true,
@@ -422,14 +424,18 @@ export class AdminService {
       throw new NotFoundException('Doctor not found');
     }
 
-    if (
-      (doctor as any).approvalStatus !== ApprovalStatus.APPROVED ||
-      !(doctor as any).isActive
-    ) {
+    // Allow schedule selection for approved doctors, regardless of doctorStatus or isActive
+    // Doctors with 'awaiting_schedule' status should be able to select their schedule
+    // Doctors with 'active' status can also update their schedule
+    if ((doctor as any).approvalStatus !== ApprovalStatus.APPROVED) {
       throw new BadRequestException(
-        'გრაფიკის დაყენება მხოლოდ „აქტიური“ სტატუსის მქონე ექიმებისთვის შესაძლებელია. გთხოვთ ჯერ დაამტკიცოთ ექიმი და მანიჭოთ „აქტიური“ სტატუსი.',
+        'გრაფიკის დაყენება მხოლოდ დამტკიცებული ექიმებისთვის შესაძლებელია.',
       );
     }
+
+    // Note: We removed the isActive check because doctors with 'awaiting_schedule' status
+    // should be able to select their schedule even if isActive is false
+    // The doctorStatus will be updated to 'active' automatically after they set a schedule
 
     const results = [];
 
@@ -509,9 +515,11 @@ export class AdminService {
         name: user.name,
         email: user.email,
         phone: user.phone,
+        idNumber: user.idNumber,
         dateOfBirth: user.dateOfBirth,
         gender: user.gender,
         profileImage: user.profileImage,
+        address: user.address,
         isVerified: user.isVerified || false,
         isActive: user.isActive !== undefined ? user.isActive : true,
         approvalStatus: user.approvalStatus,

@@ -1,11 +1,13 @@
 import { IsDateString, IsOptional, IsString } from 'class-validator';
 
 export class RescheduleRequestDto {
+  @IsOptional()
   @IsDateString()
-  newDate: string;
+  newDate?: string;
 
+  @IsOptional()
   @IsString()
-  newTime: string;
+  newTime?: string;
 
   @IsOptional()
   @IsString()

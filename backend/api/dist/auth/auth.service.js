@@ -51,11 +51,11 @@ const jwt_1 = require("@nestjs/jwt");
 const mongoose_1 = require("@nestjs/mongoose");
 const bcrypt = __importStar(require("bcrypt"));
 const mongoose = __importStar(require("mongoose"));
+const notifications_service_1 = require("../notifications/notifications.service");
+const notification_schema_1 = require("../schemas/notification.schema");
 const refresh_token_schema_1 = require("../schemas/refresh-token.schema");
 const user_schema_1 = require("../schemas/user.schema");
 const phone_verification_service_1 = require("./phone-verification.service");
-const notifications_service_1 = require("../notifications/notifications.service");
-const notification_schema_1 = require("../schemas/notification.schema");
 let AuthService = class AuthService {
     constructor(userModel, refreshTokenModel, jwtService, phoneVerificationService, notificationsService) {
         this.userModel = userModel;
@@ -71,19 +71,49 @@ let AuthService = class AuthService {
         }
     }
     async register(registerDto) {
+        console.log('📥 [AuthService] Register request received:', {
+            email: registerDto.email,
+            role: registerDto.role,
+            name: registerDto.name,
+            phone: registerDto.phone,
+            hasPhone: !!registerDto.phone,
+            phoneLength: registerDto.phone?.length,
+            idNumber: registerDto.idNumber,
+            dateOfBirth: registerDto.dateOfBirth,
+            gender: registerDto.gender,
+            profileImage: registerDto.profileImage ? 'provided' : 'not provided',
+            address: registerDto.address,
+            identificationDocument: registerDto.identificationDocument
+                ? 'provided'
+                : 'not provided',
+            specialization: registerDto.specialization,
+            licenseDocument: registerDto.licenseDocument
+                ? 'provided'
+                : 'not provided',
+            degrees: registerDto.degrees,
+            experience: registerDto.experience,
+            about: registerDto.about,
+            location: registerDto.location,
+        });
         const { email, password, role, dateOfBirth, minWorkingDaysRequired, phone, ...userData } = registerDto;
         const existingUser = await this.userModel.findOne({ email });
         if (existingUser) {
             throw new common_1.ConflictException('User with this email already exists');
         }
-        if (phone) {
-            const existingPhoneUser = await this.userModel.findOne({ phone });
-            if (existingPhoneUser) {
-                throw new common_1.ConflictException('User with this phone number already exists');
-            }
-        }
-        else {
+        if (!phone || !phone.trim()) {
             throw new common_1.BadRequestException('Phone number is required');
+        }
+        console.log('📞 [AuthService] Phone validation:', {
+            phone,
+            phoneTrimmed: phone.trim(),
+            role,
+            phoneLength: phone.trim().length,
+        });
+        const existingPhoneUser = await this.userModel.findOne({
+            phone: phone.trim(),
+        });
+        if (existingPhoneUser) {
+            throw new common_1.ConflictException('User with this phone number already exists');
         }
         if (role === user_schema_1.UserRole.DOCTOR && !registerDto.profileImage) {
             throw new common_1.BadRequestException('Profile image is required for doctors');
@@ -96,6 +126,7 @@ let AuthService = class AuthService {
             email,
             password: hashedPassword,
             role,
+            phone: phone?.trim(),
             dateOfBirth: dateOfBirthDate,
             minWorkingDaysRequired: minWorkingDaysRequired || 0,
             isActive: isDoctor ? false : true,
@@ -107,10 +138,48 @@ let AuthService = class AuthService {
             userDataToSave.address = registerDto.address.trim();
         }
         if (registerDto.identificationDocument) {
-            userDataToSave.identificationDocument = registerDto.identificationDocument;
+            userDataToSave.identificationDocument =
+                registerDto.identificationDocument;
         }
+        console.log('💾 [AuthService] User data to save:', {
+            email: userDataToSave.email,
+            role: userDataToSave.role,
+            name: userDataToSave.name,
+            phone: userDataToSave.phone,
+            phoneLength: userDataToSave.phone?.length,
+            idNumber: userDataToSave.idNumber,
+            dateOfBirth: userDataToSave.dateOfBirth,
+            gender: userDataToSave.gender,
+            isActive: userDataToSave.isActive,
+            approvalStatus: userDataToSave.approvalStatus,
+            hasPassword: !!userDataToSave.password,
+            passwordLength: userDataToSave.password?.length,
+            address: userDataToSave.address,
+            identificationDocument: userDataToSave.identificationDocument
+                ? 'provided'
+                : 'not provided',
+            specialization: userDataToSave.specialization,
+            licenseDocument: userDataToSave.licenseDocument
+                ? 'provided'
+                : 'not provided',
+            degrees: userDataToSave.degrees,
+            experience: userDataToSave.experience,
+            about: userDataToSave.about,
+            location: userDataToSave.location,
+            profileImage: userDataToSave.profileImage ? 'provided' : 'not provided',
+        });
         const user = new this.userModel(userDataToSave);
         const savedUser = await user.save();
+        console.log('✅ [AuthService] User saved successfully:', {
+            userId: savedUser._id.toString(),
+            email: savedUser.email,
+            role: savedUser.role,
+            name: savedUser.name,
+            phone: savedUser.phone,
+            phoneLength: savedUser.phone?.length,
+            isActive: savedUser.isActive,
+            approvalStatus: savedUser.approvalStatus,
+        });
         try {
             if (!this.notificationsService) {
                 console.error('❌ NotificationsService is null or undefined!');
@@ -205,6 +274,8 @@ let AuthService = class AuthService {
                     phone: user.phone,
                     isVerified: user.isVerified,
                     approvalStatus: user.approvalStatus,
+                    isActive: user.isActive,
+                    doctorStatus: user.doctorStatus,
                 },
                 token: tokens.accessToken,
                 refreshToken: tokens.refreshToken,

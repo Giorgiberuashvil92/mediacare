@@ -10,6 +10,11 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
 import * as bcrypt from 'bcrypt';
 import * as mongoose from 'mongoose';
+import { NotificationsService } from '../notifications/notifications.service';
+import {
+  NotificationPriority,
+  NotificationType,
+} from '../schemas/notification.schema';
 import {
   RefreshToken,
   RefreshTokenDocument,
@@ -23,8 +28,6 @@ import {
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { PhoneVerificationService } from './phone-verification.service';
-import { NotificationsService } from '../notifications/notifications.service';
-import { NotificationType, NotificationPriority } from '../schemas/notification.schema';
 
 @Injectable()
 export class AuthService {
@@ -46,6 +49,31 @@ export class AuthService {
   }
 
   async register(registerDto: RegisterDto) {
+    console.log('📥 [AuthService] Register request received:', {
+      email: registerDto.email,
+      role: registerDto.role,
+      name: registerDto.name,
+      phone: registerDto.phone,
+      hasPhone: !!registerDto.phone,
+      phoneLength: registerDto.phone?.length,
+      idNumber: registerDto.idNumber,
+      dateOfBirth: registerDto.dateOfBirth,
+      gender: registerDto.gender,
+      profileImage: registerDto.profileImage ? 'provided' : 'not provided',
+      address: registerDto.address,
+      identificationDocument: registerDto.identificationDocument
+        ? 'provided'
+        : 'not provided',
+      specialization: registerDto.specialization,
+      licenseDocument: registerDto.licenseDocument
+        ? 'provided'
+        : 'not provided',
+      degrees: registerDto.degrees,
+      experience: registerDto.experience,
+      about: registerDto.about,
+      location: registerDto.location,
+    });
+
     const {
       email,
       password,
@@ -80,14 +108,24 @@ export class AuthService {
     //   throw new BadRequestException('Phone number is required');
     // }
 
-    // Check if phone is already registered (without verification requirement)
-    if (phone) {
-      const existingPhoneUser = await this.userModel.findOne({ phone });
-      if (existingPhoneUser) {
-        throw new ConflictException('User with this phone number already exists');
-      }
-    } else {
+    // Phone is required for all users (doctors and patients)
+    if (!phone || !phone.trim()) {
       throw new BadRequestException('Phone number is required');
+    }
+
+    console.log('📞 [AuthService] Phone validation:', {
+      phone,
+      phoneTrimmed: phone.trim(),
+      role,
+      phoneLength: phone.trim().length,
+    });
+
+    // Check if phone is already registered (without verification requirement)
+    const existingPhoneUser = await this.userModel.findOne({
+      phone: phone.trim(),
+    });
+    if (existingPhoneUser) {
+      throw new ConflictException('User with this phone number already exists');
     }
 
     // Validate profile image for doctors
@@ -108,6 +146,7 @@ export class AuthService {
       email,
       password: hashedPassword,
       role,
+      phone: phone?.trim(), // Save phone number
       dateOfBirth: dateOfBirthDate,
       minWorkingDaysRequired: minWorkingDaysRequired || 0,
       isActive: isDoctor ? false : true,
@@ -123,12 +162,52 @@ export class AuthService {
 
     // Add identification document if provided (for patients and doctors)
     if (registerDto.identificationDocument) {
-      userDataToSave.identificationDocument = registerDto.identificationDocument;
+      userDataToSave.identificationDocument =
+        registerDto.identificationDocument;
     }
+
+    console.log('💾 [AuthService] User data to save:', {
+      email: userDataToSave.email,
+      role: userDataToSave.role,
+      name: userDataToSave.name,
+      phone: userDataToSave.phone,
+      phoneLength: userDataToSave.phone?.length,
+      idNumber: userDataToSave.idNumber,
+      dateOfBirth: userDataToSave.dateOfBirth,
+      gender: userDataToSave.gender,
+      isActive: userDataToSave.isActive,
+      approvalStatus: userDataToSave.approvalStatus,
+      hasPassword: !!userDataToSave.password,
+      passwordLength: userDataToSave.password?.length,
+      address: userDataToSave.address,
+      identificationDocument: userDataToSave.identificationDocument
+        ? 'provided'
+        : 'not provided',
+      specialization: userDataToSave.specialization,
+      licenseDocument: userDataToSave.licenseDocument
+        ? 'provided'
+        : 'not provided',
+      degrees: userDataToSave.degrees,
+      experience: userDataToSave.experience,
+      about: userDataToSave.about,
+      location: userDataToSave.location,
+      profileImage: userDataToSave.profileImage ? 'provided' : 'not provided',
+    });
 
     const user = new this.userModel(userDataToSave);
 
     const savedUser = await user.save();
+
+    console.log('✅ [AuthService] User saved successfully:', {
+      userId: (savedUser._id as string).toString(),
+      email: savedUser.email,
+      role: savedUser.role,
+      name: savedUser.name,
+      phone: savedUser.phone,
+      phoneLength: savedUser.phone?.length,
+      isActive: savedUser.isActive,
+      approvalStatus: savedUser.approvalStatus,
+    });
 
     // Create notification for admin users
     try {
@@ -137,7 +216,7 @@ export class AuthService {
         console.error('❌ NotificationsService is null or undefined!');
         throw new Error('NotificationsService is not available');
       }
-      
+
       const roleLabel = role === UserRole.DOCTOR ? 'ექიმი' : 'პაციენტი';
       console.log('🔔 Creating notification for user registration:', {
         userId: (savedUser._id as string).toString(),
@@ -146,7 +225,7 @@ export class AuthService {
         role: savedUser.role,
         notificationsServiceExists: !!this.notificationsService,
       });
-      
+
       const notification = await this.notificationsService.createNotification({
         type: NotificationType.USER_REGISTERED,
         title: `ახალი ${roleLabel} დარეგისტრირდა`,
@@ -163,7 +242,7 @@ export class AuthService {
           registrationDate: new Date(),
         },
       });
-      
+
       console.log('✅ Notification created successfully:', {
         notificationId: notification._id,
         title: notification.title,
@@ -241,6 +320,8 @@ export class AuthService {
           phone: user.phone,
           isVerified: user.isVerified,
           approvalStatus: user.approvalStatus,
+          isActive: user.isActive,
+          doctorStatus: user.doctorStatus,
         },
         token: tokens.accessToken,
         refreshToken: tokens.refreshToken,

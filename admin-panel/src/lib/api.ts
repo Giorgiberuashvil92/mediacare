@@ -21,9 +21,11 @@ export interface User {
   name: string;
   email: string;
   phone?: string;
+  idNumber?: string; // Personal ID number (პირადი ნომერი)
   dateOfBirth?: string;
   gender?: 'male' | 'female' | 'other';
   profileImage?: string;
+  address?: string; // Address for patients
   identificationDocument?: string; // პირადობა/პასპორტი PDF path or URL
   isVerified: boolean;
   isActive: boolean;
@@ -31,7 +33,6 @@ export interface User {
   createdAt?: string;
   updatedAt?: string;
   // Doctor specific
-  idNumber?: string; // Personal ID number (პირადი ნომერი)
   specialization?: string;
   licenseNumber?: string;
   licenseDocument?: string; // File path/URL for medical license (PDF or Image)
@@ -301,13 +302,13 @@ class ApiService {
     );
   }
 
-  async getUserById(userId: string): Promise<ApiResponse<{ user: User }>> {
+  async getUserById(userId: string): Promise<ApiResponse<User>> {
     const response = await fetch(`${this.baseURL}/admin/users/${userId}`, {
       method: 'GET',
       headers: this.getHeaders(),
     });
 
-    return this.handleResponse<ApiResponse<{ user: User }>>(response);
+    return this.handleResponse<ApiResponse<User>>(response);
   }
 
   async createUser(userData: {

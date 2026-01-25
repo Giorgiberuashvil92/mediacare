@@ -16,7 +16,8 @@ export declare class UploadImageController {
 }
 export declare class UploadController {
     private readonly uploadService;
-    constructor(uploadService: UploadService);
+    private readonly cloudinaryService;
+    constructor(uploadService: UploadService, cloudinaryService: CloudinaryService);
     uploadLicense(file: Express.Multer.File): {
         success: boolean;
         message: string;
@@ -27,14 +28,16 @@ export declare class UploadController {
             mimeType: string;
         };
     };
-    uploadIdentification(file: Express.Multer.File): {
+    uploadIdentification(file: Express.Multer.File): Promise<{
         success: boolean;
         message: string;
         data: {
             filePath: string;
+            url: string;
+            publicId: string;
             fileName: string;
             fileSize: number;
             mimeType: string;
         };
-    };
+    }>;
 }

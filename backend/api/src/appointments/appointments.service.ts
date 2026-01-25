@@ -703,8 +703,8 @@ export class AppointmentsService {
   async requestReschedule(
     userId: string,
     appointmentId: string,
-    newDate: string,
-    newTime: string,
+    newDate?: string,
+    newTime?: string,
     reason?: string,
   ) {
     const appointment = await this.appointmentModel.findById(
@@ -745,103 +745,118 @@ export class AppointmentsService {
       );
     }
 
-    // Parse and validate date
-    const appointmentDate = new Date(newDate + 'T00:00:00.000Z');
-    if (isNaN(appointmentDate.getTime())) {
-      throw new BadRequestException('Invalid appointment date');
-    }
-
-    const normalizedDate = appointmentDate;
-    const startOfDay = new Date(normalizedDate);
-    const endOfDay = new Date(normalizedDate);
-    endOfDay.setUTCHours(23, 59, 59, 999);
-
-    // Validate time format
-    const [hoursStr, minutesStr] = (newTime || '').split(':');
-    const hours = Number(hoursStr);
-    const minutes = Number(minutesStr);
-
-    if (
-      Number.isNaN(hours) ||
-      Number.isNaN(minutes) ||
-      hours < 0 ||
-      hours > 23 ||
-      minutes < 0 ||
-      minutes > 59
-    ) {
-      throw new BadRequestException('Invalid appointment time');
-    }
-
-    // Build full appointment DateTime
-    const appointmentDateTime = new Date(appointmentDate);
-    appointmentDateTime.setHours(hours, minutes, 0, 0);
-
-    const now = new Date();
-    if (appointmentDateTime.getTime() < now.getTime()) {
+    // If patient is requesting, date and time are required
+    if (isPatient && (!newDate || !newTime)) {
       throw new BadRequestException(
-        'ახალი თარიღი და დრო არ შეიძლება იყოს წარსულში',
+        'Patient must specify new date and time for reschedule request',
       );
     }
 
-    // Check doctor's availability
-    let availability = await this.availabilityModel.findOne({
-      doctorId: appointment.doctorId,
-      date: {
-        $gte: startOfDay,
-        $lte: endOfDay,
-      },
-      type: appointment.type,
-      isAvailable: true,
-    });
+    // If doctor is requesting, date and time are optional
+    let normalizedDate: Date | undefined;
+    let normalizedTime: string | undefined;
 
-    // If doctor doesn't have this time in schedule, add it
-    if (!availability) {
-      // Create new availability entry
-      availability = await this.availabilityModel.create({
+    if (newDate && newTime) {
+      // Parse and validate date
+      const appointmentDate = new Date(newDate + 'T00:00:00.000Z');
+      if (isNaN(appointmentDate.getTime())) {
+        throw new BadRequestException('Invalid appointment date');
+      }
+
+      normalizedDate = appointmentDate;
+      const startOfDay = new Date(normalizedDate);
+      const endOfDay = new Date(normalizedDate);
+      endOfDay.setUTCHours(23, 59, 59, 999);
+
+      // Validate time format
+      const [hoursStr, minutesStr] = (newTime || '').split(':');
+      const hours = Number(hoursStr);
+      const minutes = Number(minutesStr);
+
+      if (
+        Number.isNaN(hours) ||
+        Number.isNaN(minutes) ||
+        hours < 0 ||
+        hours > 23 ||
+        minutes < 0 ||
+        minutes > 59
+      ) {
+        throw new BadRequestException('Invalid appointment time');
+      }
+
+      // Build full appointment DateTime
+      const appointmentDateTime = new Date(appointmentDate);
+      appointmentDateTime.setHours(hours, minutes, 0, 0);
+
+      const now = new Date();
+      if (appointmentDateTime.getTime() < now.getTime()) {
+        throw new BadRequestException(
+          'ახალი თარიღი და დრო არ შეიძლება იყოს წარსულში',
+        );
+      }
+
+      normalizedTime = newTime;
+
+      // Check doctor's availability
+      let availability = await this.availabilityModel.findOne({
         doctorId: appointment.doctorId,
-        date: normalizedDate,
+        date: {
+          $gte: startOfDay,
+          $lte: endOfDay,
+        },
         type: appointment.type,
         isAvailable: true,
-        timeSlots: [newTime],
       });
-    } else if (
-      !availability.timeSlots ||
-      !availability.timeSlots.includes(newTime)
-    ) {
-      // Add time slot if it doesn't exist
-      if (!availability.timeSlots) {
-        availability.timeSlots = [];
+
+      // If doctor doesn't have this time in schedule, add it
+      if (!availability) {
+        // Create new availability entry
+        availability = await this.availabilityModel.create({
+          doctorId: appointment.doctorId,
+          date: normalizedDate,
+          type: appointment.type,
+          isAvailable: true,
+          timeSlots: [newTime],
+        });
+      } else if (
+        !availability.timeSlots ||
+        !availability.timeSlots.includes(newTime)
+      ) {
+        // Add time slot if it doesn't exist
+        if (!availability.timeSlots) {
+          availability.timeSlots = [];
+        }
+        availability.timeSlots.push(newTime);
+        availability.timeSlots.sort();
+        await availability.save();
       }
-      availability.timeSlots.push(newTime);
-      availability.timeSlots.sort();
-      await availability.save();
-    }
 
-    // Check if the new time slot is already booked
-    const existingAppointment = await this.appointmentModel.findOne({
-      doctorId: appointment.doctorId,
-      appointmentDate: normalizedDate,
-      appointmentTime: newTime,
-      type: appointment.type,
-      status: {
-        $in: [
-          AppointmentStatus.PENDING,
-          AppointmentStatus.CONFIRMED,
-          AppointmentStatus.IN_PROGRESS,
-        ],
-      },
-      _id: { $ne: new mongoose.Types.ObjectId(appointmentId) },
-    });
+      // Check if the new time slot is already booked
+      const existingAppointment = await this.appointmentModel.findOne({
+        doctorId: appointment.doctorId,
+        appointmentDate: normalizedDate,
+        appointmentTime: newTime,
+        type: appointment.type,
+        status: {
+          $in: [
+            AppointmentStatus.PENDING,
+            AppointmentStatus.CONFIRMED,
+            AppointmentStatus.IN_PROGRESS,
+          ],
+        },
+        _id: { $ne: new mongoose.Types.ObjectId(appointmentId) },
+      });
 
-    if (existingAppointment) {
-      throw new BadRequestException('Selected time slot is already booked');
+      if (existingAppointment) {
+        throw new BadRequestException('Selected time slot is already booked');
+      }
     }
 
     // Create reschedule request
     appointment.rescheduleRequest = {
       requestedBy: isDoctor ? 'doctor' : 'patient',
       requestedDate: normalizedDate,
-      requestedTime: newTime,
+      requestedTime: normalizedTime,
       reason: reason,
       status: 'pending',
       requestedAt: new Date(),
@@ -856,7 +871,12 @@ export class AppointmentsService {
     };
   }
 
-  async approveReschedule(userId: string, appointmentId: string) {
+  async approveReschedule(
+    userId: string,
+    appointmentId: string,
+    newDate?: string,
+    newTime?: string,
+  ) {
     const appointment = await this.appointmentModel.findById(
       new mongoose.Types.ObjectId(appointmentId),
     );
@@ -893,9 +913,124 @@ export class AppointmentsService {
       );
     }
 
+    // Determine the new date and time
+    let finalDate: Date;
+    let finalTime: string;
+
+    // If doctor requested without date/time, patient must provide it
+    if (
+      !appointment.rescheduleRequest.requestedDate ||
+      !appointment.rescheduleRequest.requestedTime
+    ) {
+      if (!newDate || !newTime) {
+        throw new BadRequestException(
+          'New date and time are required when doctor requested reschedule without specifying date/time',
+        );
+      }
+
+      // Parse and validate date
+      const appointmentDate = new Date(newDate + 'T00:00:00.000Z');
+      if (isNaN(appointmentDate.getTime())) {
+        throw new BadRequestException('Invalid appointment date');
+      }
+
+      finalDate = appointmentDate;
+
+      // Validate time format
+      const [hoursStr, minutesStr] = (newTime || '').split(':');
+      const hours = Number(hoursStr);
+      const minutes = Number(minutesStr);
+
+      if (
+        Number.isNaN(hours) ||
+        Number.isNaN(minutes) ||
+        hours < 0 ||
+        hours > 23 ||
+        minutes < 0 ||
+        minutes > 59
+      ) {
+        throw new BadRequestException('Invalid appointment time');
+      }
+
+      finalTime = newTime;
+
+      // Build full appointment DateTime
+      const appointmentDateTime = new Date(appointmentDate);
+      appointmentDateTime.setHours(hours, minutes, 0, 0);
+
+      const now = new Date();
+      if (appointmentDateTime.getTime() < now.getTime()) {
+        throw new BadRequestException(
+          'ახალი თარიღი და დრო არ შეიძლება იყოს წარსულში',
+        );
+      }
+
+      // Check doctor's availability
+      const startOfDay = new Date(finalDate);
+      const endOfDay = new Date(finalDate);
+      endOfDay.setUTCHours(23, 59, 59, 999);
+
+      let availability = await this.availabilityModel.findOne({
+        doctorId: appointment.doctorId,
+        date: {
+          $gte: startOfDay,
+          $lte: endOfDay,
+        },
+        type: appointment.type,
+        isAvailable: true,
+      });
+
+      // If doctor doesn't have this time in schedule, add it
+      if (!availability) {
+        // Create new availability entry
+        availability = await this.availabilityModel.create({
+          doctorId: appointment.doctorId,
+          date: finalDate,
+          type: appointment.type,
+          isAvailable: true,
+          timeSlots: [newTime],
+        });
+      } else if (
+        !availability.timeSlots ||
+        !availability.timeSlots.includes(newTime)
+      ) {
+        // Add time slot if it doesn't exist
+        if (!availability.timeSlots) {
+          availability.timeSlots = [];
+        }
+        availability.timeSlots.push(newTime);
+        availability.timeSlots.sort();
+        await availability.save();
+      }
+
+      // Check if the new time slot is already booked
+      const existingAppointment = await this.appointmentModel.findOne({
+        doctorId: appointment.doctorId,
+        appointmentDate: finalDate,
+        appointmentTime: newTime,
+        type: appointment.type,
+        status: {
+          $in: [
+            AppointmentStatus.PENDING,
+            AppointmentStatus.CONFIRMED,
+            AppointmentStatus.IN_PROGRESS,
+          ],
+        },
+        _id: { $ne: new mongoose.Types.ObjectId(appointmentId) },
+      });
+
+      if (existingAppointment) {
+        throw new BadRequestException('Selected time slot is already booked');
+      }
+    } else {
+      // Use the requested date and time
+      finalDate = appointment.rescheduleRequest.requestedDate;
+      finalTime = appointment.rescheduleRequest.requestedTime!;
+    }
+
     // Update appointment date and time
-    appointment.appointmentDate = appointment.rescheduleRequest.requestedDate!;
-    appointment.appointmentTime = appointment.rescheduleRequest.requestedTime!;
+    appointment.appointmentDate = finalDate;
+    appointment.appointmentTime = finalTime;
     appointment.rescheduleRequest.status = 'approved';
     appointment.rescheduleRequest.respondedAt = new Date();
     appointment.rescheduleRequest.respondedBy = isDoctor ? 'doctor' : 'patient';

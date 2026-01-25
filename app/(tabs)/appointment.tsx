@@ -234,6 +234,13 @@ const Appointment = () => {
   const [selectedRescheduleTime, setSelectedRescheduleTime] = useState<string | null>(null);
   const [loadingAvailability, setLoadingAvailability] = useState(false);
   
+  // Approve reschedule states (when doctor requested without date/time)
+  const [showApproveRescheduleModal, setShowApproveRescheduleModal] = useState(false);
+  const [approveRescheduleAppointmentId, setApproveRescheduleAppointmentId] = useState<string | null>(null);
+  const [approveRescheduleDate, setApproveRescheduleDate] = useState<string | null>(null);
+  const [approveRescheduleTime, setApproveRescheduleTime] = useState<string | null>(null);
+  const [approveRescheduleLoading, setApproveRescheduleLoading] = useState(false);
+  
   // Cancel states
   const [cancellingAppointmentId, setCancellingAppointmentId] = useState<string | null>(null);
 
@@ -332,16 +339,23 @@ const Appointment = () => {
   };
 
   // Check if join button should be active (5 minutes before, active for 30 minutes)
+  // TEMPORARY: Always return true for testing Agora
   const isJoinButtonActive = (appointment: PatientAppointment) => {
-    if (appointment.status !== "scheduled") return false;
-    const appointmentDateTime = new Date(
-      `${appointment.date}T${appointment.time}`
-    );
-    const diff = appointmentDateTime.getTime() - currentTime.getTime();
-    const fiveMinutesInMs = 5 * 60 * 1000;
-    const thirtyMinutesInMs = 30 * 60 * 1000;
-    // Active from 5 minutes before until 30 minutes after
-    return diff <= fiveMinutesInMs && diff >= -thirtyMinutesInMs;
+    // For testing - always show button
+    if (appointment.status === "scheduled" || appointment.status === "in-progress") {
+      return true;
+    }
+    // Original logic (commented for testing)
+    // if (appointment.status !== "scheduled") return false;
+    // const appointmentDateTime = new Date(
+    //   `${appointment.date}T${appointment.time}`
+    // );
+    // const diff = appointmentDateTime.getTime() - currentTime.getTime();
+    // const fiveMinutesInMs = 5 * 60 * 1000;
+    // const thirtyMinutesInMs = 30 * 60 * 1000;
+    // // Active from 5 minutes before until 30 minutes after
+    // return diff <= fiveMinutesInMs && diff >= -thirtyMinutesInMs;
+    return false;
   };
 
   // Get time remaining until appointment (for waiting screen)
@@ -553,7 +567,8 @@ const Appointment = () => {
         const doctorId = appointmentResponse.data.doctorId?._id || appointmentResponse.data.doctorId;
         
         // Load doctor availability
-        const availabilityResponse = await apiService.getDoctorAvailability(doctorId);
+        // პაციენტისთვის: forPatient=true, რომ დაჯავშნილი სლოტები ჩანდეს
+        const availabilityResponse = await apiService.getDoctorAvailability(doctorId, undefined, true);
         console.log('📅 Availability response:', JSON.stringify(availabilityResponse.data, null, 2));
         
         if (availabilityResponse.success && availabilityResponse.data) {
@@ -616,7 +631,55 @@ const Appointment = () => {
   };
 
   // Handle approve reschedule request
-  const handleApproveReschedule = async (appointmentId: string) => {
+  const handleApproveReschedule = async (appointmentId: string, appointment?: PatientAppointment) => {
+    // If doctor requested without date/time, patient must choose date/time
+    if (appointment?.rescheduleRequest && 
+        !appointment.rescheduleRequest.requestedDate && 
+        !appointment.rescheduleRequest.requestedTime) {
+      // Open modal to select date and time
+      setApproveRescheduleAppointmentId(appointmentId);
+      setApproveRescheduleDate(null);
+      setApproveRescheduleTime(null);
+      
+      // Load doctor availability
+      try {
+        setLoadingAvailability(true);
+        const appointmentResponse = await apiService.getAppointmentById(appointmentId);
+        if (appointmentResponse.success && appointmentResponse.data) {
+          const apt = appointmentResponse.data as any;
+          const doctorId = apt.doctorId?._id || apt.doctorId;
+          
+          if (doctorId) {
+            const response = await apiService.getDoctorAvailability(
+              doctorId.toString(),
+              apt.type as "video" | "home-visit",
+              true // forPatient
+            );
+            if (response.success && response.data) {
+              const slots = (response.data as any[]).flatMap((slot: any) => {
+                const date = new Date(slot.date);
+                const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+                return (slot.timeSlots || []).map((time: string) => ({
+                  date: dateStr,
+                  time,
+                }));
+              });
+              setAvailableSlots(slots);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load availability:", err);
+        Alert.alert("შეცდომა", "ხელმისაწვდომი დროების ჩატვირთვა ვერ მოხერხდა");
+      } finally {
+        setLoadingAvailability(false);
+      }
+      
+      setShowApproveRescheduleModal(true);
+      return;
+    }
+    
+    // If doctor specified date/time, approve directly
     try {
       const response = await apiService.approveReschedule(appointmentId);
       if (response.success) {
@@ -628,6 +691,38 @@ const Appointment = () => {
     } catch (err: any) {
       console.error('Approve reschedule error:', err);
       Alert.alert("შეცდომა", err.message || "დამტკიცება ვერ მოხერხდა");
+    }
+  };
+
+  // Handle approve reschedule with date/time selection
+  const handleApproveRescheduleWithDate = async () => {
+    if (!approveRescheduleAppointmentId || !approveRescheduleDate || !approveRescheduleTime) {
+      Alert.alert("შეცდომა", "გთხოვთ აირჩიოთ თარიღი და დრო");
+      return;
+    }
+
+    setApproveRescheduleLoading(true);
+    try {
+      const response = await apiService.approveReschedule(
+        approveRescheduleAppointmentId,
+        approveRescheduleDate,
+        approveRescheduleTime
+      );
+      if (response.success) {
+        setShowApproveRescheduleModal(false);
+        setApproveRescheduleAppointmentId(null);
+        setApproveRescheduleDate(null);
+        setApproveRescheduleTime(null);
+        await loadAppointments();
+        Alert.alert("წარმატება", "გადაჯავშნა დამტკიცდა");
+      } else {
+        Alert.alert("შეცდომა", response.message || "დამტკიცება ვერ მოხერხდა");
+      }
+    } catch (err: any) {
+      console.error('Approve reschedule error:', err);
+      Alert.alert("შეცდომა", err.message || "დამტკიცება ვერ მოხერხდა");
+    } finally {
+      setApproveRescheduleLoading(false);
     }
   };
 
@@ -946,14 +1041,14 @@ const Appointment = () => {
                     <Ionicons name="time-outline" size={16} color="#6B7280" />
                     <Text style={styles.infoText}>{appointment.time}</Text>
                   </View>
-                  {appointment.symptoms && (
+                  {/* {appointment.symptoms && (
                     <View style={styles.symptomsRow}>
                       <Ionicons name="medical" size={16} color="#6B7280" />
                       <Text style={styles.symptomsText}>
                         {appointment.symptoms}
                       </Text>
                     </View>
-                  )}
+                  )} */}
                   {appointment.diagnosis && (
                     <View style={styles.diagnosisRow}>
                       <Ionicons
@@ -1107,9 +1202,15 @@ const Appointment = () => {
                         ექიმმა მოითხოვა გადაჯავშნა
                       </Text>
                     </View>
-                    <Text style={styles.rescheduleRequestText}>
-                      ახალი თარიღი: {appointment.rescheduleRequest.requestedDate} {appointment.rescheduleRequest.requestedTime}
-                    </Text>
+                    {appointment.rescheduleRequest.requestedDate && appointment.rescheduleRequest.requestedTime ? (
+                      <Text style={styles.rescheduleRequestText}>
+                        ახალი თარიღი: {appointment.rescheduleRequest.requestedDate} {appointment.rescheduleRequest.requestedTime}
+                      </Text>
+                    ) : (
+                      <Text style={styles.rescheduleRequestText}>
+                        გთხოვთ აირჩიოთ ახალი თარიღი და დრო
+                      </Text>
+                    )}
                     {appointment.rescheduleRequest.reason && (
                       <Text style={styles.rescheduleRequestReason}>
                         მიზეზი: {appointment.rescheduleRequest.reason}
@@ -1118,7 +1219,7 @@ const Appointment = () => {
                     <View style={styles.rescheduleRequestActions}>
                       <TouchableOpacity
                         style={[styles.approveButton, styles.actionButton]}
-                        onPress={() => handleApproveReschedule(appointment.id)}
+                        onPress={() => handleApproveReschedule(appointment.id, appointment)}
                       >
                         <Ionicons name="checkmark-circle" size={18} color="#10B981" />
                         <Text style={styles.approveButtonText}>დამტკიცება</Text>
@@ -1510,6 +1611,126 @@ const Appointment = () => {
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
                   <Text style={[styles.modalButtonText, styles.rescheduleButtonText]}>დადასტურება</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Approve Reschedule Modal - when doctor requested without date/time */}
+      <Modal
+        visible={showApproveRescheduleModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowApproveRescheduleModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>აირჩიეთ თარიღი და დრო</Text>
+              <TouchableOpacity
+                onPress={() => setShowApproveRescheduleModal(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalBody}>
+              {loadingAvailability ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color="#06B6D4" />
+                  <Text style={styles.loadingText}>ხელმისაწვდომი დროების ჩატვირთვა...</Text>
+                </View>
+              ) : (
+                <>
+                  {/* Date Selection */}
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailLabel}>აირჩიეთ თარიღი</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dateScrollView}>
+                      {Array.from(new Set(availableSlots.map(s => s.date))).map((date) => (
+                        <TouchableOpacity
+                          key={date}
+                          style={[
+                            styles.dateChip,
+                            approveRescheduleDate === date && styles.dateChipSelected,
+                          ]}
+                          onPress={() => {
+                            setApproveRescheduleDate(date);
+                            setApproveRescheduleTime(null);
+                          }}
+                        >
+                          <Text
+                            style={[
+                              styles.dateChipText,
+                              approveRescheduleDate === date && styles.dateChipTextSelected,
+                            ]}
+                          >
+                            {new Date(date).toLocaleDateString("ka-GE", {
+                              weekday: "short",
+                              day: "numeric",
+                              month: "short",
+                            })}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+
+                  {/* Time Selection */}
+                  {approveRescheduleDate && (
+                    <View style={styles.detailSection}>
+                      <Text style={styles.detailLabel}>აირჩიეთ დრო</Text>
+                      <View style={styles.timeGrid}>
+                        {availableSlots
+                          .filter(s => s.date === approveRescheduleDate)
+                          .map((slot) => (
+                            <TouchableOpacity
+                              key={slot.time}
+                              style={[
+                                styles.timeChip,
+                                approveRescheduleTime === slot.time && styles.timeChipSelected,
+                              ]}
+                              onPress={() => setApproveRescheduleTime(slot.time)}
+                            >
+                              <Text
+                                style={[
+                                  styles.timeChipText,
+                                  approveRescheduleTime === slot.time && styles.timeChipTextSelected,
+                                ]}
+                              >
+                                {slot.time}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                      </View>
+                    </View>
+                  )}
+                </>
+              )}
+            </ScrollView>
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={() => setShowApproveRescheduleModal(false)}
+              >
+                <Text style={styles.modalButtonText}>გაუქმება</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalButton,
+                  styles.rescheduleButton,
+                  (!approveRescheduleDate || !approveRescheduleTime || approveRescheduleLoading) && styles.disabledButton,
+                ]}
+                onPress={handleApproveRescheduleWithDate}
+                disabled={!approveRescheduleDate || !approveRescheduleTime || approveRescheduleLoading}
+              >
+                {approveRescheduleLoading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={[styles.modalButtonText, styles.rescheduleButtonText]}>დამტკიცება</Text>
                 )}
               </TouchableOpacity>
             </View>

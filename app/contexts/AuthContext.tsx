@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, {
   createContext,
   ReactNode,
+  useCallback,
   useContext,
   useEffect,
   useState,
@@ -25,6 +26,7 @@ interface AuthContextType {
   register: (userData: RegisterRequest) => Promise<void>;
   logout: () => Promise<void>;
   setUserRole: (role: UserRole) => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -135,6 +137,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const refreshUser = useCallback(async () => {
+    try {
+      const profileResponse = await apiService.getProfile();
+      if (profileResponse.success && profileResponse.data) {
+        const updatedUser: User = {
+          id: profileResponse.data.id,
+          email: profileResponse.data.email,
+          name: profileResponse.data.name,
+          role: profileResponse.data.role,
+          profileImage: profileResponse.data.profileImage,
+          doctorStatus: profileResponse.data.doctorStatus,
+          isActive: profileResponse.data.isActive,
+          isVerified: profileResponse.data.isVerified,
+          approvalStatus: profileResponse.data.approvalStatus,
+        };
+        setUser(updatedUser);
+        await AsyncStorage.setItem("user", JSON.stringify(updatedUser));
+      }
+    } catch (error) {
+      console.error("Error refreshing user:", error);
+    }
+  }, []);
+
   const value: AuthContextType = {
     user,
     userRole,
@@ -144,6 +169,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     register,
     logout,
     setUserRole,
+    refreshUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

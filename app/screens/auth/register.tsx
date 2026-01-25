@@ -7,8 +7,10 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Modal,
+  PermissionsAndroid,
   Platform,
   ScrollView,
   StatusBar,
@@ -251,67 +253,352 @@ export default function RegisterScreen() {
   };
 
   const handleProfileImagePick = async () => {
+    console.log("========================================");
+    console.log("📸 [ProfileImage] ===== BUTTON PRESSED =====");
+    console.log("📸 [ProfileImage] Timestamp:", new Date().toISOString());
+    console.log("📸 [ProfileImage] Platform:", Platform.OS);
+    console.log("📸 [ProfileImage] Current state - uploadingProfileImage:", uploadingProfileImage);
+    console.log("📸 [ProfileImage] Current profileImage:", profileImage ? "exists" : "null");
+    console.log("========================================");
+    
+    // Prevent multiple simultaneous calls
+    if (uploadingProfileImage) {
+      console.log("⚠️ [ProfileImage] Already uploading, skipping...");
+      return;
+    }
+
     try {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (permission.status !== "granted") {
-      showToast.error("ფოტოებზე წვდომა საჭიროა", "შეცდომა");
-      return;
-    }
+      console.log("📸 [ProfileImage] Setting uploading state to true");
+      setUploadingProfileImage(true);
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.8,
-      selectionLimit: 1,
-    });
+      // Request permissions - Android specific handling
+      if (Platform.OS === "android") {
+        console.log("🤖 [ProfileImage] Android platform detected, checking permissions...");
+        try {
+          // Check if permission is already granted
+          const readPermission = await PermissionsAndroid.check(
+            PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES
+          );
+          console.log("🤖 [ProfileImage] Android permission check result:", readPermission);
 
-    if (result.canceled) {
-      return;
-    }
+          if (!readPermission) {
+            console.log("🤖 [ProfileImage] Requesting Android permission...");
+            // Request permission
+            const granted = await PermissionsAndroid.request(
+              PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES,
+              {
+                title: "ფოტოებზე წვდომა",
+                message: "აპლიკაციას სჭირდება ფოტოებზე წვდომა პროფილის სურათის ასარჩევად",
+                buttonNeutral: "მოგვიანებით",
+                buttonNegative: "არა",
+                buttonPositive: "დიახ",
+              }
+            );
+            console.log("🤖 [ProfileImage] Android permission request result:", granted);
 
-    const asset = result.assets[0];
-    const fileSize = asset.fileSize ?? 0;
-    const fileName = asset.fileName || "profile.jpg";
-    const fileType = asset.mimeType || "image/jpeg";
+            if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+              console.log("❌ [ProfileImage] Android permission denied");
+              Alert.alert(
+                "წვდომა აკრძალულია",
+                "ფოტოებზე წვდომა საჭიროა. გთხოვთ ჩართოთ პარამეტრებში.",
+                [{ text: "კარგი" }]
+              );
+              return;
+            }
+            console.log("✅ [ProfileImage] Android permission granted");
+          } else {
+            console.log("✅ [ProfileImage] Android permission already granted");
+          }
+        } catch (androidPermError) {
+          console.error("❌ [ProfileImage] Android permission error:", androidPermError);
+          console.error("❌ [ProfileImage] Error details:", JSON.stringify(androidPermError, null, 2));
+          // Fallback to ImagePicker permission request
+        }
+      } else {
+        console.log("🍎 [ProfileImage] iOS platform detected");
+      }
 
-    if (fileSize > 5 * 1024 * 1024) {
-      showToast.error("სურათის ზომა არ უნდა აღემატებოდეს 5MB-ს", "შეცდომა");
-      return;
-    }
+      // iOS: launchImageLibraryAsync automatically requests permissions
+      // Android: We already handled permissions above
+      // For iOS, we can skip explicit permission request and let launchImageLibraryAsync handle it
+      if (Platform.OS === "ios") {
+        console.log("🍎 [ProfileImage] iOS detected - skipping explicit permission request");
+        console.log("🍎 [ProfileImage] launchImageLibraryAsync will handle permissions automatically");
+      } else {
+        // Request permissions for Android (if not already granted)
+        console.log("📸 [ProfileImage] Requesting ImagePicker permissions for Android...");
+        console.log("📸 [ProfileImage] ImagePicker available:", typeof ImagePicker !== "undefined");
+        console.log("📸 [ProfileImage] requestMediaLibraryPermissionsAsync available:", typeof ImagePicker.requestMediaLibraryPermissionsAsync === "function");
+        
+        let permission;
+        try {
+          console.log("📸 [ProfileImage] Calling requestMediaLibraryPermissionsAsync...");
+          
+          // Add timeout for permission request (10 seconds)
+          const permissionPromise = ImagePicker.requestMediaLibraryPermissionsAsync();
+          const permissionTimeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => {
+              console.error("⏱️ [ProfileImage] Permission request timeout (10s)");
+              reject(new Error("Permission request timeout"));
+            }, 10000);
+          });
 
-    setUploadingProfileImage(true);
+          permission = await Promise.race([permissionPromise, permissionTimeoutPromise]) as ImagePicker.MediaLibraryPermissionResponse;
+          console.log("✅ [ProfileImage] Permission request completed");
+          console.log("📸 [ProfileImage] ImagePicker permission result:", JSON.stringify(permission, null, 2));
+          console.log("📸 [ProfileImage] Permission status:", permission?.status);
+          
+          if (!permission || permission.status !== "granted") {
+            console.log("❌ [ProfileImage] Permission not granted, status:", permission?.status);
+            Alert.alert(
+              "წვდომა აკრძალულია",
+              "ფოტოებზე წვდომა საჭიროა. გთხოვთ ჩართოთ პარამეტრებში.",
+              [{ text: "კარგი" }]
+            );
+            return;
+          }
+        } catch (permError) {
+          console.error("❌ [ProfileImage] Permission request error:", permError);
+          console.error("❌ [ProfileImage] Error type:", typeof permError);
+          console.error("❌ [ProfileImage] Error name:", permError instanceof Error ? permError.name : "unknown");
+          console.error("❌ [ProfileImage] Error message:", permError instanceof Error ? permError.message : "unknown");
+          console.error("❌ [ProfileImage] Error stack:", permError instanceof Error ? permError.stack : "no stack");
+          try {
+            console.error("❌ [ProfileImage] Error details (JSON):", JSON.stringify(permError, Object.getOwnPropertyNames(permError), 2));
+          } catch (jsonError) {
+            console.error("❌ [ProfileImage] Could not stringify error:", jsonError);
+          }
+          Alert.alert(
+            "შეცდომა",
+            "ფოტოებზე წვდომის მოთხოვნა ვერ მოხერხდა. გთხოვთ სცადოთ ხელახლა.",
+            [{ text: "კარგი" }]
+          );
+          return;
+        }
+      }
 
-    if (apiService.isMockMode()) {
-      setProfileImage({
-        uri: asset.uri,
+      console.log("✅ [ProfileImage] Ready to launch image picker...");
+      console.log("📸 [ProfileImage] launchImageLibraryAsync available:", typeof ImagePicker.launchImageLibraryAsync === "function");
+
+      // Launch image picker with timeout protection
+      console.log("📸 [ProfileImage] Launching image picker...");
+      let result;
+      try {
+        // Create a promise with timeout
+        console.log("📸 [ProfileImage] Creating picker promise...");
+        console.log("📸 [ProfileImage] Picker options:", {
+          mediaTypes: "Images",
+          allowsEditing: true,
+          quality: 0.8,
+          selectionLimit: 1,
+          aspect: [1, 1],
+        });
+        
+        const pickerPromise = ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          quality: 0.8,
+          selectionLimit: 1,
+          aspect: [1, 1], // Square aspect ratio for profile images
+        });
+        console.log("✅ [ProfileImage] Picker promise created");
+        console.log("📸 [ProfileImage] Picker promise type:", typeof pickerPromise);
+        console.log("📸 [ProfileImage] Picker promise is Promise:", pickerPromise instanceof Promise);
+
+        // Add timeout (30 seconds)
+        console.log("📸 [ProfileImage] Creating timeout promise (30s)...");
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => {
+            console.error("⏱️ [ProfileImage] Timeout reached (30s)");
+            reject(new Error("სურათის არჩევა დრო ამოიწურა"));
+          }, 30000);
+        });
+        console.log("✅ [ProfileImage] Timeout promise created");
+
+        console.log("📸 [ProfileImage] Starting Promise.race...");
+        console.log("📸 [ProfileImage] Picker promise state:", pickerPromise);
+        console.log("📸 [ProfileImage] Timeout promise state:", timeoutPromise);
+        
+        try {
+          result = await Promise.race([pickerPromise, timeoutPromise]) as ImagePicker.ImagePickerResult;
+          console.log("✅ [ProfileImage] Promise.race completed");
+          console.log("📸 [ProfileImage] Picker result received:", JSON.stringify({
+            canceled: result?.canceled,
+            assetsCount: result?.assets?.length,
+            hasAssets: !!result?.assets,
+            resultType: typeof result,
+          }, null, 2));
+        } catch (raceError) {
+          console.error("❌ [ProfileImage] Promise.race error:", raceError);
+          throw raceError;
+        }
+      } catch (pickerError) {
+        console.error("❌ [ProfileImage] Image picker launch error:", pickerError);
+        console.error("❌ [ProfileImage] Error type:", typeof pickerError);
+        console.error("❌ [ProfileImage] Error details:", JSON.stringify(pickerError, Object.getOwnPropertyNames(pickerError), 2));
+        const errorMsg = pickerError instanceof Error 
+          ? pickerError.message 
+          : "სურათის არჩევის ფანჯარა ვერ გაიხსნა";
+        
+        console.error("❌ [ProfileImage] Showing error alert:", errorMsg);
+        Alert.alert(
+          "შეცდომა",
+          errorMsg,
+          [{ text: "კარგი" }]
+        );
+        return;
+      }
+
+      if (!result) {
+        console.error("❌ [ProfileImage] Image picker returned null/undefined");
+        Alert.alert(
+          "შეცდომა",
+          "სურათის არჩევა ვერ მოხერხდა. გთხოვთ სცადოთ ხელახლა.",
+          [{ text: "კარგი" }]
+        );
+        return;
+      }
+
+      if (result.canceled) {
+        console.log("ℹ️ [ProfileImage] User canceled image selection");
+        return;
+      }
+
+      if (!result.assets || result.assets.length === 0) {
+        console.error("❌ [ProfileImage] No assets in result");
+        console.error("❌ [ProfileImage] Result structure:", JSON.stringify(result, null, 2));
+        showToast.error("სურათი არ აირჩევა", "შეცდომა");
+        return;
+      }
+
+      console.log("✅ [ProfileImage] Asset found, processing...");
+      const asset = result.assets[0];
+      console.log("📸 [ProfileImage] Asset details:", JSON.stringify({
+        uri: asset?.uri?.substring(0, 50) + "...",
+        fileName: asset?.fileName,
+        fileSize: asset?.fileSize,
+        mimeType: asset?.mimeType,
+        width: asset?.width,
+        height: asset?.height,
+      }, null, 2));
+      
+      if (!asset || !asset.uri) {
+        console.error("❌ [ProfileImage] Asset or URI is missing");
+        console.error("❌ [ProfileImage] Asset:", JSON.stringify(asset, null, 2));
+        showToast.error("სურათის URI არ მოიძებნა", "შეცდომა");
+        return;
+      }
+
+      const fileSize = asset.fileSize ?? 0;
+      const fileName = asset.fileName || `profile_${Date.now()}.jpg`;
+      const fileType = asset.mimeType || "image/jpeg";
+
+      console.log("📸 [ProfileImage] File info:", {
+        fileName,
+        fileType,
+        fileSize: `${(fileSize / 1024 / 1024).toFixed(2)} MB`,
+        uri: asset.uri.substring(0, 50) + "...",
+      });
+
+      // Validate file type
+      const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+      if (!allowedTypes.includes(fileType.toLowerCase())) {
+        console.error("❌ [ProfileImage] Invalid file type:", fileType);
+        showToast.error("მხოლოდ JPG, PNG ან WEBP ფორმატის სურათებია დაშვებული", "შეცდომა");
+        return;
+      }
+
+      // Validate file size
+      if (fileSize > 5 * 1024 * 1024) {
+        console.error("❌ [ProfileImage] File too large:", fileSize);
+        showToast.error("სურათის ზომა არ უნდა აღემატებოდეს 5MB-ს", "შეცდომა");
+        return;
+      }
+
+      // Validate URI format
+      if (!asset.uri || (!asset.uri.startsWith("file://") && !asset.uri.startsWith("content://") && !asset.uri.startsWith("http"))) {
+        console.error("❌ [ProfileImage] Invalid URI format:", asset.uri);
+        showToast.error("არასწორი სურათის ფორმატი", "შეცდომა");
+        return;
+      }
+
+      console.log("✅ [ProfileImage] All validations passed");
+
+      if (apiService.isMockMode()) {
+        console.log("🎭 [ProfileImage] Mock mode - skipping upload");
+        setProfileImage({
+          uri: asset.uri,
+          name: fileName,
+          type: fileType,
+          url: asset.uri,
+        });
+        showToast.success("სურათი აიტვირთა (mock)", "წარმატება");
+        console.log("✅ [ProfileImage] Mock upload completed");
+        return;
+      }
+
+      // Real upload
+      console.log("📤 [ProfileImage] Starting real upload...");
+      console.log("📤 [ProfileImage] Upload params:", {
+        uri: asset.uri.substring(0, 50) + "...",
         name: fileName,
         type: fileType,
-        url: asset.uri,
       });
-      showToast.success("სურათი აიტვირთა (mock)", "წარმატება");
-    } else {
-      const response = await apiService.uploadProfileImagePublic({
-        uri: asset.uri,
-        name: fileName,
-        type: fileType,
-      });
+      
+      try {
+        const response = await apiService.uploadProfileImagePublic({
+          uri: asset.uri,
+          name: fileName,
+          type: fileType,
+        });
 
-      setProfileImage({
-        uri: asset.uri,
-        name: fileName,
-        type: fileType,
-        url: response.url,
-      });
-      showToast.success("სურათი წარმატებით აიტვირთა", "წარმატება");
-    }
+        console.log("📤 [ProfileImage] Upload response received:", JSON.stringify({
+          success: response?.success,
+          hasUrl: !!response?.url,
+          url: response?.url?.substring(0, 50) + "...",
+          hasPublicId: !!response?.publicId,
+        }, null, 2));
+
+        if (!response || !response.url) {
+          console.error("❌ [ProfileImage] Invalid response:", JSON.stringify(response, null, 2));
+          throw new Error("Invalid response from server");
+        }
+
+        console.log("✅ [ProfileImage] Setting profile image state");
+        setProfileImage({
+          uri: asset.uri,
+          name: fileName,
+          type: fileType,
+          url: response.url,
+        });
+        console.log("✅ [ProfileImage] Profile image set successfully");
+        showToast.success("სურათი წარმატებით აიტვირთა", "წარმატება");
+        console.log("✅ [ProfileImage] Upload completed successfully");
+      } catch (uploadError) {
+        console.error("❌ [ProfileImage] Upload error:", uploadError);
+        console.error("❌ [ProfileImage] Upload error type:", typeof uploadError);
+        console.error("❌ [ProfileImage] Upload error details:", JSON.stringify(uploadError, Object.getOwnPropertyNames(uploadError), 2));
+        const uploadErrorMessage = uploadError instanceof Error 
+          ? uploadError.message 
+          : "სურათის ატვირთვა ვერ მოხერხდა";
+        console.error("❌ [ProfileImage] Showing upload error:", uploadErrorMessage);
+        showToast.error(uploadErrorMessage, "შეცდომა");
+        // Don't reset profile image on upload error - keep the selected image
+      }
     } catch (error) {
-      console.error("Profile image pick error:", error);
-      showToast.error(
-        error instanceof Error ? error.message : "სურათის ატვირთვა ვერ მოხერხდა",
-        "შეცდომა"
-      );
+      console.error("❌ [ProfileImage] Profile image pick error:", error);
+      console.error("❌ [ProfileImage] Error type:", typeof error);
+      console.error("❌ [ProfileImage] Error details:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : "სურათის არჩევა ვერ მოხერხდა";
+      
+      console.error("❌ [ProfileImage] Showing error:", errorMessage);
+      showToast.error(errorMessage, "შეცდომა");
     } finally {
+      console.log("🏁 [ProfileImage] Setting uploading state to false");
       setUploadingProfileImage(false);
+      console.log("🏁 [ProfileImage] Process completed");
     }
   };
 
@@ -366,11 +653,18 @@ export default function RegisterScreen() {
         const data = await response.json();
 
         if (data.success) {
+          // Use Cloudinary URL (data.data.url or data.data.filePath)
+          const cloudinaryUrl = data.data.url || data.data.filePath;
+          console.log('✅ [Register] Identification document uploaded to Cloudinary:', {
+            url: cloudinaryUrl,
+            publicId: data.data.publicId,
+            fileName: file.name,
+          });
           setIdentificationDocument({
             uri: file.uri,
             name: file.name,
             type: file.mimeType || "application/pdf",
-            filePath: data.data.filePath,
+            filePath: cloudinaryUrl, // Now contains Cloudinary URL instead of local path
           });
           showToast.success("ფაილი წარმატებით აიტვირთა", "წარმატება");
         } else {
@@ -452,8 +746,9 @@ export default function RegisterScreen() {
       return;
     }
 
-    if (!phone.trim()) {
-      showToast.error("ტელეფონის ნომერი აუცილებელია", "შეცდომა");
+    // Phone is required only for doctors
+    if (selectedRole === "doctor" && !phone.trim()) {
+      showToast.error("ტელეფონის ნომერი აუცილებელია ექიმებისთვის", "შეცდომა");
       return;
     }
 
@@ -498,10 +793,19 @@ export default function RegisterScreen() {
         password,
         idNumber: idNumber.trim(),
         role: selectedRole,
+        phone: phone.trim(), // Phone is required for all users
       };
 
-      // Add phone for all users
-      if (phone.trim()) registerData.phone = phone.trim();
+      console.log('📤 [Register] Sending registration data:', {
+        name: registerData.name,
+        email: registerData.email,
+        role: registerData.role,
+        phone: registerData.phone,
+        phoneLength: registerData.phone?.length,
+        idNumber: registerData.idNumber,
+        hasPassword: !!registerData.password,
+        passwordLength: registerData.password?.length,
+      });
 
       // Add common fields for all users
       if (dateOfBirth && dateOfBirth.trim()) {
@@ -550,6 +854,29 @@ export default function RegisterScreen() {
           registerData.location = location.trim();
         }
       }
+
+      console.log('📤 [Register] Final registration data (before API call):', {
+        name: registerData.name,
+        email: registerData.email,
+        role: registerData.role,
+        phone: registerData.phone,
+        phoneLength: registerData.phone?.length,
+        idNumber: registerData.idNumber,
+        dateOfBirth: registerData.dateOfBirth,
+        gender: registerData.gender,
+        profileImage: registerData.profileImage ? 'provided' : 'not provided',
+        address: registerData.address,
+        identificationDocument: registerData.identificationDocument ? 'provided' : 'not provided',
+        specialization: registerData.specialization,
+        licenseDocument: registerData.licenseDocument ? 'provided' : 'not provided',
+        degrees: registerData.degrees,
+        experience: registerData.experience,
+        about: registerData.about,
+        location: registerData.location,
+        hasPassword: !!registerData.password,
+        passwordLength: registerData.password?.length,
+        allKeys: Object.keys(registerData),
+      });
 
       await register(registerData);
 

@@ -67,15 +67,28 @@ export default function UserFormModal({
 
   useEffect(() => {
     if (mode === 'edit' && user) {
+      // Format dateOfBirth - handle both Date objects and ISO strings
+      let formattedDateOfBirth = '';
+      if (user.dateOfBirth) {
+        try {
+          const date = typeof user.dateOfBirth === 'string' 
+            ? new Date(user.dateOfBirth) 
+            : new Date(user.dateOfBirth);
+          if (!isNaN(date.getTime())) {
+            formattedDateOfBirth = date.toISOString().split('T')[0];
+          }
+        } catch (e) {
+          console.error('Error parsing dateOfBirth:', e);
+        }
+      }
+
       setFormData({
         role: user.role,
         name: user.name || '',
         email: user.email || '',
         password: '',
         phone: user.phone || '',
-        dateOfBirth: user.dateOfBirth
-          ? new Date(user.dateOfBirth).toISOString().split('T')[0]
-          : '',
+        dateOfBirth: formattedDateOfBirth,
         gender: user.gender || 'male',
         isVerified: user.isVerified || false,
         isActive: user.isActive !== undefined ? user.isActive : true,
@@ -212,8 +225,7 @@ export default function UserFormModal({
       if (mode === 'edit') {
         submitData.isVerified = formData.isVerified;
         submitData.isActive = formData.isActive;
-        submitData.approvalStatus =
-          formData.role === 'patient' ? 'approved' : formData.approvalStatus;
+        submitData.approvalStatus = formData.approvalStatus;
       } else if (formData.role === 'patient') {
         submitData.isActive = formData.isActive;
       }
@@ -429,8 +441,8 @@ export default function UserFormModal({
             </select>
           </div>
 
-          {/* პაციენტის სტატუსი – create/edit, მხოლოდ ორი: აქტიური | არააქტიური */}
-          {formData.role === 'patient' && (
+          {/* პაციენტის სტატუსი – create mode-ში მხოლოდ აქტიური/არააქტიური */}
+          {formData.role === 'patient' && mode === 'create' && (
             <div>
               <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
                 სტატუსი
@@ -473,43 +485,45 @@ export default function UserFormModal({
                   </label>
                   {user?.licenseDocument ? (
                     <div className="flex flex-wrap items-center gap-3">
-                      <a
-                        href={
-                          user.licenseDocument.startsWith('http')
-                            ? user.licenseDocument
-                            : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/${user.licenseDocument}`
-                        }
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 rounded-lg bg-primary/10 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/20"
-                      >
-                        <svg
-                          className="h-5 w-5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                          />
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                          />
-                        </svg>
-                        ლიცენზიის ნახვა
-                      </a>
-                      <a
-                        href={
-                          user.licenseDocument.startsWith('http')
-                            ? user.licenseDocument
-                            : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/${user.licenseDocument}`
-                        }
+                      {(() => {
+                        // Helper function to check if URL is absolute (starts with http:// or https://)
+                        const isAbsoluteUrl = (url: string) => {
+                          return url && (url.startsWith('http://') || url.startsWith('https://'));
+                        };
+                        const licenseUrl = isAbsoluteUrl(user.licenseDocument)
+                          ? user.licenseDocument
+                          : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/${user.licenseDocument}`;
+                        return (
+                          <>
+                            <a
+                              href={licenseUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 rounded-lg bg-primary/10 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/20"
+                            >
+                              <svg
+                                className="h-5 w-5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                />
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                />
+                              </svg>
+                              ლიცენზიის ნახვა
+                            </a>
+                            <a
+                              href={licenseUrl}
                         download
                         target="_blank"
                         rel="noopener noreferrer"
@@ -530,6 +544,9 @@ export default function UserFormModal({
                         </svg>
                         გადმოწერა
                       </a>
+                          </>
+                        );
+                      })()}
                     </div>
                   ) : (
                     <p className="text-sm text-dark-4 dark:text-dark-6">
@@ -539,55 +556,51 @@ export default function UserFormModal({
                 </div>
               )}
 
-              {/* ექიმი/ადმინი – დადასტურებული, აქტიური, დამტკიცების სტატუსი (პაციენტს მხოლოდ აქტიური/არააქტიური ტაბები ზემოთ) */}
-              {formData.role !== 'patient' && (
-                <>
-                  <div className="flex items-center gap-4">
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={formData.isVerified}
-                        onChange={(e) =>
-                          setFormData({ ...formData, isVerified: e.target.checked })
-                        }
-                        className="rounded border-stroke text-primary focus:ring-primary dark:border-dark-3"
-                      />
-                      <span className="text-sm text-dark dark:text-white">დადასტურებული</span>
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={formData.isActive}
-                        onChange={(e) =>
-                          setFormData({ ...formData, isActive: e.target.checked })
-                        }
-                        className="rounded border-stroke text-primary focus:ring-primary dark:border-dark-3"
-                      />
-                      <span className="text-sm text-dark dark:text-white">აქტიური</span>
-                    </label>
-                  </div>
+              {/* რედაქტირებისას ყველა მომხმარებლისთვის: დადასტურებული, აქტიური, დამტკიცების სტატუსი */}
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={formData.isVerified}
+                    onChange={(e) =>
+                      setFormData({ ...formData, isVerified: e.target.checked })
+                    }
+                    className="rounded border-stroke text-primary focus:ring-primary dark:border-dark-3"
+                  />
+                  <span className="text-sm text-dark dark:text-white">დადასტურებული</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={formData.isActive}
+                    onChange={(e) =>
+                      setFormData({ ...formData, isActive: e.target.checked })
+                    }
+                    className="rounded border-stroke text-primary focus:ring-primary dark:border-dark-3"
+                  />
+                  <span className="text-sm text-dark dark:text-white">აქტიური</span>
+                </label>
+              </div>
 
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
-                      დამტკიცების სტატუსი
-                    </label>
-                    <select
-                      value={formData.approvalStatus}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          approvalStatus: e.target.value as 'pending' | 'approved' | 'rejected',
-                        })
-                      }
-                      className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
-                    >
-                      <option value="pending">მოლოდინში</option>
-                      <option value="approved">დამტკიცებული</option>
-                      <option value="rejected">უარყოფილი</option>
-                    </select>
-                  </div>
-                </>
-              )}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
+                  დამტკიცების სტატუსი
+                </label>
+                <select
+                  value={formData.approvalStatus}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      approvalStatus: e.target.value as 'pending' | 'approved' | 'rejected',
+                    })
+                  }
+                  className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
+                >
+                  <option value="pending">მოლოდინში</option>
+                  <option value="approved">დამტკიცებული</option>
+                  <option value="rejected">უარყოფილი</option>
+                </select>
+              </div>
             </>
           )}
 

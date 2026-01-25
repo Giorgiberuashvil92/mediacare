@@ -36,7 +36,7 @@ let UploadImageController = class UploadImageController {
         const result = await this.cloudinaryService.uploadBuffer(file.buffer, {
             folder: 'mediacare',
             resource_type: 'image',
-        });
+        }, file.mimetype, file.originalname);
         return {
             success: true,
             url: result.secure_url,
@@ -57,7 +57,7 @@ let UploadImageController = class UploadImageController {
         const result = await this.cloudinaryService.uploadBuffer(file.buffer, {
             folder: 'mediacare',
             resource_type: 'image',
-        });
+        }, file.mimetype, file.originalname);
         return {
             success: true,
             url: result.secure_url,
@@ -88,8 +88,9 @@ exports.UploadImageController = UploadImageController = __decorate([
     __metadata("design:paramtypes", [cloudinary_service_1.CloudinaryService])
 ], UploadImageController);
 let UploadController = class UploadController {
-    constructor(uploadService) {
+    constructor(uploadService, cloudinaryService) {
         this.uploadService = uploadService;
+        this.cloudinaryService = cloudinaryService;
     }
     uploadLicense(file) {
         if (!file) {
@@ -110,19 +111,33 @@ let UploadController = class UploadController {
             },
         };
     }
-    uploadIdentification(file) {
+    async uploadIdentification(file) {
         if (!file) {
             throw new common_1.BadRequestException('No file uploaded');
         }
         if (!this.uploadService.validateLicenseFile(file)) {
             throw new common_1.BadRequestException('Invalid file. Only PDF, JPG, JPEG, PNG files up to 5MB are allowed.');
         }
-        const filePath = this.uploadService.saveIdentificationDocument(file);
+        console.log('📤 [UploadController] Uploading identification document to Cloudinary:', {
+            fileName: file.originalname,
+            fileSize: file.size,
+            mimeType: file.mimetype,
+        });
+        const result = await this.cloudinaryService.uploadBuffer(file.buffer, {
+            folder: 'mediacare/identification',
+            resource_type: 'raw',
+        }, file.mimetype, file.originalname);
+        console.log('✅ [UploadController] Identification document uploaded to Cloudinary:', {
+            url: result.secure_url,
+            publicId: result.public_id,
+        });
         return {
             success: true,
             message: 'File uploaded successfully',
             data: {
-                filePath,
+                filePath: result.secure_url,
+                url: result.secure_url,
+                publicId: result.public_id,
                 fileName: file.originalname,
                 fileSize: file.size,
                 mimeType: file.mimetype,
@@ -145,10 +160,11 @@ __decorate([
     __param(0, (0, common_1.UploadedFile)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:returntype", Promise)
 ], UploadController.prototype, "uploadIdentification", null);
 exports.UploadController = UploadController = __decorate([
     (0, common_1.Controller)('upload'),
-    __metadata("design:paramtypes", [upload_service_1.UploadService])
+    __metadata("design:paramtypes", [upload_service_1.UploadService,
+        cloudinary_service_1.CloudinaryService])
 ], UploadController);
 //# sourceMappingURL=upload.controller.js.map

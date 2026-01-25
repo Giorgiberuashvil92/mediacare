@@ -3,8 +3,8 @@
 import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 import { apiService, User } from '@/lib/api';
 import { useEffect, useState } from 'react';
-import UserFormModal from './_components/user-form-modal';
 import DeleteUserModal from './_components/delete-user-modal';
+import UserFormModal from './_components/user-form-modal';
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -210,6 +210,18 @@ export default function UsersPage() {
                     ტელეფონი
                   </th>
                   <th className="p-4 text-left font-medium text-dark dark:text-white">
+                    პირადი ნომერი
+                  </th>
+                  <th className="p-4 text-left font-medium text-dark dark:text-white">
+                    დაბადების თარიღი
+                  </th>
+                  <th className="p-4 text-left font-medium text-dark dark:text-white">
+                    სქესი
+                  </th>
+                  <th className="p-4 text-left font-medium text-dark dark:text-white">
+                    მისამართი
+                  </th>
+                  <th className="p-4 text-left font-medium text-dark dark:text-white">
                     პირადობა/პასპორტი
                   </th>
                   <th className="p-4 text-left font-medium text-dark dark:text-white">
@@ -232,7 +244,7 @@ export default function UsersPage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={10} className="p-8 text-center">
+                    <td colSpan={14} className="p-8 text-center">
                       <div className="flex items-center justify-center">
                         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
                       </div>
@@ -240,20 +252,25 @@ export default function UsersPage() {
                   </tr>
                 ) : users.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="p-4 text-center text-dark-4">
+                    <td colSpan={14} className="p-4 text-center text-dark-4">
                       მომხმარებლები არ მოიძებნა
                     </td>
                   </tr>
                 ) : (
                   users.map((user) => {
                     const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+                    // Helper function to check if URL is absolute (starts with http:// or https://)
+                    const isAbsoluteUrl = (url: string) => {
+                      return url && (url.startsWith('http://') || url.startsWith('https://'));
+                    };
+                    
                     const photoSrc = user.profileImage
-                      ? user.profileImage.startsWith('http')
+                      ? isAbsoluteUrl(user.profileImage)
                         ? user.profileImage
                         : `${apiBase}/${user.profileImage}`
                       : null;
                     const idDocUrl = user.identificationDocument
-                      ? user.identificationDocument.startsWith('http')
+                      ? isAbsoluteUrl(user.identificationDocument)
                         ? user.identificationDocument
                         : `${apiBase}/${user.identificationDocument}`
                       : null;
@@ -286,6 +303,26 @@ export default function UsersPage() {
                         </td>
                         <td className="p-4 text-dark-4 dark:text-dark-6">
                           {user.phone || '-'}
+                        </td>
+                        <td className="p-4 text-dark-4 dark:text-dark-6">
+                          {user.idNumber || '-'}
+                        </td>
+                        <td className="p-4 text-dark-4 dark:text-dark-6">
+                          {user.dateOfBirth
+                            ? new Date(user.dateOfBirth).toLocaleDateString('ka-GE')
+                            : '-'}
+                        </td>
+                        <td className="p-4 text-dark-4 dark:text-dark-6">
+                          {user.gender === 'male'
+                            ? 'კაცი'
+                            : user.gender === 'female'
+                            ? 'ქალი'
+                            : user.gender === 'other'
+                            ? 'სხვა'
+                            : '-'}
+                        </td>
+                        <td className="p-4 text-dark-4 dark:text-dark-6">
+                          {user.address || '-'}
                         </td>
                         <td className="p-4">
                           {idDocUrl ? (
@@ -360,9 +397,27 @@ export default function UsersPage() {
                         <td className="p-4">
                           <div className="flex gap-2">
                             <button
-                              onClick={() => {
-                                setSelectedUser(user);
-                                setShowEditModal(true);
+                              onClick={async () => {
+                                try {
+                                  setLoading(true);
+                                  const response = await apiService.getUserById(user.id);
+                                  if (response.success && response.data) {
+                                    // getUserById returns { success: true, data: User }
+                                    setSelectedUser(response.data);
+                                    setShowEditModal(true);
+                                  } else {
+                                    // Fallback to using user from list
+                                    setSelectedUser(user);
+                                    setShowEditModal(true);
+                                  }
+                                } catch (err: any) {
+                                  console.error('Error loading user:', err);
+                                  // Fallback to using user from list
+                                  setSelectedUser(user);
+                                  setShowEditModal(true);
+                                } finally {
+                                  setLoading(false);
+                                }
                               }}
                               className="rounded-lg bg-primary/10 px-3 py-1 text-xs font-medium text-primary transition hover:bg-primary/20"
                             >

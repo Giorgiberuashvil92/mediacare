@@ -5,8 +5,8 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
 import { SendVerificationCodeDto } from './dto/send-verification-code.dto';
 import { VerifyPhoneDto } from './dto/verify-phone.dto';
-import { PhoneVerificationService } from './phone-verification.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { PhoneVerificationService } from './phone-verification.service';
 
 @Controller('auth')
 export class AuthController {
@@ -17,6 +17,33 @@ export class AuthController {
 
   @Post('register')
   async register(@Body() registerDto: RegisterDto) {
+    console.log('📥 [AuthController] Register endpoint called');
+    console.log('📥 [AuthController] Received registerDto:', {
+      email: registerDto.email,
+      role: registerDto.role,
+      name: registerDto.name,
+      phone: registerDto.phone,
+      phoneLength: registerDto.phone?.length,
+      idNumber: registerDto.idNumber,
+      hasPassword: !!registerDto.password,
+      passwordLength: registerDto.password?.length,
+      dateOfBirth: registerDto.dateOfBirth,
+      gender: registerDto.gender,
+      profileImage: registerDto.profileImage ? 'provided' : 'not provided',
+      address: registerDto.address,
+      identificationDocument: registerDto.identificationDocument
+        ? 'provided'
+        : 'not provided',
+      specialization: registerDto.specialization,
+      licenseDocument: registerDto.licenseDocument
+        ? 'provided'
+        : 'not provided',
+      degrees: registerDto.degrees,
+      experience: registerDto.experience,
+      about: registerDto.about,
+      location: registerDto.location,
+      allKeys: Object.keys(registerDto),
+    });
     return this.authService.register(registerDto);
   }
 

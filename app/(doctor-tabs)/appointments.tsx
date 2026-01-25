@@ -82,11 +82,7 @@ export default function DoctorAppointments() {
   // Reschedule states
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
   const [rescheduleLoading, setRescheduleLoading] = useState(false);
-  const [selectedRescheduleDate, setSelectedRescheduleDate] = useState<string | null>(null);
-  const [selectedRescheduleTime, setSelectedRescheduleTime] = useState<string | null>(null);
   const [rescheduleReason, setRescheduleReason] = useState("");
-  const [availableSlots, setAvailableSlots] = useState<{ date: string; time: string }[]>([]);
-  const [loadingAvailability, setLoadingAvailability] = useState(false);
 
   // Laboratory tests state
   const [laboratoryProducts, setLaboratoryProducts] = useState<ShopProduct[]>(
@@ -252,16 +248,23 @@ export default function DoctorAppointments() {
   };
 
   // Check if join button should be active (5 minutes before, active for 30 minutes)
+  // TEMPORARY: Always return true for testing Agora
   const isJoinButtonActive = (consultation: Consultation) => {
-    if (consultation.status !== "scheduled" && consultation.status !== "in-progress") return false;
-    const consultationDateTime = new Date(
-      `${consultation.date}T${consultation.time}`
-    );
-    const diff = consultationDateTime.getTime() - currentTime.getTime();
-    const fiveMinutesInMs = 5 * 60 * 1000;
-    const thirtyMinutesInMs = 30 * 60 * 1000;
-    // Active from 5 minutes before until 30 minutes after
-    return diff <= fiveMinutesInMs && diff >= -thirtyMinutesInMs;
+    // For testing - always show button
+    if (consultation.status === "scheduled" || consultation.status === "in-progress") {
+      return true;
+    }
+    // Original logic (commented for testing)
+    // if (consultation.status !== "scheduled" && consultation.status !== "in-progress") return false;
+    // const consultationDateTime = new Date(
+    //   `${consultation.date}T${consultation.time}`
+    // );
+    // const diff = consultationDateTime.getTime() - currentTime.getTime();
+    // const fiveMinutesInMs = 5 * 60 * 1000;
+    // const thirtyMinutesInMs = 30 * 60 * 1000;
+    // // Active from 5 minutes before until 30 minutes after
+    // return diff <= fiveMinutesInMs && diff >= -thirtyMinutesInMs;
+    return false;
   };
 
   // Filter consultations - exclude followup consultations (they should only appear in patients.tsx)
@@ -280,10 +283,10 @@ export default function DoctorAppointments() {
       return isNotFollowup && matchesStatus && matchesType && matchesSearch;
     })
     .sort((a, b) => {
-      // Sort by date and time - newest first
+      // Sort by appointment date and time - earliest upcoming first
       const dateA = new Date(`${a.date}T${a.time}`).getTime();
       const dateB = new Date(`${b.date}T${b.time}`).getTime();
-      return dateB - dateA; // Descending order (newest first)
+      return dateA - dateB; // Ascending order (earliest first)
     });
 
   // Stats - exclude followup consultations
@@ -416,60 +419,24 @@ export default function DoctorAppointments() {
   const handleOpenReschedule = async (consultation: Consultation) => {
     setSelectedConsultation(consultation);
     setShowRescheduleModal(true);
-    setSelectedRescheduleDate(null);
-    setSelectedRescheduleTime(null);
     setRescheduleReason("");
-
-    // Load doctor availability - get doctorId from appointment
-    try {
-      setLoadingAvailability(true);
-      const appointmentResponse = await apiService.getAppointmentById(consultation.id);
-      if (appointmentResponse.success && appointmentResponse.data) {
-        const appointment = appointmentResponse.data as any;
-        const doctorId = appointment.doctorId?._id || appointment.doctorId || user?.id;
-        
-        if (doctorId) {
-          const response = await apiService.getDoctorAvailability(
-            doctorId.toString(),
-            consultation.type as "video" | "home-visit"
-          );
-          if (response.success && response.data) {
-            const slots = (response.data as any[]).flatMap((slot: any) => {
-              const date = new Date(slot.date);
-              const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-              return (slot.timeSlots || []).map((time: string) => ({
-                date: dateStr,
-                time,
-              }));
-            });
-            setAvailableSlots(slots);
-          }
-        }
-      }
-    } catch (err) {
-      console.error("Failed to load availability:", err);
-      Alert.alert("შეცდომა", "ხელმისაწვდომი დროების ჩატვირთვა ვერ მოხერხდა");
-    } finally {
-      setLoadingAvailability(false);
-    }
   };
 
   const handleRequestReschedule = async () => {
-    if (!selectedConsultation || !selectedRescheduleDate || !selectedRescheduleTime) return;
+    if (!selectedConsultation) return;
 
     setRescheduleLoading(true);
     try {
+      // Doctor sends reschedule request without date/time - patient will choose
       const response = await apiService.requestReschedule(
         selectedConsultation.id,
-        selectedRescheduleDate,
-        selectedRescheduleTime,
+        undefined, // Doctor doesn't specify date - patient will choose
+        undefined, // Doctor doesn't specify time - patient will choose
         rescheduleReason || undefined
       );
 
       if (response.success) {
         setShowRescheduleModal(false);
-        setSelectedRescheduleDate(null);
-        setSelectedRescheduleTime(null);
         setRescheduleReason("");
         await fetchConsultations();
         Alert.alert("წარმატება", "გადაჯავშნის მოთხოვნა გაიგზავნა პაციენტთან");
@@ -1302,20 +1269,7 @@ export default function DoctorAppointments() {
 
                 {/* Status Actions */}
                 <View style={styles.statusActionsRow}>
-                  {consultation.status === "scheduled" && (
-                    <TouchableOpacity
-                      style={styles.statusActionButton}
-                      onPress={() =>
-                        handleStatusUpdate(consultation, "in-progress")
-                      }
-                      disabled={
-                        statusActionLoading === `${consultation.id}-in-progress`
-                      }
-                    >
-                      <Ionicons name="play" size={16} color="#2563EB" />
-                      <Text style={styles.statusActionText}>დაწყება</Text>
-                    </TouchableOpacity>
-                  )}
+                  
 
                   {consultation.status !== "cancelled" && (
                     <TouchableOpacity
@@ -1379,29 +1333,7 @@ export default function DoctorAppointments() {
                 </View>
 
                 <View style={styles.consultationFooter}>
-                  <View style={styles.feeRow}>
-                    <Ionicons name="wallet" size={16} color="#6B7280" />
-                    <Text style={styles.feeAmount}>${consultation.fee}</Text>
-                    <View
-                      style={[
-                        styles.paymentBadge,
-                        consultation.isPaid
-                          ? styles.paymentBadgePaid
-                          : styles.paymentBadgePending,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.paymentText,
-                          consultation.isPaid
-                            ? styles.paymentTextPaid
-                            : styles.paymentTextPending,
-                        ]}
-                      >
-                        {consultation.isPaid ? "გადახდილი" : "მოსალოდნელი"}
-                      </Text>
-                    </View>
-                  </View>
+
                 </View>
               </TouchableOpacity>
             ))
@@ -1527,18 +1459,7 @@ export default function DoctorAppointments() {
                       (selectedConsultation as any).patientId?.phone ||
                       (selectedConsultation as any).patientId?.email) && (
                       <>
-                        {((selectedConsultation as any).patientPhone ||
-                          (selectedConsultation as any).patientId?.phone) && (
-                          <View style={styles.patientInfoRow}>
-                            <Text style={styles.patientInfoLabel}>
-                              ტელეფონი:
-                            </Text>
-                            <Text style={styles.patientInfoValue}>
-                              {(selectedConsultation as any).patientPhone ||
-                                (selectedConsultation as any).patientId?.phone}
-                            </Text>
-                          </View>
-                        )}
+                        
 
                         {((selectedConsultation as any).patientEmail ||
                           (selectedConsultation as any).patientId?.email) && (
@@ -1772,37 +1693,9 @@ export default function DoctorAppointments() {
                   </View>
                 )}
 
-                <View style={styles.detailSection}>
-                  <Text style={styles.detailLabel}>ანაზღაურება</Text>
-                  <Text style={styles.detailValue}>
-                    ${selectedConsultation.fee}
-                  </Text>
-                </View>
+                
 
-                <View style={styles.detailSection}>
-                  <Text style={styles.detailLabel}>გადახდის სტატუსი</Text>
-                  <View
-                    style={[
-                      styles.paymentBadge,
-                      selectedConsultation.isPaid
-                        ? styles.paymentBadgePaid
-                        : styles.paymentBadgePending,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.paymentText,
-                        selectedConsultation.isPaid
-                          ? styles.paymentTextPaid
-                          : styles.paymentTextPending,
-                      ]}
-                    >
-                      {selectedConsultation.isPaid
-                        ? "გადახდილი"
-                        : "მოსალოდნელი"}
-                    </Text>
-                  </View>
-                </View>
+
 
                 {/* Reschedule Request Status - if patient requested reschedule */}
                 {selectedConsultation.rescheduleRequest?.status === 'pending' && 
@@ -2706,91 +2599,21 @@ export default function DoctorAppointments() {
             </View>
 
             <ScrollView style={styles.modalBody}>
-              {loadingAvailability ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="large" color="#06B6D4" />
-                  <Text style={styles.loadingText}>ხელმისაწვდომი დროების ჩატვირთვა...</Text>
-                </View>
-              ) : (
-                <>
-                  {/* Date Selection */}
-                  <View style={styles.detailSection}>
-                    <Text style={styles.detailLabel}>აირჩიეთ თარიღი</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dateScrollView}>
-                      {Array.from(new Set(availableSlots.map(s => s.date))).map((date) => (
-                        <TouchableOpacity
-                          key={date}
-                          style={[
-                            styles.dateChip,
-                            selectedRescheduleDate === date && styles.dateChipSelected,
-                          ]}
-                          onPress={() => {
-                            setSelectedRescheduleDate(date);
-                            setSelectedRescheduleTime(null);
-                          }}
-                        >
-                          <Text
-                            style={[
-                              styles.dateChipText,
-                              selectedRescheduleDate === date && styles.dateChipTextSelected,
-                            ]}
-                          >
-                            {new Date(date).toLocaleDateString("ka-GE", {
-                              weekday: "short",
-                              day: "numeric",
-                              month: "short",
-                            })}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                  </View>
-
-                  {/* Time Selection */}
-                  {selectedRescheduleDate && (
-                    <View style={styles.detailSection}>
-                      <Text style={styles.detailLabel}>აირჩიეთ დრო</Text>
-                      <View style={styles.timeSlotsGrid}>
-                        {availableSlots
-                          .filter(s => s.date === selectedRescheduleDate)
-                          .map((slot) => (
-                            <TouchableOpacity
-                              key={slot.time}
-                              style={[
-                                styles.timeChip,
-                                selectedRescheduleTime === slot.time && styles.timeChipSelected,
-                              ]}
-                              onPress={() => setSelectedRescheduleTime(slot.time)}
-                            >
-                              <Text
-                                style={[
-                                  styles.timeChipText,
-                                  selectedRescheduleTime === slot.time && styles.timeChipTextSelected,
-                                ]}
-                              >
-                                {slot.time}
-                              </Text>
-                            </TouchableOpacity>
-                          ))}
-                      </View>
-                    </View>
-                  )}
-
-                  {/* Reason (Optional) */}
-                  <View style={styles.detailSection}>
-                    <Text style={styles.detailLabel}>მიზეზი (არასავალდებულო)</Text>
-                    <TextInput
-                      style={styles.reasonInput}
-                      placeholder="მიუთითეთ გადაჯავშნის მიზეზი..."
-                      placeholderTextColor="#9CA3AF"
-                      value={rescheduleReason}
-                      onChangeText={setRescheduleReason}
-                      multiline
-                      numberOfLines={3}
-                    />
-                  </View>
-                </>
-              )}
+              <View style={styles.detailSection}>
+                <Text style={styles.detailLabel}>მიზეზი (არასავალდებულო)</Text>
+                <Text style={{ fontSize: 13, color: "#6B7280", marginBottom: 12 }}>
+                  პაციენტი თავად აირჩევს ახალ თარიღს და დროს
+                </Text>
+                <TextInput
+                  style={styles.reasonInput}
+                  placeholder="მიუთითეთ გადაჯავშნის მიზეზი..."
+                  placeholderTextColor="#9CA3AF"
+                  value={rescheduleReason}
+                  onChangeText={setRescheduleReason}
+                  multiline
+                  numberOfLines={3}
+                />
+              </View>
             </ScrollView>
 
             <View style={styles.modalFooter}>
@@ -2803,18 +2626,15 @@ export default function DoctorAppointments() {
               <TouchableOpacity  
                 style={[
                   styles.rescheduleSubmitButton,
-                  (!selectedRescheduleDate || !selectedRescheduleTime || rescheduleLoading) && styles.disabledButton,
+                  rescheduleLoading && styles.disabledButton,
                 ]}
                 onPress={handleRequestReschedule}
-                disabled={!selectedRescheduleDate || !selectedRescheduleTime || rescheduleLoading}
+                disabled={rescheduleLoading}
               >
                 {rescheduleLoading ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <>
-                    
-                    <Text style={styles.rescheduleSubmitButtonText}>მოთხოვნის გაგზავნა</Text>
-                  </>
+                  <Text style={styles.rescheduleSubmitButtonText}>მოთხოვნის გაგზავნა</Text>
                 )}
               </TouchableOpacity>
             </View>

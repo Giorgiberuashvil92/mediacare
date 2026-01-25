@@ -1,11 +1,11 @@
 import { JwtService } from '@nestjs/jwt';
 import * as mongoose from 'mongoose';
+import { NotificationsService } from '../notifications/notifications.service';
 import { RefreshTokenDocument } from '../schemas/refresh-token.schema';
 import { ApprovalStatus, UserDocument, UserRole } from '../schemas/user.schema';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { PhoneVerificationService } from './phone-verification.service';
-import { NotificationsService } from '../notifications/notifications.service';
 export declare class AuthService {
     private userModel;
     private refreshTokenModel;
@@ -42,6 +42,8 @@ export declare class AuthService {
                 phone: string;
                 isVerified: boolean;
                 approvalStatus: ApprovalStatus;
+                isActive: true;
+                doctorStatus: import("../schemas/user.schema").DoctorStatus;
             };
             token: string;
             refreshToken: string;

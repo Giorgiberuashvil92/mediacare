@@ -38,6 +38,8 @@ export declare class AuthController {
                 phone: string;
                 isVerified: boolean;
                 approvalStatus: import("../schemas/user.schema").ApprovalStatus;
+                isActive: true;
+                doctorStatus: import("../schemas/user.schema").DoctorStatus;
             };
             token: string;
             refreshToken: string;

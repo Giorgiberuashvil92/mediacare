@@ -19,6 +19,7 @@ interface DayAvailability {
   homeVisitSlots?: string[];
   bookedSlots?: string[];
   isAvailable: boolean;
+  type?: "video" | "home-visit"; // Backend-იდან მოდის type ველი
 }
 
 interface Review {
@@ -101,16 +102,34 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
   const currentMonth = getCurrentMonth();
 
   // Filter availability by current mode so რომ თითო ტაბში მხოლოდ შესაბამისი ტიპის დღეები ჩანდეს
-  const filteredAvailability: DayAvailability[] = availability.filter((day) => {
-    if (isTwentyFourSeven) {
-      return day.isAvailable !== false;
-    }
-    if (mode === "video") {
-      return (day.videoSlots && day.videoSlots.length > 0) || day.timeSlots.length > 0;
-    }
-    // home-visit
-    return day.homeVisitSlots && day.homeVisitSlots.length > 0;
-  });
+  // Backend-იდან მოდის type ველი (video ან home-visit), ასე რომ უნდა ვფილტროთ type-ის მიხედვით
+  // პაციენტისთვის: მხოლოდ ის დღეები, სადაც არის თავისუფალი დრო (timeSlots არ არის ცარიელი)
+  const filteredAvailability: DayAvailability[] = availability
+    .filter((day) => {
+      // თუ day-ს აქვს type ველი, გამოვიყენოთ იგი
+      if (day.type) {
+        const typeMatches = day.type === mode;
+        // პაციენტისთვის: მხოლოდ ის დღეები, სადაც არის თავისუფალი დრო
+        if (typeMatches && day.timeSlots && day.timeSlots.length === 0) {
+          return false; // თუ timeSlots ცარიელია, ეს დღე არ ჩანს
+        }
+        return typeMatches;
+      }
+      
+      // Legacy support: თუ type არ არის, გამოვიყენოთ ძველი ლოგიკა
+      if (isTwentyFourSeven) {
+        return day.isAvailable !== false;
+      }
+      if (mode === "video") {
+        return (day.videoSlots && day.videoSlots.length > 0) || day.timeSlots.length > 0;
+      }
+      // home-visit
+      return day.homeVisitSlots && day.homeVisitSlots.length > 0;
+    })
+    // დავრწმუნდეთ, რომ თარიღები unique-ები არიან (თუ რამე პრობლემაა)
+    .filter((day, index, self) => 
+      index === self.findIndex((d) => d.date === day.date)
+    );
 
   // Ensure selected date always belongs to current filtered list
   if (
@@ -448,7 +467,8 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
 
           try {
             // გადამოწმება: ისევ თავისუფალია ეს დრო ამ ტიპისთვის?
-            const response = await apiService.getDoctorAvailability(doctorId);
+            // პაციენტისთვის: forPatient=true, რომ დაჯავშნილი სლოტები ჩანდეს
+            const response = await apiService.getDoctorAvailability(doctorId, undefined, true);
 
             if (!response.success || !response.data) {
               Alert.alert(

@@ -152,8 +152,14 @@ export class AppointmentsController {
   async approveReschedule(
     @CurrentUser() user: { sub: string },
     @Param('id') appointmentId: string,
+    @Body() dto?: RescheduleRequestDto,
   ) {
-    return this.appointmentsService.approveReschedule(user.sub, appointmentId);
+    return this.appointmentsService.approveReschedule(
+      user.sub,
+      appointmentId,
+      dto?.newDate,
+      dto?.newTime,
+    );
   }
 
   // Reject reschedule request

@@ -20,14 +20,41 @@ const refresh_token_dto_1 = require("./dto/refresh-token.dto");
 const register_dto_1 = require("./dto/register.dto");
 const send_verification_code_dto_1 = require("./dto/send-verification-code.dto");
 const verify_phone_dto_1 = require("./dto/verify-phone.dto");
-const phone_verification_service_1 = require("./phone-verification.service");
 const jwt_auth_guard_1 = require("./guards/jwt-auth.guard");
+const phone_verification_service_1 = require("./phone-verification.service");
 let AuthController = class AuthController {
     constructor(authService, phoneVerificationService) {
         this.authService = authService;
         this.phoneVerificationService = phoneVerificationService;
     }
     async register(registerDto) {
+        console.log('📥 [AuthController] Register endpoint called');
+        console.log('📥 [AuthController] Received registerDto:', {
+            email: registerDto.email,
+            role: registerDto.role,
+            name: registerDto.name,
+            phone: registerDto.phone,
+            phoneLength: registerDto.phone?.length,
+            idNumber: registerDto.idNumber,
+            hasPassword: !!registerDto.password,
+            passwordLength: registerDto.password?.length,
+            dateOfBirth: registerDto.dateOfBirth,
+            gender: registerDto.gender,
+            profileImage: registerDto.profileImage ? 'provided' : 'not provided',
+            address: registerDto.address,
+            identificationDocument: registerDto.identificationDocument
+                ? 'provided'
+                : 'not provided',
+            specialization: registerDto.specialization,
+            licenseDocument: registerDto.licenseDocument
+                ? 'provided'
+                : 'not provided',
+            degrees: registerDto.degrees,
+            experience: registerDto.experience,
+            about: registerDto.about,
+            location: registerDto.location,
+            allKeys: Object.keys(registerDto),
+        });
         return this.authService.register(registerDto);
     }
     async login(loginDto) {

@@ -2,34 +2,17 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 import { logger } from "../utils/logger";
 
-const getExpoHostIp = () => {
-  const host =
-    // Expo SDK 49+: expoConfig is available
-    Constants.expoConfig?.hostUri ||
-    // Older SDK fallback
-    (Constants.manifest as any)?.debuggerHost ||
-    "";
-
-  if (!host) {
-    return undefined;
-  }
-
-  const hostWithoutPort = host.split(":")[0];
-  if (hostWithoutPort && hostWithoutPort !== "localhost") {
-    return hostWithoutPort;
-  }
-
-  return undefined;
-};
+// Development build-ისთვის სტატიკური IP მისამართი
+// შეცვალეთ თქვენი კომპიუტერის IP მისამართით (მაგ: "192.168.1.100")
+const DEVELOPMENT_IP = "172.20.10.2"; // შეცვალეთ თქვენი IP-ით
 
 const getDefaultBaseUrl = () => {
   // Force Railway URL for testing (both dev and production)
   const FORCE_RAILWAY = false; // Set to false to use local development
-  
+
   if (FORCE_RAILWAY) {
-    console.log('🚂 Forcing Railway URL for testing');
-    return "https://mediacare-production.up.railway.app";  
-    // return "https://localhost:4000";  
+    console.log("🚂 Forcing Railway URL for testing");
+    return "https://mediacare-production.up.railway.app";
   }
 
   const envUrl =
@@ -39,19 +22,21 @@ const getDefaultBaseUrl = () => {
     (Constants.manifest as any)?.extra?.API_URL ||
     (Constants.manifest as any)?.extra?.apiUrl;
 
-  const expoHostIp = getExpoHostIp();
-  const isLocalUrl = (u: string) =>
-    !u || u.includes('localhost') || u.includes('127.0.0.1');
-  // When using local backend, prefer expoHostIp on device (localhost fails there)
-  if (isLocalUrl(envUrl) && expoHostIp) {
-    return `http://${expoHostIp}:4000`;
+  // თუ envUrl არის განსაზღვრული და არ არის localhost, გამოვიყენოთ ის
+  if (envUrl && !envUrl.includes("localhost") && !envUrl.includes("127.0.0.1")) {
+    return envUrl;
   }
+
+  // Development build-ისთვის გამოვიყენოთ სტატიკური IP
+  if (__DEV__ && DEVELOPMENT_IP) {
+    return `http://${DEVELOPMENT_IP}:4000`;
+  }
+
+  // Production-ისთვის ან fallback
   if (envUrl) {
     return envUrl;
   }
-  if (expoHostIp) {
-    return `http://${expoHostIp}:4000`;
-  }
+
   return "http://localhost:4000";
 };
 
@@ -65,6 +50,10 @@ export interface User {
   name: string;
   role: "doctor" | "patient";
   profileImage?: string;
+  doctorStatus?: "awaiting_schedule" | "active";
+  isActive?: boolean;
+  isVerified?: boolean;
+  approvalStatus?: "pending" | "approved" | "rejected";
 }
 
 export interface LoginRequest {
@@ -161,9 +150,9 @@ class ApiService {
 
   constructor() {
     this.baseURL = API_BASE_URL;
-    console.log('🚀 ApiService initialized with baseURL:', this.baseURL);
-    console.log('🔧 __DEV__ mode:', __DEV__);
-    console.log('🎯 USE_MOCK_API:', USE_MOCK_API);
+    console.log("🚀 ApiService initialized with baseURL:", this.baseURL);
+    console.log("🔧 __DEV__ mode:", __DEV__);
+    console.log("🎯 USE_MOCK_API:", USE_MOCK_API);
   }
 
   // Public getter for baseURL
@@ -185,48 +174,34 @@ class ApiService {
   }
 
   private async handleResponse<T>(response: Response): Promise<T> {
-    console.log('🔍 Handling response:', {
-      status: response.status,
-      statusText: response.statusText,
-      ok: response.ok,
-      headers: Object.fromEntries(response.headers.entries())
-    });
-
     if (!response.ok) {
       // Clone response to avoid "Already read" error
       const clonedResponse = response.clone();
       const errorData = await clonedResponse.json().catch(() => ({}));
-      console.log('❌ Error response data:', errorData);
       const errorMessage =
         errorData.message || `HTTP error! status: ${response.status}`;
-      
-      logger.api.error("Response", response.url, {
-        status: response.status,
-        message: errorMessage,
-        data: errorData,
-      });
 
       throw new Error(errorMessage);
     }
-    
+
     const jsonData = await response.json();
-    console.log('📦 Parsed JSON response:', {
-      hasSuccess: 'success' in jsonData,
+    console.log("📦 Parsed JSON response:", {
+      hasSuccess: "success" in jsonData,
       success: jsonData?.success,
-      hasData: 'data' in jsonData,
+      hasData: "data" in jsonData,
       dataKeys: jsonData?.data ? Object.keys(jsonData.data) : null,
     });
-    
+
     return jsonData;
   }
 
   // Auth endpoints
   async login(credentials: LoginRequest): Promise<AuthResponse> {
-    console.log('🔐 Login attempt:', {
+    console.log("🔐 Login attempt:", {
       email: credentials.email,
       passwordLength: credentials.password?.length || 0,
       baseURL: this.baseURL,
-      mockMode: USE_MOCK_API
+      mockMode: USE_MOCK_API,
     });
     logger.auth.login(credentials.email);
     if (USE_MOCK_API) {
@@ -254,7 +229,10 @@ class ApiService {
 
       logger.auth.loginSuccess(mockUser);
       await AsyncStorage.setItem("accessToken", mockResponse.data.token);
-      await AsyncStorage.setItem("refreshToken", mockResponse.data.refreshToken);
+      await AsyncStorage.setItem(
+        "refreshToken",
+        mockResponse.data.refreshToken,
+      );
       await AsyncStorage.setItem("user", JSON.stringify(mockUser));
       return mockResponse;
     }
@@ -312,7 +290,10 @@ class ApiService {
 
       logger.auth.registerSuccess(mockUser);
       await AsyncStorage.setItem("accessToken", mockResponse.data.token);
-      await AsyncStorage.setItem("refreshToken", mockResponse.data.refreshToken);
+      await AsyncStorage.setItem(
+        "refreshToken",
+        mockResponse.data.refreshToken,
+      );
       await AsyncStorage.setItem("user", JSON.stringify(mockUser));
       return mockResponse;
     }
@@ -343,7 +324,9 @@ class ApiService {
     return data;
   }
 
-  async sendPhoneVerificationCode(phone: string): Promise<{ success: boolean; message: string }> {
+  async sendPhoneVerificationCode(
+    phone: string,
+  ): Promise<{ success: boolean; message: string }> {
     if (USE_MOCK_API) {
       // In mock mode, always succeed
       console.log(`[MOCK] Verification code would be sent to ${phone}`);
@@ -353,13 +336,16 @@ class ApiService {
       });
     }
 
-    const response = await fetch(`${this.baseURL}/auth/send-verification-code`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
+    const response = await fetch(
+      `${this.baseURL}/auth/send-verification-code`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ phone }),
       },
-      body: JSON.stringify({ phone }),
-    });
+    );
 
     return this.handleResponse<{ success: boolean; message: string }>(response);
   }
@@ -392,16 +378,18 @@ class ApiService {
       body: JSON.stringify({ phone, code }),
     });
 
-    return this.handleResponse<{ success: boolean; message: string; verified: boolean }>(response);
+    return this.handleResponse<{
+      success: boolean;
+      message: string;
+      verified: boolean;
+    }>(response);
   }
 
-  async uploadProfileImagePublic(
-    file: {
-      uri: string;
-      name: string;
-      type: string;
-    },
-  ): Promise<{ success: boolean; url: string; publicId: string }> {
+  async uploadProfileImagePublic(file: {
+    uri: string;
+    name: string;
+    type: string;
+  }): Promise<{ success: boolean; url: string; publicId: string }> {
     if (USE_MOCK_API) {
       return Promise.resolve({
         success: true,
@@ -410,20 +398,75 @@ class ApiService {
       });
     }
 
-    const formData = new FormData();
-    formData.append("file", {
-      uri: file.uri,
-      name: file.name,
-      type: file.type,
-    } as any);
+    try {
+      const formData = new FormData();
+      formData.append("file", {
+        uri: file.uri,
+        name: file.name || "profile.jpg",
+        type: file.type || "image/jpeg",
+      } as any);
 
-    const response = await fetch(`${this.baseURL}/uploads/image/public`, {
-      method: "POST",
-      body: formData,
-      // Don't set Content-Type header - React Native FormData sets it automatically with boundary
-    });
+      console.log("📤 Uploading profile image:", {
+        uri: file.uri,
+        name: file.name,
+        type: file.type,
+        url: `${this.baseURL}/uploads/image/public`,
+      });
 
-    return this.handleResponse<{ success: boolean; url: string; publicId: string }>(response);
+      const response = await fetch(`${this.baseURL}/uploads/image/public`, {
+        method: "POST",
+        body: formData,
+        // Don't set Content-Type header - React Native FormData sets it automatically with boundary
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.message || errorMessage;
+        } catch {
+          errorMessage = errorText || errorMessage;
+        }
+
+        console.error("❌ Upload error:", {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorMessage,
+        });
+
+        throw new Error(errorMessage);
+      }
+
+      const jsonData = await response.json();
+      console.log("✅ Upload success:", jsonData);
+
+      // Backend returns { success: true, url: string, publicId: string }
+      if (jsonData.success && jsonData.url) {
+        return {
+          success: true,
+          url: jsonData.url,
+          publicId: jsonData.publicId || "",
+        };
+      }
+
+      // Handle case where response might be wrapped in data property
+      if (jsonData.data && jsonData.data.url) {
+        return {
+          success: true,
+          url: jsonData.data.url,
+          publicId: jsonData.data.publicId || "",
+        };
+      }
+
+      throw new Error("Invalid response format from server");
+    } catch (error) {
+      console.error("❌ Profile image upload error:", error);
+      throw error instanceof Error 
+        ? error 
+        : new Error("Failed to upload profile image");
+    }
   }
 
   async refreshToken(): Promise<{ accessToken: string }> {
@@ -529,36 +572,39 @@ class ApiService {
 
     const queryParams = new URLSearchParams();
     if (params?.specialization) {
-      queryParams.append('specialization', params.specialization);
+      queryParams.append("specialization", params.specialization);
     }
     if (params?.location) {
-      queryParams.append('location', params.location);
+      queryParams.append("location", params.location);
     }
     if (params?.rating) {
-      queryParams.append('rating', params.rating.toString());
+      queryParams.append("rating", params.rating.toString());
     }
     if (params?.search) {
-      queryParams.append('search', params.search);
+      queryParams.append("search", params.search);
     }
     if (params?.symptom) {
-      queryParams.append('symptom', params.symptom);
+      queryParams.append("symptom", params.symptom);
     }
     if (params?.page) {
-      queryParams.append('page', params.page.toString());
+      queryParams.append("page", params.page.toString());
     }
     if (params?.limit) {
-      queryParams.append('limit', params.limit.toString());
+      queryParams.append("limit", params.limit.toString());
     }
 
     const queryString = queryParams.toString();
-    const endpoint = `/doctors${queryString ? `?${queryString}` : ''}`;
+    const endpoint = `/doctors${queryString ? `?${queryString}` : ""}`;
 
     return this.apiCall(endpoint, {
-      method: 'GET',
+      method: "GET",
     });
   }
 
-  async getDoctorById(id: string, includePending = true): Promise<{
+  async getDoctorById(
+    id: string,
+    includePending = true,
+  ): Promise<{
     success: boolean;
     data: any;
   }> {
@@ -569,11 +615,11 @@ class ApiService {
       });
     }
 
-    const query = includePending ? '?includePending=true' : '';
+    const query = includePending ? "?includePending=true" : "";
 
     const [doctorRes, availabilityRes] = await Promise.all([
       this.apiCall(`/doctors/${id}${query}`, {
-        method: 'GET',
+        method: "GET",
       }),
       this.getDoctorAvailability(id),
     ]);
@@ -592,7 +638,8 @@ class ApiService {
 
   async getDoctorAvailability(
     doctorId: string,
-    type?: 'video' | 'home-visit',
+    type?: "video" | "home-visit",
+    forPatient: boolean = false,
   ): Promise<{
     success: boolean;
     data: any;
@@ -606,21 +653,29 @@ class ApiService {
 
     const queryParams = new URLSearchParams();
     if (type) {
-      queryParams.append('type', type);
+      queryParams.append("type", type);
+    }
+    if (forPatient) {
+      queryParams.append("forPatient", "true");
     }
 
     const queryString = queryParams.toString();
-    return this.apiCall(`/doctors/${doctorId}/availability${queryString ? `?${queryString}` : ''}`, {
-      method: 'GET',
-    });
+    return this.apiCall(
+      `/doctors/${doctorId}/availability${queryString ? `?${queryString}` : ""}`,
+      {
+        method: "GET",
+      },
+    );
   }
 
-  async updateAvailability(availability: {
-    date: string;
-    timeSlots: string[];
-    isAvailable: boolean;
-    type: 'video' | 'home-visit';
-  }[]): Promise<{
+  async updateAvailability(
+    availability: {
+      date: string;
+      timeSlots: string[];
+      isAvailable: boolean;
+      type: "video" | "home-visit";
+    }[],
+  ): Promise<{
     success: boolean;
     message?: string;
     data?: any;
@@ -628,13 +683,13 @@ class ApiService {
     if (USE_MOCK_API) {
       return Promise.resolve({
         success: true,
-        message: 'Availability updated (mock)',
+        message: "Availability updated (mock)",
         data: { updated: availability.length },
       });
     }
 
-    return this.apiCall('/doctors/availability', {
-      method: 'PUT',
+    return this.apiCall("/doctors/availability", {
+      method: "PUT",
       body: JSON.stringify({ availability }),
     });
   }
@@ -651,19 +706,22 @@ class ApiService {
       });
     }
 
-    return this.apiCall('/profile', {
-      method: 'GET',
+    return this.apiCall("/profile", {
+      method: "GET",
     });
   }
 
-  async getSpecializations(): Promise<{ success: boolean; data: Specialization[] }> {
+  async getSpecializations(): Promise<{
+    success: boolean;
+    data: Specialization[];
+  }> {
     const response = await fetch(`${this.baseURL}/specializations`, {
       method: "GET",
       headers: await this.getAuthHeaders(),
     });
 
     return this.handleResponse<{ success: boolean; data: Specialization[] }>(
-      response
+      response,
     );
   }
 
@@ -671,7 +729,10 @@ class ApiService {
     success: boolean;
     data: any;
   }> {
-    console.log('📸 [ApiService] updateProfile called with:', JSON.stringify(profileData, null, 2));
+    console.log(
+      "📸 [ApiService] updateProfile called with:",
+      JSON.stringify(profileData, null, 2),
+    );
     if (USE_MOCK_API) {
       return Promise.resolve({
         success: true,
@@ -679,11 +740,17 @@ class ApiService {
       });
     }
 
-    const result = await this.apiCall<{ success: boolean; data: any }>('/profile', {
-      method: 'PUT',
-      body: JSON.stringify(profileData),
-    });
-    console.log('📸 [ApiService] updateProfile response:', JSON.stringify(result, null, 2));
+    const result = await this.apiCall<{ success: boolean; data: any }>(
+      "/profile",
+      {
+        method: "PUT",
+        body: JSON.stringify(profileData),
+      },
+    );
+    console.log(
+      "📸 [ApiService] updateProfile response:",
+      JSON.stringify(result, null, 2),
+    );
     return result;
   }
 
@@ -697,12 +764,12 @@ class ApiService {
     if (USE_MOCK_API) {
       return Promise.resolve({
         success: true,
-        message: 'პაროლი წარმატებით შეიცვალა',
+        message: "პაროლი წარმატებით შეიცვალა",
       });
     }
 
-    return this.apiCall('/profile/password', {
-      method: 'PUT',
+    return this.apiCall("/profile/password", {
+      method: "PUT",
       body: JSON.stringify(data),
     });
   }
@@ -787,8 +854,8 @@ class ApiService {
       });
     }
 
-    return this.apiCall('/doctors/dashboard/stats', {
-      method: 'GET',
+    return this.apiCall("/doctors/dashboard/stats", {
+      method: "GET",
     });
   }
 
@@ -800,8 +867,8 @@ class ApiService {
       patientAge: number;
       date: string;
       time: string;
-      type: 'consultation' | 'followup' | 'emergency' | 'video' | 'home-visit';
-      status: 'completed' | 'scheduled' | 'in-progress' | 'cancelled';
+      type: "consultation" | "followup" | "emergency" | "video" | "home-visit";
+      status: "completed" | "scheduled" | "in-progress" | "cancelled";
       fee: number;
       isPaid: boolean;
       diagnosis?: string;
@@ -844,14 +911,14 @@ class ApiService {
     }
 
     return this.apiCall(`/doctors/dashboard/appointments?limit=${limit}`, {
-      method: 'GET',
+      method: "GET",
     });
   }
 
   async updateDoctorAppointment(
     appointmentId: string,
     payload: {
-      status?: 'scheduled' | 'completed' | 'in-progress' | 'cancelled';
+      status?: "scheduled" | "completed" | "in-progress" | "cancelled";
       consultationSummary?: {
         diagnosis?: string;
         symptoms?: string;
@@ -879,10 +946,10 @@ class ApiService {
     }
 
     const statusMap: Record<string, string> = {
-      scheduled: 'confirmed',
-      'in-progress': 'in-progress',
-      completed: 'completed',
-      cancelled: 'cancelled',
+      scheduled: "confirmed",
+      "in-progress": "in-progress",
+      completed: "completed",
+      cancelled: "cancelled",
     };
 
     const body: Record<string, unknown> = {
@@ -894,7 +961,7 @@ class ApiService {
     }
 
     return this.apiCall(`/doctors/appointments/${appointmentId}`, {
-      method: 'PATCH',
+      method: "PATCH",
       body: JSON.stringify(body),
     });
   }
@@ -925,10 +992,10 @@ class ApiService {
     });
 
     if (file) {
-      formData.append('file', {
+      formData.append("file", {
         uri: file.uri,
-        name: file.name || 'form-100.pdf',
-        type: file.mimeType || 'application/pdf',
+        name: file.name || "form-100.pdf",
+        type: file.mimeType || "application/pdf",
       } as any);
     }
 
@@ -944,7 +1011,7 @@ class ApiService {
         method: "PATCH",
         headers,
         body: formData,
-      }
+      },
     );
 
     return this.handleResponse(response);
@@ -983,7 +1050,7 @@ class ApiService {
     payload: {
       date: string;
       time: string;
-      type?: 'video' | 'home-visit';
+      type?: "video" | "home-visit";
       visitAddress?: string;
       reason?: string;
     },
@@ -1002,7 +1069,7 @@ class ApiService {
       : `/appointments/${appointmentId}/follow-up`;
 
     return this.apiCall(endpoint, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(payload),
     });
   }
@@ -1015,9 +1082,12 @@ class ApiService {
       } as any);
     }
 
-    return this.apiCall(`/appointments/${appointmentId}/follow-up/eligibility`, {
-      method: 'GET',
-    });
+    return this.apiCall(
+      `/appointments/${appointmentId}/follow-up/eligibility`,
+      {
+        method: "GET",
+      },
+    );
   }
 
   async assignLaboratoryTests(
@@ -1036,12 +1106,12 @@ class ApiService {
     if (USE_MOCK_API) {
       return Promise.resolve({
         success: true,
-        message: 'ლაბორატორიული კვლევები წარმატებით დაემატა',
+        message: "ლაბორატორიული კვლევები წარმატებით დაემატა",
       });
     }
 
     return this.apiCall(`/appointments/${appointmentId}/laboratory-tests`, {
-      method: 'PUT',
+      method: "PUT",
       body: JSON.stringify({ tests }),
     });
   }
@@ -1061,12 +1131,12 @@ class ApiService {
     if (USE_MOCK_API) {
       return Promise.resolve({
         success: true,
-        message: 'ინსტრუმენტული კვლევები წარმატებით დაემატა',
+        message: "ინსტრუმენტული კვლევები წარმატებით დაემატა",
       });
     }
 
     return this.apiCall(`/appointments/${appointmentId}/instrumental-tests`, {
-      method: 'PUT',
+      method: "PUT",
       body: JSON.stringify({ tests }),
     });
   }
@@ -1086,14 +1156,17 @@ class ApiService {
     if (USE_MOCK_API) {
       return Promise.resolve({
         success: true,
-        message: 'ლაბორატორიული კვლევა წარმატებით დაჯავშნა',
+        message: "ლაბორატორიული კვლევა წარმატებით დაჯავშნა",
       });
     }
 
-    return this.apiCall(`/appointments/${appointmentId}/laboratory-tests/book`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
+    return this.apiCall(
+      `/appointments/${appointmentId}/laboratory-tests/book`,
+      {
+        method: "PUT",
+        body: JSON.stringify(data),
+      },
+    );
   }
 
   async bookInstrumentalTest(
@@ -1111,14 +1184,17 @@ class ApiService {
     if (USE_MOCK_API) {
       return Promise.resolve({
         success: true,
-        message: 'ინსტრუმენტული კვლევა წარმატებით დაჯავშნა',
+        message: "ინსტრუმენტული კვლევა წარმატებით დაჯავშნა",
       });
     }
 
-    return this.apiCall(`/appointments/${appointmentId}/instrumental-tests/book`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
+    return this.apiCall(
+      `/appointments/${appointmentId}/instrumental-tests/book`,
+      {
+        method: "PUT",
+        body: JSON.stringify(data),
+      },
+    );
   }
 
   async getDoctorDashboardSchedule(): Promise<{
@@ -1135,8 +1211,8 @@ class ApiService {
       return Promise.resolve({
         success: true,
         data: {
-          date: new Date().toISOString().split('T')[0],
-          dayOfWeek: '',
+          date: new Date().toISOString().split("T")[0],
+          dayOfWeek: "",
           consultations: [],
           availableSlots: [],
           totalSlots: 0,
@@ -1144,8 +1220,8 @@ class ApiService {
       });
     }
 
-    return this.apiCall('/doctors/dashboard/schedule', {
-      method: 'GET',
+    return this.apiCall("/doctors/dashboard/schedule", {
+      method: "GET",
     });
   }
 
@@ -1176,46 +1252,94 @@ class ApiService {
     data: any;
     message?: string;
   }> {
-    console.log('🏥 [ApiService] createAppointment გამოძახებულია');
-    console.log('🏥 [ApiService] createAppointment - Full data:', JSON.stringify(appointmentData, null, 2));
-    console.log('🏥 [ApiService] createAppointment - Doctor ID:', appointmentData.doctorId);
-    console.log('🏥 [ApiService] createAppointment - Date:', appointmentData.appointmentDate);
-    console.log('🏥 [ApiService] createAppointment - Time:', appointmentData.appointmentTime);
-    console.log('🏥 [ApiService] createAppointment - Type:', appointmentData.type);
-    console.log('🏥 [ApiService] createAppointment - Fee:', appointmentData.consultationFee);
-    console.log('🏥 [ApiService] createAppointment - Total:', appointmentData.totalAmount);
-    console.log('🏥 [ApiService] createAppointment - Patient Details:', JSON.stringify(appointmentData.patientDetails, null, 2));
-    console.log('🏥 [ApiService] createAppointment - Visit Address:', appointmentData.visitAddress);
-    console.log('🏥 [ApiService] createAppointment - Notes:', appointmentData.notes);
-    console.log('🏥 [ApiService] createAppointment - Documents:', appointmentData.documents);
-    console.log('🏥 [ApiService] createAppointment - Payment Method:', appointmentData.paymentMethod);
-    console.log('🏥 [ApiService] createAppointment - Payment Status:', appointmentData.paymentStatus);
-    console.log('🏥 [ApiService] createAppointment - Base URL:', this.baseURL);
-    console.log('🏥 [ApiService] createAppointment - Endpoint: POST /appointments');
-    console.log('🏥 [ApiService] createAppointment - Mock Mode:', USE_MOCK_API);
+    console.log("🏥 [ApiService] createAppointment გამოძახებულია");
+    console.log(
+      "🏥 [ApiService] createAppointment - Full data:",
+      JSON.stringify(appointmentData, null, 2),
+    );
+    console.log(
+      "🏥 [ApiService] createAppointment - Doctor ID:",
+      appointmentData.doctorId,
+    );
+    console.log(
+      "🏥 [ApiService] createAppointment - Date:",
+      appointmentData.appointmentDate,
+    );
+    console.log(
+      "🏥 [ApiService] createAppointment - Time:",
+      appointmentData.appointmentTime,
+    );
+    console.log(
+      "🏥 [ApiService] createAppointment - Type:",
+      appointmentData.type,
+    );
+    console.log(
+      "🏥 [ApiService] createAppointment - Fee:",
+      appointmentData.consultationFee,
+    );
+    console.log(
+      "🏥 [ApiService] createAppointment - Total:",
+      appointmentData.totalAmount,
+    );
+    console.log(
+      "🏥 [ApiService] createAppointment - Patient Details:",
+      JSON.stringify(appointmentData.patientDetails, null, 2),
+    );
+    console.log(
+      "🏥 [ApiService] createAppointment - Visit Address:",
+      appointmentData.visitAddress,
+    );
+    console.log(
+      "🏥 [ApiService] createAppointment - Notes:",
+      appointmentData.notes,
+    );
+    console.log(
+      "🏥 [ApiService] createAppointment - Documents:",
+      appointmentData.documents,
+    );
+    console.log(
+      "🏥 [ApiService] createAppointment - Payment Method:",
+      appointmentData.paymentMethod,
+    );
+    console.log(
+      "🏥 [ApiService] createAppointment - Payment Status:",
+      appointmentData.paymentStatus,
+    );
+    console.log("🏥 [ApiService] createAppointment - Base URL:", this.baseURL);
+    console.log(
+      "🏥 [ApiService] createAppointment - Endpoint: POST /appointments",
+    );
+    console.log("🏥 [ApiService] createAppointment - Mock Mode:", USE_MOCK_API);
 
     if (USE_MOCK_API) {
-      console.log('🎭 [ApiService] createAppointment - Mock API mode, returning mock response');
+      console.log(
+        "🎭 [ApiService] createAppointment - Mock API mode, returning mock response",
+      );
       return Promise.resolve({
         success: true,
         data: {
-          appointmentNumber: 'APT20240001',
+          appointmentNumber: "APT20240001",
           ...appointmentData,
         },
       });
     }
 
-    console.log('🌐 [ApiService] createAppointment - Sending request to backend...');
+    console.log(
+      "🌐 [ApiService] createAppointment - Sending request to backend...",
+    );
     const result = await this.apiCall<{
       success: boolean;
       data: any;
       message?: string;
-    }>('/appointments', {
-      method: 'POST',
+    }>("/appointments", {
+      method: "POST",
       body: JSON.stringify(appointmentData),
     });
-    
-    console.log('✅ [ApiService] createAppointment - Response received:', JSON.stringify(result, null, 2));
+
+    console.log(
+      "✅ [ApiService] createAppointment - Response received:",
+      JSON.stringify(result, null, 2),
+    );
     return result;
   }
 
@@ -1230,8 +1354,8 @@ class ApiService {
       });
     }
 
-    return this.apiCall('/appointments/patient', {
-      method: 'GET',
+    return this.apiCall("/appointments/patient", {
+      method: "GET",
     });
   }
 
@@ -1243,12 +1367,12 @@ class ApiService {
     if (USE_MOCK_API) {
       return Promise.resolve({
         success: true,
-        message: 'ჯავშანი წარმატებით გაუქმდა',
+        message: "ჯავშანი წარმატებით გაუქმდა",
       });
     }
 
     return this.apiCall(`/appointments/${appointmentId}/cancel`, {
-      method: 'PUT',
+      method: "PUT",
     });
   }
 
@@ -1264,12 +1388,12 @@ class ApiService {
     if (USE_MOCK_API) {
       return Promise.resolve({
         success: true,
-        message: 'Time slot blocked temporarily',
+        message: "Time slot blocked temporarily",
       });
     }
 
-    return this.apiCall('/appointments/block-timeslot', {
-      method: 'POST',
+    return this.apiCall("/appointments/block-timeslot", {
+      method: "POST",
       body: JSON.stringify(blockData),
     });
   }
@@ -1286,14 +1410,14 @@ class ApiService {
     }
 
     return this.apiCall(`/appointments/${appointmentId}`, {
-      method: 'GET',
+      method: "GET",
     });
   }
 
   async requestReschedule(
     appointmentId: string,
-    newDate: string,
-    newTime: string,
+    newDate?: string,
+    newTime?: string,
     reason?: string,
   ): Promise<{
     success: boolean;
@@ -1303,21 +1427,25 @@ class ApiService {
     if (USE_MOCK_API) {
       return Promise.resolve({
         success: true,
-        message: 'გადაჯავშნის მოთხოვნა გაიგზავნა',
+        message: "გადაჯავშნის მოთხოვნა გაიგზავნა",
       });
     }
 
     return this.apiCall(`/appointments/${appointmentId}/reschedule-request`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify({
-        newDate,
-        newTime,
-        reason,
+        ...(newDate && { newDate }),
+        ...(newTime && { newTime }),
+        ...(reason && { reason }),
       }),
     });
   }
 
-  async approveReschedule(appointmentId: string): Promise<{
+  async approveReschedule(
+    appointmentId: string,
+    newDate?: string,
+    newTime?: string,
+  ): Promise<{
     success: boolean;
     message?: string;
     data?: any;
@@ -1325,12 +1453,16 @@ class ApiService {
     if (USE_MOCK_API) {
       return Promise.resolve({
         success: true,
-        message: 'გადაჯავშნა დამტკიცდა',
+        message: "გადაჯავშნა დამტკიცდა",
       });
     }
 
     return this.apiCall(`/appointments/${appointmentId}/reschedule-approve`, {
-      method: 'PUT',
+      method: "PUT",
+      body: JSON.stringify({
+        ...(newDate && { newDate }),
+        ...(newTime && { newTime }),
+      }),
     });
   }
 
@@ -1342,12 +1474,12 @@ class ApiService {
     if (USE_MOCK_API) {
       return Promise.resolve({
         success: true,
-        message: 'გადაჯავშნის მოთხოვნა უარყოფილია',
+        message: "გადაჯავშნის მოთხოვნა უარყოფილია",
       });
     }
 
     return this.apiCall(`/appointments/${appointmentId}/reschedule-reject`, {
-      method: 'PUT',
+      method: "PUT",
     });
   }
 
@@ -1360,12 +1492,12 @@ class ApiService {
     if (USE_MOCK_API) {
       return Promise.resolve({
         success: true,
-        message: 'Join time recorded (mock)',
+        message: "Join time recorded (mock)",
       });
     }
 
     return this.apiCall(`/appointments/${appointmentId}/join`, {
-      method: 'POST',
+      method: "POST",
     });
   }
 
@@ -1378,12 +1510,12 @@ class ApiService {
     if (USE_MOCK_API) {
       return Promise.resolve({
         success: true,
-        message: 'Consultation marked as conducted (mock)',
+        message: "Consultation marked as conducted (mock)",
       });
     }
 
     return this.apiCall(`/appointments/${appointmentId}/complete`, {
-      method: 'POST',
+      method: "POST",
     });
   }
 
@@ -1396,19 +1528,19 @@ class ApiService {
     if (USE_MOCK_API) {
       return Promise.resolve({
         success: true,
-        message: 'Home visit marked as completed (mock)',
+        message: "Home visit marked as completed (mock)",
       });
     }
 
     return this.apiCall(`/appointments/${appointmentId}/home-visit-complete`, {
-      method: 'POST',
+      method: "POST",
     });
   }
 
   async rescheduleAppointment(
     appointmentId: string,
     newDate: string,
-    newTime: string
+    newTime: string,
   ): Promise<{
     success: boolean;
     message?: string;
@@ -1417,12 +1549,12 @@ class ApiService {
     if (USE_MOCK_API) {
       return Promise.resolve({
         success: true,
-        message: 'ჯავშანი წარმატებით გადაინიშნა',
+        message: "ჯავშანი წარმატებით გადაინიშნა",
       });
     }
 
     return this.apiCall(`/appointments/${appointmentId}/reschedule`, {
-      method: 'PUT',
+      method: "PUT",
       body: JSON.stringify({ newDate, newTime }),
     });
   }
@@ -1439,7 +1571,7 @@ class ApiService {
     }
 
     return this.apiCall(`/appointments/${appointmentId}/documents`, {
-      method: 'GET',
+      method: "GET",
     });
   }
 
@@ -1452,7 +1584,14 @@ class ApiService {
     },
   ): Promise<{
     success: boolean;
-    data: { url: string; publicId?: string; name?: string; type?: string; size?: number; uploadedAt: string };
+    data: {
+      url: string;
+      publicId?: string;
+      name?: string;
+      type?: string;
+      size?: number;
+      uploadedAt: string;
+    };
   }> {
     if (USE_MOCK_API) {
       return Promise.resolve({
@@ -1468,7 +1607,7 @@ class ApiService {
     }
 
     const formData = new FormData();
-    formData.append('file', {
+    formData.append("file", {
       uri: file.uri,
       name: file.name,
       type: file.type,
@@ -1480,15 +1619,25 @@ class ApiService {
       headers["Authorization"] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${this.baseURL}/appointments/${appointmentId}/documents`, {
-      method: 'POST',
-      headers,
-      body: formData,
-    });
+    const response = await fetch(
+      `${this.baseURL}/appointments/${appointmentId}/documents`,
+      {
+        method: "POST",
+        headers,
+        body: formData,
+      },
+    );
 
     return this.handleResponse<{
       success: boolean;
-      data: { url: string; publicId?: string; name?: string; type?: string; size?: number; uploadedAt: string };
+      data: {
+        url: string;
+        publicId?: string;
+        name?: string;
+        type?: string;
+        size?: number;
+        uploadedAt: string;
+      };
     }>(response);
   }
 
@@ -1503,12 +1652,20 @@ class ApiService {
   ): Promise<{
     success: boolean;
     message?: string;
-    data?: { url: string; publicId?: string; name?: string; type?: string; size?: number; uploadedAt: string; isExternalLabResult?: boolean };
+    data?: {
+      url: string;
+      publicId?: string;
+      name?: string;
+      type?: string;
+      size?: number;
+      uploadedAt: string;
+      isExternalLabResult?: boolean;
+    };
   }> {
     if (USE_MOCK_API) {
       return Promise.resolve({
         success: true,
-        message: 'გარე ლაბორატორიული კვლევის შედეგი წარმატებით ატვირთა',
+        message: "გარე ლაბორატორიული კვლევის შედეგი წარმატებით ატვირთა",
         data: {
           url: file.uri,
           name: testName || file.name,
@@ -1521,13 +1678,13 @@ class ApiService {
     }
 
     const formData = new FormData();
-    formData.append('file', {
+    formData.append("file", {
       uri: file.uri,
       name: file.name,
       type: file.type,
     } as any);
     if (testName) {
-      formData.append('testName', testName);
+      formData.append("testName", testName);
     }
 
     const token = await AsyncStorage.getItem("accessToken");
@@ -1536,16 +1693,27 @@ class ApiService {
       headers["Authorization"] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${this.baseURL}/appointments/${appointmentId}/external-lab-result`, {
-      method: 'POST',
-      headers,
-      body: formData,
-    });
+    const response = await fetch(
+      `${this.baseURL}/appointments/${appointmentId}/external-lab-result`,
+      {
+        method: "POST",
+        headers,
+        body: formData,
+      },
+    );
 
     return this.handleResponse<{
       success: boolean;
       message?: string;
-      data?: { url: string; publicId?: string; name?: string; type?: string; size?: number; uploadedAt: string; isExternalLabResult?: boolean };
+      data?: {
+        url: string;
+        publicId?: string;
+        name?: string;
+        type?: string;
+        size?: number;
+        uploadedAt: string;
+        isExternalLabResult?: boolean;
+      };
     }>(response);
   }
 
@@ -1560,12 +1728,19 @@ class ApiService {
   ): Promise<{
     success: boolean;
     message?: string;
-    data?: { url: string; publicId?: string; name?: string; type?: string; size?: number; uploadedAt: string };
+    data?: {
+      url: string;
+      publicId?: string;
+      name?: string;
+      type?: string;
+      size?: number;
+      uploadedAt: string;
+    };
   }> {
     if (USE_MOCK_API) {
       return Promise.resolve({
         success: true,
-        message: 'ლაბორატორიული კვლევის შედეგი წარმატებით ატვირთა',
+        message: "ლაბორატორიული კვლევის შედეგი წარმატებით ატვირთა",
         data: {
           url: file.uri,
           name: file.name,
@@ -1577,7 +1752,7 @@ class ApiService {
     }
 
     const formData = new FormData();
-    formData.append('file', {
+    formData.append("file", {
       uri: file.uri,
       name: file.name,
       type: file.type,
@@ -1589,16 +1764,26 @@ class ApiService {
       headers["Authorization"] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${this.baseURL}/appointments/${appointmentId}/laboratory-tests/${productId}/result`, {
-      method: 'POST',
-      headers,
-      body: formData,
-    });
+    const response = await fetch(
+      `${this.baseURL}/appointments/${appointmentId}/laboratory-tests/${productId}/result`,
+      {
+        method: "POST",
+        headers,
+        body: formData,
+      },
+    );
 
     return this.handleResponse<{
       success: boolean;
       message?: string;
-      data?: { url: string; publicId?: string; name?: string; type?: string; size?: number; uploadedAt: string };
+      data?: {
+        url: string;
+        publicId?: string;
+        name?: string;
+        type?: string;
+        size?: number;
+        uploadedAt: string;
+      };
     }>(response);
   }
 
@@ -1613,8 +1798,8 @@ class ApiService {
       });
     }
 
-    return this.apiCall('/doctors/patients', {
-      method: 'GET',
+    return this.apiCall("/doctors/patients", {
+      method: "GET",
     });
   }
 
@@ -1634,8 +1819,8 @@ class ApiService {
       });
     }
 
-    return this.apiCall('/shop/overview', {
-      method: 'GET',
+    return this.apiCall("/shop/overview", {
+      method: "GET",
     });
   }
 
@@ -1650,45 +1835,51 @@ class ApiService {
       });
     }
 
-    return this.apiCall('/shop/clinics', {
-      method: 'GET',
+    return this.apiCall("/shop/clinics", {
+      method: "GET",
     });
   }
 
   // Generic API call method
   async apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const fullUrl = `${this.baseURL}${endpoint}`;
-    console.log('📡 API Call:', {
-      method: options.method || 'GET',
+    console.log("📡 API Call:", {
+      method: options.method || "GET",
       url: fullUrl,
       endpoint: endpoint,
       baseURL: this.baseURL,
       mockMode: USE_MOCK_API,
-      devMode: __DEV__
+      devMode: __DEV__,
     });
 
     if (USE_MOCK_API) {
-      console.log('🎭 Using mock API - returning empty response');
+      console.log("🎭 Using mock API - returning empty response");
       // Generic mock response placeholder
       return Promise.resolve({} as T);
     }
 
     const headers = await this.getAuthHeaders();
-    console.log('🔑 Auth headers prepared:', headers ? 'Token present' : 'No token');
+    console.log(
+      "🔑 Auth headers prepared:",
+      headers ? "Token present" : "No token",
+    );
 
-    if (options.body && typeof options.body === 'string') {
+    if (options.body && typeof options.body === "string") {
       try {
         const bodyData = JSON.parse(options.body);
-        console.log('📦 Request body:', JSON.stringify(bodyData, null, 2));
+        console.log("📦 Request body:", JSON.stringify(bodyData, null, 2));
         if (bodyData.profileImage) {
-          console.log('📸 Request body contains profileImage:', bodyData.profileImage);
+          console.log(
+            "📸 Request body contains profileImage:",
+            bodyData.profileImage,
+          );
         }
       } catch {
-        console.log('📦 Request body (not JSON):', options.body);
+        console.log("📦 Request body (not JSON):", options.body);
       }
     }
 
-    console.log('🌐 Making fetch request to:', fullUrl);
+    console.log("🌐 Making fetch request to:", fullUrl);
     const response = await fetch(fullUrl, {
       ...options,
       headers: {
@@ -1697,11 +1888,11 @@ class ApiService {
       },
     });
 
-    console.log('📨 Response received:', {
+    console.log("📨 Response received:", {
       status: response.status,
       statusText: response.statusText,
       ok: response.ok,
-      url: response.url
+      url: response.url,
     });
 
     return this.handleResponse<T>(response);
@@ -1765,7 +1956,16 @@ class ApiService {
   }
 
   // Terms endpoints
-  async getTerms(type: "cancellation" | "service" | "privacy" | "contract" | "usage" | "doctor-cancellation" | "doctor-service"): Promise<{
+  async getTerms(
+    type:
+      | "cancellation"
+      | "service"
+      | "privacy"
+      | "contract"
+      | "usage"
+      | "doctor-cancellation"
+      | "doctor-service",
+  ): Promise<{
     success: boolean;
     data: { content: string; type: string; updatedAt?: string };
   }> {
@@ -1786,7 +1986,7 @@ class ApiService {
 
   async updateTerms(
     type: "cancellation" | "service" | "privacy",
-    content: string
+    content: string,
   ): Promise<{
     success: boolean;
     data: { content: string; type: string };
@@ -1813,7 +2013,7 @@ class ApiService {
         answer: string;
         isActive?: boolean;
         order?: number;
-        role?: 'doctor' | 'patient'; // Role: doctor or patient
+        role?: "doctor" | "patient"; // Role: doctor or patient
       }[];
       contactInfo: {
         phone?: string;

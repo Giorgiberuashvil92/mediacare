@@ -48,6 +48,9 @@ export class ProfileService {
         profileImage: user.profileImage,
         address: user.address,
         about: user.about,
+        isActive: user.isActive,
+        isVerified: user.isVerified,
+        approvalStatus: user.approvalStatus,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
         // Doctor specific fields
@@ -61,7 +64,7 @@ export class ProfileService {
           location: user.location,
           rating: user.rating,
           reviewCount: user.reviewCount,
-          isActive: user.isActive,
+          doctorStatus: user.doctorStatus,
         }),
       },
     };

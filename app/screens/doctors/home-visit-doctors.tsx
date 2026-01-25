@@ -72,9 +72,11 @@ export default function HomeVisitDoctorsScreen() {
         
         for (const doctor of allDoctors) {
           try {
+            // პაციენტისთვის: forPatient=true, რომ დაჯავშნილი სლოტები ჩანდეს
             const availabilityResponse = await apiService.getDoctorAvailability(
               doctor.id,
               "home-visit",
+              true,
             );
             
             if (

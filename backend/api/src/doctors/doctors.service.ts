@@ -3,7 +3,6 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import mongoose, { FilterQuery } from 'mongoose';
@@ -16,6 +15,7 @@ import {
 } from '../appointments/schemas/appointment.schema';
 import {
   ApprovalStatus,
+  DoctorStatus,
   User,
   UserDocument,
   UserRole,
@@ -47,17 +47,7 @@ export class DoctorsService {
     @InjectModel(Appointment.name)
     private appointmentModel: mongoose.Model<AppointmentDocument>,
     private readonly uploadService: UploadService,
-  ) {
-    // Run doctor status checker every hour
-    setInterval(() => {
-      void this.updateDoctorStatusesBasedOnAvailability();
-    }, 60 * 60 * 1000); // 1 hour
-
-    // Run initial check after 10 seconds
-    setTimeout(() => {
-      void this.updateDoctorStatusesBasedOnAvailability();
-    }, 10000);
-  }
+  ) {}
 
   private async generateAppointmentNumber(): Promise<string> {
     const prefix = 'APT';
@@ -199,9 +189,11 @@ export class DoctorsService {
             problem: apt.patientDetails.problem,
           }
         : undefined,
-      // Include patient contact information from populated patientId
       patientEmail: patient?.email,
       patientPhone: patient?.phone,
+      createdAt: apt.createdAt
+        ? new Date(apt.createdAt).toISOString()
+        : undefined,
     };
   }
 
@@ -217,12 +209,12 @@ export class DoctorsService {
       status = DoctorStatusFilter.APPROVED,
     } = query;
 
-    console.log('🔍 [DoctorsService] getAllDoctors called with:', { 
-      status, 
+    console.log('🔍 [DoctorsService] getAllDoctors called with:', {
+      status,
       statusType: typeof status,
       statusValue: status,
       queryKeys: Object.keys(query),
-      fullQuery: query 
+      fullQuery: query,
     });
 
     const skip = (page - 1) * limit;
@@ -309,21 +301,36 @@ export class DoctorsService {
       ];
     }
 
-    // Get doctors
-    console.log('🔎 [DoctorsService] MongoDB filter:', JSON.stringify(filter, null, 2));
+    console.log(
+      '🔎 [DoctorsService] MongoDB filter:',
+      JSON.stringify(filter, null, 2),
+    );
     const doctors = await this.userModel
       .find(filter)
       .select('-password')
       .skip(skip)
       .limit(limit)
       .lean();
-    console.log('📊 [DoctorsService] Found doctors:', doctors.length, doctors.map(d => ({ id: d._id, name: d.name, approvalStatus: d.approvalStatus, isActive: d.isActive })));
+
+    console.log(
+      '📊 [DoctorsService] Found doctors:',
+      doctors.length,
+      doctors.map((d) => ({
+        id: d._id,
+        name: d.name,
+        approvalStatus: (d as any).approvalStatus,
+        isActive: (d as any).isActive,
+      })),
+    );
 
     // Filter doctors who have availability (at least one available time slot in the future)
     // BUT: Don't filter by availability for pending/rejected doctors - they might not have availability set up yet
     let availableDoctors = doctors;
-    
-    if (status === DoctorStatusFilter.APPROVED || status === DoctorStatusFilter.ALL) {
+
+    if (
+      status === DoctorStatusFilter.APPROVED ||
+      status === DoctorStatusFilter.ALL
+    ) {
       // Only filter by availability for approved doctors or when showing all
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -366,8 +373,11 @@ export class DoctorsService {
       );
     }
 
-    console.log('👥 [DoctorsService] Available doctors after filtering:', availableDoctors.length);
-    
+    console.log(
+      '👥 [DoctorsService] Available doctors after filtering:',
+      availableDoctors.length,
+    );
+
     // Format doctors
     const formattedDoctors = availableDoctors.map((doctor) => ({
       id: (doctor._id as string).toString(),
@@ -375,7 +385,7 @@ export class DoctorsService {
       email: doctor.email,
       phone: doctor.phone,
       idNumber: doctor.idNumber,
-      specialization: doctor.specialization,
+      specialization: (doctor as any).specialization,
       rating: doctor.rating || 0,
       reviewCount: doctor.reviewCount || 0,
       isActive: doctor.isActive,
@@ -396,7 +406,10 @@ export class DoctorsService {
 
     // Get total count (without availability filter for pending/rejected/awaiting_schedule)
     let totalCount = formattedDoctors.length;
-    if (status === DoctorStatusFilter.APPROVED || status === DoctorStatusFilter.ALL) {
+    if (
+      status === DoctorStatusFilter.APPROVED ||
+      status === DoctorStatusFilter.ALL
+    ) {
       // For approved/all, total is already filtered by availability
       totalCount = formattedDoctors.length;
     } else {
@@ -437,7 +450,6 @@ export class DoctorsService {
       role: UserRole.DOCTOR,
     };
 
-    // If not including pending, only return approved and active doctors
     if (!includePending) {
       filter.approvalStatus = ApprovalStatus.APPROVED;
       filter.isActive = true;
@@ -452,129 +464,17 @@ export class DoctorsService {
       throw new NotFoundException('Doctor not found');
     }
 
-    // Get availability for next 30 days
-    const startDate = new Date();
-    const endDate = new Date();
-    endDate.setDate(endDate.getDate() + 30);
-
-    const availability = await this.availabilityModel
-      .find({
-        doctorId: new mongoose.Types.ObjectId(doctorId),
-        isAvailable: true,
-      })
-      .lean();
-
-    // Get booked appointments for this doctor in the same date range
-    const bookedAppointments = await this.appointmentModel
-      .find({
-        doctorId: new mongoose.Types.ObjectId(doctorId),
-        appointmentDate: { $gte: startDate, $lte: endDate },
-        status: { $in: ['pending', 'confirmed', 'blocked'] },
-      })
-      .select('appointmentDate appointmentTime')
-      .lean();
-
-    // Create a map of booked time slots by date
-    const bookedSlotsByDate: { [key: string]: Set<string> } = {};
-    console.log(
-      '🏥 getDoctorById - bookedAppointments:',
-      JSON.stringify(bookedAppointments, null, 2),
+    // Get availability using getDoctorAvailability for consistency
+    // პაციენტისთვის: forPatient=true, რომ მხოლოდ available slots ჩანდეს
+    const availabilityResponse = await this.getDoctorAvailability(
+      doctorId,
+      undefined,
+      undefined,
+      undefined,
+      true, // forPatient=true
     );
 
-    bookedAppointments.forEach((apt) => {
-      // Convert appointmentDate to local date string (YYYY-MM-DD)
-      // This ensures it matches the availability date format
-      const aptDate = new Date(apt.appointmentDate);
-      const year = aptDate.getFullYear();
-      const month = String(aptDate.getMonth() + 1).padStart(2, '0');
-      const day = String(aptDate.getDate()).padStart(2, '0');
-      const dateStr = `${year}-${month}-${day}`;
-
-      if (!bookedSlotsByDate[dateStr]) {
-        bookedSlotsByDate[dateStr] = new Set();
-      }
-      if (apt.appointmentTime) {
-        // Normalize appointmentTime to HH:MM format (remove seconds if present)
-        const normalizedTime = apt.appointmentTime
-          .split(':')
-          .slice(0, 2)
-          .join(':');
-        bookedSlotsByDate[dateStr].add(normalizedTime);
-      }
-    });
-
-    console.log(
-      '🏥 getDoctorById - bookedSlotsByDate:',
-      JSON.stringify(
-        Object.fromEntries(
-          Object.entries(bookedSlotsByDate).map(([key, value]) => [
-            key,
-            Array.from(value),
-          ]),
-        ),
-        null,
-        2,
-      ),
-    );
-
-    // Format availability and remove booked time slots
-    const dayNames = [
-      'კვირა',
-      'ორშაბათი',
-      'სამშაბათი',
-      'ოთხშაბათი',
-      'ხუთშაბათი',
-      'პარასკევი',
-      'შაბათი',
-    ];
-
-    // Group availability by date and type
-    const availabilityByDate: Record<
-      string,
-      { videoSlots: string[]; homeVisitSlots: string[] }
-    > = {};
-
-    availability.forEach((avail) => {
-      const date = new Date(avail.date);
-      const dateStr = date.toISOString().split('T')[0];
-      if (!availabilityByDate[dateStr]) {
-        availabilityByDate[dateStr] = {
-          videoSlots: [],
-          homeVisitSlots: [],
-        };
-      }
-      const target =
-        avail.type === 'home-visit'
-          ? availabilityByDate[dateStr].homeVisitSlots
-          : availabilityByDate[dateStr].videoSlots;
-
-      (avail.timeSlots || []).forEach((slot: string) => {
-        if (!target.includes(slot)) {
-          target.push(slot);
-        }
-      });
-    });
-
-    const formattedAvailability = Object.entries(availabilityByDate).map(
-      ([dateStr, slots]) => {
-        const date = new Date(dateStr);
-        const bookedSlots = bookedSlotsByDate[dateStr] || new Set();
-        const allTimeSlots = [...slots.videoSlots, ...slots.homeVisitSlots];
-        const availableTimeSlots = allTimeSlots.filter(
-          (slot) => !bookedSlots.has(slot),
-        );
-
-        return {
-          date: dateStr,
-          dayOfWeek: dayNames[date.getDay()],
-          timeSlots: allTimeSlots,
-          videoSlots: slots.videoSlots,
-          homeVisitSlots: slots.homeVisitSlots,
-          bookedSlots: Array.from(bookedSlots),
-          isAvailable: availableTimeSlots.length > 0,
-        };
-      },
-    );
+    const formattedAvailability = availabilityResponse.data || [];
 
     const reviews: any[] = [];
 
@@ -631,6 +531,7 @@ export class DoctorsService {
     startDate?: string,
     endDate?: string,
     type?: 'video' | 'home-visit',
+    forPatient: boolean = false,
   ) {
     // 1) ვალიდაცია
     if (!mongoose.Types.ObjectId.isValid(doctorId)) {
@@ -684,10 +585,10 @@ export class DoctorsService {
         appointmentDate: { $gte: rangeStart, $lte: rangeEnd },
         status: { $ne: 'cancelled' },
       })
-      .select('appointmentDate appointmentTime status')
+      .select('appointmentDate appointmentTime status type')
       .lean();
 
-    // 5) დავაგენერიროთ bookedSlotsByDate (YYYY-MM-DD -> Set<HH:mm>)
+    // 5) დავაგენერიროთ bookedSlotsByDate (YYYY-MM-DD-type -> Set<HH:mm>)
     const bookedSlotsByDate: { [key: string]: Set<string> } = {};
 
     console.log('📅 [getDoctorAvailability] Processing booked appointments:', {
@@ -697,6 +598,7 @@ export class DoctorsService {
         storedDate: apt.appointmentDate,
         time: apt.appointmentTime,
         status: apt.status,
+        type: apt.type,
       })),
     });
 
@@ -706,6 +608,9 @@ export class DoctorsService {
       const month = String(aptDate.getMonth() + 1).padStart(2, '0');
       const day = String(aptDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
+      // დავრწმუნდეთ, რომ type არის 'video' ან 'home-visit'
+      const aptType = apt.type === 'home-visit' ? 'home-visit' : 'video';
+      const dateTypeKey = `${dateStr}-${aptType}`;
 
       console.log('📅 [getDoctorAvailability] Appointment date parsing:', {
         appointmentId: (apt as any)._id?.toString(),
@@ -714,10 +619,12 @@ export class DoctorsService {
         localDateStr: dateStr,
         utcDateStr: `${aptDate.getUTCFullYear()}-${String(aptDate.getUTCMonth() + 1).padStart(2, '0')}-${String(aptDate.getUTCDate()).padStart(2, '0')}`,
         time: apt.appointmentTime,
+        type: aptType,
+        dateTypeKey,
       });
 
-      if (!bookedSlotsByDate[dateStr]) {
-        bookedSlotsByDate[dateStr] = new Set();
+      if (!bookedSlotsByDate[dateTypeKey]) {
+        bookedSlotsByDate[dateTypeKey] = new Set();
       }
 
       if (apt.appointmentTime) {
@@ -725,7 +632,7 @@ export class DoctorsService {
           .split(':')
           .slice(0, 2)
           .join(':');
-        bookedSlotsByDate[dateStr].add(normalizedTime);
+        bookedSlotsByDate[dateTypeKey].add(normalizedTime);
       }
     });
 
@@ -791,29 +698,66 @@ export class DoctorsService {
         const [dateStr] = key.split('|');
         const { date, type, slots } = value;
 
-        const bookedSet = bookedSlotsByDate[dateStr] || new Set<string>();
+        // დავრწმუნდეთ, რომ type არის 'video' ან 'home-visit'
+        const typeKey = type === 'home-visit' ? 'home-visit' : 'video';
+        const dateTypeKey = `${dateStr}-${typeKey}`;
+
+        // მხოლოდ ამ type-ის booked slots (bookedSlots-ში ჩანს მხოლოდ შესაბამისი type-ის)
+        const bookedSetForThisType =
+          bookedSlotsByDate[dateTypeKey] || new Set<string>();
+
+        // ორივე type-ის appointments გავითვალისწინოთ available slots-ისთვის,
+        // რადგან ექიმი არ შეუძლია ერთდროულად იყოს ორ ადგილას
+        const otherTypeKey = typeKey === 'video' ? 'home-visit' : 'video';
+        const otherDateTypeKey = `${dateStr}-${otherTypeKey}`;
+        const bookedSetForOtherType =
+          bookedSlotsByDate[otherDateTypeKey] || new Set<string>();
+
+        // გავაერთიანოთ ორივე type-ის booked slots available slots-ისთვის
+        const bookedSetForAvailable = new Set([
+          ...bookedSetForThisType,
+          ...bookedSetForOtherType,
+        ]);
+
         const allTimeSlots: string[] = Array.from(slots).sort();
 
-        // Combine available slots with booked slots to show all slots that should be displayed
-        // This ensures booked slots are visible even if they're not in the doctor's availability
-        const allSlotsToShow = Array.from(
-          new Set([...allTimeSlots, ...Array.from(bookedSet)]),
-        ).sort();
+        console.log(`🔍 [getDoctorAvailability] Processing ${dateTypeKey}:`, {
+          dateStr,
+          type,
+          typeKey,
+          dateTypeKey,
+          bookedSlotsForThisType: Array.from(bookedSetForThisType),
+          bookedSlotsForOtherType: Array.from(bookedSetForOtherType),
+          bookedSlotsForAvailable: Array.from(bookedSetForAvailable),
+          availableSlots: allTimeSlots,
+        });
 
         // თუ არც availability-ს აქვს სლოტები და არც დაჯავშნილია რამე -> ასეთი დღე არ გვაინტერესებს
-        if (allTimeSlots.length === 0 && bookedSet.size === 0) {
+        if (allTimeSlots.length === 0 && bookedSetForThisType.size === 0) {
           return null;
         }
 
+        // Available slots: მხოლოდ ის slots, რომლებიც არ არის დაჯავშნილი (ორივე type-ისთვის)
         const availableTimeSlots = allTimeSlots.filter(
-          (slot: string) => !bookedSet.has(slot),
+          (slot: string) => !bookedSetForAvailable.has(slot),
         );
+
+        // პაციენტისთვის: თუ available slots არ არის, ეს დღე არ უნდა ჩანდეს
+        if (forPatient && availableTimeSlots.length === 0) {
+          return null;
+        }
+
+        // Combine available slots with booked slots to show all slots that should be displayed
+        // ექიმისთვის: მხოლოდ available slots (დაჯავშნილი არ ჩანს გრაფიკში, არც disabled-ად)
+        // პაციენტისთვის: მხოლოდ available slots (დაჯავშნილი არ ჩანს, მხოლოდ თავისუფალი დრო)
+        // bookedSlots-ში მხოლოდ ამ type-ის booked slots (პაციენტისთვის არ გამოიყენება, მაგრამ დავტოვოთ)
+        const allSlotsToShow = availableTimeSlots; // ორივესთვის მხოლოდ available slots
 
         return {
           date: dateStr,
           dayOfWeek: dayNames[date.getDay()],
-          timeSlots: allSlotsToShow, // Show all slots (available + booked) so booked slots are visible
-          bookedSlots: Array.from(bookedSet),
+          timeSlots: allSlotsToShow,
+          bookedSlots: Array.from(bookedSetForThisType), // მხოლოდ ამ type-ის booked slots
           isAvailable: availableTimeSlots.length > 0,
           type,
         };
@@ -832,12 +776,124 @@ export class DoctorsService {
   }
 
   async updateAvailability(
-    _doctorId: string,
-    _updateAvailabilityDto: UpdateAvailabilityDto,
+    doctorId: string,
+    updateAvailabilityDto: UpdateAvailabilityDto,
   ) {
-    throw new ForbiddenException(
-      'გრაფიკის ცვლილება მხოლოდ ადმინის მხრიდან შესაძლებელია. გთხოვთ დაელოდოთ „აქტიური“ სტატუსის მინიჭებას და ადმინის მიერ გრაფიკის დაყენებას.',
+    console.log('📥 [DoctorsService] updateAvailability called');
+    console.log('📥 [DoctorsService] doctorId:', doctorId);
+    console.log(
+      '📥 [DoctorsService] Received DTO:',
+      JSON.stringify(updateAvailabilityDto, null, 2),
     );
+    console.log(
+      '📥 [DoctorsService] availability array length:',
+      updateAvailabilityDto.availability?.length,
+    );
+
+    if (!mongoose.Types.ObjectId.isValid(doctorId)) {
+      throw new BadRequestException('Invalid doctor ID format');
+    }
+
+    const doctor = await this.userModel.findOne({
+      _id: new mongoose.Types.ObjectId(doctorId),
+      role: UserRole.DOCTOR,
+    });
+
+    if (!doctor) {
+      throw new NotFoundException('Doctor not found');
+    }
+
+    console.log('📥 [DoctorsService] Doctor found:', {
+      id: (doctor as any)._id?.toString(),
+      name: (doctor as any).name,
+      approvalStatus: (doctor as any).approvalStatus,
+      isActive: (doctor as any).isActive,
+      doctorStatus: (doctor as any).doctorStatus,
+    });
+
+    // Allow schedule selection for approved doctors, regardless of doctorStatus
+    // Doctors with 'awaiting_schedule' status should be able to select their schedule
+    // Doctors with 'active' status can also update their schedule
+    if ((doctor as any).approvalStatus !== ApprovalStatus.APPROVED) {
+      throw new ForbiddenException(
+        'გრაფიკის დაყენება შესაძლებელია მხოლოდ დამტკიცებული ექიმებისთვის.',
+      );
+    }
+
+    // Note: We removed the isActive check because doctors with 'awaiting_schedule' status
+    // should be able to select their schedule even if isActive is false
+    // The doctorStatus will be updated to 'active' automatically after they set a schedule
+
+    const results: AvailabilityDocument[] = [];
+
+    for (const slot of updateAvailabilityDto.availability) {
+      console.log(
+        '📥 [DoctorsService] Processing slot:',
+        JSON.stringify(slot, null, 2),
+      );
+      const date = new Date(slot.date);
+      date.setHours(0, 0, 0, 0);
+
+      const availabilityDoc = await this.availabilityModel.findOneAndUpdate(
+        {
+          doctorId: new mongoose.Types.ObjectId(doctorId),
+          date,
+          type: slot.type,
+        },
+        {
+          doctorId: new mongoose.Types.ObjectId(doctorId),
+          date,
+          timeSlots: slot.timeSlots,
+          isAvailable: slot.isAvailable,
+          type: slot.type,
+        },
+        { upsert: true, new: true },
+      );
+
+      console.log('📥 [DoctorsService] Saved availability:', {
+        date: date.toISOString(),
+        type: slot.type,
+        timeSlots: slot.timeSlots,
+        isAvailable: slot.isAvailable,
+        docId: (availabilityDoc as any)._id?.toString(),
+      });
+
+      results.push(availabilityDoc);
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const futureAvailability = await this.availabilityModel.findOne({
+      doctorId: new mongoose.Types.ObjectId(doctorId),
+      date: { $gte: today },
+      timeSlots: { $exists: true, $ne: [] },
+    });
+
+    const newDoctorStatus = futureAvailability
+      ? DoctorStatus.ACTIVE
+      : DoctorStatus.AWAITING_SCHEDULE;
+
+    console.log('📥 [DoctorsService] Updating doctor status:', {
+      hasFutureAvailability: !!futureAvailability,
+      newStatus: newDoctorStatus,
+      futureAvailabilityDate: futureAvailability?.date,
+    });
+
+    await this.userModel.findByIdAndUpdate(doctorId, {
+      doctorStatus: newDoctorStatus,
+    });
+
+    console.log(
+      '✅ [DoctorsService] updateAvailability completed successfully',
+    );
+    console.log('✅ [DoctorsService] Results count:', results.length);
+
+    return {
+      success: true,
+      message: 'ხელმისაწვდომობა წარმატებით განახლდა',
+      data: results,
+    };
   }
 
   async updateDoctor(doctorId: string, updateDoctorDto: UpdateDoctorDto) {
@@ -1935,77 +1991,70 @@ export class DoctorsService {
       return patient;
     });
 
-    return {
-      success: true,
-      data: patients,
-    };
-  }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-  /**
-   * Scheduled task: Check all active doctors and update their status
-   * based on whether they have valid future availability.
-   * Runs every hour to ensure doctors without schedules are hidden from patients.
-   */
-  private async updateDoctorStatusesBasedOnAvailability() {
-    try {
-      console.log('🔄 [Scheduler] Checking doctor statuses based on availability...');
-      
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+    // Find all approved doctors with active status
+    const activeDoctors = await this.userModel.find({
+      role: UserRole.DOCTOR,
+      approvalStatus: ApprovalStatus.APPROVED,
+      doctorStatus: 'active',
+    });
 
-      // Find all approved doctors with active status
-      const activeDoctors = await this.userModel.find({
-        role: UserRole.DOCTOR,
-        approvalStatus: ApprovalStatus.APPROVED,
-        doctorStatus: 'active',
+    console.log(
+      `🔄 [Scheduler] Found ${activeDoctors.length} active doctors to check`,
+    );
+
+    for (const doctor of activeDoctors) {
+      const futureAvailability = await this.availabilityModel.findOne({
+        doctorId: doctor._id,
+        date: { $gte: today },
+        timeSlots: { $exists: true, $ne: [] },
       });
 
-      console.log(`🔄 [Scheduler] Found ${activeDoctors.length} active doctors to check`);
-
-      for (const doctor of activeDoctors) {
-        const futureAvailability = await this.availabilityModel.findOne({
-          doctorId: doctor._id,
-          date: { $gte: today },
-          timeSlots: { $exists: true, $ne: [] },
+      if (!futureAvailability) {
+        // No future availability → revert to awaiting_schedule
+        await this.userModel.findByIdAndUpdate(doctor._id, {
+          doctorStatus: 'awaiting_schedule',
         });
-
-        if (!futureAvailability) {
-          // No future availability → revert to awaiting_schedule
-          await this.userModel.findByIdAndUpdate(doctor._id, {
-            doctorStatus: 'awaiting_schedule',
-          });
-          console.log(`⚠️ [Scheduler] Doctor ${doctor.name} (${doctor._id}) reverted to AWAITING_SCHEDULE (no future availability)`);
-        }
+        console.log(
+          `⚠️ [Scheduler] Doctor ${doctor.name} (${doctor._id}) reverted to AWAITING_SCHEDULE (no future availability)`,
+        );
       }
-
-      // Also check doctors in awaiting_schedule who might have added availability
-      const awaitingDoctors = await this.userModel.find({
-        role: UserRole.DOCTOR,
-        approvalStatus: ApprovalStatus.APPROVED,
-        doctorStatus: 'awaiting_schedule',
-      });
-
-      console.log(`🔄 [Scheduler] Found ${awaitingDoctors.length} awaiting_schedule doctors to check`);
-
-      for (const doctor of awaitingDoctors) {
-        const futureAvailability = await this.availabilityModel.findOne({
-          doctorId: doctor._id,
-          date: { $gte: today },
-          timeSlots: { $exists: true, $ne: [] },
-        });
-
-        if (futureAvailability) {
-          // Has future availability → set to active
-          await this.userModel.findByIdAndUpdate(doctor._id, {
-            doctorStatus: 'active',
-          });
-          console.log(`✅ [Scheduler] Doctor ${doctor.name} (${doctor._id}) set to ACTIVE (has future availability)`);
-        }
-      }
-
-      console.log('✅ [Scheduler] Doctor status check completed');
-    } catch (error) {
-      console.error('❌ [Scheduler] Error updating doctor statuses:', error);
     }
+
+    // Also check doctors in awaiting_schedule who might have added availability
+    const awaitingDoctors = await this.userModel.find({
+      role: UserRole.DOCTOR,
+      approvalStatus: ApprovalStatus.APPROVED,
+      doctorStatus: 'awaiting_schedule',
+    });
+
+    console.log(
+      `🔄 [Scheduler] Found ${awaitingDoctors.length} awaiting_schedule doctors to check`,
+    );
+
+    for (const doctor of awaitingDoctors) {
+      const futureAvailability = await this.availabilityModel.findOne({
+        doctorId: doctor._id,
+        date: { $gte: today },
+        timeSlots: { $exists: true, $ne: [] },
+      });
+
+      if (futureAvailability) {
+        // Has future availability → set to active
+        await this.userModel.findByIdAndUpdate(doctor._id, {
+          doctorStatus: 'active',
+        });
+        console.log(
+          `✅ [Scheduler] Doctor ${doctor.name} (${doctor._id}) set to ACTIVE (has future availability)`,
+        );
+      }
+    }
+
+    console.log('✅ [Scheduler] Doctor status check completed');
+  }
+  catch(error) {
+    console.error('❌ [Scheduler] Error updating doctor statuses:', error);
   }
 }

@@ -1,15 +1,15 @@
 import {
-    Body,
-    Controller,
-    Get,
-    Param,
-    Patch,
-    Post,
-    Put,
-    Query,
-    UploadedFile,
-    UseGuards,
-    UseInterceptors,
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -90,13 +90,7 @@ export class DoctorsController {
         user.sub,
       );
       const result = await this.doctorsService.getDoctorPatients(user.sub);
-      console.log(
-        '🏥 DoctorsController.getDoctorPatients - Service returned:',
-        {
-          success: result.success,
-          dataLength: result.data?.length,
-        },
-      );
+
       return result;
     } catch (error: unknown) {
       const errorMessage =
@@ -170,12 +164,14 @@ export class DoctorsController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('type') type?: 'video' | 'home-visit',
+    @Query('forPatient') forPatient?: string,
   ) {
     return this.doctorsService.getDoctorAvailability(
       id,
       startDate,
       endDate,
       type,
+      forPatient === 'true',
     );
   }
 
@@ -185,6 +181,18 @@ export class DoctorsController {
     @CurrentUser() user: { sub: string },
     @Body() updateAvailabilityDto: UpdateAvailabilityDto,
   ) {
+    console.log('📥 [DoctorsController] updateAvailability endpoint called');
+    console.log('📥 [DoctorsController] User ID:', user.sub);
+    console.log(
+      '📥 [DoctorsController] Received body:',
+      JSON.stringify(updateAvailabilityDto, null, 2),
+    );
+    console.log(
+      '📥 [DoctorsController] Availability array:',
+      updateAvailabilityDto.availability?.length,
+      'items',
+    );
+
     return this.doctorsService.updateAvailability(
       user.sub,
       updateAvailabilityDto,
