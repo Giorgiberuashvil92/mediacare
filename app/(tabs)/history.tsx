@@ -16,8 +16,8 @@ import {
   View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { apiService } from "../_services/api";
 import { useAuth } from "../contexts/AuthContext";
-import { apiService } from "../services/api";
 
 const History = () => {
   const router = useRouter();
@@ -32,6 +32,15 @@ const History = () => {
   const [checkingEligibility, setCheckingEligibility] = useState(false);
   const [followUpEligible, setFollowUpEligible] = useState<boolean | null>(null);
   const [uploadingResult, setUploadingResult] = useState<string | null>(null);
+  const [expandedVisits, setExpandedVisits] = useState<Set<string>>(new Set());
+  
+  // Symptoms and Diagnosis modal states
+  const [showSymptomsModal, setShowSymptomsModal] = useState(false);
+  const [showDiagnosisModal, setShowDiagnosisModal] = useState(false);
+  const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
+  const [selectedSymptoms, setSelectedSymptoms] = useState<string>("");
+  const [selectedDiagnosis, setSelectedDiagnosis] = useState<string>("");
+  const [selectedPrescription, setSelectedPrescription] = useState<any>(null);
   
   // Reschedule states
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
@@ -119,6 +128,19 @@ const History = () => {
       return searchable.includes(query);
     });
   }, [visits, searchQuery]);
+
+  const toggleVisitExpansion = (visit: any) => {
+    const isExpanded = expandedVisits.has(visit.id);
+    if (isExpanded) {
+      setExpandedVisits(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(visit.id);
+        return newSet;
+      });
+    } else {
+      setExpandedVisits(prev => new Set(prev).add(visit.id));
+    }
+  };
 
   const openDetails = async (visit: any) => {
     console.log('📋 History - openDetails called with visit:', {
@@ -319,12 +341,16 @@ const History = () => {
               </Text>
             </View>
           ) : (
-            filteredVisits.map((visit) => (
-              <TouchableOpacity
-                key={visit.id}
-                style={styles.visitCard}
-                onPress={() => openDetails(visit)}
-              >
+            filteredVisits.map((visit) => {
+              const isExpanded = expandedVisits.has(visit.id);
+              
+              return (
+              <View key={visit.id} style={styles.visitCard}>
+                <TouchableOpacity
+                  style={{ flex: 1 }}
+                  onPress={() => toggleVisitExpansion(visit)}
+                  activeOpacity={0.7}
+                >
                 <View style={styles.visitHeader}>
                   <View style={styles.doctorInfo}>
                     <View style={styles.avatarContainer}>
@@ -337,43 +363,201 @@ const History = () => {
                       </Text>
                     </View>
                   </View>
-                  <View style={styles.dateBadge}>
-                    <Text style={styles.dateText}>{visit.date}</Text>
-                    {visit.appointmentTime && (
-                      <View style={styles.timeRow}>
-                        <Ionicons name="time-outline" size={12} color="#06B6D4" />
-                        <Text style={styles.timeText}>{visit.appointmentTime}</Text>
-                      </View>
-                    )}
-                    {visit.statusLabel ? (
-                      <Text style={styles.statusLabel}>{visit.statusLabel}</Text>
-                    ) : null}
+                  <View
+                    style={[
+                      styles.statusBadge,
+                      {
+                        backgroundColor: visit.status === "completed"
+                          ? "#10B98120"
+                          : visit.status === "cancelled"
+                          ? "#EF444420"
+                          : "#6B728020",
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.statusText,
+                        {
+                          color:
+                            visit.status === "completed"
+                              ? "#10B981"
+                              : visit.status === "cancelled"
+                              ? "#EF4444"
+                              : "#6B7280",
+                        },
+                      ]}
+                    >
+                      {visit.statusLabel || "დასრულებული"}
+                    </Text>
                   </View>
+                  <TouchableOpacity
+                    onPress={() => toggleVisitExpansion(visit)}
+                    style={styles.expandButton}
+                  >
+                    <Ionicons
+                      name={isExpanded ? "chevron-up" : "chevron-down"}
+                      size={20}
+                      color="#6B7280"
+                    />
+                  </TouchableOpacity>
                 </View>
 
                 <View style={styles.visitBody}>
-                  <View style={styles.diagnosisRow}>
+                  <View style={styles.infoRow}>
                     <Ionicons
-                      name="checkmark-circle"
+                      name="calendar-outline"
                       size={16}
-                      color="#10B981"
+                      color="#6B7280"
                     />
-                    <Text style={styles.diagnosisText}>
-                      {visit.diagnosis || "დიაგნოზი არ არის მითითებული"}
-                    </Text>
+                    <Text style={styles.infoText}>{visit.date}</Text>
                   </View>
-
-                  {visit.symptoms && visit.symptoms.length > 0 && (
-                    <View style={styles.symptomsContainer}>
-                      <Text style={styles.symptomsLabel}>სიმპტომები:</Text>
-                      <View style={styles.symptomsList}>
-                        {visit.symptoms.map((symptom: string, index: number) => (
-                          <View key={index} style={styles.symptomTag}>
-                            <Text style={styles.symptomText}>{symptom}</Text>
-                          </View>
-                        ))}
-                      </View>
+                  {visit.appointmentTime && (
+                    <View style={styles.infoRow}>
+                      <Ionicons name="time-outline" size={16} color="#6B7280" />
+                      <Text style={styles.infoText}>{visit.appointmentTime}</Text>
                     </View>
+                  )}
+                  {visit.consultationType && (
+                    <View style={styles.infoRow}>
+                      <Ionicons name="videocam-outline" size={16} color="#6B7280" />
+                      <Text style={styles.infoText}>
+                        {getConsultationTypeLabel(visit.consultationType)}
+                      </Text>
+                    </View>
+                  )}
+                  {/* Tests Indicator - Always visible */}
+                  {(() => {
+                    const instrumentalBooked = visit.instrumentalTests?.filter((t: any) => t.booked).length || 0;
+                    const laboratoryBooked = visit.laboratoryTests?.filter((t: any) => t.booked).length || 0;
+                    const totalBooked = instrumentalBooked + laboratoryBooked;
+                    
+                    const instrumentalTotal = visit.instrumentalTests?.length || 0;
+                    const laboratoryTotal = visit.laboratoryTests?.length || 0;
+                    const totalAssigned = instrumentalTotal + laboratoryTotal;
+                    
+                    if (totalAssigned > 0) {
+                      return (
+                        <View style={styles.infoRow}>
+                          <Ionicons name="flask-outline" size={16} color="#10B981" />
+                          <Text style={styles.infoText}>
+                            დაჯავშნილი: <Text style={styles.bookedCountText}>{totalBooked}</Text>
+                            {totalAssigned > totalBooked && (
+                              <> • დანიშნული: <Text style={styles.assignedCountText}>{totalAssigned}</Text></>
+                            )}
+                          </Text>
+                        </View>
+                      );
+                    }
+                    return null;
+                  })()}
+                  {/* Symptoms Button - Show only if not requiring follow-up or if it's a follow-up appointment */}
+                  {(() => {
+                    const isFollowUpAppointment = visit.followUp?.appointmentId;
+                    const requiresFollowUp = visit.followUp?.required && !visit.followUp?.appointmentId;
+                    const shouldShow = !requiresFollowUp || isFollowUpAppointment;
+                    return shouldShow && visit.symptoms && visit.symptoms.length > 0;
+                  })() && (
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => {
+                        const symptomsText = Array.isArray(visit.symptoms) 
+                          ? visit.symptoms.join(", ") 
+                          : visit.symptoms;
+                        setSelectedSymptoms(symptomsText);
+                        setShowSymptomsModal(true);
+                      }}
+                    >
+                      <Ionicons name="medical-outline" size={18} color="#F59E0B" />
+                      <Text style={styles.actionButtonText}>სიმპტომები</Text>
+                      <Ionicons name="chevron-forward" size={16} color="#6B7280" />
+                    </TouchableOpacity>
+                  )}
+
+                  {/* Diagnosis Button - Show only if not requiring follow-up or if it's a follow-up appointment */}
+                  {(() => {
+                    const isFollowUpAppointment = visit.followUp?.appointmentId;
+                    const requiresFollowUp = visit.followUp?.required && !visit.followUp?.appointmentId;
+                    const shouldShow = !requiresFollowUp || isFollowUpAppointment;
+                    return shouldShow && visit.diagnosis && visit.diagnosis.trim();
+                  })() && (
+                    <View style={styles.diagnosisRow}>
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={16}
+                        color="#10B981"
+                      />
+                      <Text style={styles.diagnosisText}>
+                        {visit.diagnosis}
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Form 100 Button */}
+                  {visit.form100 && (
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={async () => {
+                        try {
+                          if (visit.form100.pdfUrl) {
+                            const canOpen = await Linking.canOpenURL(visit.form100.pdfUrl);
+                            if (canOpen) {
+                              await Linking.openURL(visit.form100.pdfUrl);
+                            } else {
+                              Alert.alert("შეცდომა", "PDF ფაილის გახსნა ვერ მოხერხდა");
+                            }
+                          } else {
+                            Alert.alert("ინფორმაცია", "PDF ფაილი ჯერ არ არის ხელმისაწვდომი");
+                          }
+                        } catch (error) {
+                          console.error("Error opening Form 100:", error);
+                          Alert.alert("შეცდომა", "PDF ფაილის გახსნა ვერ მოხერხდა");
+                        }
+                      }}
+                    >
+                      <Ionicons name="document-text" size={18} color="#10B981" />
+                      <Text style={styles.actionButtonText}>ფორმა 100</Text>
+                      <Ionicons name="chevron-forward" size={16} color="#6B7280" />
+                    </TouchableOpacity>
+                  )}
+
+                  {/* Prescription Button */}
+                  {visit.medications && visit.medications.length > 0 && (
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => {
+                        setSelectedPrescription(visit.medications);
+                        setShowPrescriptionModal(true);
+                      }}
+                    >
+                      <Ionicons name="medkit-outline" size={18} color="#8B5CF6" />
+                      <Text style={styles.actionButtonText}>დანიშნულება</Text>
+                      <Ionicons name="chevron-forward" size={16} color="#6B7280" />
+                    </TouchableOpacity>
+                  )}
+
+                  {/* Follow-up Required Indicator */}
+                  {visit.followUp && visit.followUp.required && !visit.followUp.appointmentId && (
+                    <TouchableOpacity
+                      style={styles.followUpRequiredCard}
+                      onPress={async () => {
+                        setSelectedVisit(visit);
+                        await handleFollowUpAppointment();
+                      }}
+                    >
+                      <Ionicons name="refresh" size={20} color="#06B6D4" />
+                      <View style={styles.followUpRequiredContent}>
+                        <Text style={styles.followUpRequiredTitle}>
+                          საჭიროა განმეორებითი ვიზიტი
+                        </Text>
+                        {visit.followUp.reason && (
+                          <Text style={styles.followUpRequiredReason}>
+                            {visit.followUp.reason}
+                          </Text>
+                        )}
+                      </View>
+                      <Ionicons name="arrow-forward" size={20} color="#06B6D4" />
+                    </TouchableOpacity>
                   )}
 
                   {visit.medications && visit.medications.length > 0 && (
@@ -491,24 +675,210 @@ const History = () => {
                     </View>
                   )}
                 </View>
+                </TouchableOpacity>
 
-                <View style={styles.visitFooter}>
-                  <TouchableOpacity
-                    style={styles.viewDetailsButton}
-                    onPress={() => openDetails(visit)}
-                  >
-                    <Text style={styles.viewDetailsText}>
-                      დეტალურად ნახვა
-                    </Text>
-                    <Ionicons
-                      name="arrow-forward"
-                      size={16}
-                      color="#06B6D4"
-                    />
-                  </TouchableOpacity>
-                </View>
-              </TouchableOpacity>
-            ))
+                {/* More Details Button - Always visible - Expands the card */}
+                <TouchableOpacity
+                  style={styles.moreDetailsButton}
+                  onPress={() => toggleVisitExpansion(visit)}
+                >
+                  <Text style={styles.moreDetailsButtonText}>მეტის ნახვა</Text>
+                  <Ionicons 
+                    name={isExpanded ? "chevron-up" : "chevron-down"} 
+                    size={16} 
+                    color="#06B6D4" 
+                  />
+                </TouchableOpacity>
+
+                {/* Expanded Details */}
+                {isExpanded && (
+                  <View style={styles.expandedSection}>
+                    {/* Notes */}
+                    {visit.notes && (
+                      <View style={styles.detailSection}>
+                        <Text style={styles.detailSectionTitle}>შენიშვნები</Text>
+                        <View style={styles.notesCard}>
+                          <Ionicons name="document-text-outline" size={18} color="#6B7280" />
+                          <Text style={styles.notesTextExpanded}>{visit.notes}</Text>
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Medications Details */}
+                    {visit.medications && visit.medications.length > 0 && (
+                      <View style={styles.detailSection}>
+                        <Text style={styles.detailSectionTitle}>დანიშნული მედიკამენტები</Text>
+                        {visit.medications.map((med: any, index: number) => (
+                          <View key={index} style={styles.medicationDetailCard}>
+                            <View style={styles.medicationDetailHeader}>
+                              <Ionicons name="medkit" size={20} color="#8B5CF6" />
+                              <Text style={styles.medicationDetailName}>{med.name || med.medicationName || `მედიკამენტი ${index + 1}`}</Text>
+                            </View>
+                            {med.dosage && (
+                              <Text style={styles.medicationDetailInfo}>
+                                <Text style={styles.medicationDetailLabelModal}>დოზა: </Text>
+                                {med.dosage}
+                              </Text>
+                            )}
+                            {med.frequency && (
+                              <Text style={styles.medicationDetailInfo}>
+                                <Text style={styles.medicationDetailLabelModal}>სიხშირე: </Text>
+                                {med.frequency}
+                              </Text>
+                            )}
+                            {med.duration && (
+                              <Text style={styles.medicationDetailInfo}>
+                                <Text style={styles.medicationDetailLabelModal}>ხანგრძლივობა: </Text>
+                                {med.duration}
+                              </Text>
+                            )}
+                            {med.instructions && (
+                              <Text style={styles.medicationDetailInfo}>
+                                <Text style={styles.medicationDetailLabelModal}>ინსტრუქცია: </Text>
+                                {med.instructions}
+                              </Text>
+                            )}
+                          </View>
+                        ))}
+                      </View>
+                    )}
+
+                    {/* Instrumental Tests */}
+                    {visit.instrumentalTests && visit.instrumentalTests.length > 0 && (
+                      <View style={styles.detailSection}>
+                        <Text style={styles.detailSectionTitle}>
+                          დანიშნული ინსტრუმენტული კვლევები
+                        </Text>
+                        {visit.instrumentalTests.map((test: any, index: number) => (
+                          <View key={index} style={styles.testCard}>
+                            <View style={styles.testHeader}>
+                              <Ionicons name="pulse-outline" size={18} color="#8B5CF6" />
+                              <View style={styles.testInfo}>
+                                <Text style={styles.testName}>{test.productName}</Text>
+                                {test.clinicName && (
+                                  <Text style={styles.testNotes}>კლინიკა: {test.clinicName}</Text>
+                                )}
+                                {test.notes && (
+                                  <Text style={styles.testNotes}>შენიშვნა: {test.notes}</Text>
+                                )}
+                              </View>
+                            </View>
+                            {test.booked && (
+                              <View style={styles.bookedBadge}>
+                                <Ionicons
+                                  name="checkmark-circle"
+                                  size={16}
+                                  color="#10B981"
+                                />
+                                <Text style={styles.bookedBadgeText}>
+                                  დაჯავშნილია
+                                </Text>
+                              </View>
+                            )}
+                            {test.resultFile && (
+                              <TouchableOpacity
+                                style={styles.viewResultButton}
+                                onPress={async () => {
+                                  if (test.resultFile?.url) {
+                                    const url = test.resultFile.url;
+                                    const isPdf = test.resultFile.type === 'application/pdf' || url.endsWith('.pdf');
+                                    
+                                    if (isPdf) {
+                                      const googleDocsUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=false`;
+                                      Linking.openURL(googleDocsUrl).catch(() =>
+                                        Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა")
+                                      );
+                                    } else {
+                                      Linking.openURL(url).catch(() =>
+                                        Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა")
+                                      );
+                                    }
+                                  }
+                                }}
+                              >
+                                <Ionicons
+                                  name="document-text-outline"
+                                  size={16}
+                                  color="#8B5CF6"
+                                />
+                                <Text style={styles.viewResultButtonText}>
+                                  შედეგის ნახვა
+                                </Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        ))}
+                      </View>
+                    )}
+
+                    {/* Laboratory Tests */}
+                    {visit.laboratoryTests && visit.laboratoryTests.length > 0 && (
+                      <View style={styles.detailSection}>
+                        <Text style={styles.detailSectionTitle}>
+                          დანიშნული ლაბორატორიული კვლევები
+                        </Text>
+                        {visit.laboratoryTests.map((test: any, index: number) => (
+                          <View key={index} style={styles.testCard}>
+                            <View style={styles.testHeader}>
+                              <Ionicons name="flask-outline" size={18} color="#06B6D4" />
+                              <View style={styles.testInfo}>
+                                <Text style={styles.testName}>{test.productName}</Text>
+                                {test.clinicName && (
+                                  <Text style={styles.testNotes}>კლინიკა: {test.clinicName}</Text>
+                                )}
+                              </View>
+                            </View>
+                            {test.booked && (
+                              <View style={styles.bookedBadge}>
+                                <Ionicons
+                                  name="checkmark-circle"
+                                  size={16}
+                                  color="#10B981"
+                                />
+                                <Text style={styles.bookedBadgeText}>
+                                  დაჯავშნილია
+                                </Text>
+                              </View>
+                            )}
+                            {test.resultFile && (
+                              <TouchableOpacity
+                                style={styles.viewResultButton}
+                                onPress={async () => {
+                                  if (test.resultFile?.url) {
+                                    const url = test.resultFile.url;
+                                    const isPdf = test.resultFile.type === 'application/pdf' || url.endsWith('.pdf');
+                                    
+                                    if (isPdf) {
+                                      const googleDocsUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=false`;
+                                      Linking.openURL(googleDocsUrl).catch(() =>
+                                        Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა")
+                                      );
+                                    } else {
+                                      Linking.openURL(url).catch(() =>
+                                        Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა")
+                                      );
+                                    }
+                                  }
+                                }}
+                              >
+                                <Ionicons
+                                  name="document-text-outline"
+                                  size={16}
+                                  color="#06B6D4"
+                                />
+                                <Text style={styles.viewResultButtonText}>
+                                  შედეგის ნახვა
+                                </Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                )}
+              </View>
+            )})
           )}
         </View>
       </ScrollView>
@@ -549,26 +919,25 @@ const History = () => {
                   <Text style={styles.detailValue}>{selectedVisit.date}</Text>
                 </View>
 
-                {/* Diagnosis */}
-                <View style={styles.detailSection}>
-                  <Text style={styles.detailLabel}>დიაგნოზი</Text>
-                  <Text style={styles.detailValue}>{selectedVisit.diagnosis}</Text>
-                </View>
-
-                {/* Symptoms */}
-                {selectedVisit.symptoms && selectedVisit.symptoms.length > 0 && (
+                {/* Time */}
+                {selectedVisit.appointmentTime && (
                   <View style={styles.detailSection}>
-                    <Text style={styles.detailLabel}>სიმპტომები</Text>
-                    {selectedVisit.symptoms.map((symptom: string, index: number) => (
-                      <View key={index} style={styles.listItem}>
-                        <Ionicons
-                          name="remove-circle"
-                          size={16}
-                          color="#6B7280"
-                        />
-                        <Text style={styles.listItemText}>{symptom}</Text>
-                      </View>
-                    ))}
+                    <Text style={styles.detailLabel}>დრო</Text>
+                    <Text style={styles.detailValue}>{selectedVisit.appointmentTime}</Text>
+                  </View>
+                )}
+
+                {/* Consultation Type */}
+                {selectedVisit.consultationType && (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailLabel}>კონსულტაციის ტიპი</Text>
+                    <Text style={styles.detailValue}>
+                      {selectedVisit.consultationType === "home-visit" 
+                        ? "ბინაზე ვიზიტი" 
+                        : selectedVisit.consultationType === "video"
+                        ? "ონლაინ კონსულტაცია"
+                        : selectedVisit.consultationType}
+                    </Text>
                   </View>
                 )}
 
@@ -767,6 +1136,79 @@ const History = () => {
                                 </Text>
                               </View>
                             )}
+                            {/* Upload button - works for all assigned tests (booked or not) */}
+                            <TouchableOpacity
+                              style={[
+                                styles.uploadResultButton,
+                                uploadingResult === test.productId && styles.uploadResultButtonDisabled,
+                              ]}
+                              onPress={async () => {
+                                if (uploadingResult === test.productId) return;
+                                
+                                try {
+                                  const result = await DocumentPicker.getDocumentAsync({
+                                    type: ["application/pdf", "image/jpeg", "image/jpg", "image/png", "image/webp"],
+                                    copyToCacheDirectory: true,
+                                  });
+
+                                  if (result.canceled) return;
+                                  const file = result.assets?.[0];
+                                  if (!file) return;
+
+                                  if (file.size && file.size > 10 * 1024 * 1024) {
+                                    Alert.alert("შეცდომა", "ფაილი უნდა იყოს 10MB-მდე");
+                                    return;
+                                  }
+
+                                  setUploadingResult(test.productId);
+                                  
+                                  // Use uploadInstrumentalTestResult for assigned tests (they have productId)
+                                  // This works for both booked and non-booked tests
+                                  const uploadResp = await apiService.uploadInstrumentalTestResult(
+                                    selectedVisit.id,
+                                    test.productId,
+                                    {
+                                      uri: file.uri,
+                                      name: file.name || "document",
+                                      type: file.mimeType || "application/pdf",
+                                    }
+                                  );
+
+                                  if (uploadResp.success) {
+                                    Alert.alert("წარმატება", "ინსტრუმენტული კვლევის შედეგი წარმატებით ატვირთა");
+                                    loadPastAppointments();
+                                  } else {
+                                    Alert.alert("შეცდომა", uploadResp?.message || "ატვირთვა ვერ მოხერხდა");
+                                  }
+                                } catch (err: any) {
+                                  console.error("Instrumental result upload error:", err);
+                                  Alert.alert("შეცდომა", err?.message || "ფაილის ატვირთვა ვერ მოხერხდა");
+                                } finally {
+                                  setUploadingResult(null);
+                                }
+                              }}
+                              disabled={uploadingResult === test.productId}
+                            >
+                              {uploadingResult === test.productId ? (
+                                <>
+                                  <ActivityIndicator size="small" color="#FFFFFF" />
+                                  <Text style={styles.uploadResultButtonText}>
+                                    ატვირთვა...
+                                  </Text>
+                                </>
+                              ) : (
+                                <>
+                                  <Ionicons
+                                    name="cloud-upload-outline"
+                                    size={16}
+                                    color="#FFFFFF"
+                                  />
+                                  <Text style={styles.uploadResultButtonText}>
+                                    {test.resultFile ? "შედეგის განახლება" : "შედეგის ატვირთვა"}
+                                  </Text>
+                                </>
+                              )}
+                            </TouchableOpacity>
                             {test.resultFile && (
                               <TouchableOpacity
                                 style={styles.viewResultButton}
@@ -913,7 +1355,6 @@ const History = () => {
 
                                   if (uploadResp.success) {
                                     Alert.alert("წარმატება", "ლაბორატორიული კვლევის შედეგი წარმატებით ატვირთა");
-                                      // Reload appointments to get updated data
                                       loadPastAppointments();
                                     } else {
                                       Alert.alert("შეცდომა", uploadResp?.message || "ატვირთვა ვერ მოხერხდა");
@@ -1114,6 +1555,146 @@ const History = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Symptoms Modal */}
+      <Modal
+        visible={showSymptomsModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowSymptomsModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>სიმპტომები</Text>
+              <TouchableOpacity
+                onPress={() => setShowSymptomsModal(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalBody}>
+              <View style={styles.detailSection}>
+                <Text style={styles.detailValue}>{selectedSymptoms}</Text>
+              </View>
+            </ScrollView>
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={() => setShowSymptomsModal(false)}
+              >
+                <Text style={styles.modalButtonText}>დახურვა</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Diagnosis Modal */}
+      <Modal
+        visible={showDiagnosisModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowDiagnosisModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>დიაგნოზი</Text>
+              <TouchableOpacity
+                onPress={() => setShowDiagnosisModal(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalBody}>
+              <View style={styles.detailSection}>
+                <Text style={styles.detailValue}>{selectedDiagnosis}</Text>
+              </View>
+            </ScrollView>
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={() => setShowDiagnosisModal(false)}
+              >
+                <Text style={styles.modalButtonText}>დახურვა</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Prescription Modal */}
+      <Modal
+        visible={showPrescriptionModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowPrescriptionModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>დანიშნულება</Text>
+              <TouchableOpacity
+                onPress={() => setShowPrescriptionModal(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalBody}>
+              <View style={styles.detailSection}>
+                {selectedPrescription && Array.isArray(selectedPrescription) && selectedPrescription.length > 0 ? (
+                  selectedPrescription.map((med: any, index: number) => (
+                    <View key={index} style={styles.medicationDetailCard}>
+                      <View style={styles.medicationDetailHeader}>
+                        <Ionicons name="medkit" size={20} color="#8B5CF6" />
+                        <Text style={styles.medicationDetailName}>{med.name || med.medicationName || `მედიკამენტი ${index + 1}`}</Text>
+                      </View>
+                      {med.dosage && (
+                        <Text style={styles.medicationDetailInfo}>
+                          <Text style={styles.medicationDetailLabelModal}>დოზა: </Text>
+                          {med.dosage}
+                        </Text>
+                      )}
+                      {med.frequency && (
+                        <Text style={styles.medicationDetailInfo}>
+                          <Text style={styles.medicationDetailLabelModal}>სიხშირე: </Text>
+                          {med.frequency}
+                        </Text>
+                      )}
+                      {med.duration && (
+                        <Text style={styles.medicationDetailInfo}>
+                          <Text style={styles.medicationDetailLabelModal}>ხანგრძლივობა: </Text>
+                          {med.duration}
+                        </Text>
+                      )}
+                      {med.instructions && (
+                        <Text style={styles.medicationDetailInfo}>
+                          <Text style={styles.medicationDetailLabelModal}>ინსტრუქცია: </Text>
+                          {med.instructions}
+                        </Text>
+                      )}
+                    </View>
+                  ))
+                ) : (
+                  <Text style={styles.detailValue}>დანიშნულება არ არის მითითებული</Text>
+                )}
+              </View>
+            </ScrollView>
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={() => setShowPrescriptionModal(false)}
+              >
+                <Text style={styles.modalButtonText}>დახურვა</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -1124,6 +1705,23 @@ const STATUS_LABELS: Record<string, string> = {
   "in-progress": "მიმდინარე",
   scheduled: "დანიშნული",
   pending: "მოლოდინში",
+};
+
+const getConsultationTypeLabel = (type: string) => {
+  switch (type) {
+    case "video":
+      return "ვიდეო კონსულტაცია";
+    case "home-visit":
+      return "ბინაზე ვიზიტი";
+    case "consultation":
+      return "კონსულტაცია";
+    case "followup":
+      return "განმეორებითი";
+    case "emergency":
+      return "სასწრაფო";
+    default:
+      return type;
+  }
 };
 
 const mapAppointmentToVisit = (appointment: any) => {
@@ -1215,6 +1813,7 @@ const mapAppointmentToVisit = (appointment: any) => {
     date: appointmentDate,
     appointmentDate,
     appointmentTime: appointment.appointmentTime || appointment.time || "",
+    consultationType: appointment.type || "video",
     diagnosis:
       summary.diagnosis ||
       appointment.diagnosis ||
@@ -1264,6 +1863,13 @@ const isPastAppointment = (visit: any) => {
     return false;
   }
 
+  // "in-progress" appointments NEVER go to history - they stay in appointments tab (მიმდინარე)
+  // Only when they change to completed/cancelled do they go to history
+  if (visit.status === "in-progress") {
+    console.log('❌ [isPastAppointment] In-progress -> stay in appointments, not history:', visit.id, visit.appointmentDate);
+    return false;
+  }
+
   // Cancelled appointments ALWAYS go to history, regardless of date
   if (visit.status === "cancelled") {
     console.log('✅ [isPastAppointment] Cancelled -> history:', visit.id, visit.appointmentDate);
@@ -1289,7 +1895,7 @@ const isPastAppointment = (visit: any) => {
     return true;
   }
 
-  // For other statuses (pending, scheduled, in-progress), check if date has passed
+  // For other statuses (pending, scheduled), check if date has passed
   // Use local timezone to avoid timezone issues
   const timePart = visit.appointmentTime || "00:00";
   let appointmentDateTime: Date;
@@ -1433,57 +2039,133 @@ const styles = StyleSheet.create({
     color: "#1F2937",
     marginBottom: 2,
   },
+  bookedCountText: {
+    fontFamily: "Poppins-SemiBold",
+    color: "#10B981",
+  },
+  assignedCountText: {
+    fontFamily: "Poppins-SemiBold",
+    color: "#8B5CF6",
+  },
   doctorSpecialty: {
     fontSize: 12,
     fontFamily: "Poppins-Regular",
     color: "#6B7280",
   },
-  dateBadge: {
-    backgroundColor: "#06B6D410",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    alignItems: "flex-end",
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
-  dateText: {
+  statusText: {
+    fontSize: 11,
+    fontFamily: "Poppins-SemiBold",
+  },
+  expandButton: {
+    padding: 4,
+  },
+  expandedSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
+  },
+  detailSectionTitle: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#1F2937",
+    marginBottom: 12,
+  },
+  notesCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#F9FAFB",
+    padding: 12,
+    borderRadius: 12,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  notesTextExpanded: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#374151",
+    lineHeight: 20,
+  },
+  testCard: {
+    backgroundColor: "#F9FAFB",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  testHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  testInfo: {
+    flex: 1,
+  },
+  testName: {
+    fontSize: 16,
+    fontFamily: "Poppins-SemiBold",
+    color: "#1F2937",
+    marginBottom: 4,
+  },
+  testNotes: {
     fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+  },
+  moreDetailsButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: "#F0FDFA",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#06B6D4",
+  },
+  moreDetailsButtonText: {
+    fontSize: 14,
     fontFamily: "Poppins-SemiBold",
     color: "#06B6D4",
   },
-  timeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginTop: 2,
-  },
-  timeText: {
-    fontSize: 11,
-    fontFamily: "Poppins-Medium",
-    color: "#06B6D4",
-  },
-  statusLabel: {
-    fontSize: 11,
-    fontFamily: "Poppins-Regular",
-    color: "#1F2937",
-  },
   visitBody: {
-    gap: 12,
+    gap: 8,
     marginBottom: 12,
     paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#F3F4F6",
+  },
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  infoText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
   },
   diagnosisRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     backgroundColor: "#F0FDF4",
-    padding: 12,
+    padding: 8,
     borderRadius: 8,
   },
   diagnosisText: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: "Poppins-Medium",
     color: "#10B981",
   },
@@ -1514,7 +2196,8 @@ const styles = StyleSheet.create({
     color: "#6B7280",
   },
   medicationsContainer: {
-    gap: 8,
+    gap: 10,
+    marginTop: 4,
   },
   medicationsLabel: {
     fontSize: 12,
@@ -1590,22 +2273,6 @@ const styles = StyleSheet.create({
   },
   labTestBadgeTextPending: {
     color: "#F59E0B",
-  },
-  visitFooter: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-  },
-  viewDetailsButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  viewDetailsText: {
-    fontSize: 14,
-    fontFamily: "Poppins-Medium",
-    color: "#06B6D4",
   },
   emptyState: {
     alignItems: "center",
@@ -2025,6 +2692,82 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Poppins-SemiBold",
     color: "#06B6D4",
+  },
+  // Action buttons for main page
+  actionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#F9FAFB",
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  actionButtonText: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#1F2937",
+    marginLeft: 10,
+  },
+  // Follow-up required card
+  followUpRequiredCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#ECFEFF",
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: "#06B6D4",
+  },
+  followUpRequiredContent: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  followUpRequiredTitle: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#06B6D4",
+    marginBottom: 2,
+  },
+  followUpRequiredReason: {
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: "#0891B2",
+  },
+  // Medication detail card for prescription modal
+  medicationDetailCard: {
+    backgroundColor: "#F9FAFB",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  medicationDetailHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 12,
+  },
+  medicationDetailName: {
+    fontSize: 16,
+    fontFamily: "Poppins-Bold",
+    color: "#1F2937",
+    flex: 1,
+  },
+  medicationDetailInfo: {
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#374151",
+    marginBottom: 6,
+  },
+  medicationDetailLabelModal: {
+    fontFamily: "Poppins-SemiBold",
+    color: "#6B7280",
   },
 });
 

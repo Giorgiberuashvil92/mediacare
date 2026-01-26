@@ -11,8 +11,8 @@ import {
   View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { apiService } from "../_services/api";
 import { useAuth } from "../contexts/AuthContext";
-import { apiService } from "../services/api";
 
 // 24-საათიანი სლოტები (საათობრივი ინტერვალით)
 const AVAILABLE_HOURS = Array.from({ length: 24 }, (_, h) =>
@@ -36,6 +36,8 @@ export default function DoctorSchedule() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showClearConfirmModal, setShowClearConfirmModal] = useState(false);
+  const [showDateDeleteConfirmModal, setShowDateDeleteConfirmModal] = useState(false);
+  const [dateToDelete, setDateToDelete] = useState<{ date: Date; mode: "video" | "home-visit" } | null>(null);
   // საწყისი მდგომარეობა: ცვლილება არ არის შენახვასთან შედარებით
   const [hasSaved, setHasSaved] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -1380,16 +1382,8 @@ export default function DoctorSchedule() {
               </Text>
               <TouchableOpacity
                 onPress={() => {
-                  // შევამოწმოთ არის თუ არა დაჯავშნილი სლოტები
-                  const hasBookedSlots = Object.keys(bookedSlots).length > 0;
-                  
-                  if (hasBookedSlots) {
-                    // თუ არის დაჯავშნილი სლოტები, გამოვაჩინოთ მოდალი
-                    setShowClearConfirmModal(true);
-                  } else {
-                    // თუ არ არის, უბრალოდ გავასუფთავოთ
-                    handleClearSchedule();
-                  }
+                  // ყოველთვის გამოვაჩინოთ დადასტურების მოდალი
+                  setShowClearConfirmModal(true);
                 }}
               >
                 <Text style={styles.clearText}>გასუფთავება</Text>
@@ -2021,8 +2015,9 @@ export default function DoctorSchedule() {
               </View>
               <Text style={styles.clearModalTitle}>გრაფიკის გასუფთავება</Text>
               <Text style={styles.clearModalText}>
-                თქვენ გაქვთ დაჯავშნილი საათები. გასუფთავებისას მხოლოდ თავისუფალი საათები წაიშლება, 
-                დაჯავშნილი საათები კი დარჩება.
+                {Object.keys(bookedSlots).length > 0
+                  ? "თქვენ გაქვთ დაჯავშნილი საათები. გასუფთავებისას მხოლოდ თავისუფალი საათები წაიშლება, დაჯავშნილი საათები კი დარჩება."
+                  : "დარწმუნებული ხართ, რომ გსურთ გრაფიკის გასუფთავება? ყველა თავისუფალი საათი წაიშლება."}
               </Text>
             </View>
             <View style={styles.clearModalFooter}>
@@ -2037,6 +2032,83 @@ export default function DoctorSchedule() {
                 onPress={handleClearSchedule}
               >
                 <Text style={styles.clearModalConfirmText}>გასუფთავება</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Date Delete Confirm Modal */}
+      <Modal
+        visible={showDateDeleteConfirmModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setShowDateDeleteConfirmModal(false);
+          setDateToDelete(null);
+        }}
+      >
+        <View style={styles.clearModalOverlay}>
+          <View style={styles.clearModalContent}>
+            <View style={styles.clearModalHeader}>
+              <View style={styles.clearModalIconContainer}>
+                <Ionicons name="alert-circle" size={32} color="#EF4444" />
+              </View>
+              <Text style={styles.clearModalTitle}>თარიღის წაშლა</Text>
+              <Text style={styles.clearModalText}>
+                {dateToDelete && (() => {
+                  const dateStr = formatDate(dateToDelete.date);
+                  const dateKey = `${dateStr}-${dateToDelete.mode}`;
+                  const bookedForDate = bookedSlots[dateKey] || [];
+                  const currentSchedules = dateToDelete.mode === "video" ? videoSchedules : homeVisitSchedules;
+                  const currentSlots = currentSchedules[dateStr] || [];
+                  
+                  if (bookedForDate.length > 0) {
+                    return `დარწმუნებული ხართ, რომ გსურთ ამ თარიღის (${dateStr}) წაშლა? დაჯავშნილი ${bookedForDate.length} საათი დარჩება, მაგრამ თარიღი და ${currentSlots.length} თავისუფალი საათი წაიშლება.`;
+                  } else {
+                    return `დარწმუნებული ხართ, რომ გსურთ ამ თარიღის (${dateStr}) წაშლა? ყველა საათი (${currentSlots.length}) წაიშლება.`;
+                  }
+                })()}
+              </Text>
+            </View>
+            <View style={styles.clearModalFooter}>
+              <TouchableOpacity
+                style={styles.clearModalCancelButton}
+                onPress={() => {
+                  setShowDateDeleteConfirmModal(false);
+                  setDateToDelete(null);
+                }}
+              >
+                <Text style={styles.clearModalCancelText}>გაუქმება</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.clearModalConfirmButton}
+                onPress={async () => {
+                  if (!dateToDelete) return;
+                  
+                  const dateStr = formatDate(dateToDelete.date);
+                  
+                  if (dateToDelete.mode === "video") {
+                    // ამოიღე თარიღი
+                    setVideoSelectedDates(videoSelectedDates.filter((d) => d !== dateStr));
+                    const updatedSchedules = { ...videoSchedules };
+                    delete updatedSchedules[dateStr];
+                    setVideoSchedules(updatedSchedules);
+                    setHasSaved(false);
+                  } else {
+                    // ამოიღე თარიღი
+                    setHomeVisitSelectedDates(homeVisitSelectedDates.filter((d) => d !== dateStr));
+                    const updatedSchedules = { ...homeVisitSchedules };
+                    delete updatedSchedules[dateStr];
+                    setHomeVisitSchedules(updatedSchedules);
+                    setHasSaved(false);
+                  }
+                  
+                  setShowDateDeleteConfirmModal(false);
+                  setDateToDelete(null);
+                }}
+              >
+                <Text style={styles.clearModalConfirmText}>წაშლა</Text>
               </TouchableOpacity>
             </View>
           </View>

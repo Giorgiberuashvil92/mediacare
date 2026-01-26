@@ -1,4 +1,4 @@
-import { apiService } from "@/app/services/api";
+import { apiService } from "@/app/_services/api";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";

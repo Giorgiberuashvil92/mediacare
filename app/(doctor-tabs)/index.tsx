@@ -21,9 +21,9 @@ import {
   getStatusColor,
   getStatusLabel,
 } from "../../assets/data/doctorDashboard";
+import { apiService } from "../_services/api";
 import { useAuth } from "../contexts/AuthContext";
 import { useSchedule } from "../contexts/ScheduleContext";
-import { apiService } from "../services/api";
 
 export default function DoctorDashboard() {
   const { user } = useAuth();
@@ -69,23 +69,41 @@ export default function DoctorDashboard() {
     if (!recentConsultations?.length) return null;
 
     const now = new Date();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
 
     const parseDateTime = (date: string, time: string) => {
-      const dateTime = new Date(`${date}T${time}`);
-      return isNaN(dateTime.getTime()) ? null : dateTime;
+      // Parse date and time in local timezone (same as patient side)
+      // This ensures consistent time display across doctor and patient apps
+      try {
+        const [year, month, day] = date.split('-').map(Number);
+        const [hours, minutes] = time.split(':').map(Number);
+        const dateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
+        return isNaN(dateTime.getTime()) ? null : dateTime;
+      } catch {
+        return null;
+      }
     };
 
-    const upcoming = recentConsultations
+    // Filter for today's consultations only
+    const todayConsultations = recentConsultations
       .filter((c) => c.status === "scheduled" || c.status === "in-progress")
       .map((c) => {
         const dt = parseDateTime(c.date, c.time);
         return dt ? { ...c, dateTime: dt } : null;
       })
       .filter((c): c is Consultation & { dateTime: Date } => !!c)
-      .filter((c) => c.dateTime >= now)
+      .filter((c) => {
+        // Check if consultation is today
+        const consultationDate = new Date(c.dateTime);
+        consultationDate.setHours(0, 0, 0, 0);
+        return consultationDate.getTime() === today.getTime() && c.dateTime >= now;
+      })
       .sort((a, b) => a.dateTime.getTime() - b.dateTime.getTime());
 
-    return upcoming[0] || null;
+    return todayConsultations[0] || null;
   }, [recentConsultations]);
 
   // Group upcoming available hours (doctor's schedule) by date for the selected type

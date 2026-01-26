@@ -2,9 +2,64 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 import { logger } from "../utils/logger";
 
-// Development build-ისთვის სტატიკური IP მისამართი
-// შეცვალეთ თქვენი კომპიუტერის IP მისამართით (მაგ: "192.168.1.100")
-const DEVELOPMENT_IP = "172.20.10.2"; // შეცვალეთ თქვენი IP-ით
+// Development build-ისთვის IP მისამართის ავტომატურად გამოყენება
+const getDevelopmentIP = (): string | null => {
+  // დეტალური ლოგირება debug-ისთვის
+  console.log("🔍 IP Detection Debug Info:");
+  console.log("  - Constants.debuggerHost:", Constants.debuggerHost);
+  console.log("  - Constants.expoConfig?.hostUri:", Constants.expoConfig?.hostUri);
+  console.log("  - Constants.manifest?.hostUri:", (Constants.manifest as any)?.hostUri);
+  
+  // პირველ რიგში ვცდილობთ expo-constants-დან ავტომატურად მივიღოთ IP
+  const debuggerHost = Constants.debuggerHost;
+  if (debuggerHost) {
+    // debuggerHost არის "IP:port" ფორმატში, მაგ: "192.168.1.100:8081"
+    const ip = debuggerHost.split(':')[0];
+    console.log(`  - Extracted IP from debuggerHost: ${ip}`);
+    if (ip && ip !== 'localhost' && ip !== '127.0.0.1') {
+      console.log(`🌐 ✅ Auto-detected IP from debuggerHost: ${ip}`);
+      return ip;
+    }
+  }
+
+  // ალტერნატიულად ვცდილობთ hostUri-დან
+  const hostUri = Constants.expoConfig?.hostUri || (Constants.manifest as any)?.hostUri;
+  if (hostUri) {
+    console.log(`  - hostUri value: ${hostUri}`);
+    
+    // hostUri შეიძლება იყოს "exp://IP:port", "http://IP:port" ან "IP:port" ფორმატში
+    let ip: string | null = null;
+    
+    // ვცდილობთ exp:// ან http:// prefix-ით
+    const matchWithPrefix = hostUri.match(/(?:exp|http):\/\/([^:]+)/);
+    if (matchWithPrefix && matchWithPrefix[1]) {
+      ip = matchWithPrefix[1];
+      console.log(`  - Extracted IP from hostUri (with prefix): ${ip}`);
+    } else {
+      // თუ prefix არ აქვს, ვცდილობთ პირდაპირ IP:port format-ს
+      const matchWithoutPrefix = hostUri.match(/^([^:]+):/);
+      if (matchWithoutPrefix && matchWithoutPrefix[1]) {
+        ip = matchWithoutPrefix[1];
+        console.log(`  - Extracted IP from hostUri (without prefix): ${ip}`);
+      }
+    }
+    
+    if (ip && ip !== 'localhost' && ip !== '127.0.0.1') {
+      console.log(`🌐 ✅ Auto-detected IP from hostUri: ${ip}`);
+      return ip;
+    }
+  }
+
+  // Fallback: სტატიკური IP (თუ ავტომატურად ვერ მოიძებნა)
+  const STATIC_IP = "172.20.10.2"; // შეცვალეთ თქვენი IP-ით თუ ავტომატურად ვერ მოიძებნა
+  if (STATIC_IP) {
+    console.log(`🌐 ⚠️ Using static IP (fallback): ${STATIC_IP}`);
+    return STATIC_IP;
+  }
+
+  console.log("🌐 ❌ No IP found!");
+  return null;
+};
 
 const getDefaultBaseUrl = () => {
   // Force Railway URL for testing (both dev and production)
@@ -27,9 +82,12 @@ const getDefaultBaseUrl = () => {
     return envUrl;
   }
 
-  // Development build-ისთვის გამოვიყენოთ სტატიკური IP
-  if (__DEV__ && DEVELOPMENT_IP) {
-    return `http://${DEVELOPMENT_IP}:4000`;
+  // Development build-ისთვის გამოვიყენოთ ავტომატურად გამოვლენილი IP
+  if (__DEV__) {
+    const devIP = getDevelopmentIP();
+    if (devIP) {
+      return `http://${devIP}:4000`;
+    }
   }
 
   // Production-ისთვის ან fallback
@@ -237,15 +295,10 @@ class ApiService {
       return mockResponse;
     }
 
-    const response = await fetch(`${this.baseURL}/auth/login`, {
+    const data = await this.apiCall<AuthResponse>("/auth/login", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
       body: JSON.stringify(credentials),
     });
-
-    const data = await this.handleResponse<AuthResponse>(response);
 
     logger.auth.loginSuccess(data.data.user);
 
@@ -1787,6 +1840,76 @@ class ApiService {
     }>(response);
   }
 
+  async uploadInstrumentalTestResult(
+    appointmentId: string,
+    productId: string,
+    file: {
+      uri: string;
+      name: string;
+      type: string;
+    },
+  ): Promise<{
+    success: boolean;
+    message?: string;
+    data?: {
+      url: string;
+      publicId?: string;
+      name?: string;
+      type?: string;
+      size?: number;
+      uploadedAt: string;
+    };
+  }> {
+    if (USE_MOCK_API) {
+      return Promise.resolve({
+        success: true,
+        message: "ინსტრუმენტული კვლევის შედეგი წარმატებით ატვირთა",
+        data: {
+          url: file.uri,
+          name: file.name,
+          type: file.type,
+          size: 0,
+          uploadedAt: new Date().toISOString(),
+        },
+      });
+    }
+
+    const formData = new FormData();
+    formData.append("file", {
+      uri: file.uri,
+      name: file.name,
+      type: file.type,
+    } as any);
+
+    const token = await AsyncStorage.getItem("accessToken");
+    const headers: HeadersInit = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(
+      `${this.baseURL}/appointments/${appointmentId}/instrumental-tests/${productId}/result`,
+      {
+        method: "POST",
+        headers,
+        body: formData,
+      },
+    );
+
+    return this.handleResponse<{
+      success: boolean;
+      message?: string;
+      data?: {
+        url: string;
+        publicId?: string;
+        name?: string;
+        type?: string;
+        size?: number;
+        uploadedAt: string;
+      };
+    }>(response);
+  }
+
   async getDoctorPatients(): Promise<{
     success: boolean;
     data: any[];
@@ -1840,9 +1963,11 @@ class ApiService {
     });
   }
 
-  // Generic API call method
+  // Generic API call method with timeout and better error handling
   async apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const fullUrl = `${this.baseURL}${endpoint}`;
+    const timeoutMs = 30000; // 30 seconds timeout
+    
     console.log("📡 API Call:", {
       method: options.method || "GET",
       url: fullUrl,
@@ -1850,6 +1975,7 @@ class ApiService {
       baseURL: this.baseURL,
       mockMode: USE_MOCK_API,
       devMode: __DEV__,
+      timeout: timeoutMs,
     });
 
     if (USE_MOCK_API) {
@@ -1879,23 +2005,68 @@ class ApiService {
       }
     }
 
-    console.log("🌐 Making fetch request to:", fullUrl);
-    const response = await fetch(fullUrl, {
-      ...options,
-      headers: {
-        ...headers,
-        ...options.headers,
-      },
-    });
+    // Create AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, timeoutMs);
 
-    console.log("📨 Response received:", {
-      status: response.status,
-      statusText: response.statusText,
-      ok: response.ok,
-      url: response.url,
-    });
+    try {
+      console.log("🌐 Making fetch request to:", fullUrl);
+      const response = await fetch(fullUrl, {
+        ...options,
+        signal: controller.signal,
+        headers: {
+          "Content-Type": "application/json",
+          ...headers,
+          ...options.headers,
+        },
+      });
 
-    return this.handleResponse<T>(response);
+      clearTimeout(timeoutId);
+
+      console.log("📨 Response received:", {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        url: response.url,
+      });
+
+      return this.handleResponse<T>(response);
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      
+      // Network error handling
+      if (error.name === "AbortError") {
+        console.error("⏱️ Request timeout:", fullUrl);
+        throw new Error(
+          `მოთხოვნა დრო ამოეწურა. გთხოვთ შეამოწმოთ ინტერნეტ კავშირი და სცადოთ თავიდან.`
+        );
+      }
+      
+      if (error.message?.includes("Network request failed") || 
+          error.message?.includes("Network request timed out") ||
+          error.message?.includes("Failed to connect")) {
+        console.error("🌐 Network error:", {
+          url: fullUrl,
+          error: error.message,
+          baseURL: this.baseURL,
+        });
+        throw new Error(
+          `ინტერნეტ კავშირი ვერ დამყარდა. გთხოვთ შეამოწმოთ:\n` +
+          `1. ინტერნეტ კავშირი\n` +
+          `2. Backend სერვერი მუშაობს: ${this.baseURL}\n` +
+          `3. WiFi/მობილური ინტერნეტი ჩართულია`
+        );
+      }
+      
+      console.error("❌ API Error:", {
+        url: fullUrl,
+        error: error.message,
+        errorType: error.name,
+      });
+      throw error;
+    }
   }
 
   // Advisors endpoints

@@ -18,16 +18,18 @@ export declare class UploadController {
     private readonly uploadService;
     private readonly cloudinaryService;
     constructor(uploadService: UploadService, cloudinaryService: CloudinaryService);
-    uploadLicense(file: Express.Multer.File): {
+    uploadLicense(file: Express.Multer.File): Promise<{
         success: boolean;
         message: string;
         data: {
             filePath: string;
+            url: string;
+            publicId: string;
             fileName: string;
             fileSize: number;
             mimeType: string;
         };
-    };
+    }>;
     uploadIdentification(file: Express.Multer.File): Promise<{
         success: boolean;
         message: string;

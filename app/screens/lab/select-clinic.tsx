@@ -15,8 +15,8 @@ import {
   View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Clinic, apiService } from "../../_services/api";
 import { useCart } from "../../contexts/CartContext";
-import { Clinic, apiService } from "../../services/api";
 
 const SelectClinic = () => {
   const params = useLocalSearchParams<{

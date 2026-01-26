@@ -1,5 +1,5 @@
+import { apiService } from "@/app/_services/api";
 import { useAuth } from "@/app/contexts/AuthContext";
-import { apiService } from "@/app/services/api";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";

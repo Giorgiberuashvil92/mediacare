@@ -1,3 +1,4 @@
+import { apiService, AppointmentType } from "@/app/_services/api";
 import { useAuth } from "@/app/contexts/AuthContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -17,7 +18,6 @@ import {
   View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { apiService, AppointmentType } from "../../services/api";
 
 const PatientDetails = () => {
   const { user } = useAuth();
@@ -50,11 +50,29 @@ const PatientDetails = () => {
   const [loading, setLoading] = useState(false);
   const [profileLoaded, setProfileLoaded] = useState(false);
 
-  const { appointmentType: appointmentTypeParam, visitAddress, bookingFor } =
+  const { appointmentType: appointmentTypeParam, visitAddress, bookingFor, uploadedFile } =
     useLocalSearchParams();
   const appointmentType: AppointmentType =
     (appointmentTypeParam as AppointmentType) || "video";
   const isBookingForOther = bookingFor === "other";
+
+  // Load uploaded file from make-appointment screen
+  useEffect(() => {
+    if (uploadedFile) {
+      try {
+        const fileData = JSON.parse(uploadedFile as string);
+        if (fileData.uri && fileData.name && fileData.type) {
+          setUploadedDocuments([{
+            uri: fileData.uri,
+            name: fileData.name,
+            type: fileData.type,
+          }]);
+        }
+      } catch (error) {
+        console.error("Error parsing uploaded file:", error);
+      }
+    }
+  }, [uploadedFile]);
 
   // Auto-fill disabled - user always enters data manually
   useEffect(() => {

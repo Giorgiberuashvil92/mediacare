@@ -31,6 +31,7 @@ export function AddDoctorForm({ onSuccess, onCancel }: AddDoctorFormProps) {
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
   const [specializations, setSpecializations] = useState<Specialization[]>([]);
   const [isLoadingSpecializations, setIsLoadingSpecializations] = useState(false);
+  const [showLicenseInfoModal, setShowLicenseInfoModal] = useState(false);
 
   useEffect(() => {
     const loadSpecializations = async () => {
@@ -341,9 +342,31 @@ export function AddDoctorForm({ onSuccess, onCancel }: AddDoctorFormProps) {
             />
 
             <div className="w-full sm:w-1/2">
-              <label className="mb-2.5 block text-sm font-medium text-dark dark:text-white">
-                სამედიცინო ლიცენზია (PDF)
-              </label>
+              <div className="mb-2.5 flex items-center gap-2">
+                <label className="block text-sm font-medium text-dark dark:text-white">
+                  სამედიცინო ლიცენზია (PDF)
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowLicenseInfoModal(true)}
+                  className="text-primary hover:text-primary/80 focus:outline-none"
+                  title="ინფორმაცია"
+                >
+                  <svg
+                    className="h-5 w-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                </button>
+              </div>
               <input
                 type="file"
                 accept="application/pdf"
@@ -428,6 +451,72 @@ export function AddDoctorForm({ onSuccess, onCancel }: AddDoctorFormProps) {
           </div>
         </form>
       </div>
+
+      {/* License Info Modal */}
+      {showLicenseInfoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg dark:bg-gray-dark">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-dark dark:text-white">
+                სამედიცინო ლიცენზიის ატვირთვის ინფორმაცია
+              </h3>
+              <button
+                onClick={() => setShowLicenseInfoModal(false)}
+                className="text-dark-4 hover:text-dark dark:text-dark-6 dark:hover:text-white"
+              >
+                <svg
+                  className="h-6 w-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+            <div className="mb-6">
+              <div className="rounded-lg bg-yellow-50 p-4 dark:bg-yellow-900/20">
+                <div className="flex items-start gap-3">
+                  <svg
+                    className="h-6 w-6 flex-shrink-0 text-yellow-600 dark:text-yellow-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                    />
+                  </svg>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                      მნიშვნელოვანი ინფორმაცია
+                    </p>
+                    <p className="mt-2 text-sm text-yellow-700 dark:text-yellow-300">
+                      ლიცენზია იტვირთება მხოლოდ ერთხელ. გთხოვთ, ყურადღებით შეამოწმოთ არჩეული ფაილი სანამ ატვირთვას დააწყებთ. შეცდომის შემთხვევაში ლიცენზიის შეცვლა შესაძლებელი იქნება მხოლოდ ადმინისტრატორის მხარდაჭერით.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setShowLicenseInfoModal(false)}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition hover:bg-primary/90"
+              >
+                გასაგებია
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

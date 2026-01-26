@@ -33,6 +33,7 @@ interface Appointment {
   paymentStatus: 'pending' | 'paid' | 'failed';
   symptoms?: string;
   laboratoryTests?: LaboratoryTest[];
+  documentsCount?: number;
 }
 
 export default function AppointmentsPage() {
@@ -260,6 +261,9 @@ export default function AppointmentsPage() {
                     ლაბ. კვლევები
                   </th>
                   <th className="p-4 text-left font-medium text-dark dark:text-white">
+                    დოკუმენტები
+                  </th>
+                  <th className="p-4 text-left font-medium text-dark dark:text-white">
                     ღირებულება
                   </th>
                 </tr>
@@ -267,7 +271,7 @@ export default function AppointmentsPage() {
               <tbody>
                 {appointments.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="p-4 text-center text-dark-4">
+                    <td colSpan={10} className="p-4 text-center text-dark-4">
                       ჯავშნები არ მოიძებნა
                     </td>
                   </tr>
@@ -288,8 +292,16 @@ export default function AppointmentsPage() {
                       </td>
                       <td className="p-4">
                         <div>
-                          <div className="font-medium text-dark dark:text-white">
+                          <div className="flex items-center gap-2 font-medium text-dark dark:text-white">
                             {appointment.patientName}
+                            {appointment.documentsCount && appointment.documentsCount > 0 && (
+                              <span className="flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" title={`${appointment.documentsCount} დოკუმენტი ატვირთულია`}>
+                                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                {appointment.documentsCount}
+                              </span>
+                            )}
                           </div>
                           {appointment.symptoms && (
                             <div className="text-sm text-dark-4 dark:text-dark-6">
@@ -347,6 +359,18 @@ export default function AppointmentsPage() {
                               </span>
                             )}
                           </div>
+                        ) : (
+                          <span className="text-dark-4 dark:text-dark-6">—</span>
+                        )}
+                      </td>
+                      <td className="p-4">
+                        {appointment.documentsCount && appointment.documentsCount > 0 ? (
+                          <span className="flex items-center gap-1.5 rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            {appointment.documentsCount} ფაილი
+                          </span>
                         ) : (
                           <span className="text-dark-4 dark:text-dark-6">—</span>
                         )}

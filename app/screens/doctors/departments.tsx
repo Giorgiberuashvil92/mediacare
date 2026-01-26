@@ -11,7 +11,7 @@ import {
   View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { apiService, Specialization } from "../../services/api";
+import { apiService, Specialization } from "../../_services/api";
 
 // Icon mapping for specializations
 const getIconForSpecialization = (name: string) => {

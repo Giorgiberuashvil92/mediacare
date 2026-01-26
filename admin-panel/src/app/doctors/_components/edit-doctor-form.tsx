@@ -19,6 +19,7 @@ export function EditDoctorForm({
   const [error, setError] = useState<string | null>(null);
   const [specializations, setSpecializations] = useState<Specialization[]>([]);
   const [loadingSpecializations, setLoadingSpecializations] = useState(true);
+  const [licenseFile, setLicenseFile] = useState<File | null>(null);
 
   const [formData, setFormData] = useState({
     name: doctor.name || '',
@@ -86,12 +87,27 @@ export function EditDoctorForm({
     setError(null);
   };
 
+  const handleLicenseFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    setLicenseFile(file ?? null);
+    setError(null);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
     try {
+      // Upload license document if a new file is selected
+      let licenseDocumentUrl: string | undefined;
+      if (licenseFile) {
+        const uploadResponse = await apiService.uploadLicenseDocument(licenseFile);
+        if (uploadResponse.success) {
+          licenseDocumentUrl = uploadResponse.data.filePath;
+        }
+      }
+
       const updateData: any = {
         name: formData.name.trim(),
         email: formData.email.trim(),
@@ -110,6 +126,11 @@ export function EditDoctorForm({
         isActive: formData.isActive,
         gender: formData.gender,
       };
+
+      // Add license document URL if uploaded
+      if (licenseDocumentUrl) {
+        updateData.licenseDocument = licenseDocumentUrl;
+      }
 
       if (formData.consultationFee) {
         updateData.consultationFee = parseFloat(formData.consultationFee);
@@ -402,6 +423,57 @@ export function EditDoctorForm({
                 </label>
               </div>
             </div>
+          </div>
+
+          {/* License Document */}
+          <div className="mb-5.5">
+            <label className="mb-2.5 block text-sm font-medium text-dark dark:text-white">
+              სამედიცინო ლიცენზია (PDF)
+            </label>
+            {doctor.licenseDocument && (
+              <div className="mb-3">
+                <a
+                  href={
+                    doctor.licenseDocument.startsWith('http://') ||
+                    doctor.licenseDocument.startsWith('https://')
+                      ? doctor.licenseDocument
+                      : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/${doctor.licenseDocument}`
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 rounded-lg bg-primary/10 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/20"
+                >
+                  <svg
+                    className="h-5 w-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                    />
+                  </svg>
+                  არსებული ლიცენზიის ნახვა
+                </a>
+              </div>
+            )}
+            <input
+              type="file"
+              accept="application/pdf,image/jpeg,image/jpg,image/png"
+              onChange={handleLicenseFileChange}
+              className="block w-full cursor-pointer rounded-lg border border-stroke bg-transparent px-5 py-3 text-sm text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white"
+            />
+            {licenseFile && (
+              <p className="mt-2 text-sm text-dark-4 dark:text-dark-6">
+                ახალი ფაილი: {licenseFile.name}
+              </p>
+            )}
+            <p className="mt-2 text-xs text-dark-4 dark:text-dark-6">
+              ატვირთე ახალი ლიცენზია რომ შეცვალო არსებული
+            </p>
           </div>
 
           {/* Minimum Working Days Required - Admin restriction for doctor's availability */}

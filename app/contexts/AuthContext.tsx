@@ -12,7 +12,7 @@ import {
   LoginRequest,
   RegisterRequest,
   User,
-} from "../services/api";
+} from "../_services/api";
 const ROLE_STORAGE_KEY = "@medicare_user_role";
 
 export type UserRole = "doctor" | "patient" | null;

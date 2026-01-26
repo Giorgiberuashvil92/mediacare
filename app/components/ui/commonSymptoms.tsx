@@ -2,7 +2,7 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { apiService, Specialization } from "../../services/api";
+import { apiService, Specialization } from "../../_services/api";
 
 // Icon mapping for symptoms
 const getIconForSymptom = (symptomName: string) => {

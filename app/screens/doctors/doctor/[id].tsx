@@ -1,6 +1,6 @@
+import { apiService } from "@/app/_services/api";
 import AppointmentScheduler from "@/app/components/ui/appointmentScheduler";
 import { useFavorites } from "@/app/contexts/FavoritesContext";
-import { apiService } from "@/app/services/api";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
@@ -289,7 +289,7 @@ const DoctorDetail = () => {
       </ScrollView>
 
       <View style={styles.buttonContainer}>
-        <TouchableOpacity
+        {/* <TouchableOpacity
           style={[styles.actionButton, styles.chatButton]}
           onPress={() => {
             router.push({
@@ -300,7 +300,7 @@ const DoctorDetail = () => {
         >
           <Ionicons name="chatbubbles-outline" size={20} color="#06B6D4" />
           <Text style={styles.chatButtonText}>ჩატი</Text>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
         <TouchableOpacity
           style={[styles.actionButton, styles.appointmentButton]}
           onPress={() => setShowAppointmentScheduler(true)}

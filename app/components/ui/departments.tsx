@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { apiService, Specialization } from "../../services/api";
+import { apiService, Specialization } from "../../_services/api";
 import SeeAll from "../shared/seeAll";
 
 // Icon mapping for specializations

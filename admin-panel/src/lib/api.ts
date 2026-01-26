@@ -99,6 +99,7 @@ export interface ShopProduct {
   id: string;
   name: string;
   icdCode?: string;
+  icdCode2?: string;
   uniqueCode?: string;
   description?: string;
   type: ShopEntityType;

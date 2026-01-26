@@ -2,23 +2,23 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    PermissionsAndroid,
-    Platform,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  PermissionsAndroid,
+  Platform,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import RtcEngine, {
-    ChannelProfileType,
-    ClientRoleType,
-    IRtcEngine,
-    RtcSurfaceView
+  ChannelProfileType,
+  ClientRoleType,
+  IRtcEngine,
+  RtcSurfaceView
 } from "react-native-agora";
-import { apiService } from "../services/api";
+import { apiService } from "../_services/api";
 
 /**
  * ვიდეო კონსულტაციის გვერდი - Agora Video SDK
@@ -146,11 +146,9 @@ export default function VideoCallScreen() {
         };
         
         const stateName = stateNames[state] || "unknown";
-        console.log("Connection state changed:", stateName, "reason:", reason);
         setConnectionState(stateName);
 
-        // თუ connection-ი დაიხურა ან ვერ დაკავშირდა
-        if (state === 1 || state === 5) { // disconnected ან failed
+        if (state === 1 || state === 5) {
           setChannelClosed(true);
           setIsJoined(false);
           Alert.alert(
@@ -230,8 +228,7 @@ export default function VideoCallScreen() {
             loadAgoraTokenRef.current();
           }
         } else {
-          // Token-ის expiration-ის შემოწმება 5 წუთით ადრე
-          const checkTime = Math.max(timeUntilExpiration - 5 * 60 * 1000, 60000); // მინიმუმ 1 წუთი
+          const checkTime = Math.max(timeUntilExpiration - 5 * 60 * 1000, 60000);
           
           if (tokenExpirationCheckRef.current) {
             clearTimeout(tokenExpirationCheckRef.current);

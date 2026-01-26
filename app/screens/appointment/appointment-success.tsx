@@ -66,12 +66,7 @@ const AppointmentSuccess = () => {
             <Text style={styles.secondaryButtonText}>მთავარზე დაბრუნება</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={handleViewDetails}
-          >
-            <Text style={styles.primaryButtonText}>დეტალების ნახვა</Text>
-          </TouchableOpacity>
+       
         </View>
       </View>
     </SafeAreaView>

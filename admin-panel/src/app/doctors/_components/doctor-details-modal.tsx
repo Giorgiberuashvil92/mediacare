@@ -252,27 +252,38 @@ export function DoctorDetailsModal({
                     სამედიცინო ლიცენზია
                   </h3>
                   <div>
-                    <a
-                      href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/${doctor.licenseDocument}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 rounded-lg bg-primary/10 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/20"
-                    >
-                      <svg
-                        className="h-5 w-5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-                        />
-                      </svg>
-                      ლიცენზიის ნახვა
-                    </a>
+                    {(() => {
+                      // Helper function to check if URL is absolute (starts with http:// or https://)
+                      const isAbsoluteUrl = (url: string) => {
+                        return url && (url.startsWith('http://') || url.startsWith('https://'));
+                      };
+                      const licenseUrl = isAbsoluteUrl(doctor.licenseDocument)
+                        ? doctor.licenseDocument
+                        : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/${doctor.licenseDocument}`;
+                      return (
+                        <a
+                          href={licenseUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 rounded-lg bg-primary/10 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/20"
+                        >
+                          <svg
+                            className="h-5 w-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                            />
+                          </svg>
+                          ლიცენზიის ნახვა
+                        </a>
+                      );
+                    })()}
                   </div>
                 </div>
               )}

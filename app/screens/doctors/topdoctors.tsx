@@ -1,7 +1,7 @@
+import { apiService } from "@/app/_services/api";
 import DoctorFilters, {
   DoctorFilterOption,
 } from "@/app/components/shared/doctorFilters";
-import { apiService } from "@/app/services/api";
 import Fontisto from "@expo/vector-icons/Fontisto";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";

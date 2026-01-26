@@ -1655,6 +1655,83 @@ export class AppointmentsService {
     };
   }
 
+  async uploadInstrumentalTestResult(
+    patientId: string,
+    appointmentId: string,
+    productId: string,
+    file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('ფაილი აუცილებელია');
+    }
+
+    const allowedTypes = [
+      'application/pdf',
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'image/jpg',
+    ];
+    if (!allowedTypes.includes(file.mimetype)) {
+      throw new BadRequestException('ფაილის ტიპი არასწორია');
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      throw new BadRequestException('ფაილი უნდა იყოს 10MB-მდე');
+    }
+
+    const appointment = await this.appointmentModel.findById(appointmentId);
+    if (!appointment) {
+      throw new NotFoundException('Appointment not found');
+    }
+
+    this.ensurePatientOwner(patientId, appointment);
+
+    if (
+      !appointment.instrumentalTests ||
+      appointment.instrumentalTests.length === 0
+    ) {
+      throw new NotFoundException(
+        'No instrumental tests found for this appointment',
+      );
+    }
+
+    const testIndex = appointment.instrumentalTests.findIndex(
+      (test) => test.productId.toString() === productId,
+    );
+
+    if (testIndex === -1) {
+      throw new NotFoundException('Instrumental test not found');
+    }
+
+    // Upload file to Cloudinary
+    const upload = await this.cloudinaryService.uploadBuffer(
+      file.buffer,
+      { folder: 'mediacare/instrumental-results' },
+      file.mimetype,
+      file.originalname,
+    );
+
+    const resultFile = {
+      url: upload.secure_url,
+      publicId: upload.public_id,
+      name: file.originalname,
+      type: file.mimetype,
+      size: file.size,
+      uploadedAt: new Date(),
+    };
+
+    // Update the test with result file
+    appointment.instrumentalTests[testIndex].resultFile = resultFile as any;
+    await appointment.save();
+
+    return {
+      success: true,
+      message: 'ინსტრუმენტული კვლევის შედეგი წარმატებით ატვირთა',
+      data: resultFile,
+    };
+  }
+
   /**
    * Upload external lab result (for tests done outside the app)
    */

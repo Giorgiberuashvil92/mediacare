@@ -1,5 +1,5 @@
+import { apiService, Specialization } from "@/app/_services/api";
 import { useFavorites } from "@/app/contexts/FavoritesContext";
-import { apiService, Specialization } from "@/app/services/api";
 import Fontisto from "@expo/vector-icons/Fontisto";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";

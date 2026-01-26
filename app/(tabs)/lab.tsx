@@ -18,7 +18,7 @@ import {
   MedicineShopOverview,
   ShopProduct,
   apiService,
-} from "../services/api";
+} from "../_services/api";
 
 const fallbackOverview: MedicineShopOverview = {
   laboratoryCategories: [],

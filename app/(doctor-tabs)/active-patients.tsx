@@ -17,7 +17,7 @@ import {
   View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { apiService } from "../services/api";
+import { apiService } from "../_services/api";
 
 interface LabTest {
   id: string;
@@ -136,9 +136,16 @@ export default function ActivePatientsScreen() {
           });
         
         // Sort by date and time (earliest first)
+        // Parse dates in local timezone (same as patient side)
         filtered.sort((a: ActivePatient, b: ActivePatient) => {
-          const dateTimeA = new Date(`${a.appointmentDate}T${a.appointmentTime}`);
-          const dateTimeB = new Date(`${b.appointmentDate}T${b.appointmentTime}`);
+          const [yearA, monthA, dayA] = a.appointmentDate.split('-').map(Number);
+          const [hoursA, minutesA] = a.appointmentTime.split(':').map(Number);
+          const dateTimeA = new Date(yearA, monthA - 1, dayA, hoursA, minutesA, 0, 0);
+          
+          const [yearB, monthB, dayB] = b.appointmentDate.split('-').map(Number);
+          const [hoursB, minutesB] = b.appointmentTime.split(':').map(Number);
+          const dateTimeB = new Date(yearB, monthB - 1, dayB, hoursB, minutesB, 0, 0);
+          
           return dateTimeA.getTime() - dateTimeB.getTime();
         });
         

@@ -10,7 +10,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { apiService } from "../services/api";
+import { apiService } from "../_services/api";
 
 interface DashboardStats {
   earnings: {

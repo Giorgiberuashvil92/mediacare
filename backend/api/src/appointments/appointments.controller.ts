@@ -267,6 +267,24 @@ export class AppointmentsController {
     );
   }
 
+  // Patient uploads instrumental test result (for assigned tests)
+  @Post(':id/instrumental-tests/:productId/result')
+  @UseGuards(JwtAuthGuard, PatientGuard)
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadInstrumentalTestResult(
+    @CurrentUser() user: { sub: string },
+    @Param('id') appointmentId: string,
+    @Param('productId') productId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.appointmentsService.uploadInstrumentalTestResult(
+      user.sub,
+      appointmentId,
+      productId,
+      file,
+    );
+  }
+
   // Patient uploads external lab result (not pre-assigned)
   @Post(':id/external-lab-result')
   @UseGuards(JwtAuthGuard, PatientGuard)

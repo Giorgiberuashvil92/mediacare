@@ -12,8 +12,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { apiService } from "../../_services/api";
 import { useAuth } from "../../contexts/AuthContext";
-import { apiService } from "../../services/api";
 
 interface FAQItem {
   question: string;

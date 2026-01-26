@@ -225,6 +225,9 @@ export default function UsersPage() {
                     პირადობა/პასპორტი
                   </th>
                   <th className="p-4 text-left font-medium text-dark dark:text-white">
+                    სამედიცინო ლიცენზია
+                  </th>
+                  <th className="p-4 text-left font-medium text-dark dark:text-white">
                     როლი
                   </th>
                   <th className="p-4 text-left font-medium text-dark dark:text-white">
@@ -244,7 +247,7 @@ export default function UsersPage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={14} className="p-8 text-center">
+                    <td colSpan={15} className="p-8 text-center">
                       <div className="flex items-center justify-center">
                         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
                       </div>
@@ -252,7 +255,7 @@ export default function UsersPage() {
                   </tr>
                 ) : users.length === 0 ? (
                   <tr>
-                    <td colSpan={14} className="p-4 text-center text-dark-4">
+                    <td colSpan={15} className="p-4 text-center text-dark-4">
                       მომხმარებლები არ მოიძებნა
                     </td>
                   </tr>
@@ -273,6 +276,11 @@ export default function UsersPage() {
                       ? isAbsoluteUrl(user.identificationDocument)
                         ? user.identificationDocument
                         : `${apiBase}/${user.identificationDocument}`
+                      : null;
+                    const licenseDocUrl = user.licenseDocument
+                      ? isAbsoluteUrl(user.licenseDocument)
+                        ? user.licenseDocument
+                        : `${apiBase}/${user.licenseDocument}`
                       : null;
                     return (
                       <tr
@@ -346,6 +354,33 @@ export default function UsersPage() {
                                 />
                               </svg>
                               გახსნა
+                            </a>
+                          ) : (
+                            <span className="text-dark-4 dark:text-dark-6">-</span>
+                          )}
+                        </td>
+                        <td className="p-4">
+                          {user.role === 'doctor' && licenseDocUrl ? (
+                            <a
+                              href={licenseDocUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 rounded-lg bg-primary/10 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/20"
+                            >
+                              <svg
+                                className="h-4 w-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                                />
+                              </svg>
+                              ლიცენზია
                             </a>
                           ) : (
                             <span className="text-dark-4 dark:text-dark-6">-</span>

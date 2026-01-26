@@ -825,6 +825,11 @@ export class DoctorsService {
     // The doctorStatus will be updated to 'active' automatically after they set a schedule
 
     const results: AvailabilityDocument[] = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Track which date+type combinations are being updated
+    const updatedDateTypes = new Set<string>();
 
     for (const slot of updateAvailabilityDto.availability) {
       console.log(
@@ -833,6 +838,43 @@ export class DoctorsService {
       );
       const date = new Date(slot.date);
       date.setHours(0, 0, 0, 0);
+      const dateTypeKey = `${date.toISOString()}_${slot.type}`;
+      updatedDateTypes.add(dateTypeKey);
+
+      // Check if the same time slots are already added for the other appointment type
+      const otherType = slot.type === 'video' ? 'home-visit' : 'video';
+      const existingAvailability = await this.availabilityModel.findOne({
+        doctorId: new mongoose.Types.ObjectId(doctorId),
+        date,
+        type: otherType,
+        isAvailable: true,
+      });
+
+      if (existingAvailability && existingAvailability.timeSlots?.length > 0) {
+        // Check for overlapping time slots
+        const overlappingSlots = slot.timeSlots.filter((timeSlot) =>
+          existingAvailability.timeSlots.includes(timeSlot),
+        );
+
+        if (overlappingSlots.length > 0) {
+          throw new BadRequestException(
+            `დროები ${overlappingSlots.join(', ')} უკვე დამატებულია ${otherType === 'video' ? 'ვიდეო კონსულტაციაზე' : 'სახლზე მისვლაზე'}. იგივე დროები ვერ დაამატებთ სხვადასხვა ტიპის კონსულტაციაზე.`,
+          );
+        }
+      }
+
+      // If timeSlots is empty, delete the availability instead of updating
+      if (!slot.timeSlots || slot.timeSlots.length === 0) {
+        await this.availabilityModel.deleteOne({
+          doctorId: new mongoose.Types.ObjectId(doctorId),
+          date,
+          type: slot.type,
+        });
+        console.log(
+          `🗑️ [DoctorsService] Deleted availability for ${date.toISOString()}, type: ${slot.type}`,
+        );
+        continue;
+      }
 
       const availabilityDoc = await this.availabilityModel.findOneAndUpdate(
         {
@@ -861,8 +903,35 @@ export class DoctorsService {
       results.push(availabilityDoc);
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Delete availability entries that are not in the request (for future dates only)
+    // This handles the case when doctor removes a day from their schedule
+    const allExistingAvailability = await this.availabilityModel.find({
+      doctorId: new mongoose.Types.ObjectId(doctorId),
+      date: { $gte: today },
+    });
+
+    let deletedCount = 0;
+    for (const existing of allExistingAvailability) {
+      const existingDate = new Date(existing.date);
+      existingDate.setHours(0, 0, 0, 0);
+      const dateTypeKey = `${existingDate.toISOString()}_${existing.type}`;
+
+      if (!updatedDateTypes.has(dateTypeKey)) {
+        await this.availabilityModel.deleteOne({
+          _id: existing._id,
+        });
+        deletedCount++;
+        console.log(
+          `🗑️ [DoctorsService] Deleted availability not in request: ${existingDate.toISOString()}, type: ${existing.type}`,
+        );
+      }
+    }
+
+    if (deletedCount > 0) {
+      console.log(
+        `🗑️ [DoctorsService] Deleted ${deletedCount} availability entries that were not in the request`,
+      );
+    }
 
     const futureAvailability = await this.availabilityModel.findOne({
       doctorId: new mongoose.Types.ObjectId(doctorId),
@@ -1383,6 +1452,19 @@ export class DoctorsService {
 
     if (dto.status) {
       appointment.status = dto.status;
+    }
+
+    // Validation: თუ განმეორებითი ვიზიტი არ არის მონიშნული, დიაგნოზი სავალდებულოა
+    const followUpRequired =
+      dto.followUp?.required ?? appointment.followUp?.required ?? false;
+    if (
+      !followUpRequired &&
+      dto.consultationSummary &&
+      !dto.consultationSummary.diagnosis?.trim()
+    ) {
+      throw new BadRequestException(
+        'დიაგნოზი სავალდებულოა, როდესაც განმეორებითი ვიზიტი არ არის მონიშნული',
+      );
     }
 
     if (dto.consultationSummary) {

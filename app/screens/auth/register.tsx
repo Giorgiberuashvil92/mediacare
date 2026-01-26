@@ -21,9 +21,9 @@ import {
   View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { apiService, Specialization } from "../../_services/api";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../contexts/LanguageContext";
-import { apiService, Specialization } from "../../services/api";
 import { showToast } from "../../utils/toast";
 
 export default function RegisterScreen() {
@@ -74,6 +74,7 @@ export default function RegisterScreen() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [tosModalVisible, setTosModalVisible] = useState(false);
   const [hasAcceptedTos, setHasAcceptedTos] = useState(false);
+  const [showLicenseInfoModal, setShowLicenseInfoModal] = useState(false);
 
   // Phone verification states
   const [verificationCode, setVerificationCode] = useState("");
@@ -1684,9 +1685,21 @@ export default function RegisterScreen() {
 
                   {/* License Document */}
                   <View style={styles.inputContainer}>
-                    <Text style={styles.label}>
-                      {t("doctor.license.label")}
-                    </Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                      <Text style={styles.label}>
+                        {t("doctor.license.label")}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => setShowLicenseInfoModal(true)}
+                        style={{ padding: 4 }}
+                      >
+                        <Ionicons
+                          name="information-circle-outline"
+                          size={20}
+                          color="#06B6D4"
+                        />
+                      </TouchableOpacity>
+                    </View>
                     <TouchableOpacity
                       style={[
                         styles.filePickerButton,
@@ -2145,6 +2158,80 @@ export default function RegisterScreen() {
           minimumDate={new Date(1900, 0, 1)}
         />
       )}
+
+      {/* License Info Modal */}
+      <Modal
+        visible={showLicenseInfoModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowLicenseInfoModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                სამედიცინო ლიცენზიის ატვირთვის ინფორმაცია
+              </Text>
+              <TouchableOpacity
+                onPress={() => setShowLicenseInfoModal(false)}
+                style={styles.modalCloseButton}
+              >
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalList}>
+              <View style={{
+                backgroundColor: "#FEF3C7",
+                borderRadius: 8,
+                padding: 16,
+                marginBottom: 16,
+              }}>
+                <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
+                  <Ionicons
+                    name="warning-outline"
+                    size={24}
+                    color="#D97706"
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{
+                      fontSize: 14,
+                      fontFamily: "Poppins-SemiBold",
+                      color: "#92400E",
+                      marginBottom: 8,
+                    }}>
+                      მნიშვნელოვანი ინფორმაცია
+                    </Text>
+                    <Text style={{
+                      fontSize: 13,
+                      fontFamily: "Poppins-Regular",
+                      color: "#78350F",
+                      lineHeight: 20,
+                    }}>
+                      ლიცენზია იტვირთება მხოლოდ ერთხელ. გთხოვთ, ყურადღებით შეამოწმოთ არჩეული ფაილი სანამ ატვირთვას დააწყებთ. შეცდომის შემთხვევაში ლიცენზიის შეცვლა შესაძლებელი იქნება მხოლოდ ადმინისტრატორის მხარდაჭერით.
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </ScrollView>
+            <View style={{
+              paddingHorizontal: 20,
+              paddingBottom: 20,
+              paddingTop: 12,
+              borderTopWidth: 1,
+              borderTopColor: "#E5E7EB",
+            }}>
+              <TouchableOpacity
+                onPress={() => setShowLicenseInfoModal(false)}
+                style={styles.modalPrimaryButton}
+              >
+                <Text style={styles.modalPrimaryButtonText}>
+                  გასაგებია
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

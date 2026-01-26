@@ -3,9 +3,9 @@ import { Image } from "expo-image";
 import { router, useFocusEffect } from "expo-router";
 import React, { useCallback, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { apiService } from "../../_services/api";
 import { useAuth } from "../../contexts/AuthContext";
 import { useCart } from "../../contexts/CartContext";
-import { apiService } from "../../services/api";
 
 const Header = () => {
   const { getTotalItems } = useCart();

@@ -9,13 +9,13 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Search from "../components/ui/search";
 import {
   MedicineShopOverview,
   ShopCategory,
   ShopProduct,
   apiService,
-} from "../services/api";
+} from "../_services/api";
+import Search from "../components/ui/search";
 
 const fallbackOverview: MedicineShopOverview = {
   laboratoryCategories: [],

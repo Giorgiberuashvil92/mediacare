@@ -12,8 +12,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { apiService } from "../../_services/api";
 import { useAuth } from "../../contexts/AuthContext";
-import { apiService } from "../../services/api";
 import { showToast } from "../../utils/toast";
 
 export default function ProfileScreen() {

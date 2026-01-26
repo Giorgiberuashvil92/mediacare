@@ -93,7 +93,7 @@ export class UploadController {
 
   @Post('license')
   @UseInterceptors(FileInterceptor('file'))
-  uploadLicense(@UploadedFile() file: Express.Multer.File) {
+  async uploadLicense(@UploadedFile() file: Express.Multer.File) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
@@ -105,14 +105,41 @@ export class UploadController {
       );
     }
 
-    // Save file
-    const filePath = this.uploadService.saveLicenseDocument(file);
+    // Upload to Cloudinary instead of saving locally
+    console.log(
+      '📤 [UploadController] Uploading license document to Cloudinary:',
+      {
+        fileName: file.originalname,
+        fileSize: file.size,
+        mimeType: file.mimetype,
+      },
+    );
+
+    const result = await this.cloudinaryService.uploadBuffer(
+      file.buffer,
+      {
+        folder: 'mediacare/license',
+        resource_type: 'raw', // PDFs and documents use 'raw' resource type
+      },
+      file.mimetype,
+      file.originalname,
+    );
+
+    console.log(
+      '✅ [UploadController] License document uploaded to Cloudinary:',
+      {
+        url: result.secure_url,
+        publicId: result.public_id,
+      },
+    );
 
     return {
       success: true,
       message: 'File uploaded successfully',
       data: {
-        filePath,
+        filePath: result.secure_url, // Return Cloudinary URL instead of local path
+        url: result.secure_url, // Also include url for consistency
+        publicId: result.public_id,
         fileName: file.originalname,
         fileSize: file.size,
         mimeType: file.mimetype,

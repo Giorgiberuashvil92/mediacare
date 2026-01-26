@@ -17,7 +17,7 @@ import {
   getStatusColor,
   getStatusLabel,
 } from "../../assets/data/doctorDashboard";
-import { apiService } from "../services/api";
+import { apiService } from "../_services/api";
 
 export default function AppointmentsDetails() {
   const router = useRouter();

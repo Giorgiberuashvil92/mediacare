@@ -16,6 +16,7 @@ import {
 } from '../doctors/schemas/availability.schema';
 import {
   ApprovalStatus,
+  DoctorStatus,
   User,
   UserDocument,
   UserRole,
@@ -327,6 +328,7 @@ export class AdminService {
         symptoms: appointment.patientDetails?.problem || appointment.symptoms,
         diagnosis: appointment.diagnosis,
         laboratoryTests: appointment.laboratoryTests || [],
+        documentsCount: appointment.documents?.length || 0,
         createdAt: appointment.createdAt,
         updatedAt: appointment.updatedAt,
       };
@@ -438,10 +440,52 @@ export class AdminService {
     // The doctorStatus will be updated to 'active' automatically after they set a schedule
 
     const results = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Track which date+type combinations are being updated
+    const updatedDateTypes = new Set<string>();
 
     for (const slot of availability) {
       const date = new Date(slot.date);
       date.setHours(0, 0, 0, 0);
+      const dateTypeKey = `${date.toISOString()}_${slot.type}`;
+      updatedDateTypes.add(dateTypeKey);
+
+      // Check if the same time slots are already added for the other appointment type
+      const otherType = slot.type === 'video' ? 'home-visit' : 'video';
+      const existingAvailability = await this.availabilityModel.findOne({
+        doctorId: new mongoose.Types.ObjectId(doctorId),
+        date,
+        type: otherType,
+        isAvailable: true,
+      });
+
+      if (existingAvailability && existingAvailability.timeSlots?.length > 0) {
+        // Check for overlapping time slots
+        const overlappingSlots = slot.timeSlots.filter((timeSlot) =>
+          existingAvailability.timeSlots.includes(timeSlot),
+        );
+
+        if (overlappingSlots.length > 0) {
+          throw new BadRequestException(
+            `დროები ${overlappingSlots.join(', ')} უკვე დამატებულია ${otherType === 'video' ? 'ვიდეო კონსულტაციაზე' : 'სახლზე მისვლაზე'}. იგივე დროები ვერ დაამატებთ სხვადასხვა ტიპის კონსულტაციაზე.`,
+          );
+        }
+      }
+
+      // If timeSlots is empty, delete the availability instead of updating
+      if (!slot.timeSlots || slot.timeSlots.length === 0) {
+        await this.availabilityModel.deleteOne({
+          doctorId: new mongoose.Types.ObjectId(doctorId),
+          date,
+          type: slot.type,
+        });
+        console.log(
+          `🗑️ [AdminService] Deleted availability for ${date.toISOString()}, type: ${slot.type}`,
+        );
+        continue;
+      }
 
       const availabilityDoc = await this.availabilityModel.findOneAndUpdate(
         {
@@ -462,18 +506,64 @@ export class AdminService {
       results.push(availabilityDoc);
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Delete availability entries that are not in the request (for future dates only)
+    // This handles the case when admin removes a day from the UI
+    const allExistingAvailability = await this.availabilityModel.find({
+      doctorId: new mongoose.Types.ObjectId(doctorId),
+      date: { $gte: today },
+    });
 
+    let deletedCount = 0;
+    for (const existing of allExistingAvailability) {
+      const existingDate = new Date(existing.date);
+      existingDate.setHours(0, 0, 0, 0);
+      const dateTypeKey = `${existingDate.toISOString()}_${existing.type}`;
+
+      if (!updatedDateTypes.has(dateTypeKey)) {
+        await this.availabilityModel.deleteOne({
+          _id: existing._id,
+        });
+        deletedCount++;
+        console.log(
+          `🗑️ [AdminService] Deleted availability not in request: ${existingDate.toISOString()}, type: ${existing.type}`,
+        );
+      }
+    }
+
+    if (deletedCount > 0) {
+      console.log(
+        `🗑️ [AdminService] Deleted ${deletedCount} availability entries that were not in the request`,
+      );
+    }
+
+    // Check if doctor has any future availability with time slots
     const futureAvailability = await this.availabilityModel.findOne({
       doctorId: new mongoose.Types.ObjectId(doctorId),
       date: { $gte: today },
+      isAvailable: true,
       timeSlots: { $exists: true, $ne: [] },
+      $expr: { $gt: [{ $size: '$timeSlots' }, 0] }, // Ensure timeSlots array is not empty
     });
 
+    const newDoctorStatus = futureAvailability
+      ? DoctorStatus.ACTIVE
+      : DoctorStatus.AWAITING_SCHEDULE;
+
+    console.log(
+      '📥 [AdminService] Updating doctor status after availability update:',
+      {
+        doctorId,
+        hasFutureAvailability: !!futureAvailability,
+        newStatus: newDoctorStatus,
+        futureAvailabilityDate: futureAvailability?.date,
+      },
+    );
+
     await this.userModel.findByIdAndUpdate(doctorId, {
-      doctorStatus: futureAvailability ? 'active' : 'awaiting_schedule',
+      doctorStatus: newDoctorStatus,
     });
+
+    console.log('✅ [AdminService] Doctor status updated successfully');
 
     return {
       success: true,

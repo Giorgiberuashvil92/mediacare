@@ -1,6 +1,8 @@
-import { apiService, AppointmentType } from "@/app/services/api";
+import { apiService, AppointmentType } from "@/app/_services/api";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import * as DocumentPicker from "expo-document-picker";
 import { Image } from "expo-image";
+import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -58,6 +60,12 @@ const MakeAppointment = () => {
   );
   const [visitAddress, setVisitAddress] = useState("");
   const [bookingFor, setBookingFor] = useState<"myself" | "other">("myself");
+  const [uploadedFile, setUploadedFile] = useState<{
+    uri: string;
+    name: string;
+    type: string;
+  } | null>(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
   const isLockedType = !!appointmentTypeParam;
 
   useEffect(() => {
@@ -92,6 +100,130 @@ const MakeAppointment = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleFilePick = async () => {
+    try {
+      // Show action sheet to choose between image and document
+      Alert.alert(
+        "ფაილის არჩევა",
+        "აირჩიეთ ფაილის ტიპი",
+        [
+          {
+            text: "სურათი",
+            onPress: async () => {
+              try {
+                // Request permissions
+                const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                if (status !== "granted") {
+                  Alert.alert(
+                    "წვდომა",
+                    "სურათის არჩევისთვის საჭიროა გალერეის წვდომა",
+                  );
+                  return;
+                }
+
+                const result = await ImagePicker.launchImageLibraryAsync({
+                  mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                  allowsEditing: true,
+                  aspect: [4, 3],
+                  quality: 0.8,
+                });
+
+                if (result.canceled || !result.assets || result.assets.length === 0) {
+                  return;
+                }
+
+                const asset = result.assets[0];
+                if (!asset.uri) {
+                  Alert.alert("შეცდომა", "სურათის URI არ მოიძებნა");
+                  return;
+                }
+
+                // Validate file size (max 10MB)
+                if (asset.fileSize && asset.fileSize > 10 * 1024 * 1024) {
+                  Alert.alert("შეცდომა", "ფაილის ზომა არ უნდა აღემატებოდეს 10MB-ს");
+                  return;
+                }
+
+                await uploadFile({
+                  uri: asset.uri,
+                  name: asset.fileName || `appointment_${Date.now()}.jpg`,
+                  type: asset.mimeType || "image/jpeg",
+                });
+              } catch (error: any) {
+                console.error("Image pick error:", error);
+                Alert.alert("შეცდომა", error.message || "ფოტოს არჩევა ვერ მოხერხდა");
+              }
+            },
+          },
+          {
+            text: "დოკუმენტი",
+            onPress: async () => {
+              try {
+                const result = await DocumentPicker.getDocumentAsync({
+                  type: ["application/pdf", "image/jpeg", "image/jpg", "image/png", "image/webp"],
+                  copyToCacheDirectory: true,
+                  multiple: false,
+                });
+
+                if (result.canceled || !result.assets || result.assets.length === 0) {
+                  return;
+                }
+
+                const file = result.assets[0];
+                
+                // Validate file size (max 10MB)
+                if (file.size && file.size > 10 * 1024 * 1024) {
+                  Alert.alert("შეცდომა", "ფაილის ზომა არ უნდა აღემატებოდეს 10MB-ს");
+                  return;
+                }
+
+                await uploadFile({
+                  uri: file.uri,
+                  name: file.name || "document",
+                  type: file.mimeType || "application/pdf",
+                });
+              } catch (error: any) {
+                console.error("Document picker error:", error);
+                Alert.alert("შეცდომა", error.message || "დოკუმენტის არჩევა ვერ მოხერხდა");
+              }
+            },
+          },
+          {
+            text: "გაუქმება",
+            style: "cancel",
+          },
+        ],
+        { cancelable: true }
+      );
+    } catch (error: any) {
+      console.error("File pick error:", error);
+      Alert.alert("შეცდომა", error.message || "ფაილის არჩევა ვერ მოხერხდა");
+    }
+  };
+
+  const uploadFile = async (file: { uri: string; name: string; type: string }) => {
+    try {
+      setUploadingFile(true);
+      
+      // Just store the file info, don't upload yet - will upload in patient-details
+      setUploadedFile({
+        uri: file.uri,
+        name: file.name,
+        type: file.type,
+      });
+      Alert.alert("წარმატება", "ფაილი მომზადებულია ატვირთვისთვის");
+    } catch (error: any) {
+      console.error("File selection error:", error);
+      Alert.alert("შეცდომა", error.message || "ფაილის არჩევა ვერ მოხერხდა");
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  const removeFile = () => {
+    setUploadedFile(null);
   };
 
 
@@ -187,6 +319,7 @@ const MakeAppointment = () => {
         appointmentType,
         visitAddress,
         bookingFor,
+        uploadedFile: uploadedFile ? JSON.stringify(uploadedFile) : "",
       },
     });
   };
@@ -251,7 +384,7 @@ const MakeAppointment = () => {
         </View>
 
         {/* Booking For Selection */}
-        <View style={styles.section}>
+        {/* <View style={styles.section}>
           <Text style={styles.sectionTitle}>ვისთვის ჯავშნავთ?</Text>
           <View style={styles.bookingForContainer}>
             <TouchableOpacity
@@ -310,7 +443,7 @@ const MakeAppointment = () => {
               </View>
             </TouchableOpacity>
           </View>
-        </View>
+        </View> */}
 
         {/* Appointment Type */}
         <View style={styles.section}>
@@ -401,6 +534,54 @@ const MakeAppointment = () => {
           )}
         </View>
 
+        {/* File Upload Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>ფაილის დამატება (არასავალდებულო)</Text>
+          <Text style={styles.sectionSubtitle}>
+            შეგიძლიათ დაურთოთ ფოტო ან დოკუმენტი თქვენი პრობლემის ან სიმპტომების შესახებ
+          </Text>
+
+          {uploadedFile ? (
+            <View style={styles.filePreviewContainer}>
+              {uploadedFile.type.startsWith("image/") ? (
+                <Image source={{ uri: uploadedFile.uri }} style={styles.filePreview} />
+              ) : (
+                <View style={styles.documentPreview}>
+                  <Ionicons name="document-text-outline" size={48} color="#0EA5E9" />
+                  <Text style={styles.documentName} numberOfLines={1}>
+                    {uploadedFile.name}
+                  </Text>
+                  <Text style={styles.documentType}>
+                    {uploadedFile.type.includes("pdf") ? "PDF" : uploadedFile.type.split("/")[1]?.toUpperCase() || "დოკუმენტი"}
+                  </Text>
+                </View>
+              )}
+              <TouchableOpacity
+                style={styles.removeFileButton}
+                onPress={removeFile}
+              >
+                <Ionicons name="close-circle" size={24} color="#EF4444" />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.fileUploadButton}
+              onPress={handleFilePick}
+              disabled={uploadingFile}
+            >
+              {uploadingFile ? (
+                <ActivityIndicator size="small" color="#0EA5E9" />
+              ) : (
+                <>
+                  <Ionicons name="attach-outline" size={24} color="#0EA5E9" />
+                  <Text style={styles.fileUploadButtonText}>
+                    ფაილის არჩევა
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
 
         {/* Payment Details */}
         <View style={styles.section}>
@@ -411,19 +592,15 @@ const MakeAppointment = () => {
             <Text style={styles.paymentAmount}>{consultationFee} ₾</Text>
           </View>
 
-          <View style={styles.paymentRow}>
-            <Text style={styles.paymentLabel}>დღგ (5%)</Text>
-            <Text style={styles.paymentAmount}>{vat} ₾</Text>
-          </View>
+        
 
-          <View style={styles.divider} />
 
           <View style={styles.paymentRow}>
             <Text style={styles.netAmountLabel}>საერთო თანხა</Text>
             <Text style={styles.netAmountValue}>{netAmount} ₾</Text>
           </View>
 
-          <View style={styles.promoCodeContainer}>
+          {/* <View style={styles.promoCodeContainer}>
             <TextInput
               style={styles.promoCodeInput}
               placeholder="გაქვთ პრომო კოდი?"
@@ -434,7 +611,7 @@ const MakeAppointment = () => {
             <TouchableOpacity style={styles.applyButton}>
               <Text style={styles.applyButtonText}>გამოყენება</Text>
             </TouchableOpacity>
-          </View>
+          </View> */}
         </View>
 
         {/* Payment Method - Temporarily hidden, payment will be handled later */}
@@ -861,6 +1038,73 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Poppins-SemiBold",
     color: "#FFFFFF",
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+    marginBottom: 12,
+  },
+  fileUploadButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "#0EA5E9",
+    borderStyle: "dashed",
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  fileUploadButtonText: {
+    fontSize: 16,
+    fontFamily: "Poppins-SemiBold",
+    color: "#0EA5E9",
+  },
+  filePreviewContainer: {
+    position: "relative",
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  filePreview: {
+    width: "100%",
+    height: 200,
+    borderRadius: 12,
+  },
+  documentPreview: {
+    width: "100%",
+    minHeight: 150,
+    padding: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F0F9FF",
+    borderRadius: 12,
+  },
+  documentName: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#0F172A",
+    marginTop: 12,
+    maxWidth: "90%",
+  },
+  documentType: {
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+    marginTop: 4,
+  },
+  removeFileButton: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 4,
   },
 });
 

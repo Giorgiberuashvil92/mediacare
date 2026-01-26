@@ -1,4 +1,4 @@
-import { apiService } from "@/app/services/api";
+import { apiService } from "@/app/_services/api";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -29,6 +29,7 @@ interface PatientAppointment {
   appointmentTime?: string;
   doctorId?: any;
   patientDetails?: any;
+  formattedDate?: string; // Formatted date in YYYY-MM-DD format (local timezone)
 }
 
 const TodayAppointment = () => {
@@ -61,27 +62,43 @@ const TodayAppointment = () => {
           const day = String(now.getDate()).padStart(2, '0');
           const today = `${year}-${month}-${day}`;
           
-          // Filter for today's scheduled appointments
-          const todayScheduled = response.data.filter((appointment: any) => {
-            // Format appointment date in local timezone
-            let appointmentDate: string;
-            if (appointment.appointmentDate) {
-              const date = new Date(appointment.appointmentDate);
-              const appYear = date.getFullYear();
-              const appMonth = String(date.getMonth() + 1).padStart(2, '0');
-              const appDay = String(date.getDate()).padStart(2, '0');
-              appointmentDate = `${appYear}-${appMonth}-${appDay}`;
-            } else {
-              appointmentDate = appointment.date;
-            }
-            
-            return appointmentDate === today && 
-                   (appointment.status === "scheduled" || 
-                    appointment.status === "confirmed" || 
-                    appointment.status === "pending");
-          });
+          // Filter for today's scheduled appointments only
+          const todayScheduled = response.data
+            .filter((appointment: any) => {
+              // Format appointment date in local timezone
+              let appointmentDate: string;
+              if (appointment.appointmentDate) {
+                const date = new Date(appointment.appointmentDate);
+                const appYear = date.getFullYear();
+                const appMonth = String(date.getMonth() + 1).padStart(2, '0');
+                const appDay = String(date.getDate()).padStart(2, '0');
+                appointmentDate = `${appYear}-${appMonth}-${appDay}`;
+              } else {
+                appointmentDate = appointment.date;
+              }
+              
+              // Only show appointments for today
+              return appointmentDate === today && 
+                     (appointment.status === "scheduled" || 
+                      appointment.status === "confirmed" || 
+                      appointment.status === "pending");
+            })
+            .map((appointment: any) => {
+              // Format appointment date in local timezone
+              let appointmentDate: string;
+              if (appointment.appointmentDate) {
+                const date = new Date(appointment.appointmentDate);
+                const appYear = date.getFullYear();
+                const appMonth = String(date.getMonth() + 1).padStart(2, '0');
+                const appDay = String(date.getDate()).padStart(2, '0');
+                appointmentDate = `${appYear}-${appMonth}-${appDay}`;
+              } else {
+                appointmentDate = appointment.date;
+              }
+              return { ...appointment, formattedDate: appointmentDate };
+            });
 
-          // Sort by time (closest first) - show the appointment with the nearest time
+          // Sort by time (closest first)
           todayScheduled.sort((a: any, b: any) => {
             const timeA = a.appointmentTime || a.time || '00:00';
             const timeB = b.appointmentTime || b.time || '00:00';
@@ -108,59 +125,14 @@ const TodayAppointment = () => {
 
   // Get the first appointment (or closest one)
   const appointment = todayAppointments[0];
-
-  // Calculate time until appointment
-  const getTimeUntil = () => {
-    // Get appointment date in local timezone
-    let appointmentDate: string;
-    if (appointment.appointmentDate) {
-      const date = new Date(appointment.appointmentDate);
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      appointmentDate = `${year}-${month}-${day}`;
-    } else {
-      appointmentDate = appointment.date || '';
-    }
-    
-    const appointmentTime = appointment.time || appointment.appointmentTime || '00:00';
-    
-    // Create date from YYYY-MM-DD and HH:MM in local timezone
-    const [year, month, day] = appointmentDate.split('-').map(Number);
-    const [hours, minutes] = appointmentTime.split(':').map(Number);
-    const appointmentDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
-    
-    const now = new Date();
-    const diff = appointmentDateTime.getTime() - now.getTime();
-
-    if (diff < 0) return "ახლა";
-
-    const hoursUntil = Math.floor(diff / (1000 * 60 * 60));
-    const minutesUntil = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-
-    if (hoursUntil > 0) {
-      return `${hoursUntil} საათში`;
-    } else if (minutesUntil > 0) {
-      return `${minutesUntil} წუთში`;
-    } else {
-      return "ახლა";
-    }
-  };
+  
+  // Appointment is always today since we filtered for today only
+  const isToday = true;
 
   // Check if appointment is within 1 hour from now
   const isUrgent = () => {
-    // Get appointment date in local timezone
-    let appointmentDate: string;
-    if (appointment.appointmentDate) {
-      const date = new Date(appointment.appointmentDate);
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      appointmentDate = `${year}-${month}-${day}`;
-    } else {
-      appointmentDate = appointment.date || '';
-    }
-    
+    // Use formattedDate that we already calculated
+    const appointmentDate = appointment.formattedDate || appointment.date || '';
     const appointmentTime = appointment.time || appointment.appointmentTime || '00:00';
     
     // Create date from YYYY-MM-DD and HH:MM in local timezone
@@ -188,7 +160,11 @@ const TodayAppointment = () => {
         </View>
         <View style={styles.content}>
           <Text style={styles.title}>
-            {isUrgent() ? "კონსულტაცია მალე!" : "დღეს გაქვთ ჯავშანი"}
+            {isUrgent() 
+              ? "კონსულტაცია მალე!" 
+              : isToday 
+                ? "დღეს გაქვთ ჯავშანი"
+                : "გაქვთ ჯავშანი"}
           </Text>
           <View style={styles.infoRow}>
             <Ionicons name="medical" size={16} color="#FFFFFF" />
@@ -245,23 +221,10 @@ const TodayAppointment = () => {
                   <View style={styles.detailContent}>
                     <Text style={styles.detailLabel}>დრო</Text>
                     <Text style={styles.detailValue}>
-                      {appointment.time || appointment.appointmentTime}
+                      დანიშნულია {appointment.time || appointment.appointmentTime}-ზე
                     </Text>
-                    <Text style={styles.detailSubValue}>{getTimeUntil()} დარჩა</Text>
                   </View>
                 </View>
-
-                {(appointment.symptoms || appointment.patientDetails?.problem) && (
-                  <View style={styles.detailRow}>
-                    <Ionicons name="pulse" size={20} color="#EF4444" />
-                    <View style={styles.detailContent}>
-                      <Text style={styles.detailLabel}>სიმპტომები</Text>
-                      <Text style={styles.detailValue}>
-                        {appointment.symptoms || appointment.patientDetails?.problem}
-                      </Text>
-                    </View>
-                  </View>
-                )}
               </View>
 
               <TouchableOpacity

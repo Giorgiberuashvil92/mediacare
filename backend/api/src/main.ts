@@ -113,9 +113,11 @@ async function bootstrap() {
   console.log(`📊 Database: ${connection.db?.databaseName || 'medicare'}`);
 
   const port = process.env.PORT || 4000;
-  await app.listen(port);
-  console.log(`🚀 Server running on http://localhost:${port}`);
-  console.log(`📚 API Documentation: http://localhost:${port}/docs`);
+  const host = process.env.HOST || '0.0.0.0'; // Listen on all network interfaces for mobile access
+  await app.listen(port, host);
+  console.log(`🚀 Server running on http://${host}:${port}`);
+  console.log(`📚 API Documentation: http://${host}:${port}/docs`);
+  console.log(`🌐 Accessible from network at: http://<your-ip>:${port}`);
 }
 
 bootstrap();

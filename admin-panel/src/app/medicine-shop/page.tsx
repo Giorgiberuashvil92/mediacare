@@ -25,6 +25,7 @@ const defaultCategoryForm = {
 const defaultProductForm = {
   name: '',
   icdCode: '',
+  icdCode2: '',
   uniqueCode: '',
   type: 'laboratory' as ShopEntityType,
   description: '',
@@ -153,6 +154,7 @@ export default function MedicineShopPage() {
       const payload = {
         name: productForm.name,
         icdCode: productForm.icdCode || undefined,
+        icdCode2: productForm.icdCode2 || undefined,
         uniqueCode: productForm.uniqueCode || undefined,
         type: productForm.type,
         description: productForm.description || undefined,
@@ -205,6 +207,7 @@ export default function MedicineShopPage() {
     setProductForm({
       name: product.name,
       icdCode: product.icdCode || '',
+      icdCode2: product.icdCode2 || '',
       uniqueCode: product.uniqueCode || '',
       type: product.type,
       description: product.description || '',
@@ -576,6 +579,21 @@ export default function MedicineShopPage() {
                         setProductForm({ ...productForm, icdCode: event.target.value })
                       }
                       placeholder="მაგ: BL.6"
+                      className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
+                      მეორე ICD კოდი (არასავალდებულო)
+                    </label>
+                    <input
+                      type="text"
+                      value={productForm.icdCode2}
+                      onChange={(event) =>
+                        setProductForm({ ...productForm, icdCode2: event.target.value })
+                      }
+                      placeholder="მაგ: BL.7"
                       className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
                     />
                   </div>
@@ -1039,6 +1057,7 @@ export default function MedicineShopPage() {
                       <thead>
                         <tr className="border-b border-stroke text-left text-xs uppercase text-dark-4 dark:border-dark-3">
                           <th className="p-3">ICD</th>
+                          <th className="p-3">მეორე ICD</th>
                           <th className="p-3">უნიკალური კოდი</th>
                           <th className="p-3">კვლევის დასახელება</th>
                           <th className="p-3">ფასი / ლარი</th>
@@ -1052,7 +1071,7 @@ export default function MedicineShopPage() {
                       <tbody>
                         {filteredProducts.length === 0 ? (
                           <tr>
-                            <td colSpan={9} className="p-4 text-center text-dark-4">
+                            <td colSpan={10} className="p-4 text-center text-dark-4">
                               პროდუქტი არ მოიძებნა
                             </td>
                           </tr>
@@ -1069,6 +1088,9 @@ export default function MedicineShopPage() {
                               >
                                 <td className="p-3">
                                   <div className="font-medium">{product.icdCode || '-'}</div>
+                                </td>
+                                <td className="p-3">
+                                  <div className="font-medium">{product.icdCode2 || '-'}</div>
                                 </td>
                                 <td className="p-3">
                                   <div className="font-mono text-xs">{product.uniqueCode || '-'}</div>

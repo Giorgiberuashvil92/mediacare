@@ -16,6 +16,9 @@ export class ShopProduct {
   icdCode?: string;
 
   @Prop({ trim: true, unique: true, sparse: true })
+  icdCode2?: string; // მეორე ICD კოდი
+
+  @Prop({ trim: true, unique: true, sparse: true })
   uniqueCode?: string; // უნიკალური კოდი ლაბორატორიისთვის
 
   @Prop({ trim: true })

@@ -26,8 +26,8 @@ import {
   getStatusColor,
   getStatusLabel,
 } from "../../assets/data/doctorDashboard";
+import { apiService, Clinic, ShopProduct } from "../_services/api";
 import { useAuth } from "../contexts/AuthContext";
-import { apiService, Clinic, ShopProduct } from "../services/api";
 
 interface Medication {
   name: string;
@@ -253,8 +253,15 @@ export default function DoctorPatients() {
     })
     .sort((a, b) => {
       // Sort by date and time - newest first
-      const dateA = new Date(`${a.date}T${a.time}`).getTime();
-      const dateB = new Date(`${b.date}T${b.time}`).getTime();
+      // Parse dates in local timezone (same as patient side)
+      const [yearA, monthA, dayA] = a.date.split('-').map(Number);
+      const [hoursA, minutesA] = a.time.split(':').map(Number);
+      const dateA = new Date(yearA, monthA - 1, dayA, hoursA, minutesA, 0, 0).getTime();
+      
+      const [yearB, monthB, dayB] = b.date.split('-').map(Number);
+      const [hoursB, minutesB] = b.time.split(':').map(Number);
+      const dateB = new Date(yearB, monthB - 1, dayB, hoursB, minutesB, 0, 0).getTime();
+      
       return dateB - dateA; // Descending order (newest first)
     });
 

@@ -1,4 +1,4 @@
-import { apiService } from "@/app/services/api";
+import { apiService } from "@/app/_services/api";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Image } from "expo-image";
@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Modal,
   RefreshControl,
   ScrollView,
@@ -218,6 +219,13 @@ const Appointment = () => {
   const [selectedAppointment, setSelectedAppointment] =
     useState<PatientAppointment | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [appointmentDocuments, setAppointmentDocuments] = useState<Record<string, {
+    url: string;
+    name?: string;
+    type?: string;
+    uploadedAt?: string;
+  }[]>>({});
+  const [expandedAppointments, setExpandedAppointments] = useState<Set<string>>(new Set());
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [filterStartDate, setFilterStartDate] = useState("");
   const [filterEndDate, setFilterEndDate] = useState("");
@@ -283,6 +291,35 @@ const Appointment = () => {
           mapAppointmentFromAPI(appointment, apiBaseUrl)
         );
         setAppointments(mappedAppointments);
+
+        // Pre-load documents count for all appointments to show indicators
+        const docsPromises = mappedAppointments.map(async (apt: PatientAppointment) => {
+          try {
+            const docsResponse = await apiService.getAppointmentDocuments(apt.id);
+            if (docsResponse.success && docsResponse.data) {
+              setAppointmentDocuments(prev => {
+                const newDocs = { ...prev };
+                newDocs[apt.id] = docsResponse.data;
+                return newDocs;
+              });
+            } else {
+              setAppointmentDocuments(prev => {
+                const newDocs = { ...prev };
+                newDocs[apt.id] = [];
+                return newDocs;
+              });
+            }
+          } catch (error) {
+            console.error(`Error loading documents for appointment ${apt.id}:`, error);
+            setAppointmentDocuments(prev => {
+              const newDocs = { ...prev };
+              newDocs[apt.id] = [];
+              return newDocs;
+            });
+          }
+        });
+        // Load documents in background, don't wait
+        Promise.all(docsPromises).catch(err => console.error("Error loading documents:", err));
       } else {
         setAppointments([]);
       }
@@ -304,16 +341,14 @@ const Appointment = () => {
 
     if (diff < 0) return null; // Past appointment
 
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    const days = Math.floor(hours / 24);
+    // Calculate total hours (round up to nearest hour)
+    const totalHours = Math.ceil(diff / (1000 * 60 * 60));
+    const days = Math.floor(totalHours / 24);
 
     if (days > 0) {
-      return `${days} დღეში`;
-    } else if (hours > 0) {
-      return `${hours} საათში`;
-    } else if (minutes > 0) {
-      return `${minutes} წუთში`;
+      return `${days} დღე`;
+    } else if (totalHours > 0) {
+      return `${totalHours} საათი`;
     } else {
       return "ახლა";
     }
@@ -388,15 +423,22 @@ const Appointment = () => {
       return false;
     }
 
-    // Exclude cancelled appointments
+    // "in-progress" appointments ALWAYS show in appointments (მიმდინარე)
+    // regardless of date - this is the active appointment
+    if (appointment.status === "in-progress") {
+      console.log('✅ [isUpcomingAppointment] In-progress -> show in appointments:', appointment.id, appointment.date);
+      return true;
+    }
+
+    // Exclude cancelled appointments - they go to history
     if (appointment.status === "cancelled") {
-      console.log('❌ [isUpcomingAppointment] Cancelled:', appointment.id, appointment.date);
+      console.log('❌ [isUpcomingAppointment] Cancelled -> history:', appointment.id, appointment.date);
       return false;
     }
 
     // Exclude completed appointments - they should go to history
     if (appointment.status === "completed") {
-      console.log('❌ [isUpcomingAppointment] Completed:', appointment.id, appointment.date);
+      console.log('❌ [isUpcomingAppointment] Completed -> history:', appointment.id, appointment.date);
       return false;
     }
 
@@ -486,24 +528,68 @@ const Appointment = () => {
       .length,
   };
 
-  const openDetails = async (appointment: PatientAppointment) => {
-    setSelectedAppointment(appointment);
-    setShowDetailsModal(true);
+  const toggleAppointmentExpansion = async (appointment: PatientAppointment) => {
+    const isExpanded = expandedAppointments.has(appointment.id);
     
-    // Fetch full appointment details to get instrumental tests and laboratory tests
-    try {
-      const appointmentResponse = await apiService.getAppointmentById(appointment.id);
-      if (appointmentResponse.success && appointmentResponse.data) {
-        const fullAppointment = appointmentResponse.data as any;
-        setSelectedAppointment({
-          ...appointment,
-          instrumentalTests: fullAppointment.instrumentalTests || [],
-          laboratoryTests: fullAppointment.laboratoryTests || [],
-        });
+    if (!isExpanded) {
+      // Fetch full appointment details when expanding
+      try {
+        const appointmentResponse = await apiService.getAppointmentById(appointment.id);
+        if (appointmentResponse.success && appointmentResponse.data) {
+          const fullAppointment = appointmentResponse.data as any;
+          // Update appointment in the list with full details
+          setAppointments(prev => prev.map(apt => 
+            apt.id === appointment.id 
+              ? { 
+                  ...apt, 
+                  instrumentalTests: fullAppointment.instrumentalTests || [], 
+                  laboratoryTests: fullAppointment.laboratoryTests || [],
+                  symptoms: fullAppointment.patientDetails?.problem || fullAppointment.notes || apt.symptoms,
+                }
+              : apt
+          ));
+        }
+
+        // Load appointment documents
+        try {
+          const docsResponse = await apiService.getAppointmentDocuments(appointment.id);
+          if (docsResponse.success && docsResponse.data) {
+            // Store documents per appointment
+            setAppointmentDocuments(prev => {
+              const newDocs = { ...prev };
+              newDocs[appointment.id] = docsResponse.data;
+              return newDocs;
+            });
+          } else {
+            // Ensure empty array if no documents
+            setAppointmentDocuments(prev => {
+              const newDocs = { ...prev };
+              newDocs[appointment.id] = [];
+              return newDocs;
+            });
+          }
+        } catch (error) {
+          console.error("Error fetching appointment documents:", error);
+          setAppointmentDocuments(prev => {
+            const newDocs = { ...prev };
+            newDocs[appointment.id] = [];
+            return newDocs;
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching appointment details:", error);
       }
-    } catch (error) {
-      console.error("Error fetching appointment details:", error);
     }
+    
+    setExpandedAppointments(prev => {
+      const newSet = new Set(prev);
+      if (isExpanded) {
+        newSet.delete(appointment.id);
+      } else {
+        newSet.add(appointment.id);
+      }
+      return newSet;
+    });
   };
 
   if (!isAuthenticated) {
@@ -900,39 +986,11 @@ const Appointment = () => {
                 filterStatus === "scheduled" && styles.statLabelActive,
               ]}
             >
-              დანიშნული
+              მიმდინარე
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[
-              styles.statCard,
-              filterStatus === "cancelled" && styles.statCardActive,
-            ]}
-            onPress={() => setFilterStatus("cancelled")}
-          >
-            <Ionicons
-              name="close-circle"
-              size={24}
-              color={filterStatus === "cancelled" ? "#EF4444" : "#6B7280"}
-            />
-            <Text
-              style={[
-                styles.statValue,
-                filterStatus === "cancelled" && styles.statValueActive,
-              ]}
-            >
-              {stats.cancelled}
-            </Text>
-            <Text
-              style={[
-                styles.statLabel,
-                filterStatus === "cancelled" && styles.statLabelActive,
-              ]}
-            >
-              გაუქმებული
-            </Text>
-          </TouchableOpacity>
+        
         </View>
 
         {/* Filter by consultation type (video / home-visit) */}
@@ -964,11 +1022,16 @@ const Appointment = () => {
               </Text>
             </View>
           ) : (
-            filteredAppointments.map((appointment) => (
+            filteredAppointments.map((appointment) => {
+              const isExpanded = expandedAppointments.has(appointment.id);
+              const documents = appointmentDocuments[appointment.id] || [];
+              
+              return (
               <View key={appointment.id} style={styles.appointmentCard}>
                 <TouchableOpacity
                   style={{ flex: 1 }}
-                  onPress={() => openDetails(appointment)}
+                  onPress={() => toggleAppointmentExpansion(appointment)}
+                  activeOpacity={0.7}
                 >
                   <View style={styles.appointmentHeader}>
                     <View style={styles.doctorInfo}>
@@ -995,6 +1058,12 @@ const Appointment = () => {
                                 <Text style={styles.soonText}>მალე</Text>
                               </View>
                             )}
+                          {/* File indicator badge */}
+                          {documents.length > 0 && (
+                            <View style={styles.fileIndicatorBadge}>
+                              <Ionicons name="document-attach" size={12} color="#0EA5E9" />
+                            </View>
+                          )}
                         </View>
                         <Text style={styles.doctorSpecialty}>
                           {appointment.doctorSpecialty} •{" "}
@@ -1025,6 +1094,16 @@ const Appointment = () => {
                         {getStatusLabel(appointment.status)}
                       </Text>
                     </View>
+                    <TouchableOpacity
+                      onPress={() => toggleAppointmentExpansion(appointment)}
+                      style={styles.expandButton}
+                    >
+                      <Ionicons
+                        name={isExpanded ? "chevron-up" : "chevron-down"}
+                        size={20}
+                        color="#6B7280"
+                      />
+                    </TouchableOpacity>
                   </View>
                 </TouchableOpacity>
 
@@ -1041,14 +1120,6 @@ const Appointment = () => {
                     <Ionicons name="time-outline" size={16} color="#6B7280" />
                     <Text style={styles.infoText}>{appointment.time}</Text>
                   </View>
-                  {/* {appointment.symptoms && (
-                    <View style={styles.symptomsRow}>
-                      <Ionicons name="medical" size={16} color="#6B7280" />
-                      <Text style={styles.symptomsText}>
-                        {appointment.symptoms}
-                      </Text>
-                    </View>
-                  )} */}
                   {appointment.diagnosis && (
                     <View style={styles.diagnosisRow}>
                       <Ionicons
@@ -1061,7 +1132,163 @@ const Appointment = () => {
                       </Text>
                     </View>
                   )}
+                  {appointment.type === "home-visit" && appointment.visitAddress && (
+                    <View style={styles.infoRow}>
+                      <Ionicons name="location-outline" size={16} color="#6B7280" />
+                      <Text style={styles.infoText}>{appointment.visitAddress}</Text>
+                    </View>
+                  )}
+                  {/* File indicator */}
+                  {documents.length > 0 && (
+                    <View style={styles.infoRow}>
+                      <Ionicons name="document-attach-outline" size={16} color="#0EA5E9" />
+                      <Text style={[styles.infoText, { color: "#0EA5E9" }]}>
+                        {documents.length} ფაილი ატვირთულია
+                      </Text>
+                    </View>
+                  )}
                 </View>
+
+                {/* Expanded Details */}
+                {isExpanded && (
+                  <View style={styles.expandedSection}>
+                    {/* Prescription/Danijnuloba */}
+                    <View style={styles.detailSection}>
+                      <Text style={styles.detailSectionTitle}>დანიშნულება</Text>
+                      <View style={styles.symptomsCard}>
+                        <Ionicons name="document-text-outline" size={18} color="#6B7280" />
+                        <Text style={styles.symptomsTextExpanded}>
+                          ჯერ არანაირი დანიშნულება არ არის ატვირთული
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Instrumental Tests */}
+                    {appointment.instrumentalTests && appointment.instrumentalTests.length > 0 && (
+                      <View style={styles.detailSection}>
+                        <Text style={styles.detailSectionTitle}>
+                          დანიშნული ინსტრუმენტული კვლევები
+                        </Text>
+                        {appointment.instrumentalTests.map((test: any, index: number) => (
+                          <View key={index} style={styles.testCard}>
+                            <View style={styles.testHeader}>
+                              <Ionicons name="pulse-outline" size={18} color="#8B5CF6" />
+                              <View style={styles.testInfo}>
+                                <Text style={styles.testName}>{test.productName}</Text>
+                                {test.notes && (
+                                  <Text style={styles.testNotes}>შენიშვნა: {test.notes}</Text>
+                                )}
+                              </View>
+                            </View>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+
+                    {/* Laboratory Tests */}
+                    {appointment.laboratoryTests && appointment.laboratoryTests.length > 0 && (
+                      <View style={styles.detailSection}>
+                        <Text style={styles.detailSectionTitle}>
+                          დანიშნული ლაბორატორიული კვლევები
+                        </Text>
+                        {appointment.laboratoryTests.map((test: any, index: number) => (
+                          <View key={index} style={styles.testCard}>
+                            <View style={styles.testHeader}>
+                              <Ionicons name="flask-outline" size={18} color="#06B6D4" />
+                              <View style={styles.testInfo}>
+                                <Text style={styles.testName}>{test.productName}</Text>
+                                {test.clinicName && (
+                                  <Text style={styles.testNotes}>კლინიკა: {test.clinicName}</Text>
+                                )}
+                              </View>
+                            </View>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+
+                    {/* Patient Uploaded Documents */}
+                    {documents.length > 0 && (
+                      <View style={styles.detailSection}>
+                        <Text style={styles.detailSectionTitle}>ატვირთული ფაილები</Text>
+                        {documents.map((doc, index) => (
+                          <TouchableOpacity
+                            key={index}
+                            style={styles.viewFileButton}
+                            onPress={() => {
+                              const url = doc.url.startsWith("http") 
+                                ? doc.url 
+                                : `${apiService.getBaseURL()}/${doc.url}`;
+                              Linking.openURL(url).catch(() =>
+                                Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა")
+                              );
+                            }}
+                          >
+                            <Ionicons
+                              name={doc.type?.startsWith("image/") ? "image-outline" : "document-text-outline"}
+                              size={18}
+                              color="#0EA5E9"
+                            />
+                            <Text style={styles.viewFileButtonText} numberOfLines={1}>
+                              {doc.name || `ფაილი ${index + 1}`}
+                            </Text>
+                            <Ionicons
+                              name="open-outline"
+                              size={16}
+                              color="#0EA5E9"
+                              style={{ marginLeft: "auto" }}
+                            />
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+
+                    {/* Patient Uploaded Symptoms */}
+                    {appointment.symptoms && appointment.symptoms.trim().length > 0 && (
+                      <View style={styles.detailSection}>
+                        <Text style={styles.detailSectionTitle}>პაციენტის ატვირთული სიმპტომები</Text>
+                        <View style={styles.symptomsCard}>
+                          <Ionicons name="medical-outline" size={18} color="#6B7280" />
+                          <Text style={styles.symptomsTextExpanded}>
+                            {appointment.symptoms}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Collapse Button */}
+                    <TouchableOpacity
+                      style={styles.viewDetailsButton}
+                      onPress={() => toggleAppointmentExpansion(appointment)}
+                    >
+                      <Text style={styles.viewDetailsButtonText}>
+                        დეტალების დაფარვა
+                      </Text>
+                      <Ionicons 
+                        name="chevron-up" 
+                        size={18} 
+                        color="#0EA5E9" 
+                      />
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* View Details Button */}
+                {!isExpanded && (
+                  <TouchableOpacity
+                    style={styles.viewDetailsButton}
+                    onPress={() => toggleAppointmentExpansion(appointment)}
+                  >
+                    <Text style={styles.viewDetailsButtonText}>
+                      დეტალების ნახვა
+                    </Text>
+                    <Ionicons 
+                      name="chevron-down" 
+                      size={18} 
+                      color="#0EA5E9" 
+                    />
+                  </TouchableOpacity>
+                )}
 
                 {/* Reminder & Join Call Section */}
                 {appointment.status === "scheduled" && (
@@ -1315,7 +1542,8 @@ const Appointment = () => {
                   </View>
                 </View>
               </View>
-            ))
+            );
+            })
           )}
         </View>
       </ScrollView>
@@ -1379,14 +1607,13 @@ const Appointment = () => {
                     </View>
                   )}
 
-                {selectedAppointment.symptoms && (
-                  <View style={styles.detailSection}>
-                    <Text style={styles.detailLabel}>სიმპტომები</Text>
-                    <Text style={styles.detailValue}>
-                      {selectedAppointment.symptoms}
-                    </Text>
-                  </View>
-                )}
+                {/* Prescription/Danijnuloba */}
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailLabel}>დანიშნულება</Text>
+                  <Text style={styles.detailValue}>
+                    ჯერ არანაირი დანიშნულება არ არის ატვირთული
+                  </Text>
+                </View>
 
                 {selectedAppointment.diagnosis && (
                   <View style={styles.detailSection}>
@@ -1462,6 +1689,42 @@ const Appointment = () => {
                       )}
                     </View>
                   )}
+
+                {/* Patient Uploaded Documents */}
+                {appointmentDocuments[selectedAppointment.id] && appointmentDocuments[selectedAppointment.id].length > 0 && (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailLabel}>ატვირთული ფაილები</Text>
+                    {appointmentDocuments[selectedAppointment.id].map((doc: any, index: number) => (
+                      <TouchableOpacity
+                        key={index}
+                        style={styles.viewFileButton}
+                        onPress={() => {
+                          const url = doc.url.startsWith("http") 
+                            ? doc.url 
+                            : `${apiService.getBaseURL()}/${doc.url}`;
+                          Linking.openURL(url).catch(() =>
+                            Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა")
+                          );
+                        }}
+                      >
+                        <Ionicons
+                          name={doc.type?.startsWith("image/") ? "image-outline" : "document-text-outline"}
+                          size={18}
+                          color="#0EA5E9"
+                        />
+                        <Text style={styles.viewFileButtonText} numberOfLines={1}>
+                          {doc.name || `ფაილი ${index + 1}`}
+                        </Text>
+                        <Ionicons
+                          name="open-outline"
+                          size={16}
+                          color="#0EA5E9"
+                          style={{ marginLeft: "auto" }}
+                        />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
 
                 <View style={styles.detailSection}>
                   <Text style={styles.detailLabel}>ანაზღაურება</Text>
@@ -2666,6 +2929,81 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Poppins-Regular",
     color: "#9CA3AF",
+  },
+  viewFileButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F0F9FF",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "#E0F2FE",
+    gap: 12,
+  },
+  viewFileButtonText: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#0EA5E9",
+  },
+  expandButton: {
+    padding: 4,
+  },
+  expandedSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
+  },
+  detailSectionTitle: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#1F2937",
+    marginBottom: 12,
+  },
+  symptomsCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#F9FAFB",
+    padding: 12,
+    borderRadius: 12,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  symptomsTextExpanded: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#374151",
+    lineHeight: 20,
+  },
+  viewDetailsButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+    marginTop: 8,
+    backgroundColor: "#F0F9FF",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E0F2FE",
+  },
+  viewDetailsButtonText: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#0EA5E9",
+  },
+  fileIndicatorBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#E0F2FE",
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 6,
   },
 });
 

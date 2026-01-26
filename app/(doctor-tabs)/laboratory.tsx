@@ -16,7 +16,7 @@ import {
   View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { apiService } from "../services/api";
+import { apiService } from "../_services/api";
 import { showToast } from "../utils/toast";
 
 type ExamType = "laboratory" | "instrumental";
@@ -180,9 +180,16 @@ export default function LaboratoryScreen() {
           });
         
         // Sort by date (newest first)
+        // Parse dates in local timezone (same as patient side)
         appointmentList.sort((a, b) => {
-          const dateA = new Date(`${a.date}T${a.time || "00:00"}`);
-          const dateB = new Date(`${b.date}T${b.time || "00:00"}`);
+          const [yearA, monthA, dayA] = a.date.split('-').map(Number);
+          const [hoursA, minutesA] = (a.time || "00:00").split(':').map(Number);
+          const dateA = new Date(yearA, monthA - 1, dayA, hoursA, minutesA, 0, 0);
+          
+          const [yearB, monthB, dayB] = b.date.split('-').map(Number);
+          const [hoursB, minutesB] = (b.time || "00:00").split(':').map(Number);
+          const dateB = new Date(yearB, monthB - 1, dayB, hoursB, minutesB, 0, 0);
+          
           return dateB.getTime() - dateA.getTime();
         });
         
