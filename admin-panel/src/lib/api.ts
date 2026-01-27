@@ -7,7 +7,7 @@ const API_BASE_URL =
   // 'http://localhost:4000';
 
 // DEVELOPMENT MODE: Skip auth and use static token (from dev-token.ts)
-const DISABLE_AUTH = false;
+const DISABLE_AUTH = true;
 
 export interface ApiResponse<T> {
   success: boolean;
