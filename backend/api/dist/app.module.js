@@ -31,7 +31,11 @@ const moduleImports = [
     config_1.ConfigModule.forRoot({
         isGlobal: true,
     }),
-    mongoose_1.MongooseModule.forRoot('mongodb+srv://gioberuashvili:Berobero12!@cluster0.g31ptrc.mongodb.net/?appName=Cluster0'),
+    mongoose_1.MongooseModule.forRoot(process.env.DATABASE_URL ||
+        'mongodb+srv://gioberuashvili:Berobero12!@cluster0.g31ptrc.mongodb.net/medicare?retryWrites=true&w=majority&appName=Cluster0', {
+        retryWrites: true,
+        w: 'majority',
+    }),
     jwt_1.JwtModule.registerAsync({
         global: true,
         useFactory: () => ({

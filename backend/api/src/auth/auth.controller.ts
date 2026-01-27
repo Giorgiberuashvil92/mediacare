@@ -49,7 +49,36 @@ export class AuthController {
 
   @Post('login')
   async login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto);
+    console.log('🔐 [AuthController] Login endpoint called');
+    console.log('🔐 [AuthController] Login request:', {
+      email: loginDto.email,
+      hasPassword: !!loginDto.password,
+      passwordLength: loginDto.password?.length,
+    });
+    try {
+      const result = await this.authService.login(loginDto);
+      console.log('✅ [AuthController] Login successful:', {
+        userId: result.data.user.id,
+        email: result.data.user.email,
+        role: result.data.user.role,
+      });
+      return result;
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      const errorStatus =
+        error && typeof error === 'object' && 'status' in error
+          ? (error.status as number)
+          : error && typeof error === 'object' && 'statusCode' in error
+            ? (error.statusCode as number)
+            : undefined;
+      console.error('❌ [AuthController] Login failed:', {
+        email: loginDto.email,
+        error: errorMessage,
+        status: errorStatus,
+      });
+      throw error;
+    }
   }
 
   @Post('refresh')

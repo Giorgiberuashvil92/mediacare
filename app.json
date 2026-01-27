@@ -65,8 +65,8 @@
     },
     "extra": {
       "router": {},
-      // "apiUrl": "http://localhost:4000",
-      "apiUrl": "https://mediacare-production.up.railway.app",
+      "apiUrl": "http://localhost:4000",
+      // "apiUrl": "https://mediacare-production.up.railway.app",
       "agoraAppId": "3f485e4bf3bd4b4ea9bac7375d33785a",
       "eas": {
         "projectId": "8e3315d4-a7cd-4d3a-a2d1-40988cd66b12"

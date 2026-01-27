@@ -1522,7 +1522,48 @@ export default function DoctorAppointments() {
                         </View>
                       </View>
                     )}
-
+                    {consultationDocuments[consultation.id] &&
+                      consultationDocuments[consultation.id].length > 0 && (
+                        <View style={styles.detailSection}>
+                          <Text style={styles.detailSectionTitle}>
+                            პაციენტის ატვირთული ფაილები
+                            <Text style={{ color: "#0EA5E9", fontWeight: "600" }}>
+                              {" "}({consultationDocuments[consultation.id].length})
+                            </Text>
+                          </Text>
+                          {consultationDocuments[consultation.id].map((doc, index) => (
+                            <TouchableOpacity
+                              key={index}
+                              style={styles.viewFileButton}
+                              onPress={() => {
+                                const url = doc.url.startsWith("http")
+                                  ? doc.url
+                                  : `${apiService.getBaseURL()}/${doc.url}`;
+                                downloadAndOpenFile(url, doc.name);
+                              }}
+                            >
+                              <Ionicons
+                                name={
+                                  doc.type?.startsWith("image/")
+                                    ? "image-outline"
+                                    : "document-text-outline"
+                                }
+                                size={18}
+                                color="#0EA5E9"
+                              />
+                              <Text style={styles.viewFileButtonText}>
+                                ფაილის ნახვა
+                              </Text>
+                              <Ionicons
+                                name="open-outline"
+                                size={16}
+                                color="#0EA5E9"
+                                style={{ marginLeft: "auto" }}
+                              />
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      )}
                     {/* Diagnosis - Full View */}
                     {(consultation.consultationSummary?.diagnosis ||
                       consultation.diagnosis) && (
@@ -1629,48 +1670,7 @@ export default function DoctorAppointments() {
                     )}
 
                     {/* Patient Uploaded Documents */}
-                    {consultationDocuments[consultation.id] &&
-                      consultationDocuments[consultation.id].length > 0 && (
-                        <View style={styles.detailSection}>
-                          <Text style={styles.detailSectionTitle}>
-                            პაციენტის ატვირთული ფაილები
-                            <Text style={{ color: "#0EA5E9", fontWeight: "600" }}>
-                              {" "}({consultationDocuments[consultation.id].length})
-                            </Text>
-                          </Text>
-                          {consultationDocuments[consultation.id].map((doc, index) => (
-                            <TouchableOpacity
-                              key={index}
-                              style={styles.viewFileButton}
-                              onPress={() => {
-                                const url = doc.url.startsWith("http")
-                                  ? doc.url
-                                  : `${apiService.getBaseURL()}/${doc.url}`;
-                                downloadAndOpenFile(url, doc.name);
-                              }}
-                            >
-                              <Ionicons
-                                name={
-                                  doc.type?.startsWith("image/")
-                                    ? "image-outline"
-                                    : "document-text-outline"
-                                }
-                                size={18}
-                                color="#0EA5E9"
-                              />
-                              <Text style={styles.viewFileButtonText}>
-                                ფაილის ნახვა
-                              </Text>
-                              <Ionicons
-                                name="open-outline"
-                                size={16}
-                                color="#0EA5E9"
-                                style={{ marginLeft: "auto" }}
-                              />
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      )}
+
 
                     {/* Collapse Button */}
                     <TouchableOpacity

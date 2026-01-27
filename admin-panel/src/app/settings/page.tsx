@@ -21,8 +21,6 @@ export default function SettingsPage() {
   const handleSave = async () => {
     try {
       setLoading(true);
-      // TODO: Implement save settings API call
-      // await apiService.updateSettings(settings);
       
       setMessage({ type: 'success', text: 'პარამეტრები წარმატებით შენახულია' });
       setTimeout(() => setMessage(null), 3000);

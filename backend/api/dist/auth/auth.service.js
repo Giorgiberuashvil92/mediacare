@@ -250,15 +250,59 @@ let AuthService = class AuthService {
     }
     async login(loginDto) {
         const { email, password } = loginDto;
+        console.log('🔐 [AuthService] Login attempt:', {
+            email,
+            hasPassword: !!password,
+            passwordLength: password?.length,
+        });
+        const db = this.userModel.db;
+        console.log('🗄️ [AuthService] Database info:', {
+            databaseName: db.databaseName || 'unknown',
+            readyState: db.readyState,
+        });
+        console.log('🔍 [AuthService] Searching for user with email:', email);
         const user = await this.userModel.findOne({ email });
+        console.log('🔍 [AuthService] User lookup result:', {
+            email,
+            userFound: !!user,
+            userId: user?._id?.toString(),
+            userEmail: user?.email,
+            userRole: user?.role,
+            userIsActive: user?.isActive,
+            hasPassword: !!user?.password,
+            passwordLength: user?.password?.length,
+        });
+        if (process.env.NODE_ENV !== 'production') {
+            const allUsers = await this.userModel
+                .find({})
+                .select('email')
+                .limit(5)
+                .lean();
+            console.log('👥 [AuthService] Sample users in database:', allUsers.map((u) => u.email));
+        }
         if (!user) {
+            console.error('❌ [AuthService] User not found:', { email });
             throw new common_1.UnauthorizedException('Invalid credentials');
         }
+        console.log('🔐 [AuthService] Comparing password...');
+        if (process.env.NODE_ENV !== 'production') {
+            console.log('🔐 [AuthService] Input password:', password);
+            console.log('🔐 [AuthService] Stored password hash:', user.password?.substring(0, 20) + '...');
+        }
         const isPasswordValid = await bcrypt.compare(password, user.password);
+        console.log('🔐 [AuthService] Password comparison result:', {
+            isValid: isPasswordValid,
+            email,
+        });
         if (!isPasswordValid) {
+            console.error('❌ [AuthService] Invalid password:', { email });
             throw new common_1.UnauthorizedException('Invalid credentials');
         }
         if (!user.isActive) {
+            console.error('❌ [AuthService] Account deactivated:', {
+                email,
+                userId: user._id?.toString(),
+            });
             throw new common_1.UnauthorizedException('Account is deactivated');
         }
         const tokens = await this.generateTokens(user._id.toString());

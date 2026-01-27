@@ -1244,19 +1244,9 @@ const Appointment = () => {
                     )}
 
                     {/* Patient Uploaded Symptoms */}
-                    {appointment.symptoms && appointment.symptoms.trim().length > 0 && (
-                      <View style={styles.detailSection}>
-                        <Text style={styles.detailSectionTitle}>პაციენტის ატვირთული სიმპტომები</Text>
-                        <View style={styles.symptomsCard}>
-                          <Ionicons name="medical-outline" size={18} color="#6B7280" />
-                          <Text style={styles.symptomsTextExpanded}>
-                            {appointment.symptoms}
-                          </Text>
-                        </View>
-                      </View>
-                    )}
+                   
 
-                    {/* Collapse Button */}
+                    {/* Collapse Button */} 
                     <TouchableOpacity
                       style={styles.viewDetailsButton}
                       onPress={() => toggleAppointmentExpansion(appointment)}
@@ -1512,35 +1502,7 @@ const Appointment = () => {
                   </View>
                 )}
 
-                <View style={styles.appointmentFooter}>
-                  <View style={styles.feeRow}>
-                    <Ionicons name="wallet" size={16} color="#6B7280" />
-                    <Text style={styles.feeAmount}>
-                      {typeof appointment.fee === 'number' 
-                        ? `${appointment.fee} ₾`
-                        : appointment.fee || "0 ₾"}
-                    </Text>
-                    <View
-                      style={[
-                        styles.paymentBadge,
-                        appointment.isPaid
-                          ? styles.paymentBadgePaid
-                          : styles.paymentBadgePending,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.paymentText,
-                          appointment.isPaid
-                            ? styles.paymentTextPaid
-                            : styles.paymentTextPending,
-                        ]}
-                      >
-                        {appointment.isPaid ? "გადახდილი" : "მოსალოდნელი"}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
+
               </View>
             );
             })

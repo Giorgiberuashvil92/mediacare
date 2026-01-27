@@ -26,7 +26,12 @@ const moduleImports: Array<
     isGlobal: true,
   }),
   MongooseModule.forRoot(
-    'mongodb+srv://gioberuashvili:Berobero12!@cluster0.g31ptrc.mongodb.net/?appName=Cluster0',
+    process.env.DATABASE_URL ||
+      'mongodb+srv://gioberuashvili:Berobero12!@cluster0.g31ptrc.mongodb.net/medicare?retryWrites=true&w=majority&appName=Cluster0',
+    {
+      retryWrites: true,
+      w: 'majority',
+    },
   ),
 
   JwtModule.registerAsync({
