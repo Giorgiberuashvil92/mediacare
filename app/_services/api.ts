@@ -77,6 +77,14 @@ const getDefaultBaseUrl = () => {
     (Constants.manifest as any)?.extra?.API_URL ||
     (Constants.manifest as any)?.extra?.apiUrl;
 
+  console.log("🌐 API URL Configuration:", {
+    isDev: __DEV__,
+    envUrl: envUrl,
+    hasEnvUrl: !!envUrl,
+    expoConfigExtra: (Constants.expoConfig?.extra as any)?.apiUrl,
+    manifestExtra: (Constants.manifest as any)?.extra?.apiUrl,
+  });
+
   // თუ envUrl არის განსაზღვრული და არ არის localhost, გამოვიყენოთ ის
   if (envUrl && !envUrl.includes("localhost") && !envUrl.includes("127.0.0.1")) {
     return envUrl;
@@ -86,15 +94,19 @@ const getDefaultBaseUrl = () => {
   if (__DEV__) {
     const devIP = getDevelopmentIP();
     if (devIP) {
-      return `http://${devIP}:4000`;
+      const devUrl = `http://${devIP}:4000`;
+      console.log("🔧 Using development URL:", devUrl);
+      return devUrl;
     }
   }
 
   // Production-ისთვის ან fallback
   if (envUrl) {
+    console.log("✅ Using fallback URL:", envUrl);
     return envUrl;
   }
 
+  console.warn("⚠️ No API URL found, using localhost fallback");
   return "http://localhost:4000";
 };
 
