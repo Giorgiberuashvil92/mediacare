@@ -340,7 +340,9 @@ export class AuthService {
       throw new UnauthorizedException('Admin user not found');
     }
 
-    const tokens = await this.generateTokens((admin._id as string).toString());
+    const tokens = await this.generateDevTokens(
+      (admin._id as string).toString(),
+    );
 
     return {
       success: true,
@@ -416,6 +418,29 @@ export class AuthService {
       token: refreshToken,
       userId,
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+    });
+
+    await refreshTokenDoc.save();
+
+    return {
+      accessToken,
+      refreshToken,
+    };
+  }
+
+  // DEV ONLY: Generate tokens with longer expiration for dev/admin use
+  private async generateDevTokens(userId: string) {
+    const payload = { sub: userId };
+
+    // Dev tokens last 7 days instead of 24 hours
+    const accessToken = this.jwtService.sign(payload, { expiresIn: '7d' });
+    const refreshToken = this.jwtService.sign(payload, { expiresIn: '30d' });
+
+    // Save refresh token to database
+    const refreshTokenDoc = new this.refreshTokenModel({
+      token: refreshToken,
+      userId,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
     });
 
     await refreshTokenDoc.save();
