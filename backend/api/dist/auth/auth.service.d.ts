@@ -76,4 +76,5 @@ export declare class AuthService {
         message: string;
     }>;
     private generateTokens;
+    private generateDevTokens;
 }

@@ -290,7 +290,7 @@ let AuthService = class AuthService {
         if (!admin) {
             throw new common_1.UnauthorizedException('Admin user not found');
         }
-        const tokens = await this.generateTokens(admin._id.toString());
+        const tokens = await this.generateDevTokens(admin._id.toString());
         return {
             success: true,
             message: 'DEV: Admin token generated',
@@ -346,6 +346,21 @@ let AuthService = class AuthService {
             token: refreshToken,
             userId,
             expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        });
+        await refreshTokenDoc.save();
+        return {
+            accessToken,
+            refreshToken,
+        };
+    }
+    async generateDevTokens(userId) {
+        const payload = { sub: userId };
+        const accessToken = this.jwtService.sign(payload, { expiresIn: '7d' });
+        const refreshToken = this.jwtService.sign(payload, { expiresIn: '30d' });
+        const refreshTokenDoc = new this.refreshTokenModel({
+            token: refreshToken,
+            userId,
+            expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         });
         await refreshTokenDoc.save();
         return {
