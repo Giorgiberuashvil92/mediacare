@@ -194,6 +194,24 @@ export class DoctorsService {
       createdAt: apt.createdAt
         ? new Date(apt.createdAt).toISOString()
         : undefined,
+      rescheduleRequest: apt.rescheduleRequest
+        ? {
+            requestedBy: apt.rescheduleRequest.requestedBy,
+            requestedDate: apt.rescheduleRequest.requestedDate
+              ? new Date(apt.rescheduleRequest.requestedDate).toISOString()
+              : undefined,
+            requestedTime: apt.rescheduleRequest.requestedTime,
+            reason: apt.rescheduleRequest.reason,
+            status: apt.rescheduleRequest.status,
+            requestedAt: apt.rescheduleRequest.requestedAt
+              ? new Date(apt.rescheduleRequest.requestedAt).toISOString()
+              : undefined,
+            respondedAt: apt.rescheduleRequest.respondedAt
+              ? new Date(apt.rescheduleRequest.respondedAt).toISOString()
+              : undefined,
+            respondedBy: apt.rescheduleRequest.respondedBy,
+          }
+        : undefined,
     };
   }
 
@@ -557,12 +575,24 @@ export class DoctorsService {
       rangeEnd = new Date(endDate);
       rangeEnd.setHours(23, 59, 59, 999);
     } else {
+      // დიაპაზონი: წარსული 7 დღე + მომავალი 30 დღე (რომ ჩანდეს დაჯავშნილი appointments-ებიც)
       rangeStart = new Date();
+      rangeStart.setDate(rangeStart.getDate() - 7); // წარსული 7 დღე
       rangeStart.setHours(0, 0, 0, 0);
-      rangeEnd = new Date(rangeStart);
-      rangeEnd.setDate(rangeEnd.getDate() + 30);
+      rangeEnd = new Date();
+      rangeEnd.setDate(rangeEnd.getDate() + 30); // მომავალი 30 დღე
       rangeEnd.setHours(23, 59, 59, 999);
     }
+
+    console.log('📅 [getDoctorAvailability] Date range:', {
+      rangeStart: rangeStart.toISOString(),
+      rangeEnd: rangeEnd.toISOString(),
+      rangeStartLocal: rangeStart.toLocaleString(),
+      rangeEndLocal: rangeEnd.toLocaleString(),
+      startDate,
+      endDate,
+      forPatient,
+    });
 
     // 3) ამ დიაპაზონში ექიმის availability ამოვიღოთ
     const availabilityFilter: FilterQuery<AvailabilityDocument> = {
@@ -579,28 +609,45 @@ export class DoctorsService {
       .lean();
 
     // 4) ამავე დიაპაზონში დაჯავშნილი ვიზიტები ამოვიღოთ
-    const bookedAppointments = await this.appointmentModel
-      .find({
-        doctorId: new mongoose.Types.ObjectId(doctorId),
-        appointmentDate: { $gte: rangeStart, $lte: rangeEnd },
+    const bookedAppointmentsQuery = {
+      doctorId: new mongoose.Types.ObjectId(doctorId),
+      appointmentDate: { $gte: rangeStart, $lte: rangeEnd },
+      status: { $ne: 'cancelled' },
+    };
+
+    console.log('📅 [getDoctorAvailability] Querying booked appointments:', {
+      query: {
+        doctorId: doctorId,
+        appointmentDate: {
+          $gte: rangeStart.toISOString(),
+          $lte: rangeEnd.toISOString(),
+        },
         status: { $ne: 'cancelled' },
-      })
+      },
+    });
+
+    const bookedAppointments = await this.appointmentModel
+      .find(bookedAppointmentsQuery)
       .select('appointmentDate appointmentTime status type')
       .lean();
 
-    // 5) დავაგენერიროთ bookedSlotsByDate (YYYY-MM-DD-type -> Set<HH:mm>)
-    const bookedSlotsByDate: { [key: string]: Set<string> } = {};
-
-    console.log('📅 [getDoctorAvailability] Processing booked appointments:', {
+    console.log('📅 [getDoctorAvailability] Found booked appointments:', {
       count: bookedAppointments.length,
       appointments: bookedAppointments.map((apt) => ({
         id: (apt as any)._id?.toString(),
         storedDate: apt.appointmentDate,
+        storedDateISO:
+          apt.appointmentDate instanceof Date
+            ? apt.appointmentDate.toISOString()
+            : new Date(apt.appointmentDate).toISOString(),
         time: apt.appointmentTime,
         status: apt.status,
         type: apt.type,
       })),
     });
+
+    // 5) დავაგენერიროთ bookedSlotsByDate (YYYY-MM-DD-type -> Set<HH:mm>)
+    const bookedSlotsByDate: { [key: string]: Set<string> } = {};
 
     bookedAppointments.forEach((apt) => {
       const aptDate = new Date(apt.appointmentDate);
@@ -691,6 +738,48 @@ export class DoctorsService {
       (avail.timeSlots || []).forEach((slot: string) => {
         availabilityByDateType[key].slots.add(slot);
       });
+    });
+
+    // 🔒 დაჯავშნილი დღეების დამატება, თუნდაც არ იყოს availability record
+    // ექიმისთვის საჭიროა ვნახოთ დაჯავშნილი დღეები, თუნდაც არ იყოს timeSlots
+    Object.keys(bookedSlotsByDate).forEach((dateTypeKey) => {
+      // dateTypeKey არის "YYYY-MM-DD-type" ფორმატში (მაგ: "2026-02-06-video" ან "2026-02-06-home-visit")
+      // უნდა გავყოთ ბოლო dash-ის მიხედვით, რადგან type შეიძლება იყოს "home-visit" (ორი სიტყვა)
+      const lastDashIndex = dateTypeKey.lastIndexOf('-');
+      const dateStr = dateTypeKey.substring(0, lastDashIndex); // "2026-02-06"
+      const typeKey = dateTypeKey.substring(lastDashIndex + 1); // "video" ან "home-visit"
+      const type = typeKey === 'home-visit' ? 'home-visit' : 'video';
+      const key = `${dateStr}|${type}`;
+
+      console.log(`🔍 [getDoctorAvailability] Parsing booked dateTypeKey:`, {
+        dateTypeKey,
+        dateStr,
+        typeKey,
+        type,
+        key,
+      });
+
+      // თუ ეს დღე უკვე არ არის availabilityByDateType-ში, დავამატოთ
+      if (!availabilityByDateType[key]) {
+        // დავპარსოთ თარიღი
+        const [year, month, day] = dateStr.split('-').map(Number);
+        const date = new Date(year, month - 1, day);
+
+        availabilityByDateType[key] = {
+          date,
+          type: type,
+          slots: new Set<string>(), // ცარიელი slots, რადგან availability record არ არის
+        };
+
+        console.log(
+          `🔒 [getDoctorAvailability] Added booked-only date: ${dateTypeKey}`,
+          {
+            dateStr,
+            type,
+            bookedSlots: Array.from(bookedSlotsByDate[dateTypeKey]),
+          },
+        );
+      }
     });
 
     const result = Object.entries(availabilityByDateType)
@@ -1385,11 +1474,32 @@ export class DoctorsService {
               appointments[0].appointmentDate instanceof Date
                 ? appointments[0].appointmentDate.toISOString()
                 : new Date(appointments[0].appointmentDate).toISOString(),
+            hasRescheduleRequest: !!appointments[0].rescheduleRequest,
+            rescheduleRequest: appointments[0].rescheduleRequest,
           }
         : 'No appointments',
     );
 
+    // Log all appointments with rescheduleRequest
+    const appointmentsWithReschedule = appointments.filter(
+      (apt: any) => apt.rescheduleRequest,
+    );
+    console.log(
+      `🔄 Found ${appointmentsWithReschedule.length} appointments with rescheduleRequest:`,
+      appointmentsWithReschedule.map((apt: any) => ({
+        _id: apt._id,
+        rescheduleRequest: apt.rescheduleRequest,
+      })),
+    );
+
     const formattedAppointments = appointments.map((apt: any) => {
+      // Log rescheduleRequest if exists
+      if (apt.rescheduleRequest) {
+        console.log(
+          `🔄 Found rescheduleRequest for appointment ${apt._id}:`,
+          JSON.stringify(apt.rescheduleRequest, null, 2),
+        );
+      }
       const formatted = this.formatDashboardAppointment(apt) as any;
       // Check if this appointment is a follow-up (referenced by another appointment's followUp.appointmentId)
       const aptId = apt._id ? apt._id.toString() : apt.id;
@@ -1402,6 +1512,13 @@ export class DoctorsService {
         formatted.originalType =
           apt.type === 'home-visit' ? 'home-visit' : 'video';
         formatted.type = 'followup';
+      }
+      // Log formatted rescheduleRequest
+      if (formatted.rescheduleRequest) {
+        console.log(
+          `✅ Formatted rescheduleRequest for appointment ${aptId}:`,
+          JSON.stringify(formatted.rescheduleRequest, null, 2),
+        );
       }
       return formatted;
     });

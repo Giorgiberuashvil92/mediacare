@@ -16,7 +16,6 @@ import { useCart } from "../../contexts/CartContext";
 
 const Checkout = () => {
   const { cartItems, getTotalPrice, clearCart } = useCart();
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "card">("cash");
   const [showCardModal, setShowCardModal] = useState(false);
   const [cardData, setCardData] = useState({
     cardNumber: "",
@@ -24,35 +23,12 @@ const Checkout = () => {
     expiryDate: "",
     cvv: "",
   });
-  const [formData, setFormData] = useState({
-    fullName: "",
-    email: "",
-    phone: "",
-    address: "",
-    city: "",
-    zipCode: "",
-  });
-
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
 
   const handlePlaceOrder = () => {
-    // Validate form
-    if (!formData.fullName || !formData.email || !formData.phone || !formData.address) {
-      Alert.alert("შეცდომა", "გთხოვთ შეავსოთ ყველა სავალდებულო ველი");
+    // Validate card data
+    if (!cardData.cardNumber || !cardData.cardHolder || !cardData.expiryDate || !cardData.cvv) {
+      Alert.alert("შეცდომა", "გთხოვთ შეავსოთ ბარათის ყველა დეტალი");
       return;
-    }
-
-    // Validate card data if credit card is selected
-    if (paymentMethod === "card") {
-      if (!cardData.cardNumber || !cardData.cardHolder || !cardData.expiryDate || !cardData.cvv) {
-        Alert.alert("შეცდომა", "გთხოვთ შეავსოთ ბარათის ყველა დეტალი");
-        return;
-      }
     }
 
     // Simulate order placement
@@ -94,29 +70,42 @@ const Checkout = () => {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#333333" />
+          <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Checkout</Text>
+        <Text style={styles.headerTitle}>გადახდა</Text>
         <View style={styles.placeholder} />
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Order Summary */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Order Summary</Text>
+          <Text style={styles.sectionTitle}>შეკვეთის დეტალები</Text>
           <View style={styles.orderSummaryCard}>
             {cartItems.map((item) => {
               const isTest = item.clinic || item.clinicId;
+              const displayPrice = isTest ? item.price : item.price * item.quantity;
               return (
                 <View key={item.id} style={styles.orderItem}>
                   <View style={styles.itemInfo}>
                     <Text style={styles.itemName}>{item.name}</Text>
-                    <Text style={styles.itemDetails}>
-                      {isTest ? item.weight : `${item.weight} × ${item.quantity}`}
-                    </Text>
+                    {item.homeCollection && (
+                      <Text style={styles.itemDetails}>
+                        მისამართი: {item.homeCollection.address}
+                      </Text>
+                    )}
+                    {item.homeCollection && (
+                      <Text style={styles.itemDetails}>
+                        {item.homeCollection.date} {item.homeCollection.time}
+                      </Text>
+                    )}
+                    {!item.homeCollection && (
+                      <Text style={styles.itemDetails}>
+                        {isTest ? item.weight : `${item.weight} × ${item.quantity}`}
+                      </Text>
+                    )}
                   </View>
                   <Text style={styles.itemPrice}>
-                    ${isTest ? item.price : item.price * item.quantity}
+                    {displayPrice} ₾
                   </Text>
                 </View>
               );
@@ -125,88 +114,8 @@ const Checkout = () => {
             <View style={styles.divider} />
             
             <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>Total</Text>
-              <Text style={styles.totalPrice}>${getTotalPrice()}</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Delivery Information */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Delivery Information</Text>
-          <View style={styles.formCard}>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Full Name *</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.fullName}
-                onChangeText={(value) => handleInputChange("fullName", value)}
-                placeholder="Enter your full name"
-                placeholderTextColor="#999999"
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Email *</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.email}
-                onChangeText={(value) => handleInputChange("email", value)}
-                placeholder="Enter your email"
-                placeholderTextColor="#999999"
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Phone Number *</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.phone}
-                onChangeText={(value) => handleInputChange("phone", value)}
-                placeholder="Enter your phone number"
-                placeholderTextColor="#999999"
-                keyboardType="phone-pad"
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Address *</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                value={formData.address}
-                onChangeText={(value) => handleInputChange("address", value)}
-                placeholder="Enter your full address"
-                placeholderTextColor="#999999"
-                multiline
-                numberOfLines={3}
-              />
-            </View>
-
-            <View style={styles.row}>
-              <View style={[styles.inputGroup, styles.halfWidth]}>
-                <Text style={styles.inputLabel}>City</Text>
-                <TextInput
-                  style={styles.input}
-                  value={formData.city}
-                  onChangeText={(value) => handleInputChange("city", value)}
-                  placeholder="Enter city"
-                  placeholderTextColor="#999999"
-                />
-              </View>
-
-              <View style={[styles.inputGroup, styles.halfWidth]}>
-                <Text style={styles.inputLabel}>ZIP Code</Text>
-                <TextInput
-                  style={styles.input}
-                  value={formData.zipCode}
-                  onChangeText={(value) => handleInputChange("zipCode", value)}
-                  placeholder="Enter ZIP code"
-                  placeholderTextColor="#999999"
-                  keyboardType="numeric"
-                />
-              </View>
+              <Text style={styles.totalLabel}>საერთო თანხა</Text>
+              <Text style={styles.totalPrice}>{getTotalPrice()} ₾</Text>
             </View>
           </View>
         </View>
@@ -217,30 +126,18 @@ const Checkout = () => {
           <View style={styles.paymentCard}>
             <TouchableOpacity
               style={styles.paymentOption}
-              onPress={() => setPaymentMethod("cash")}
+              onPress={() => setShowCardModal(true)}
             >
-              <Ionicons name="cash-outline" size={24} color={paymentMethod === "cash" ? "#20BEB8" : "#999999"} />
-              <Text style={[styles.paymentText, paymentMethod !== "cash" && styles.paymentTextInactive]}>
-                ნაღდი ფული მიტანისას
-              </Text>
-              {paymentMethod === "cash" && (
-                <Ionicons name="checkmark-circle" size={24} color="#20BEB8" />
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.paymentOption}
-              onPress={() => {
-                setPaymentMethod("card");
-                setShowCardModal(true);
-              }}
-            >
-              <Ionicons name="card-outline" size={24} color={paymentMethod === "card" ? "#20BEB8" : "#999999"} />
-              <Text style={[styles.paymentText, paymentMethod !== "card" && styles.paymentTextInactive]}>
-                საბანკო ბარათი
-              </Text>
-              {paymentMethod === "card" && (
-                <Ionicons name="checkmark-circle" size={24} color="#20BEB8" />
-              )}
+              <View style={styles.paymentIconContainer}>
+                <Ionicons name="card-outline" size={28} color="#06B6D4" />
+              </View>
+              <View style={styles.paymentInfo}>
+                <Text style={styles.paymentText}>საბანკო ბარათი</Text>
+                <Text style={styles.paymentSubtext}>
+                  {cardData.cardNumber ? `**** ${cardData.cardNumber.slice(-4)}` : "დაამატეთ ბარათი"}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={24} color="#999999" />
             </TouchableOpacity>
           </View>
         </View>
@@ -349,7 +246,7 @@ const Checkout = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8F9FA",
+    backgroundColor: "#F3F4F6",
   },
   header: {
     flexDirection: "row",
@@ -357,22 +254,20 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E5EA",
+    backgroundColor: "#06B6D4",
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
     justifyContent: "center",
     alignItems: "center",
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontFamily: "Poppins-Bold",
-    color: "#333333",
+    color: "#FFFFFF",
   },
   placeholder: {
     width: 40,
@@ -388,20 +283,20 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontFamily: "Poppins-Bold",
-    color: "#333333",
-    marginBottom: 12,
+    color: "#0F172A",
+    marginBottom: 16,
   },
   orderSummaryCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
+    padding: 20,
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 2,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
     elevation: 3,
   },
   orderItem: {
@@ -414,20 +309,21 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   itemName: {
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: "Poppins-SemiBold",
-    color: "#333333",
-    marginBottom: 2,
+    color: "#0F172A",
+    marginBottom: 4,
   },
   itemDetails: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: "Poppins-Regular",
-    color: "#666666",
+    color: "#6B7280",
+    marginTop: 2,
   },
   itemPrice: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: "Poppins-Bold",
-    color: "#333333",
+    color: "#0F172A",
   },
   divider: {
     height: 1,
@@ -440,14 +336,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   totalLabel: {
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: "Poppins-Bold",
-    color: "#333333",
+    color: "#0F172A",
   },
   totalPrice: {
-    fontSize: 16,
+    fontSize: 20,
     fontFamily: "Poppins-Bold",
-    color: "#20BEB8",
+    color: "#06B6D4",
   },
   formCard: {
     backgroundColor: "#FFFFFF",
@@ -495,30 +391,43 @@ const styles = StyleSheet.create({
   },
   paymentCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
+    padding: 20,
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 2,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
     elevation: 3,
   },
   paymentOption: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 16,
+  },
+  paymentIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    backgroundColor: "#E0F2FE",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  paymentInfo: {
+    flex: 1,
   },
   paymentText: {
-    flex: 1,
     fontSize: 16,
     fontFamily: "Poppins-SemiBold",
-    color: "#333333",
+    color: "#0F172A",
+    marginBottom: 4,
   },
-  paymentTextInactive: {
-    color: "#999999",
+  paymentSubtext: {
+    fontSize: 13,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
   },
   modalOverlay: {
     flex: 1,
@@ -571,10 +480,18 @@ const styles = StyleSheet.create({
     borderTopColor: "#E5E5EA",
   },
   placeOrderButton: {
-    backgroundColor: "#20BEB8",
-    borderRadius: 12,
-    paddingVertical: 16,
+    backgroundColor: "#06B6D4",
+    borderRadius: 16,
+    paddingVertical: 18,
     alignItems: "center",
+    shadowColor: "#06B6D4",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   placeOrderButtonText: {
     fontSize: 16,

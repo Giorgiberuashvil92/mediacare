@@ -15,7 +15,6 @@ import {
   View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Clinic, apiService } from "../../_services/api";
 import { useCart } from "../../contexts/CartContext";
 
 const SelectClinic = () => {
@@ -29,11 +28,9 @@ const SelectClinic = () => {
     testType?: "laboratory" | "instrumental"; // Type of test being booked
   }>();
 
-  const [clinics, setClinics] = useState<Clinic[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedClinic, setSelectedClinic] = useState<string | null>(null);
-  const [collectionType, setCollectionType] = useState<"clinic" | "home">("clinic");
+  // Only home collection is available now
+  const [collectionType] = useState<"clinic" | "home">("home");
   const [homeAddress, setHomeAddress] = useState("");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedTime, setSelectedTime] = useState<Date>(new Date());
@@ -42,34 +39,8 @@ const SelectClinic = () => {
   const { addToCart } = useCart();
 
   useEffect(() => {
-    loadClinics();
+    setLoading(false);
   }, []);
-
-  const loadClinics = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await apiService.getClinics();
-      if (response.success) {
-        setClinics(response.data.filter((clinic) => clinic.isActive));
-      }
-    } catch (err) {
-      console.error("Failed to load clinics", err);
-      setError("კლინიკების ჩატვირთვა ვერ მოხერხდა");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSelectClinic = (clinic: Clinic) => {
-    setSelectedClinic(clinic.id);
-    setCollectionType("clinic");
-  };
-
-  const handleSelectHomeCollection = () => {
-    setCollectionType("home");
-    setSelectedClinic(null);
-  };
 
   const formatDate = (date: Date) => {
     const year = date.getFullYear();
@@ -85,11 +56,6 @@ const SelectClinic = () => {
   };
 
   const handleAddToCart = async () => {
-    if (collectionType === "clinic" && !selectedClinic) {
-      Alert.alert("შეცდომა", "გთხოვთ აირჩიოთ კლინიკა");
-      return;
-    }
-
     if (collectionType === "home") {
       if (!homeAddress.trim()) {
         Alert.alert("შეცდომა", "გთხოვთ შეიყვანოთ მისამართი");
@@ -106,70 +72,29 @@ const SelectClinic = () => {
       }
     }
 
-    const selectedClinicData = collectionType === "clinic" 
-      ? clinics.find((c) => c.id === selectedClinic)
-      : null;
-    
-    if (collectionType === "clinic" && !selectedClinicData) {
+    // If home collection is selected, add to cart and navigate directly to checkout
+    if (collectionType === "home") {
+      const price = Number(params.productPrice || 0);
+
+      addToCart({
+        id: params.productId,
+        name: params.productName,
+        price: price,
+        weight: "1", // Default for laboratory products
+        image: params.productImage,
+        clinic: "სახლში გამოძახება",
+        clinicId: "home-collection",
+        homeCollection: {
+          address: homeAddress,
+          date: formatDate(selectedDate),
+          time: formatTime(selectedTime),
+        },
+      });
+
+      // Navigate directly to checkout instead of going back
+      router.push("/screens/medicine/checkout");
       return;
     }
-
-    // If this is booking from appointment history, update the appointment's test
-    // Note: Home collection is not available for appointment history bookings
-    if (params.appointmentId) {
-      if (collectionType === "home") {
-        Alert.alert("შეცდომა", "სახლში გამოძახება არ არის ხელმისაწვდომი ჯავშნიდან. გთხოვთ აირჩიოთ კლინიკა.");
-        return;
-      }
-      
-      if (!selectedClinicData) {
-        Alert.alert("შეცდომა", "გთხოვთ აირჩიოთ კლინიკა");
-        return;
-      }
-
-      try {
-        const isInstrumental = params.testType === "instrumental";
-        
-        if (isInstrumental) {
-          await apiService.bookInstrumentalTest(params.appointmentId, {
-            productId: params.productId,
-            clinicId: selectedClinicData.id,
-            clinicName: selectedClinicData.name,
-          });
-        } else {
-          await apiService.bookLaboratoryTest(params.appointmentId, {
-            productId: params.productId,
-            clinicId: selectedClinicData.id,
-            clinicName: selectedClinicData.name,
-          });
-        }
-        router.back();
-        return;
-      } catch (err) {
-        console.error(`Failed to book ${params.testType || "laboratory"} test:`, err);
-        // Fall through to add to cart as fallback
-      }
-    }
-
-    const price = Number(params.productPrice || 0);
-
-    addToCart({
-      id: params.productId,
-      name: params.productName,
-      price: price,
-      weight: "1", // Default for laboratory products
-      image: params.productImage,
-      clinic: collectionType === "clinic" ? selectedClinicData!.name : "სახლში გამოძახება",
-      clinicId: collectionType === "clinic" ? selectedClinicData!.id : "home-collection",
-      homeCollection: collectionType === "home" ? {
-        address: homeAddress,
-        date: formatDate(selectedDate),
-        time: formatTime(selectedTime),
-      } : undefined,
-    });
-
-    router.back();
-    router.back(); // Go back twice: once from clinic selection, once from product details
   };
 
   if (loading) {
@@ -202,66 +127,14 @@ const SelectClinic = () => {
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.infoCard}>
-          <Text style={styles.infoTitle}>აირჩიეთ ვარიანტი</Text>
+          <Text style={styles.infoTitle}>სახლში გამოძახება</Text>
           <Text style={styles.infoSubtitle}>
-            აირჩიეთ კლინიკა ან სახლში გამოძახება &quot;{params.productName}&quot;-ისთვის
+            შეიყვანეთ მისამართი და აირჩიეთ თარიღი &quot;{params.productName}&quot;-ისთვის
           </Text>
         </View>
 
-        {/* Collection Type Selection */}
-        <View style={styles.collectionTypeContainer}>
-          <TouchableOpacity
-            style={[
-              styles.collectionTypeCard,
-              collectionType === "clinic" && styles.collectionTypeCardActive,
-            ]}
-            onPress={() => {
-              setCollectionType("clinic");
-              setSelectedClinic(null);
-            }}
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name="business"
-              size={24}
-              color={collectionType === "clinic" ? "#06B6D4" : "#64748B"}
-            />
-            <Text
-              style={[
-                styles.collectionTypeText,
-                collectionType === "clinic" && styles.collectionTypeTextActive,
-              ]}
-            >
-              კლინიკაში
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.collectionTypeCard,
-              collectionType === "home" && styles.collectionTypeCardActive,
-            ]}
-            onPress={handleSelectHomeCollection}
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name="home"
-              size={24}
-              color={collectionType === "home" ? "#06B6D4" : "#64748B"}
-            />
-            <Text
-              style={[
-                styles.collectionTypeText,
-                collectionType === "home" && styles.collectionTypeTextActive,
-              ]}
-            >
-              სახლში გამოძახება
-            </Text>
-          </TouchableOpacity>
-        </View>
-
         {/* Home Collection Form */}
-        {collectionType === "home" && (
+        {(
           <View style={styles.homeCollectionForm}>
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>მისამართი *</Text>
@@ -306,88 +179,18 @@ const SelectClinic = () => {
           </View>
         )}
 
-        {error && (
-          <View style={styles.errorContainer}>
-            <Ionicons name="alert-circle-outline" size={24} color="#EF4444" />
-            <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity style={styles.retryButton} onPress={loadClinics}>
-              <Text style={styles.retryButtonText}>ხელახლა ცდა</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Clinics List - Only show when clinic type is selected */}
-        {collectionType === "clinic" && (
-          <>
-            {clinics.length === 0 && !loading && !error ? (
-              <View style={styles.emptyContainer}>
-                <Ionicons name="business-outline" size={64} color="#CBD5E1" />
-                <Text style={styles.emptyTitle}>კლინიკა არ მოიძებნა</Text>
-                <Text style={styles.emptySubtitle}>
-                  ამჟამად არ არის ხელმისაწვდომი კლინიკები
-                </Text>
-              </View>
-            ) : (
-              <View style={styles.clinicsList}>
-                {clinics.map((item) => (
-                  <TouchableOpacity
-                    key={item.id}
-                    style={[
-                      styles.clinicCard,
-                      selectedClinic === item.id && styles.clinicCardSelected,
-                    ]}
-                    onPress={() => handleSelectClinic(item)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.clinicCardContent}>
-                      <View style={styles.clinicIconContainer}>
-                        <Ionicons
-                          name="business"
-                          size={24}
-                          color={selectedClinic === item.id ? "#06B6D4" : "#64748B"}
-                        />
-                      </View>
-                      <View style={styles.clinicInfo}>
-                        <Text style={styles.clinicName}>{item.name}</Text>
-                        {item.address && (
-                          <View style={styles.clinicDetailRow}>
-                            <Ionicons name="location-outline" size={14} color="#94A3B8" />
-                            <Text style={styles.clinicDetailText}>{item.address}</Text>
-                          </View>
-                        )}
-                        {item.phone && (
-                          <View style={styles.clinicDetailRow}>
-                            <Ionicons name="call-outline" size={14} color="#94A3B8" />
-                            <Text style={styles.clinicDetailText}>{item.phone}</Text>
-                          </View>
-                        )}
-                      </View>
-                      {selectedClinic === item.id && (
-                        <View style={styles.checkIcon}>
-                          <Ionicons name="checkmark-circle" size={24} color="#06B6D4" />
-                        </View>
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </>
-        )}
       </ScrollView>
 
-      {(selectedClinic || collectionType === "home") && (
-        <View style={styles.bottomBar}>
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={handleAddToCart}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="add-circle" size={20} color="#FFFFFF" />
-            <Text style={styles.addButtonText}>კალათაში დამატება</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+      <View style={styles.bottomBar}>
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={handleAddToCart}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="card-outline" size={20} color="#FFFFFF" />
+          <Text style={styles.addButtonText}>გადახდა</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Date Picker */}
       {showDatePicker && Platform.OS === "android" && (
@@ -626,6 +429,11 @@ const styles = StyleSheet.create({
     borderColor: "#06B6D4",
     backgroundColor: "#F0FDFA",
   },
+  collectionTypeCardDisabled: {
+    opacity: 0.5,
+    borderColor: "#E5E7EB",
+    backgroundColor: "#F9FAFB",
+  },
   collectionTypeText: {
     marginTop: 8,
     fontSize: 14,
@@ -634,6 +442,9 @@ const styles = StyleSheet.create({
   },
   collectionTypeTextActive: {
     color: "#06B6D4",
+  },
+  collectionTypeTextDisabled: {
+    color: "#94A3B8",
   },
   homeCollectionForm: {
     backgroundColor: "#FFFFFF",

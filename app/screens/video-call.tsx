@@ -1,18 +1,24 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useKeepAwake } from "expo-keep-awake";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  AppState,
+  AppStateStatus,
+  Dimensions,
   PermissionsAndroid,
   Platform,
   SafeAreaView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import RtcEngine, {
+  AudioProfileType,
+  AudioScenarioType,
   ChannelProfileType,
   ClientRoleType,
   IRtcEngine,
@@ -29,6 +35,9 @@ import { apiService } from "../_services/api";
 export default function VideoCallScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
+
+  // Keep screen awake during video call
+  useKeepAwake("video-call");
 
   // Get parameters from navigation
   const appointmentId = (params.appointmentId || params.consultationId) as string;
@@ -48,12 +57,15 @@ export default function VideoCallScreen() {
   const [remoteUid, setRemoteUid] = useState<number | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
+  const [isFrontCamera, setIsFrontCamera] = useState(true); // true = front camera, false = back camera
   const [connectionState, setConnectionState] = useState<string>("disconnected");
   const [channelClosed, setChannelClosed] = useState(false);
+  const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
   
   const engineRef = useRef<IRtcEngine | null>(null);
   const tokenExpirationCheckRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadAgoraTokenRef = useRef<(() => Promise<void>) | null>(null);
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
 
   // Channel-ის დახურვის შემოწმება
   const checkChannelStatus = useCallback(() => {
@@ -99,6 +111,36 @@ export default function VideoCallScreen() {
       
       await engine.enableAudio();
 
+      // Configure audio for low latency
+      // Use low latency audio profile for real-time communication
+      try {
+        await engine.setAudioProfile(
+          AudioProfileType.AudioProfileDefault,
+          AudioScenarioType.AudioScenarioGameStreaming // Low latency scenario for real-time communication
+        );
+      } catch {
+        console.log("setAudioProfile not available, using defaults");
+      }
+
+      // Configure audio for background mode and call interruption handling
+      if (Platform.OS === 'ios') {
+        // iOS: Enable audio session for background and prevent interruption
+        await engine.setDefaultAudioRouteToSpeakerphone(true);
+        await engine.setEnableSpeakerphone(true);
+        // Try to set audio session restrictions to prevent interruption
+        try {
+          // This helps keep audio active even when phone call comes in
+          await (engine as any).setAudioSessionOperationRestriction?.(0);
+        } catch {
+          console.log("setAudioSessionOperationRestriction not available");
+        }
+      } else {
+        // Android: Configure audio for background and low latency
+        await engine.setDefaultAudioRouteToSpeakerphone(true);
+        await engine.setEnableSpeakerphone(true);
+        // Android automatically handles call interruption better than iOS
+      }
+
       await engine.setChannelProfile(ChannelProfileType.ChannelProfileCommunication);
 
       await engine.setClientRole(ClientRoleType.ClientRoleBroadcaster);
@@ -106,6 +148,7 @@ export default function VideoCallScreen() {
       engine.addListener("onJoinChannelSuccess", (connection: any, elapsed: number) => {
         console.log("Joined channel successfully:", connection, elapsed);
         setIsJoined(true);
+        // Keep awake is already active via useKeepAwake hook
       });
 
       engine.addListener("onUserJoined", (connection: any, remoteUid: number, elapsed: number) => {
@@ -129,6 +172,7 @@ export default function VideoCallScreen() {
         setRemoteUid(null);
         setChannelClosed(true);
         setConnectionState("disconnected");
+        // Keep awake will be automatically deactivated when component unmounts
       });
 
       // Channel-ის დახურვის შემოწმება connection state-ის მეშვეობით
@@ -208,6 +252,20 @@ export default function VideoCallScreen() {
           ]
         );
       });
+
+      // Set initial orientation before joining channel
+      const { width, height } = Dimensions.get('window');
+      const isLandscape = width > height;
+      const initialOrientation = isLandscape ? 'landscape' : 'portrait';
+      setOrientation(initialOrientation);
+      
+      // Set device orientation in Agora SDK
+      try {
+        const orientationValue = isLandscape ? 90 : 0;
+        await (engine as any).setDeviceOrientation?.(orientationValue);
+      } catch {
+        console.log("setDeviceOrientation not available during initialization");
+      }
 
       await engine.joinChannel(data.token, data.channelName, data.uid, {
         clientRoleType: ClientRoleType.ClientRoleBroadcaster,
@@ -293,6 +351,59 @@ export default function VideoCallScreen() {
     loadAgoraTokenRef.current = loadAgoraToken;
   }, [loadAgoraToken]);
 
+  // Handle app state changes for background audio and call interruption
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      console.log('App state changed:', appStateRef.current, '->', nextAppState);
+      
+      if (
+        appStateRef.current.match(/inactive|background/) &&
+        nextAppState === 'active'
+      ) {
+        // App came to foreground (e.g., after rejecting incoming call)
+        console.log('App came to foreground, ensuring audio is active');
+        if (engineRef.current && isJoined) {
+          // Re-enable audio when app comes to foreground
+          // This handles the case when user rejects incoming call
+          engineRef.current.enableAudio();
+          engineRef.current.enableVideo();
+        }
+      } else if (
+        appStateRef.current === 'active' &&
+        nextAppState === 'inactive'
+      ) {
+        // App went to inactive (e.g., incoming call notification shown)
+        console.log('App went to inactive (possibly incoming call), maintaining audio connection');
+        // Don't disconnect - keep audio running
+        // This is like WhatsApp - call continues even when system call UI shows
+        if (engineRef.current && isJoined) {
+          // Keep audio active - don't disable it
+          // The call should continue even when system shows incoming call
+          engineRef.current.enableAudio();
+        }
+      } else if (
+        appStateRef.current === 'active' &&
+        nextAppState === 'background'
+      ) {
+        // App went to background
+        console.log('App went to background, maintaining audio connection');
+        // Don't disable audio - keep it running in background
+        if (engineRef.current && isJoined) {
+          // Ensure audio continues in background
+          engineRef.current.enableAudio();
+        }
+      }
+
+      appStateRef.current = nextAppState;
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+    return () => {
+      subscription.remove();
+    };
+  }, [isJoined]);
+
   useEffect(() => {
     if (!appointmentId) {
       setError("Appointment ID is missing");
@@ -309,6 +420,8 @@ export default function VideoCallScreen() {
         tokenExpirationCheckRef.current = null;
       }
       
+      // Keep awake will be automatically deactivated when component unmounts
+      
       if (engineRef.current) {
         engineRef.current.leaveChannel();
         engineRef.current.release();
@@ -316,6 +429,44 @@ export default function VideoCallScreen() {
       }
     };
   }, [appointmentId, loadAgoraToken]);
+
+  // Orientation-ის განახლება და Agora SDK-ში დაყენება
+  const updateOrientation = useCallback(async () => {
+    if (!engineRef.current) return;
+
+    const { width, height } = Dimensions.get('window');
+    const isLandscape = width > height;
+    const newOrientation = isLandscape ? 'landscape' : 'portrait';
+    
+    if (newOrientation !== orientation) {
+      setOrientation(newOrientation);
+      
+      try {
+        // Agora SDK-ს აქვს setDeviceOrientation მეთოდი orientation-ის დასაყენებლად
+        // Orientation values: 0 = portrait, 90 = landscape right, 180 = portrait upside down, 270 = landscape left
+        const orientationValue = isLandscape ? 90 : 0;
+        
+        // Try to set device orientation in Agora SDK
+        try {
+          await (engineRef.current as any).setDeviceOrientation?.(orientationValue);
+        } catch {
+          // If setDeviceOrientation is not available, try alternative method
+          console.log("setDeviceOrientation not available, trying alternative");
+        }
+        
+        // Also try to update video encoder configuration with orientation
+        try {
+          await (engineRef.current as any).setVideoEncoderConfiguration?.({
+            orientationMode: isLandscape ? 1 : 0, // 0 = portrait, 1 = landscape
+          });
+        } catch {
+          console.log("setVideoEncoderConfiguration not available");
+        }
+      } catch (err) {
+        console.error("Error updating orientation:", err);
+      }
+    }
+  }, [orientation]);
 
   // Channel-ის status-ის პერიოდული შემოწმება
   useEffect(() => {
@@ -350,12 +501,34 @@ export default function VideoCallScreen() {
           ]
         );
       }
-    }, 5000); // შემოწმება ყოველ 5 წუთში
+    }, 5000); 
 
     return () => {
       clearInterval(statusCheckInterval);
     };
   }, [isJoined, channelClosed, checkChannelStatus, loadAgoraToken, router]);
+
+  // Orientation-ის მონიტორინგი
+  useEffect(() => {
+    if (!isJoined || !engineRef.current) return;
+
+    // Initial orientation check
+    updateOrientation();
+
+    // Listen for dimension changes (orientation changes)
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      const isLandscape = window.width > window.height;
+      const newOrientation = isLandscape ? 'landscape' : 'portrait';
+      
+      if (newOrientation !== orientation) {
+        updateOrientation();
+      }
+    });
+
+    return () => {
+      subscription?.remove();
+    };
+  }, [isJoined, orientation, updateOrientation]);
 
   const toggleMute = async () => {
     if (!engineRef.current) return;
@@ -379,11 +552,23 @@ export default function VideoCallScreen() {
     }
   };
 
+  const switchCamera = async () => {
+    if (!engineRef.current) return;
+    
+    try {
+      await engineRef.current.switchCamera();
+      setIsFrontCamera(!isFrontCamera);
+    } catch (err) {
+      console.error("Error switching camera:", err);
+    }
+  };
+
   const handleEndCall = async () => {
     const channelStatus = checkChannelStatus();
     
     if (channelStatus.isClosed) {
       console.log("Channel already closed:", channelStatus.reason);
+      // Keep awake will be automatically deactivated when component unmounts
       router.back();
       return;
     }
@@ -410,6 +595,7 @@ export default function VideoCallScreen() {
             } catch (err) {
               console.error("Error leaving channel:", err);
             }
+            // Keep awake will be automatically deactivated when component unmounts
             router.back();
           },
         },
@@ -483,6 +669,7 @@ export default function VideoCallScreen() {
       </View>
 
       <View style={styles.videoContainer}>
+        {/* Remote video - always show full screen when available */}
         {remoteUid !== null && engineRef.current && (
           <View style={styles.remoteVideoContainer}>
             <RtcSurfaceView
@@ -492,20 +679,24 @@ export default function VideoCallScreen() {
           </View>
         )}
 
-        {engineRef.current && (
+        {/* Local video - show as small overlay only when video is enabled */}
+        {engineRef.current && isVideoEnabled && (
           <View style={styles.localVideoContainer}>
-            {isVideoEnabled ? (
-              <RtcSurfaceView
-                canvas={{ uid: 0 }}
-                style={styles.localVideo}
-                zOrderMediaOverlay={true}
-              />
-            ) : (
-              <View style={styles.videoPlaceholder}>
-                <Ionicons name="person" size={32} color="#9CA3AF" />
-                <Text style={styles.placeholderText}>{userName}</Text>
-              </View>
-            )}
+            <RtcSurfaceView
+              canvas={{ uid: 0 }}
+              style={styles.localVideo}
+              zOrderMediaOverlay={true}
+            />
+          </View>
+        )}
+
+        {/* Local video placeholder - show only when video is disabled AND remote user is connected */}
+        {engineRef.current && !isVideoEnabled && remoteUid !== null && (
+          <View style={styles.localVideoPlaceholderContainer}>
+            <View style={styles.videoPlaceholder}>
+              <Ionicons name="person" size={24} color="#9CA3AF" />
+              <Text style={styles.placeholderTextSmall}>{userName}</Text>
+            </View>
           </View>
         )}
 
@@ -542,6 +733,20 @@ export default function VideoCallScreen() {
             color={isVideoEnabled ? "#111827" : "#FFFFFF"}
           />
         </TouchableOpacity>
+
+        {/* Camera switch button - only show when video is enabled */}
+        {isVideoEnabled && (
+          <TouchableOpacity
+            style={styles.controlButton}
+            onPress={switchCamera}
+          >
+            <Ionicons
+              name={isFrontCamera ? "camera-reverse" : "camera"}
+              size={24}
+              color="#111827"
+            />
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity
           style={styles.endCallButton}
@@ -663,6 +868,17 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
+  localVideoPlaceholderContainer: {
+    position: "absolute",
+    top: 16,
+    right: 16,
+    width: 120,
+    height: 160,
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: "#1F2937",
+    zIndex: 10,
+  },
   remoteVideoContainer: {
     flex: 1,
     backgroundColor: "#000000",
@@ -680,6 +896,12 @@ const styles = StyleSheet.create({
   placeholderText: {
     marginTop: 8,
     fontSize: 10,
+    fontFamily: "Poppins-Medium",
+    color: "#9CA3AF",
+  },
+  placeholderTextSmall: {
+    marginTop: 4,
+    fontSize: 9,
     fontFamily: "Poppins-Medium",
     color: "#9CA3AF",
   },

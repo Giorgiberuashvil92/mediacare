@@ -249,6 +249,9 @@ const Appointment = () => {
   const [approveRescheduleTime, setApproveRescheduleTime] = useState<string | null>(null);
   const [approveRescheduleLoading, setApproveRescheduleLoading] = useState(false);
   
+  // Modal for "consultation time not yet" message
+  const [showConsultationTimeModal, setShowConsultationTimeModal] = useState(false);
+  
   // Cancel states
   const [cancellingAppointmentId, setCancellingAppointmentId] = useState<string | null>(null);
 
@@ -373,24 +376,49 @@ const Appointment = () => {
     return diff < 0; // Past appointment
   };
 
-  // Check if join button should be active (5 minutes before, active for 30 minutes)
-  // TEMPORARY: Always return true for testing Agora
+  // Check if join button should be active
+  // Button is active before appointment time and until 1 hour after appointment time
   const isJoinButtonActive = (appointment: PatientAppointment) => {
-    // For testing - always show button
-    if (appointment.status === "scheduled" || appointment.status === "in-progress") {
-      return true;
+    // Only show for scheduled or in-progress appointments
+    if (appointment.status !== "scheduled" && appointment.status !== "in-progress") {
+      return false;
     }
-    // Original logic (commented for testing)
-    // if (appointment.status !== "scheduled") return false;
-    // const appointmentDateTime = new Date(
-    //   `${appointment.date}T${appointment.time}`
-    // );
-    // const diff = appointmentDateTime.getTime() - currentTime.getTime();
-    // const fiveMinutesInMs = 5 * 60 * 1000;
-    // const thirtyMinutesInMs = 30 * 60 * 1000;
-    // // Active from 5 minutes before until 30 minutes after
-    // return diff <= fiveMinutesInMs && diff >= -thirtyMinutesInMs;
-    return false;
+
+    // Parse appointment date and time
+    const appointmentDateTime = new Date(
+      `${appointment.date}T${appointment.time}`
+    );
+    
+    // Calculate time difference (negative means past)
+    const diff = appointmentDateTime.getTime() - currentTime.getTime();
+    
+    // One hour in milliseconds
+    const oneHourInMs = 60 * 60 * 1000;
+    
+    // Button is active:
+    // - Before appointment time (diff > 0) - always show
+    // - From appointment time until 1 hour after (diff <= 0 && diff >= -oneHourInMs)
+    // So: diff >= -oneHourInMs covers both cases
+    return diff >= -oneHourInMs;
+  };
+
+  // Check if consultation time has not yet arrived (more than 30 minutes before)
+  const isConsultationTimeNotYet = (appointment: PatientAppointment) => {
+    if (appointment.status !== "scheduled" && appointment.status !== "in-progress") {
+      return false;
+    }
+
+    const appointmentDateTime = new Date(
+      `${appointment.date}T${appointment.time}`
+    );
+    
+    const diff = appointmentDateTime.getTime() - currentTime.getTime();
+    
+    // 30 minutes in milliseconds
+    const thirtyMinutesInMs = 30 * 60 * 1000;
+    
+    // Consultation time has not yet arrived if diff > 30 minutes
+    return diff > thirtyMinutesInMs;
   };
 
   // Get time remaining until appointment (for waiting screen)
@@ -647,24 +675,40 @@ const Appointment = () => {
     setLoadingAvailability(true);
     
     try {
-      // Get the doctor ID from the original appointment
+      // Get the doctor ID and appointment type from the original appointment
       const appointmentResponse = await apiService.getAppointmentById(appointment.id);
       if (appointmentResponse.success && appointmentResponse.data) {
-        const doctorId = appointmentResponse.data.doctorId?._id || appointmentResponse.data.doctorId;
+        const apt = appointmentResponse.data as any;
+        const doctorId = apt.doctorId?._id || apt.doctorId;
+        const appointmentType = apt.type || appointment.type; // video or home-visit
         
-        // Load doctor availability
+        // Load doctor availability - მხოლოდ იმ ტიპის, რომელიც აქვს appointment-ს
         // პაციენტისთვის: forPatient=true, რომ დაჯავშნილი სლოტები ჩანდეს
-        const availabilityResponse = await apiService.getDoctorAvailability(doctorId, undefined, true);
-        console.log('📅 Availability response:', JSON.stringify(availabilityResponse.data, null, 2));
+        const availabilityResponse = await apiService.getDoctorAvailability(
+          doctorId, 
+          appointmentType as "video" | "home-visit", 
+          true
+        );
+        console.log('📅 Availability response for type', appointmentType, ':', JSON.stringify(availabilityResponse.data, null, 2));
         
         if (availabilityResponse.success && availabilityResponse.data) {
           // Flatten availability into slots
           const slots: { date: string; time: string }[] = [];
           const availability = availabilityResponse.data;
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
           
           // API returns: { date, dayOfWeek, timeSlots, bookedSlots, isAvailable, type }
           availability.forEach((day: any) => {
-            if (day.isAvailable && day.timeSlots) {
+            // Check if date is in the future
+            const dayDate = new Date(day.date);
+            dayDate.setHours(0, 0, 0, 0);
+            
+            // Only show future dates and matching type
+            if (day.isAvailable && 
+                day.timeSlots && 
+                dayDate >= today && 
+                day.type === appointmentType) {
               const bookedSet = new Set(day.bookedSlots || []);
               day.timeSlots.forEach((time: string) => {
                 // Only add if not booked
@@ -675,7 +719,7 @@ const Appointment = () => {
             }
           });
           
-          console.log('📅 Parsed slots:', slots);
+          console.log('📅 Parsed slots (filtered by type and future dates):', slots);
           setAvailableSlots(slots);
         }
       }
@@ -1343,6 +1387,12 @@ const Appointment = () => {
                         !isJoinButtonActive(appointment) && styles.joinCallButtonDisabled,
                       ]}
                       onPress={async () => {
+                        // Check if consultation time has not yet arrived
+                        if (isConsultationTimeNotYet(appointment)) {
+                          setShowConsultationTimeModal(true);
+                          return;
+                        }
+                        
                         if (!isJoinButtonActive(appointment)) {
                           // Navigate to waiting screen
                           router.push({
@@ -1995,6 +2045,36 @@ const Appointment = () => {
                 ) : (
                   <Text style={[styles.modalButtonText, styles.rescheduleButtonText]}>დამტკიცება</Text>
                 )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Consultation time not yet modal */}
+      <Modal
+        visible={showConsultationTimeModal}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setShowConsultationTimeModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={[styles.modalHeader, { justifyContent: "center", flexDirection: "column", gap: 12 }]}>
+              <Ionicons name="time-outline" size={48} color="#F59E0B" />
+              <Text style={styles.modalTitle}>კონსულტაციის დრო არ მოვიდა</Text>
+            </View>
+            <View style={styles.modalBody}>
+              <Text style={styles.modalMessage}>
+                ვერ შეხვალ ჯერ კონსულტაციის დრო არაა. გთხოვთ დაელოდოთ კონსულტაციის დროს.
+              </Text>
+            </View>
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.primaryButton]}
+                onPress={() => setShowConsultationTimeModal(false)}
+              >
+                <Text style={[styles.modalButtonText, styles.primaryButtonText]}>გასაგებია</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -2664,6 +2744,19 @@ const styles = StyleSheet.create({
     color: "#6B7280",
   },
   modalButtonTextPrimary: {
+    color: "#FFFFFF",
+  },
+  modalMessage: {
+    fontSize: 16,
+    fontFamily: "Poppins-Regular",
+    color: "#4B5563",
+    textAlign: "center",
+    lineHeight: 24,
+  },
+  primaryButton: {
+    backgroundColor: "#06B6D4",
+  },
+  primaryButtonText: {
     color: "#FFFFFF",
   },
   dateInput: {

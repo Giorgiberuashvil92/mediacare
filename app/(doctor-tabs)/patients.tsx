@@ -1571,175 +1571,6 @@ export default function DoctorPatients() {
                     }
                   />
                 </View>
-
-                {/* Medications */}
-                <View style={styles.formSection}>
-                  <View style={styles.medicationsHeader}>
-                    <Text style={styles.formLabel}>
-                      დანიშნული მედიკამენტები
-                    </Text>
-                    <TouchableOpacity
-                      style={styles.addMedicationButton}
-                      onPress={() => {
-                        setAppointmentData({
-                          ...appointmentData,
-                          medications: [
-                            ...appointmentData.medications,
-                            {
-                              name: "",
-                              dosage: "",
-                              frequency: "",
-                              duration: "",
-                              instructions: "",
-                            },
-                          ],
-                        });
-                      }}
-                    >
-                      <Ionicons name="add-circle" size={20} color="#06B6D4" />
-                      <Text style={styles.addMedicationText}>დამატება</Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {appointmentData.medications.map((med, index) => (
-                    <View key={index} style={styles.medicationCard}>
-                      <View style={styles.medicationCardHeader}>
-                        <Ionicons
-                          name="medkit-outline"
-                          size={20}
-                          color="#8B5CF6"
-                        />
-                        <TextInput
-                          style={styles.medicationNameInput}
-                          placeholder="მედიკამენტის სახელი"
-                          placeholderTextColor="#9CA3AF"
-                          value={med.name}
-                          onChangeText={(text) => {
-                            const newMedications = [
-                              ...appointmentData.medications,
-                            ];
-                            newMedications[index].name = text;
-                            setAppointmentData({
-                              ...appointmentData,
-                              medications: newMedications,
-                            });
-                          }}
-                        />
-                        {appointmentData.medications.length > 0 && (
-                          <TouchableOpacity
-                            onPress={() => {
-                              const newMedications =
-                                appointmentData.medications.filter(
-                                  (_, i) => i !== index
-                                );
-                              setAppointmentData({
-                                ...appointmentData,
-                                medications: newMedications,
-                              });
-                            }}
-                          >
-                            <Ionicons
-                              name="close-circle"
-                              size={20}
-                              color="#EF4444"
-                            />
-                          </TouchableOpacity>
-                        )}
-                      </View>
-
-                      <View style={styles.medicationDetails}>
-                        <View style={styles.medicationDetailRow}>
-                          <Text style={styles.medicationDetailLabel}>
-                            დოზა:
-                          </Text>
-                          <TextInput
-                            style={styles.medicationDetailInput}
-                            placeholder="მაგ: 10მგ"
-                            placeholderTextColor="#9CA3AF"
-                            value={med.dosage}
-                            onChangeText={(text) => {
-                              const newMedications = [
-                                ...appointmentData.medications,
-                              ];
-                              newMedications[index].dosage = text;
-                              setAppointmentData({
-                                ...appointmentData,
-                                medications: newMedications,
-                              });
-                            }}
-                          />
-                        </View>
-                        <View style={styles.medicationDetailRow}>
-                          <Text style={styles.medicationDetailLabel}>
-                            სიხშირე:
-                          </Text>
-                          <TextInput
-                            style={styles.medicationDetailInput}
-                            placeholder="მაგ: დღეში 1-ჯერ"
-                            placeholderTextColor="#9CA3AF"
-                            value={med.frequency}
-                            onChangeText={(text) => {
-                              const newMedications = [
-                                ...appointmentData.medications,
-                              ];
-                              newMedications[index].frequency = text;
-                              setAppointmentData({
-                                ...appointmentData,
-                                medications: newMedications,
-                              });
-                            }}
-                          />
-                        </View>
-                        <View style={styles.medicationDetailRow}>
-                          <Text style={styles.medicationDetailLabel}>
-                            ხანგრძლივობა:
-                          </Text>
-                          <TextInput
-                            style={styles.medicationDetailInput}
-                            placeholder="მაგ: 7 დღე"
-                            placeholderTextColor="#9CA3AF"
-                            value={med.duration}
-                            onChangeText={(text) => {
-                              const newMedications = [
-                                ...appointmentData.medications,
-                              ];
-                              newMedications[index].duration = text;
-                              setAppointmentData({
-                                ...appointmentData,
-                                medications: newMedications,
-                              });
-                            }}
-                          />
-                        </View>
-                        <View style={styles.medicationInstructionsRow}>
-                          <Text style={styles.medicationDetailLabel}>
-                            ინსტრუქცია:
-                          </Text>
-                          <TextInput
-                            style={styles.medicationInstructionsInput}
-                            placeholder="დამატებითი ინსტრუქცია (არასავალდებულო)"
-                            placeholderTextColor="#9CA3AF"
-                            multiline
-                            numberOfLines={2}
-                            value={med.instructions || ""}
-                            onChangeText={(text) => {
-                              const newMedications = [
-                                ...appointmentData.medications,
-                              ];
-                              newMedications[index].instructions = text;
-                              setAppointmentData({
-                                ...appointmentData,
-                                medications: newMedications,
-                              });
-                            }}
-                          />
-                        </View>
-                      </View>
-                    </View>
-                  ))}
-                </View>
-
-                {/* Follow Up */}
                 <View style={styles.formSection}>
                   <TouchableOpacity
                     style={styles.checkboxRow}
@@ -1953,22 +1784,178 @@ export default function DoctorPatients() {
                     </>
                   )}
                 </View>
+                {/* Medications */}
+                <View style={styles.formSection}>
+                  <View style={styles.medicationsHeader}>
+                    <Text style={styles.formLabel}>
+                      დანიშნული მედიკამენტები
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.addMedicationButton}
+                      onPress={() => {
+                        setAppointmentData({
+                          ...appointmentData,
+                          medications: [
+                            ...appointmentData.medications,
+                            {
+                              name: "",
+                              dosage: "",
+                              frequency: "",
+                              duration: "",
+                              instructions: "",
+                            },
+                          ],
+                        });
+                      }}
+                    >
+                      <Ionicons name="add-circle" size={20} color="#06B6D4" />
+                      <Text style={styles.addMedicationText}>დამატება</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {appointmentData.medications.map((med, index) => (
+                    <View key={index} style={styles.medicationCard}>
+                      <View style={styles.medicationCardHeader}>
+                        <Ionicons
+                          name="medkit-outline"
+                          size={20}
+                          color="#8B5CF6"
+                        />
+                        <TextInput
+                          style={styles.medicationNameInput}
+                          placeholder="მედიკამენტის სახელი"
+                          placeholderTextColor="#9CA3AF"
+                          value={med.name}
+                          onChangeText={(text) => {
+                            const newMedications = [
+                              ...appointmentData.medications,
+                            ];
+                            newMedications[index].name = text;
+                            setAppointmentData({
+                              ...appointmentData,
+                              medications: newMedications,
+                            });
+                          }}
+                        />
+                        {appointmentData.medications.length > 0 && (
+                          <TouchableOpacity
+                            onPress={() => {
+                              const newMedications =
+                                appointmentData.medications.filter(
+                                  (_, i) => i !== index
+                                );
+                              setAppointmentData({
+                                ...appointmentData,
+                                medications: newMedications,
+                              });
+                            }}
+                          >
+                            <Ionicons
+                              name="close-circle"
+                              size={20}
+                              color="#EF4444"
+                            />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+
+                      <View style={styles.medicationDetails}>
+                        <View style={styles.medicationDetailRow}>
+                          <Text style={styles.medicationDetailLabel}>
+                            დოზა:
+                          </Text>
+                          <TextInput
+                            style={styles.medicationDetailInput}
+                            placeholder="მაგ: 10მგ"
+                            placeholderTextColor="#9CA3AF"
+                            value={med.dosage}
+                            onChangeText={(text) => {
+                              const newMedications = [
+                                ...appointmentData.medications,
+                              ];
+                              newMedications[index].dosage = text;
+                              setAppointmentData({
+                                ...appointmentData,
+                                medications: newMedications,
+                              });
+                            }}
+                          />
+                        </View>
+                        <View style={styles.medicationDetailRow}>
+                          <Text style={styles.medicationDetailLabel}>
+                            სიხშირე:
+                          </Text>
+                          <TextInput
+                            style={styles.medicationDetailInput}
+                            placeholder="მაგ: დღეში 1-ჯერ"
+                            placeholderTextColor="#9CA3AF"
+                            value={med.frequency}
+                            onChangeText={(text) => {
+                              const newMedications = [
+                                ...appointmentData.medications,
+                              ];
+                              newMedications[index].frequency = text;
+                              setAppointmentData({
+                                ...appointmentData,
+                                medications: newMedications,
+                              });
+                            }}
+                          />
+                        </View>
+                        <View style={styles.medicationDetailRow}>
+                          <Text style={styles.medicationDetailLabel}>
+                            ხანგრძლივობა:
+                          </Text>
+                          <TextInput
+                            style={styles.medicationDetailInput}
+                            placeholder="მაგ: 7 დღე"
+                            placeholderTextColor="#9CA3AF"
+                            value={med.duration}
+                            onChangeText={(text) => {
+                              const newMedications = [
+                                ...appointmentData.medications,
+                              ];
+                              newMedications[index].duration = text;
+                              setAppointmentData({
+                                ...appointmentData,
+                                medications: newMedications,
+                              });
+                            }}
+                          />
+                        </View>
+                        <View style={styles.medicationInstructionsRow}>
+                          <Text style={styles.medicationDetailLabel}>
+                            ინსტრუქცია:
+                          </Text>
+                          <TextInput
+                            style={styles.medicationInstructionsInput}
+                            placeholder="დამატებითი ინსტრუქცია (არასავალდებულო)"
+                            placeholderTextColor="#9CA3AF"
+                            multiline
+                            numberOfLines={2}
+                            value={med.instructions || ""}
+                            onChangeText={(text) => {
+                              const newMedications = [
+                                ...appointmentData.medications,
+                              ];
+                              newMedications[index].instructions = text;
+                              setAppointmentData({
+                                ...appointmentData,
+                                medications: newMedications,
+                              });
+                            }}
+                          />
+                        </View>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+
+                {/* Follow Up */}
+              
 
                 {/* Notes */}
-                <View style={styles.formSection}>
-                  <Text style={styles.formLabel}>შენიშვნები</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="დამატებითი ინფორმაცია..."
-                    placeholderTextColor="#9CA3AF"
-                    multiline
-                    numberOfLines={4}
-                    value={appointmentData.notes}
-                    onChangeText={(text) =>
-                      setAppointmentData({ ...appointmentData, notes: text })
-                    }
-                  />
-                </View>
+
 
                 {/* Laboratory Tests - Available when completing appointment */}
                 {(selectedConsultation?.status === "completed" ||
@@ -2055,6 +2042,21 @@ export default function DoctorPatients() {
                   </View>
                 )}
 
+                <View style={styles.formSection}>
+                  <Text style={styles.formLabel}>ინსტრუქცია კვლევებზე</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="დამატებითი ინფორმაცია..."
+                    placeholderTextColor="#9CA3AF"
+                    multiline
+                    numberOfLines={4}
+                    value={appointmentData.notes}
+                    onChangeText={(text) =>
+                      setAppointmentData({ ...appointmentData, notes: text })
+                    }
+                  />
+                </View>
+                
                 <View style={styles.formSection}>
                   <Text style={styles.formLabel}>ფორმა 100 ფაილი</Text>
                   {selectedConsultation?.form100?.pdfUrl ? (

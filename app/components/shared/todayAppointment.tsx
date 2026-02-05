@@ -38,6 +38,7 @@ const TodayAppointment = () => {
   const [showModal, setShowModal] = useState(false);
   const [todayAppointments, setTodayAppointments] = useState<PatientAppointment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   // Load today's appointments from API
   useEffect(() => {
@@ -118,6 +119,15 @@ const TodayAppointment = () => {
     loadTodayAppointments();
   }, [isAuthenticated, user?.id]);
 
+  // Update current time every minute for countdown
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000); // Update every minute
+
+    return () => clearInterval(interval);
+  }, []);
+
   // If loading or no appointments for today, don't show banner
   if (loading || todayAppointments.length === 0) {
     return null;
@@ -140,9 +150,38 @@ const TodayAppointment = () => {
     const [hours, minutes] = appointmentTime.split(':').map(Number);
     const appointmentDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
     
-    const now = new Date();
-    const diff = appointmentDateTime.getTime() - now.getTime();
+    const diff = appointmentDateTime.getTime() - currentTime.getTime();
     return diff > 0 && diff <= 60 * 60 * 1000; // 1 hour
+  };
+
+  // Check if join button should be active
+  // Button is active from appointment time until 1 hour after appointment time
+  const isJoinButtonActive = () => {
+    // Only show for scheduled or in-progress appointments
+    if (appointment.status !== "scheduled" && appointment.status !== "in-progress" && appointment.status !== "confirmed" && appointment.status !== "pending") {
+      return false;
+    }
+
+    // Use formattedDate that we already calculated
+    const appointmentDate = appointment.formattedDate || appointment.date || '';
+    const appointmentTime = appointment.time || appointment.appointmentTime || '00:00';
+    
+    // Parse appointment date and time
+    const appointmentDateTime = new Date(
+      `${appointmentDate}T${appointmentTime}`
+    );
+    
+    // Calculate time difference (negative means past)
+    const diff = appointmentDateTime.getTime() - currentTime.getTime();
+    
+    // One hour in milliseconds
+    const oneHourInMs = 60 * 60 * 1000;
+    
+    // Button is active:
+    // - Before appointment time (diff > 0) - always show
+    // - From appointment time until 1 hour after (diff <= 0 && diff >= -oneHourInMs)
+    // So: diff >= -oneHourInMs covers both cases
+    return diff >= -oneHourInMs;
   };
 
   return (
@@ -227,26 +266,28 @@ const TodayAppointment = () => {
                 </View>
               </View>
 
-              <TouchableOpacity
-                style={[styles.joinCallButton, isUrgent() && styles.joinCallButtonUrgent]}
-                onPress={() => {
-                  setShowModal(false);
-                  router.push({
-                    pathname: "/screens/video-call",
-                    params: {
-                      appointmentId: appointment.id,
-                      doctorName: appointment.doctorName,
-                      roomName: `medicare-${appointment.id}`,
-                    },
-                  });
-                }}
-              >
-                <Ionicons name="videocam" size={20} color="#FFFFFF" />
-                <Text style={styles.joinCallText}>
-                  შესვლა კონსულტაციაზე
-                </Text>
-                <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
-              </TouchableOpacity>
+              {isJoinButtonActive() && (
+                <TouchableOpacity
+                  style={[styles.joinCallButton, isUrgent() && styles.joinCallButtonUrgent]}
+                  onPress={() => {
+                    setShowModal(false);
+                    router.push({
+                      pathname: "/screens/video-call",
+                      params: {
+                        appointmentId: appointment.id,
+                        doctorName: appointment.doctorName,
+                        roomName: `medicare-${appointment.id}`,
+                      },
+                    });
+                  }}
+                >
+                  <Ionicons name="videocam" size={20} color="#FFFFFF" />
+                  <Text style={styles.joinCallText}>
+                    შესვლა კონსულტაციაზე
+                  </Text>
+                  <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+                </TouchableOpacity>
+              )}
 
               <TouchableOpacity
                 style={styles.viewAllButton}

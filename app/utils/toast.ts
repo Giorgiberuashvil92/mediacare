@@ -68,12 +68,47 @@ export const showToast = {
     registerError: (error: string) => {
       let message = 'შეცდომა რეგისტრაციისას';
       
-      if (error.includes('already exists')) {
-        message = 'ამ ელ-ფოსტით უკვე არსებობს ანგარიში';
-      } else if (error.includes('Invalid email')) {
+      // Convert error to lowercase for case-insensitive matching
+      const errorLower = error.toLowerCase();
+      
+      // Check for errors in priority order: phone > idNumber > email
+      // Note: Errors now include role (Doctor/Patient) in the message
+      if (errorLower.includes('phone number') && errorLower.includes('already exists')) {
+        if (errorLower.includes('doctor')) {
+          message = 'ამ ტელეფონის ნომრით უკვე არსებობს ექიმის ანგარიში';
+        } else if (errorLower.includes('patient')) {
+          message = 'ამ ტელეფონის ნომრით უკვე არსებობს პაციენტის ანგარიში';
+        } else {
+          message = 'ამ ტელეფონის ნომრით უკვე არსებობს ანგარიში';
+        }
+      } else if (
+        errorLower.includes('personal id number') &&
+        errorLower.includes('already exists')
+      ) {
+        if (errorLower.includes('doctor')) {
+          message = 'ამ პირადი ნომრით უკვე არსებობს ექიმის ანგარიში';
+        } else if (errorLower.includes('patient')) {
+          message = 'ამ პირადი ნომრით უკვე არსებობს პაციენტის ანგარიში';
+        } else {
+          message = 'ამ პირადი ნომრით უკვე არსებობს ანგარიში';
+        }
+      } else if (errorLower.includes('email') && errorLower.includes('already exists')) {
+        if (errorLower.includes('doctor')) {
+          message = 'ამ ელ-ფოსტით უკვე არსებობს ექიმის ანგარიში';
+        } else if (errorLower.includes('patient')) {
+          message = 'ამ ელ-ფოსტით უკვე არსებობს პაციენტის ანგარიში';
+        } else {
+          message = 'ამ ელ-ფოსტით უკვე არსებობს ანგარიში';
+        }
+      } else if (errorLower.includes('already exists')) {
+        // Fallback for other "already exists" errors
+        message = 'ეს მონაცემები უკვე გამოყენებულია';
+      } else if (errorLower.includes('invalid email')) {
         message = 'არასწორი ელ-ფოსტის ფორმატი';
-      } else if (error.includes('Password')) {
+      } else if (errorLower.includes('password')) {
         message = 'პაროლი უნდა იყოს მინიმუმ 6 სიმბოლო';
+      } else if (errorLower.includes('phone number is required')) {
+        message = 'ტელეფონის ნომერი აუცილებელია';
       }
       
       showToast.error(message, 'რეგისტრაციის შეცდომა');

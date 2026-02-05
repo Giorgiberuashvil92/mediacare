@@ -182,6 +182,18 @@ export default function DoctorAppointments() {
 
       if (response.success) {
         const consultationsData = response.data as any;
+        
+        // Debug: Check if any appointment has rescheduleRequest in raw data
+        console.log('🔍 Raw consultations data check:', {
+          total: consultationsData.length,
+          withRescheduleRequest: consultationsData.filter((c: any) => c.rescheduleRequest).length,
+          appointmentsWithReschedule: consultationsData
+            .filter((c: any) => c.rescheduleRequest)
+            .map((c: any) => ({
+              id: c.id,
+              rescheduleRequest: c.rescheduleRequest,
+            })),
+        });
         // Format dates to local timezone (same as patient side)
         const formattedConsultations = consultationsData.map((consultation: any) => {
           // Format date from ISO to YYYY-MM-DD using local timezone
@@ -192,8 +204,32 @@ export default function DoctorAppointments() {
             const day = String(date.getDate()).padStart(2, '0');
             consultation.date = `${year}-${month}-${day}`;
           }
+          
+          // Format reschedule request date if exists
+          if (consultation.rescheduleRequest) {
+            console.log('🔄 Found rescheduleRequest for appointment:', consultation.id);
+            console.log('   Status:', consultation.rescheduleRequest.status);
+            console.log('   RequestedBy:', consultation.rescheduleRequest.requestedBy);
+            console.log('   RequestedDate:', consultation.rescheduleRequest.requestedDate);
+            console.log('   RequestedTime:', consultation.rescheduleRequest.requestedTime);
+            console.log('   Full object:', JSON.stringify(consultation.rescheduleRequest, null, 2));
+            
+            if (consultation.rescheduleRequest.requestedDate) {
+              const reqDate = new Date(consultation.rescheduleRequest.requestedDate);
+              const year = reqDate.getFullYear();
+              const month = String(reqDate.getMonth() + 1).padStart(2, '0');
+              const day = String(reqDate.getDate()).padStart(2, '0');
+              consultation.rescheduleRequest = {
+                ...consultation.rescheduleRequest,
+                requestedDate: `${year}-${month}-${day}`,
+              };
+              console.log('   Formatted date:', consultation.rescheduleRequest.requestedDate);
+            }
+          }
+          
           return consultation;
         });
+        console.log('📋 Formatted consultations with rescheduleRequests:', formattedConsultations.filter((c: any) => c.rescheduleRequest));
         setConsultations(formattedConsultations);
         
         // Load documents count for each consultation
@@ -302,24 +338,30 @@ export default function DoctorAppointments() {
     return diff > 0 && diff <= 30 * 60 * 1000; // 30 minutes
   };
 
-  // Check if join button should be active (5 minutes before, active for 30 minutes)
-  // TEMPORARY: Always return true for testing Agora
+  // Check if join button should be active
+  // Button is active before appointment time and until 1 hour after appointment time
   const isJoinButtonActive = (consultation: Consultation) => {
-    // For testing - always show button
-    if (consultation.status === "scheduled" || consultation.status === "in-progress") {
-      return true;
+    // Only show for scheduled or in-progress consultations
+    if (consultation.status !== "scheduled" && consultation.status !== "in-progress") {
+      return false;
     }
-    // Original logic (commented for testing)
-    // if (consultation.status !== "scheduled" && consultation.status !== "in-progress") return false;
-    // const consultationDateTime = new Date(
-    //   `${consultation.date}T${consultation.time}`
-    // );
-    // const diff = consultationDateTime.getTime() - currentTime.getTime();
-    // const fiveMinutesInMs = 5 * 60 * 1000;
-    // const thirtyMinutesInMs = 30 * 60 * 1000;
-    // // Active from 5 minutes before until 30 minutes after
-    // return diff <= fiveMinutesInMs && diff >= -thirtyMinutesInMs;
-    return false;
+
+    // Parse consultation date and time in local timezone
+    const [year, month, day] = consultation.date.split('-').map(Number);
+    const [timeHours, timeMinutes] = consultation.time.split(':').map(Number);
+    const consultationDateTime = new Date(year, month - 1, day, timeHours, timeMinutes, 0, 0);
+    
+    // Calculate time difference (negative means past)
+    const diff = consultationDateTime.getTime() - currentTime.getTime();
+    
+    // One hour in milliseconds
+    const oneHourInMs = 60 * 60 * 1000;
+    
+    // Button is active:
+    // - Before appointment time (diff > 0) - always show
+    // - From appointment time until 1 hour after (diff <= 0 && diff >= -oneHourInMs)
+    // So: diff >= -oneHourInMs covers both cases
+    return diff >= -oneHourInMs;
   };
 
   // Filter consultations - exclude followup consultations (they should only appear in patients.tsx)
@@ -658,12 +700,28 @@ export default function DoctorAppointments() {
     try {
       const response = await apiService.approveReschedule(appointmentId);
       if (response.success) {
+        // Refresh consultations list
         await fetchConsultations();
+        
         // Reload details if modal is open
         if (selectedConsultation?.id === appointmentId) {
           await openDetails(selectedConsultation);
         }
-        Alert.alert("წარმატება", "გადაჯავშნა დამტკიცდა");
+        
+        // Show success message with new date/time from response
+        let message = "გადაჯავშნა დამტკიცდა და ჯავშანი ავტომატურად გადაიჯავშნა ახალ თარიღზე";
+        if (response.data?.appointmentDate && response.data?.appointmentTime) {
+          // Format date for display
+          const dateObj = new Date(response.data.appointmentDate);
+          const formattedDate = dateObj.toLocaleDateString('ka-GE', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          });
+          message = `გადაჯავშნა დამტკიცდა\n\nახალი თარიღი: ${formattedDate} ${response.data.appointmentTime}`;
+        }
+        
+        Alert.alert("წარმატება", message);
       } else {
         Alert.alert("შეცდომა", response.message || "დამტკიცება ვერ მოხერხდა");
       }
@@ -1806,20 +1864,53 @@ export default function DoctorAppointments() {
                 )}
 
                 {/* Reschedule Request Status - if patient requested reschedule */}
-                {consultation.rescheduleRequest?.status === 'pending' && 
-                 consultation.rescheduleRequest?.requestedBy === 'patient' && (
-                  <View style={styles.rescheduleRequestCardInline}>
-                    <View style={styles.rescheduleRequestHeader}>
-                      <Ionicons name="calendar-outline" size={16} color="#8B5CF6" />
-                      <Text style={styles.rescheduleRequestTitleInline}>
-                        პაციენტმა მოითხოვა გადაჯავშნა
+                {(() => {
+                  const hasRescheduleRequest = consultation.rescheduleRequest?.status === 'pending' && 
+                                               consultation.rescheduleRequest?.requestedBy === 'patient';
+                  if (consultation.rescheduleRequest) {
+                    console.log(`🔍 Appointment ${consultation.id} rescheduleRequest check:`, {
+                      hasRescheduleRequest,
+                      status: consultation.rescheduleRequest.status,
+                      requestedBy: consultation.rescheduleRequest.requestedBy,
+                      requestedDate: consultation.rescheduleRequest.requestedDate,
+                      requestedTime: consultation.rescheduleRequest.requestedTime,
+                    });
+                  }
+                  return hasRescheduleRequest && consultation.rescheduleRequest ? (
+                    <View style={styles.rescheduleRequestCardInline}>
+                      <View style={styles.rescheduleRequestHeader}>
+                        <Ionicons name="calendar-outline" size={16} color="#8B5CF6" />
+                        <Text style={styles.rescheduleRequestTitleInline}>
+                          პაციენტმა მოითხოვა გადაჯავშნა
+                        </Text>
+                      </View>
+                      <Text style={styles.rescheduleRequestTextInline}>
+                        {consultation.rescheduleRequest.requestedDate} {consultation.rescheduleRequest.requestedTime}
                       </Text>
+                      {consultation.rescheduleRequest.reason && (
+                        <Text style={styles.rescheduleRequestReasonInline}>
+                          {consultation.rescheduleRequest.reason}
+                        </Text>
+                      )}
+                      <View style={styles.rescheduleRequestActionsInline}>
+                        <TouchableOpacity
+                          style={[styles.approveButtonInline, styles.actionButtonInline]}
+                          onPress={() => handleApproveReschedule(consultation.id)}
+                        >
+                          <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                          <Text style={styles.approveButtonTextInline}>დამტკიცება</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.rejectButtonInline, styles.actionButtonInline]}
+                          onPress={() => handleRejectReschedule(consultation.id)}
+                        >
+                          <Ionicons name="close-circle" size={16} color="#EF4444" />
+                          <Text style={styles.rejectButtonTextInline}>უარყოფა</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
-                    <Text style={styles.rescheduleRequestTextInline}>
-                      {consultation.rescheduleRequest.requestedDate} {consultation.rescheduleRequest.requestedTime}
-                    </Text>
-                  </View>
-                )}
+                  ) : null;
+                })()}
 
                 {/* Status Actions */}
                 <View style={styles.statusActionsRow}>
@@ -3934,6 +4025,43 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins-Regular",
     color: "#6B7280",
     marginTop: 4,
+  },
+  rescheduleRequestReasonInline: {
+    fontSize: 11,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+    marginTop: 4,
+    fontStyle: "italic",
+  },
+  rescheduleRequestActionsInline: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 10,
+  },
+  actionButtonInline: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 4,
+  },
+  approveButtonInline: {
+    backgroundColor: "#D1FAE5",
+  },
+  approveButtonTextInline: {
+    fontSize: 12,
+    fontFamily: "Poppins-SemiBold",
+    color: "#10B981",
+  },
+  rejectButtonInline: {
+    backgroundColor: "#FEE2E2",
+  },
+  rejectButtonTextInline: {
+    fontSize: 12,
+    fontFamily: "Poppins-SemiBold",
+    color: "#EF4444",
   },
   textInput: {
     backgroundColor: "#F9FAFB",

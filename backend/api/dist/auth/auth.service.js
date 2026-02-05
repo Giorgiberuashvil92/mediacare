@@ -96,10 +96,6 @@ let AuthService = class AuthService {
             location: registerDto.location,
         });
         const { email, password, role, dateOfBirth, minWorkingDaysRequired, phone, ...userData } = registerDto;
-        const existingUser = await this.userModel.findOne({ email });
-        if (existingUser) {
-            throw new common_1.ConflictException('User with this email already exists');
-        }
         if (!phone || !phone.trim()) {
             throw new common_1.BadRequestException('Phone number is required');
         }
@@ -109,11 +105,32 @@ let AuthService = class AuthService {
             role,
             phoneLength: phone.trim().length,
         });
-        const existingPhoneUser = await this.userModel.findOne({
-            phone: phone.trim(),
-        });
+        const [existingUser, existingPhoneUser, existingIdNumberUser] = await Promise.all([
+            this.userModel.findOne({ email, role }),
+            this.userModel.findOne({ phone: phone.trim(), role }),
+            this.userModel.findOne({
+                idNumber: registerDto.idNumber.trim(),
+                role,
+            }),
+        ]);
+        const errors = [];
+        if (existingUser) {
+            errors.push(`${role === user_schema_1.UserRole.DOCTOR ? 'Doctor' : 'Patient'} with this email already exists`);
+        }
         if (existingPhoneUser) {
-            throw new common_1.ConflictException('User with this phone number already exists');
+            errors.push(`${role === user_schema_1.UserRole.DOCTOR ? 'Doctor' : 'Patient'} with this phone number already exists`);
+        }
+        if (existingIdNumberUser) {
+            errors.push(`${role === user_schema_1.UserRole.DOCTOR ? 'Doctor' : 'Patient'} with this personal ID number already exists`);
+        }
+        if (errors.length > 0) {
+            if (errors.some((e) => e.includes('phone number'))) {
+                throw new common_1.ConflictException(`${role === user_schema_1.UserRole.DOCTOR ? 'Doctor' : 'Patient'} with this phone number already exists`);
+            }
+            if (errors.some((e) => e.includes('personal ID number'))) {
+                throw new common_1.ConflictException(`${role === user_schema_1.UserRole.DOCTOR ? 'Doctor' : 'Patient'} with this personal ID number already exists`);
+            }
+            throw new common_1.ConflictException(errors[0]);
         }
         if (role === user_schema_1.UserRole.DOCTOR && !registerDto.profileImage) {
             throw new common_1.BadRequestException('Profile image is required for doctors');

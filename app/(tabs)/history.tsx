@@ -451,7 +451,6 @@ const History = () => {
                     }
                     return null;
                   })()}
-                  {/* Symptoms Button - Show only if not requiring follow-up or if it's a follow-up appointment */}
                   {(() => {
                     const isFollowUpAppointment = visit.followUp?.appointmentId;
                     const requiresFollowUp = visit.followUp?.required && !visit.followUp?.appointmentId;
@@ -468,9 +467,8 @@ const History = () => {
                         setShowSymptomsModal(true);
                       }}
                     >
-                      <Ionicons name="medical-outline" size={18} color="#F59E0B" />
-                      <Text style={styles.actionButtonText}>სიმპტომები</Text>
-                      <Ionicons name="chevron-forward" size={16} color="#6B7280" />
+                    
+                    
                     </TouchableOpacity>
                   )}
 
@@ -560,120 +558,6 @@ const History = () => {
                     </TouchableOpacity>
                   )}
 
-                  {visit.medications && visit.medications.length > 0 && (
-                    <View style={styles.medicationsContainer}>
-                      <Text style={styles.medicationsLabel}>
-                        დანიშნული მედიკამენტები:
-                      </Text>
-                      <View style={styles.medicationsList}>
-                        {visit.medications.slice(0, 3).map((med: any, index: number) => (
-                          <View key={index} style={styles.medicationTag}>
-                            <Ionicons
-                              name="medkit-outline"
-                              size={14}
-                              color="#8B5CF6"
-                            />
-                            <Text style={styles.medicationText}>
-                              {med.name}
-                            </Text>
-                          </View>
-                        ))}
-                        {visit.medications.length > 3 && (
-                          <View style={styles.medicationTag}>
-                            <Text style={styles.medicationText}>
-                              +{visit.medications.length - 3} მეტი
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                    </View>
-                  )}
-
-                  {/* Instrumental Tests Indicator */}
-                  {visit.instrumentalTests && visit.instrumentalTests.length > 0 && (
-                    <View style={styles.labTestsContainer}>
-                      <View style={styles.labTestsHeader}>
-                        <Ionicons name="pulse" size={16} color="#8B5CF6" />
-                        <Text style={styles.labTestsLabel}>
-                          ინსტრუმენტული კვლევები
-                        </Text>
-                      </View>
-                      <View style={styles.labTestsBadges}>
-                        <View style={styles.labTestBadge}>
-                          <Text style={styles.labTestBadgeText}>
-                            {visit.instrumentalTests.length} კვლევა
-                          </Text>
-                        </View>
-                        {(() => {
-                          const withResults = visit.instrumentalTests.filter((t: any) => t.resultFile?.url).length;
-                          const pending = visit.instrumentalTests.length - withResults;
-                          return (
-                            <>
-                              {withResults > 0 && (
-                                <View style={[styles.labTestBadge, styles.labTestBadgeSuccess]}>
-                                  <Ionicons name="checkmark-circle" size={12} color="#10B981" />
-                                  <Text style={[styles.labTestBadgeText, styles.labTestBadgeTextSuccess]}>
-                                    {withResults} პასუხი
-                                  </Text>
-                                </View>
-                              )}
-                              {pending > 0 && (
-                                <View style={[styles.labTestBadge, styles.labTestBadgePending]}>
-                                  <Ionicons name="time-outline" size={12} color="#F59E0B" />
-                                  <Text style={[styles.labTestBadgeText, styles.labTestBadgeTextPending]}>
-                                    {pending} მოლოდინში
-                                  </Text>
-                                </View>
-                              )}
-                            </>
-                          );
-                        })()}
-                      </View>
-                    </View>
-                  )}
-
-                  {/* Laboratory Tests Indicator */}
-                  {visit.laboratoryTests && visit.laboratoryTests.length > 0 && (
-                    <View style={styles.labTestsContainer}>
-                      <View style={styles.labTestsHeader}>
-                        <Ionicons name="flask" size={16} color="#8B5CF6" />
-                        <Text style={styles.labTestsLabel}>
-                          ლაბორატორიული კვლევები
-                        </Text>
-                      </View>
-                      <View style={styles.labTestsBadges}>
-                        <View style={styles.labTestBadge}>
-                          <Text style={styles.labTestBadgeText}>
-                            {visit.laboratoryTests.length} კვლევა
-                          </Text>
-                        </View>
-                        {(() => {
-                          const withResults = visit.laboratoryTests.filter((t: any) => t.resultFile?.url).length;
-                          const pending = visit.laboratoryTests.length - withResults;
-                          return (
-                            <>
-                              {withResults > 0 && (
-                                <View style={[styles.labTestBadge, styles.labTestBadgeSuccess]}>
-                                  <Ionicons name="checkmark-circle" size={12} color="#10B981" />
-                                  <Text style={[styles.labTestBadgeText, styles.labTestBadgeTextSuccess]}>
-                                    {withResults} პასუხი
-                                  </Text>
-                                </View>
-                              )}
-                              {pending > 0 && (
-                                <View style={[styles.labTestBadge, styles.labTestBadgePending]}>
-                                  <Ionicons name="time-outline" size={12} color="#F59E0B" />
-                                  <Text style={[styles.labTestBadgeText, styles.labTestBadgeTextPending]}>
-                                    {pending} მოლოდინში
-                                  </Text>
-                                </View>
-                              )}
-                            </>
-                          );
-                        })()}
-                      </View>
-                    </View>
-                  )}
                 </View>
                 </TouchableOpacity>
 
@@ -694,6 +578,175 @@ const History = () => {
                 {isExpanded && (
                   <View style={styles.expandedSection}>
                     {/* Notes */}
+                    {visit.instrumentalTests && visit.instrumentalTests.length > 0 && (
+                      <View style={styles.detailSection}>
+                        <Text style={styles.detailSectionTitle}>
+                          დანიშნული ინსტრუმენტული კვლევები
+                        </Text>
+                        {visit.instrumentalTests.map((test: any, index: number) => (
+                          <TouchableOpacity
+                            key={index}
+                            style={styles.testCard}
+                            onPress={() => {
+                              if (!test.booked && test.productId) {
+                                router.push({
+                                  pathname: "/screens/lab/select-clinic",
+                                  params: {
+                                    productId: test.productId,
+                                    productName: test.productName,
+                                    productPrice: "0",
+                                    appointmentId: visit.id,
+                                    testType: "instrumental",
+                                  },
+                                });
+                              }
+                            }}
+                            disabled={test.booked}
+                          >
+                            <View style={styles.testHeader}>
+                              <Ionicons name="pulse-outline" size={18} color="#8B5CF6" />
+                              <View style={styles.testInfo}>
+                                <Text style={styles.testName}>{test.productName}</Text>
+                                {test.clinicName && (
+                                  <Text style={styles.testNotes}>კლინიკა: {test.clinicName}</Text>
+                                )}
+                                {test.notes && (
+                                  <Text style={styles.testNotes}>შენიშვნა: {test.notes}</Text>
+                                )}
+                              </View>
+                            </View>
+                            {test.booked && (
+                              <View style={styles.bookedBadge}>
+                                <Ionicons
+                                  name="checkmark-circle"
+                                  size={16}
+                                  color="#10B981"
+                                />
+                                <Text style={styles.bookedBadgeText}>
+                                  დაჯავშნილია
+                                </Text>
+                              </View>
+                            )}
+                            {test.resultFile && (
+                              <TouchableOpacity
+                                style={styles.viewResultButton}
+                                onPress={async (e) => {
+                                  e.stopPropagation();
+                                  if (test.resultFile?.url) {
+                                    const url = test.resultFile.url;
+                                    const isPdf = test.resultFile.type === 'application/pdf' || url.endsWith('.pdf');
+                                    
+                                    if (isPdf) {
+                                      const googleDocsUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=false`;
+                                      Linking.openURL(googleDocsUrl).catch(() =>
+                                        Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა")
+                                      );
+                                    } else {
+                                      Linking.openURL(url).catch(() =>
+                                        Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა")
+                                      );
+                                    }
+                                  }
+                                }}
+                              >
+                                <Ionicons
+                                  name="document-text-outline"
+                                  size={16}
+                                  color="#8B5CF6"
+                                />
+                                <Text style={styles.viewResultButtonText}>
+                                  შედეგის ნახვა
+                                </Text>
+                              </TouchableOpacity>
+                            )}
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+
+                    {/* Laboratory Tests */}
+                    {visit.laboratoryTests && visit.laboratoryTests.length > 0 && (
+                      <View style={styles.detailSection}>
+                        <Text style={styles.detailSectionTitle}>
+                          დანიშნული ლაბორატორიული კვლევები
+                        </Text>
+                        {visit.laboratoryTests.map((test: any, index: number) => (
+                          <TouchableOpacity
+                            key={index}
+                            style={styles.testCard}
+                            onPress={() => {
+                              if (!test.booked && test.productId) {
+                                router.push({
+                                  pathname: "/screens/lab/select-clinic",
+                                  params: {
+                                    productId: test.productId,
+                                    productName: test.productName,
+                                    productPrice: "0",
+                                    appointmentId: visit.id,
+                                    testType: "laboratory",
+                                  },
+                                });
+                              }
+                            }}
+                            disabled={test.booked}
+                          >
+                            <View style={styles.testHeader}>
+                              <Ionicons name="flask-outline" size={18} color="#06B6D4" />
+                              <View style={styles.testInfo}>
+                                <Text style={styles.testName}>{test.productName}</Text>
+                                {test.clinicName && (
+                                  <Text style={styles.testNotes}>კლინიკა: {test.clinicName}</Text>
+                                )}
+                              </View>
+                            </View>
+                            {test.booked && (
+                              <View style={styles.bookedBadge}>
+                                <Ionicons
+                                  name="checkmark-circle"
+                                  size={16}
+                                  color="#10B981"
+                                />
+                                <Text style={styles.bookedBadgeText}>
+                                  დაჯავშნილია
+                                </Text>
+                              </View>
+                            )}
+                            {test.resultFile && (
+                              <TouchableOpacity
+                                style={styles.viewResultButton}
+                                onPress={async (e) => {
+                                  e.stopPropagation();
+                                  if (test.resultFile?.url) {
+                                    const url = test.resultFile.url;
+                                    const isPdf = test.resultFile.type === 'application/pdf' || url.endsWith('.pdf');
+                                    
+                                    if (isPdf) {
+                                      const googleDocsUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=false`;
+                                      Linking.openURL(googleDocsUrl).catch(() =>
+                                        Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა")
+                                      );
+                                    } else {
+                                      Linking.openURL(url).catch(() =>
+                                        Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა")
+                                      );
+                                    }
+                                  }
+                                }}
+                              >
+                                <Ionicons
+                                  name="document-text-outline"
+                                  size={16}
+                                  color="#06B6D4"
+                                />
+                                <Text style={styles.viewResultButtonText}>
+                                  შედეგის ნახვა
+                                </Text>
+                              </TouchableOpacity>
+                            )}
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
                     {visit.notes && (
                       <View style={styles.detailSection}>
                         <Text style={styles.detailSectionTitle}>შენიშვნები</Text>
@@ -744,137 +797,7 @@ const History = () => {
                     )}
 
                     {/* Instrumental Tests */}
-                    {visit.instrumentalTests && visit.instrumentalTests.length > 0 && (
-                      <View style={styles.detailSection}>
-                        <Text style={styles.detailSectionTitle}>
-                          დანიშნული ინსტრუმენტული კვლევები
-                        </Text>
-                        {visit.instrumentalTests.map((test: any, index: number) => (
-                          <View key={index} style={styles.testCard}>
-                            <View style={styles.testHeader}>
-                              <Ionicons name="pulse-outline" size={18} color="#8B5CF6" />
-                              <View style={styles.testInfo}>
-                                <Text style={styles.testName}>{test.productName}</Text>
-                                {test.clinicName && (
-                                  <Text style={styles.testNotes}>კლინიკა: {test.clinicName}</Text>
-                                )}
-                                {test.notes && (
-                                  <Text style={styles.testNotes}>შენიშვნა: {test.notes}</Text>
-                                )}
-                              </View>
-                            </View>
-                            {test.booked && (
-                              <View style={styles.bookedBadge}>
-                                <Ionicons
-                                  name="checkmark-circle"
-                                  size={16}
-                                  color="#10B981"
-                                />
-                                <Text style={styles.bookedBadgeText}>
-                                  დაჯავშნილია
-                                </Text>
-                              </View>
-                            )}
-                            {test.resultFile && (
-                              <TouchableOpacity
-                                style={styles.viewResultButton}
-                                onPress={async () => {
-                                  if (test.resultFile?.url) {
-                                    const url = test.resultFile.url;
-                                    const isPdf = test.resultFile.type === 'application/pdf' || url.endsWith('.pdf');
-                                    
-                                    if (isPdf) {
-                                      const googleDocsUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=false`;
-                                      Linking.openURL(googleDocsUrl).catch(() =>
-                                        Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა")
-                                      );
-                                    } else {
-                                      Linking.openURL(url).catch(() =>
-                                        Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა")
-                                      );
-                                    }
-                                  }
-                                }}
-                              >
-                                <Ionicons
-                                  name="document-text-outline"
-                                  size={16}
-                                  color="#8B5CF6"
-                                />
-                                <Text style={styles.viewResultButtonText}>
-                                  შედეგის ნახვა
-                                </Text>
-                              </TouchableOpacity>
-                            )}
-                          </View>
-                        ))}
-                      </View>
-                    )}
-
-                    {/* Laboratory Tests */}
-                    {visit.laboratoryTests && visit.laboratoryTests.length > 0 && (
-                      <View style={styles.detailSection}>
-                        <Text style={styles.detailSectionTitle}>
-                          დანიშნული ლაბორატორიული კვლევები
-                        </Text>
-                        {visit.laboratoryTests.map((test: any, index: number) => (
-                          <View key={index} style={styles.testCard}>
-                            <View style={styles.testHeader}>
-                              <Ionicons name="flask-outline" size={18} color="#06B6D4" />
-                              <View style={styles.testInfo}>
-                                <Text style={styles.testName}>{test.productName}</Text>
-                                {test.clinicName && (
-                                  <Text style={styles.testNotes}>კლინიკა: {test.clinicName}</Text>
-                                )}
-                              </View>
-                            </View>
-                            {test.booked && (
-                              <View style={styles.bookedBadge}>
-                                <Ionicons
-                                  name="checkmark-circle"
-                                  size={16}
-                                  color="#10B981"
-                                />
-                                <Text style={styles.bookedBadgeText}>
-                                  დაჯავშნილია
-                                </Text>
-                              </View>
-                            )}
-                            {test.resultFile && (
-                              <TouchableOpacity
-                                style={styles.viewResultButton}
-                                onPress={async () => {
-                                  if (test.resultFile?.url) {
-                                    const url = test.resultFile.url;
-                                    const isPdf = test.resultFile.type === 'application/pdf' || url.endsWith('.pdf');
-                                    
-                                    if (isPdf) {
-                                      const googleDocsUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=false`;
-                                      Linking.openURL(googleDocsUrl).catch(() =>
-                                        Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა")
-                                      );
-                                    } else {
-                                      Linking.openURL(url).catch(() =>
-                                        Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა")
-                                      );
-                                    }
-                                  }
-                                }}
-                              >
-                                <Ionicons
-                                  name="document-text-outline"
-                                  size={16}
-                                  color="#06B6D4"
-                                />
-                                <Text style={styles.viewResultButtonText}>
-                                  შედეგის ნახვა
-                                </Text>
-                              </TouchableOpacity>
-                            )}
-                          </View>
-                        ))}
-                      </View>
-                    )}
+                    
                   </View>
                 )}
               </View>
@@ -1557,39 +1480,7 @@ const History = () => {
       </Modal>
 
       {/* Symptoms Modal */}
-      <Modal
-        visible={showSymptomsModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowSymptomsModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>სიმპტომები</Text>
-              <TouchableOpacity
-                onPress={() => setShowSymptomsModal(false)}
-                style={styles.closeButton}
-              >
-                <Ionicons name="close" size={24} color="#6B7280" />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={styles.modalBody}>
-              <View style={styles.detailSection}>
-                <Text style={styles.detailValue}>{selectedSymptoms}</Text>
-              </View>
-            </ScrollView>
-            <View style={styles.modalFooter}>
-              <TouchableOpacity
-                style={styles.modalButton}
-                onPress={() => setShowSymptomsModal(false)}
-              >
-                <Text style={styles.modalButtonText}>დახურვა</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+     
 
       {/* Diagnosis Modal */}
       <Modal

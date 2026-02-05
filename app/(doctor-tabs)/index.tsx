@@ -170,7 +170,37 @@ export default function DoctorDashboard() {
         availabilityResponse.success &&
         Array.isArray(availabilityResponse.data)
       ) {
+        // 🔍 დეტალური ლოგირება availability response-ისთვის
+        console.log('\n📊 [Dashboard] getDoctorAvailability Response:');
+        console.log('   ✅ success:', availabilityResponse.success);
+        console.log('   📦 data length:', availabilityResponse.data.length);
+        console.log('   📋 Full response.data:', JSON.stringify(availabilityResponse.data, null, 2));
+        
+        // თითოეული availability object-ის დეტალური ანალიზი
+        availabilityResponse.data.forEach((avail: any, index: number) => {
+          console.log(`\n   📦 [${index}] Availability Object:`);
+          console.log('      📅 date:', avail.date, `(type: ${typeof avail.date})`);
+          console.log('      🎯 type:', avail.type);
+          console.log('      ⏱️  timeSlots:', avail.timeSlots, `(length: ${avail.timeSlots?.length || 0})`);
+          console.log('      🔒 bookedSlots:', avail.bookedSlots, `(length: ${avail.bookedSlots?.length || 0})`);
+          console.log('      ✅ isAvailable:', avail.isAvailable);
+          console.log('      📆 dayOfWeek:', avail.dayOfWeek);
+          
+          // დამატებითი ველების შემოწმება
+          if (avail.bookedTimeSlots) {
+            console.log('      ⚠️  bookedTimeSlots:', avail.bookedTimeSlots);
+          }
+          if (avail.appointments) {
+            console.log('      ⚠️  appointments:', avail.appointments);
+          }
+        });
+        
         setAvailability(availabilityResponse.data as any[]);
+      } else {
+        console.log('\n❌ [Dashboard] getDoctorAvailability - Invalid response:');
+        console.log('   success:', availabilityResponse.success);
+        console.log('   data:', availabilityResponse.data);
+        console.log('   isArray:', Array.isArray(availabilityResponse.data));
       }
     } catch (err) {
       console.error("Error fetching dashboard data:", err);

@@ -84,30 +84,6 @@ export class AuthService {
       ...userData
     } = registerDto;
 
-    const existingUser = await this.userModel.findOne({ email });
-    if (existingUser) {
-      throw new ConflictException('User with this email already exists');
-    }
-
-    // Phone verification temporarily disabled
-    // TODO: Re-enable phone verification when SMS service is fully configured
-    // if (phone) {
-    //   const isVerified = await this.phoneVerificationService.isPhoneVerified(phone);
-    //   if (!isVerified) {
-    //     throw new BadRequestException(
-    //       'Phone number must be verified before registration. Please verify your phone number first.',
-    //     );
-    //   }
-
-    //   // Check if phone is already registered
-    //   const existingPhoneUser = await this.userModel.findOne({ phone });
-    //   if (existingPhoneUser) {
-    //     throw new ConflictException('User with this phone number already exists');
-    //   }
-    // } else {
-    //   throw new BadRequestException('Phone number is required');
-    // }
-
     // Phone is required for all users (doctors and patients)
     if (!phone || !phone.trim()) {
       throw new BadRequestException('Phone number is required');
@@ -120,12 +96,51 @@ export class AuthService {
       phoneLength: phone.trim().length,
     });
 
-    // Check if phone is already registered (without verification requirement)
-    const existingPhoneUser = await this.userModel.findOne({
-      phone: phone.trim(),
-    });
+    // Check email, phone, and idNumber in parallel, but only for the same role
+    // Users can have the same email/phone/idNumber with different roles (doctor/patient)
+    const [existingUser, existingPhoneUser, existingIdNumberUser] =
+      await Promise.all([
+        this.userModel.findOne({ email, role }),
+        this.userModel.findOne({ phone: phone.trim(), role }),
+        this.userModel.findOne({
+          idNumber: registerDto.idNumber.trim(),
+          role,
+        }),
+      ]);
+
+    // Build error messages for all fields if they exist (only for same role)
+    const errors: string[] = [];
+    if (existingUser) {
+      errors.push(
+        `${role === UserRole.DOCTOR ? 'Doctor' : 'Patient'} with this email already exists`,
+      );
+    }
     if (existingPhoneUser) {
-      throw new ConflictException('User with this phone number already exists');
+      errors.push(
+        `${role === UserRole.DOCTOR ? 'Doctor' : 'Patient'} with this phone number already exists`,
+      );
+    }
+    if (existingIdNumberUser) {
+      errors.push(
+        `${role === UserRole.DOCTOR ? 'Doctor' : 'Patient'} with this personal ID number already exists`,
+      );
+    }
+
+    // If there are any errors, throw them
+    if (errors.length > 0) {
+      // Prioritize errors: phone > idNumber > email
+      if (errors.some((e) => e.includes('phone number'))) {
+        throw new ConflictException(
+          `${role === UserRole.DOCTOR ? 'Doctor' : 'Patient'} with this phone number already exists`,
+        );
+      }
+      if (errors.some((e) => e.includes('personal ID number'))) {
+        throw new ConflictException(
+          `${role === UserRole.DOCTOR ? 'Doctor' : 'Patient'} with this personal ID number already exists`,
+        );
+      }
+      // Otherwise throw the first error (email)
+      throw new ConflictException(errors[0]);
     }
 
     // Validate profile image for doctors

@@ -60,6 +60,7 @@ const MakeAppointment = () => {
   );
   const [visitAddress, setVisitAddress] = useState("");
   const [bookingFor, setBookingFor] = useState<"myself" | "other">("myself");
+  const [problemDescription, setProblemDescription] = useState("");
   const [uploadedFile, setUploadedFile] = useState<{
     uri: string;
     name: string;
@@ -306,9 +307,15 @@ const MakeAppointment = () => {
       return;
     }
 
-    // Always navigate to Patient Details page to fill in all information
+    // Validate problem description
+    if (!problemDescription.trim()) {
+      Alert.alert("შეცდომა", "გთხოვთ აღწეროთ პრობლემა");
+      return;
+    }
+
+    // Navigate directly to payment page
     router.push({
-      pathname: "/screens/appointment/patient-details",
+      pathname: "/screens/payment/payment-methods",
       params: {
         doctorId: doctorId as string,
         selectedDate: selectedDate as string,
@@ -318,7 +325,7 @@ const MakeAppointment = () => {
         consultationFee: consultationFee.toString(),
         appointmentType,
         visitAddress,
-        bookingFor,
+        problemDescription,
         uploadedFile: uploadedFile ? JSON.stringify(uploadedFile) : "",
       },
     });
@@ -532,6 +539,24 @@ const MakeAppointment = () => {
               />
             </View>
           )}
+        </View>
+
+        {/* Problem Description Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>პრობლემის აღწერა</Text>
+          <Text style={styles.sectionSubtitle}>
+            აღწერეთ თქვენი პრობლემა ან სიმპტომები დეტალურად
+          </Text>
+          <TextInput
+            style={styles.problemInput}
+            placeholder="მაგ: თავის ტკივილი, ტემპერატურა, სხვა სიმპტომები..."
+            placeholderTextColor="#9CA3AF"
+            value={problemDescription}
+            onChangeText={setProblemDescription}
+            multiline
+            numberOfLines={4}
+            textAlignVertical="top"
+          />
         </View>
 
         {/* File Upload Section */}
@@ -838,6 +863,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     minHeight: 70,
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#111827",
+    backgroundColor: "#FFFFFF",
+    textAlignVertical: "top",
+  },
+  problemInput: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    minHeight: 100,
     fontSize: 14,
     fontFamily: "Poppins-Regular",
     color: "#111827",

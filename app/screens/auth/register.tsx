@@ -93,6 +93,10 @@ export default function RegisterScreen() {
     filePath?: string;
   } | null>(null);
   const [uploadingIdentificationDocument, setUploadingIdentificationDocument] = useState(false);
+  
+  // Nationality selection (only for patients)
+  const [nationality, setNationality] = useState<"georgian" | "non-georgian" | null>(null);
+  const [showPassportInfoModal, setShowPassportInfoModal] = useState(false);
 
   const nameInputRef = useRef<TextInput>(null);
   const emailInputRef = useRef<TextInput>(null);
@@ -747,6 +751,15 @@ export default function RegisterScreen() {
       return;
     }
 
+    // Nationality is required for patients
+    if (!isDoctor && nationality === null) {
+      showToast.error(
+        t("auth.register.validation.fillAll"),
+        t("auth.register.error.default"),
+      );
+      return;
+    }
+
     // Phone is required only for doctors
     if (selectedRole === "doctor" && !phone.trim()) {
       showToast.error("ტელეფონის ნომერი აუცილებელია ექიმებისთვის", "შეცდომა");
@@ -891,10 +904,12 @@ export default function RegisterScreen() {
         router.replace("/(tabs)");
       }
     } catch (error) {
+      console.error("❌ [Register] Registration error:", error);
       const errorMessage =
         error instanceof Error
           ? error.message
           : t("auth.register.error.default");
+      console.log("❌ [Register] Error message:", errorMessage);
       showToast.auth.registerError(errorMessage);
     } finally {
       setIsLoading(false);
@@ -950,7 +965,63 @@ export default function RegisterScreen() {
             {/* Role Switcher */}
             
 
+            {/* Nationality Selection - Only for patients */}
+            {!isDoctor && nationality === null && (
+              <View style={styles.form}>
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>
+                    {t("auth.register.nationality.label")}
+                  </Text>
+                  <View style={styles.nationalityContainer}>
+                    <TouchableOpacity
+                      style={[
+                        styles.nationalityOption,
+                        nationality === "georgian" && styles.nationalityOptionSelected,
+                      ]}
+                      onPress={() => setNationality("georgian")}
+                    >
+                      <Ionicons
+                        name="flag-outline"
+                        size={24}
+                        color={nationality === "georgian" ? "#06B6D4" : "#6B7280"}
+                      />
+                      <Text
+                        style={[
+                          styles.nationalityText,
+                          nationality === "georgian" && styles.nationalityTextSelected,
+                        ]}
+                      >
+                        {t("auth.register.nationality.georgian")}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.nationalityOption,
+                        nationality === "non-georgian" && styles.nationalityOptionSelected,
+                      ]}
+                      onPress={() => setNationality("non-georgian")}
+                    >
+                      <Ionicons
+                        name="globe-outline"
+                        size={24}
+                        color={nationality === "non-georgian" ? "#06B6D4" : "#6B7280"}
+                      />
+                      <Text
+                        style={[
+                          styles.nationalityText,
+                          nationality === "non-georgian" && styles.nationalityTextSelected,
+                        ]}
+                      >
+                        {t("auth.register.nationality.nonGeorgian")}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            )}
+
             {/* Form */}
+            {(!isDoctor && nationality !== null || isDoctor) && (
             <View style={styles.form}>
               {/* Name Input */}
               <View style={styles.inputContainer}>
@@ -1019,8 +1090,22 @@ export default function RegisterScreen() {
               <View style={styles.inputContainer}>
                 <View style={styles.labelRow}>
                   <Text style={styles.label}>
-                    {t("auth.register.idNumber.label")}
+                    {!isDoctor && nationality === "non-georgian"
+                      ? t("auth.register.idNumber.label.passport")
+                      : t("auth.register.idNumber.label")}
                   </Text>
+                  {!isDoctor && nationality === "non-georgian" && (
+                    <TouchableOpacity
+                      onPress={() => setShowPassportInfoModal(true)}
+                      style={styles.infoButton}
+                    >
+                      <Ionicons
+                        name="information-circle"
+                        size={20}
+                        color="#06B6D4"
+                      />
+                    </TouchableOpacity>
+                  )}
                 </View>
                 <TouchableOpacity
                   activeOpacity={1}
@@ -1036,7 +1121,11 @@ export default function RegisterScreen() {
                   <TextInput
                     ref={idNumberInputRef}
                     style={styles.input}
-                    placeholder={t("auth.register.idNumber.placeholder")}
+                    placeholder={
+                      !isDoctor && nationality === "non-georgian"
+                        ? t("auth.register.idNumber.placeholder.passport")
+                        : t("auth.register.idNumber.placeholder")
+                    }
                     placeholderTextColor="#9CA3AF"
                     value={idNumber}
                     onChangeText={setIdNumber}
@@ -1986,9 +2075,59 @@ export default function RegisterScreen() {
                 </TouchableOpacity>
               </View>
             </View>
+            )}
           </ScrollView>
         </SafeAreaView>
       </KeyboardAvoidingView>
+
+      {/* Passport Info Modal - Only for non-Georgian patients */}
+      {!isDoctor && (
+        <Modal
+          visible={showPassportInfoModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowPassportInfoModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContainer}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>
+                  {t("auth.register.passportInfo.title")}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setShowPassportInfoModal(false)}
+                  style={styles.modalCloseButton}
+                >
+                  <Ionicons name="close" size={24} color="#6B7280" />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.modalContent}>
+                <View style={styles.passportInfoContainer}>
+                  <Ionicons
+                    name="information-circle"
+                    size={32}
+                    color="#06B6D4"
+                    style={styles.passportInfoIcon}
+                  />
+                  <Text style={styles.passportInfoText}>
+                    {t("auth.register.passportInfo.message")}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.modalFooter}>
+                <TouchableOpacity
+                  onPress={() => setShowPassportInfoModal(false)}
+                  style={styles.modalPrimaryButton}
+                >
+                  <Text style={styles.modalPrimaryButtonText}>
+                    {t("auth.register.passportInfo.ok")}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
 
       {/* Terms of Service / Privacy Policy modal */}
       <Modal
@@ -2172,12 +2311,7 @@ export default function RegisterScreen() {
               <Text style={styles.modalTitle}>
                 სამედიცინო ლიცენზიის ატვირთვის ინფორმაცია
               </Text>
-              <TouchableOpacity
-                onPress={() => setShowLicenseInfoModal(false)}
-                style={styles.modalCloseButton}
-              >
-                <Ionicons name="close" size={24} color="#6B7280" />
-              </TouchableOpacity>
+
             </View>
             <ScrollView style={styles.modalList}>
               <View style={{
@@ -2329,8 +2463,43 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 4,
   },
+  infoButton: {
+    padding: 4,
+    marginLeft: 8,
+  },
   infoIconButton: {
     padding: 4,
+  },
+  nationalityContainer: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 8,
+  },
+  nationalityOption: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 2,
+    borderColor: "#E5E7EB",
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+  },
+  nationalityOptionSelected: {
+    borderColor: "#06B6D4",
+    backgroundColor: "#F0FDFA",
+  },
+  nationalityText: {
+    fontSize: 16,
+    fontFamily: "Poppins-Medium",
+    color: "#6B7280",
+  },
+  nationalityTextSelected: {
+    color: "#06B6D4",
+    fontFamily: "Poppins-SemiBold",
   },
   inputWrapper: {
     flexDirection: "row",
@@ -2626,6 +2795,28 @@ const styles = StyleSheet.create({
     backgroundColor: "#E2E8F0",
     alignItems: "center",
     justifyContent: "center",
+  },
+  modalContent: {
+    paddingVertical: 20,
+  },
+  modalFooter: {
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
+  },
+  passportInfoContainer: {
+    alignItems: "center",
+    paddingVertical: 20,
+  },
+  passportInfoIcon: {
+    marginBottom: 16,
+  },
+  passportInfoText: {
+    fontSize: 16,
+    fontFamily: "Poppins-Regular",
+    color: "#1F2937",
+    textAlign: "center",
+    lineHeight: 24,
   },
   modalList: {
     marginBottom: 20,
