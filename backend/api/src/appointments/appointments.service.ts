@@ -1356,15 +1356,10 @@ export class AppointmentsService {
     }
 
     // Check if appointment is in a valid status for lab test assignment
-    // Allowed statuses: confirmed, in-progress, completed
-    const allowedStatuses = [
-      AppointmentStatus.CONFIRMED,
-      AppointmentStatus.IN_PROGRESS,
-      AppointmentStatus.COMPLETED,
-    ];
-    if (!allowedStatuses.includes(appointment.status)) {
+    // Allow all statuses except CANCELLED
+    if (appointment.status === AppointmentStatus.CANCELLED) {
       throw new BadRequestException(
-        'ლაბორატორიული კვლევები მხოლოდ დადასტურებულ, მიმდინარე ან დასრულებულ ჯავშნებზე შეიძლება დაინიშნოს',
+        'ლაბორატორიული კვლევები გაუქმებულ ჯავშნებზე ვერ დაინიშნება',
       );
     }
 
@@ -1416,14 +1411,10 @@ export class AppointmentsService {
       );
     }
 
-    const allowedStatuses = [
-      AppointmentStatus.CONFIRMED,
-      AppointmentStatus.IN_PROGRESS,
-      AppointmentStatus.COMPLETED,
-    ];
-    if (!allowedStatuses.includes(appointment.status)) {
+    // Allow all statuses except CANCELLED
+    if (appointment.status === AppointmentStatus.CANCELLED) {
       throw new BadRequestException(
-        'ინსტრუმენტული კვლევები მხოლოდ დადასტურებულ, მიმდინარე ან დასრულებულ ჯავშნებზე შეიძლება დაინიშნოს',
+        'ინსტრუმენტული კვლევები გაუქმებულ ჯავშნებზე ვერ დაინიშნება',
       );
     }
 
