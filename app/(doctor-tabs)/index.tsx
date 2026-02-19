@@ -492,7 +492,7 @@ export default function DoctorDashboard() {
               <View style={styles.quickActionIconWrapper}>
                 <Ionicons name="flask" size={28} color="#FFFFFF" />
               </View>
-              <Text style={styles.quickActionLabel}>ლაბორატორია</Text>
+              <Text style={styles.quickActionLabel}>კვლევები</Text>
               <Text style={styles.quickActionSubLabel}>კვლევების დანიშვნა</Text>
             </TouchableOpacity>
           </View>

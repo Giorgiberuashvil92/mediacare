@@ -150,12 +150,73 @@ export default function LaboratoryScreen() {
       }
       
       // Build appointments list for lab test assignment
+      console.log('🏥 [Laboratory] appointmentsResponse:', {
+        success: appointmentsResponse.success,
+        hasData: !!appointmentsResponse.data,
+        dataType: Array.isArray(appointmentsResponse.data) ? 'array' : typeof appointmentsResponse.data,
+        dataLength: Array.isArray(appointmentsResponse.data) ? appointmentsResponse.data.length : 'N/A',
+        fullResponse: JSON.stringify(appointmentsResponse, null, 2),
+      });
+      
       if (appointmentsResponse.success && Array.isArray(appointmentsResponse.data)) {
-        console.log('🏥 [Laboratory] Raw appointments response:', appointmentsResponse.data.slice(0, 2));
+        console.log('🏥 [Laboratory] Total appointments from API:', appointmentsResponse.data.length);
+        console.log('🏥 [Laboratory] First 3 raw appointments:', appointmentsResponse.data.slice(0, 3));
         
-        const allowedStatuses = ["scheduled", "confirmed", "in-progress", "completed"];
+        const allowedStatuses = ["scheduled", "confirmed", "in-progress"]; // მხოლოდ მიმდინარე appointments, დასრულებული აღარ
+        
+        // Log all appointments before filtering
+        console.log('🏥 [Laboratory] All appointments statuses:', 
+          appointmentsResponse.data.map((apt: any) => ({
+            id: apt.id,
+            status: apt.status,
+            patientName: apt.patientName,
+          }))
+        );
+        
+        // სპეციალურად ვნახოთ "in-progress" და "completed" სტატუსების appointments
+        const inProgressAppts = appointmentsResponse.data.filter((apt: any) => apt.status === "in-progress");
+        const completedAppts = appointmentsResponse.data.filter((apt: any) => apt.status === "completed");
+        
+        console.log('🟡 [Laboratory] მიმდინარე appointments (in-progress):', {
+          count: inProgressAppts.length,
+          appointments: inProgressAppts.map((apt: any) => ({
+            id: apt.id,
+            patientName: apt.patientName,
+            patientId: apt.patientId?._id || apt.patientId,
+            date: apt.date,
+            time: apt.time,
+            type: apt.type,
+            status: apt.status,
+            fullData: apt,
+          })),
+        });
+        
+        console.log('🟢 [Laboratory] დასრულებული appointments (completed):', {
+          count: completedAppts.length,
+          appointments: completedAppts.map((apt: any) => ({
+            id: apt.id,
+            patientName: apt.patientName,
+            patientId: apt.patientId?._id || apt.patientId,
+            date: apt.date,
+            time: apt.time,
+            type: apt.type,
+            status: apt.status,
+            fullData: apt,
+          })),
+        });
+        
         const appointmentList: Appointment[] = appointmentsResponse.data
-          .filter((apt: any) => allowedStatuses.includes(apt.status))
+          .filter((apt: any) => {
+            const isAllowed = allowedStatuses.includes(apt.status);
+            if (!isAllowed) {
+              console.log('❌ [Laboratory] Appointment filtered out:', {
+                id: apt.id,
+                status: apt.status,
+                patientName: apt.patientName,
+              });
+            }
+            return isAllowed;
+          })
           .map((apt: any): Appointment => {
             // Extract patientId - can be object or string
             const patientId = apt.patientId?._id || apt.patientId || "";
@@ -166,6 +227,11 @@ export default function LaboratoryScreen() {
               rawPatientId: apt.patientId,
               patientIdType: typeof apt.patientId,
               extractedPatientId: patientId,
+              date: apt.date,
+              time: apt.time,
+              type: apt.type,
+              status: apt.status,
+              fullApt: JSON.stringify(apt, null, 2),
             });
             
             return {
@@ -178,6 +244,9 @@ export default function LaboratoryScreen() {
               status: apt.status,
             };
           });
+        
+        console.log('🏥 [Laboratory] Filtered appointmentList length:', appointmentList.length);
+        console.log('🏥 [Laboratory] Final appointmentList:', appointmentList);
         
         // Sort by date (newest first)
         // Parse dates in local timezone (same as patient side)
