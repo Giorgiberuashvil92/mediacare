@@ -1,8 +1,8 @@
+import { ADMIN_DEV_TOKEN } from '@/lib/dev-token';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { ADMIN_DEV_TOKEN } from '@/lib/dev-token';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://mediacare-production.up.railway.app';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4001';
 
 export async function GET() {
   try {

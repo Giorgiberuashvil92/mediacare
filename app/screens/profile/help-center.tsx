@@ -127,42 +127,50 @@ const HelpCenterScreen = () => {
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
           <Ionicons name="chevron-back" size={20} color="#1F2937" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>დახმარების ცენტრი</Text>
+        <Text style={styles.headerTitle}>
+          {params.tab === "faq" 
+            ? "ხშირად დასმული კითხვები" 
+            : params.tab === "contact" 
+            ? "კონტაქტები" 
+            : "დახმარების ცენტრი"}
+        </Text>
         <View style={styles.placeholder} />
       </View>
 
-      {/* Tab Navigation */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={styles.tab}
-          onPress={() => handleTabChange("faq")}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "faq" && styles.activeTabText,
-            ]}
+      {/* Tab Navigation - Show only if no specific tab is requested */}
+      {!params.tab && (
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            style={styles.tab}
+            onPress={() => handleTabChange("faq")}
           >
-            FAQ
-          </Text>
-          {activeTab === "faq" && <View style={styles.tabIndicator} />}
-        </TouchableOpacity>
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === "faq" && styles.activeTabText,
+              ]}
+            >
+              FAQ
+            </Text>
+            {activeTab === "faq" && <View style={styles.tabIndicator} />}
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.tab}
-          onPress={() => handleTabChange("contact")}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "contact" && styles.activeTabText,
-            ]}
+          <TouchableOpacity
+            style={styles.tab}
+            onPress={() => handleTabChange("contact")}
           >
-            კონტაქტი
-          </Text>
-          {activeTab === "contact" && <View style={styles.tabIndicator} />}
-        </TouchableOpacity>
-      </View>
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === "contact" && styles.activeTabText,
+              ]}
+            >
+              კონტაქტი
+            </Text>
+            {activeTab === "contact" && <View style={styles.tabIndicator} />}
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Content */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>

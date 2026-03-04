@@ -417,7 +417,7 @@ export function AddDoctorForm({ onSuccess, onCancel }: AddDoctorFormProps) {
 
           <div className="mb-5.5">
             <label className="mb-2.5 block text-sm font-medium text-dark dark:text-white">
-              შესახებ
+              ექიმის შესახებ
             </label>
             <textarea
               name="about"

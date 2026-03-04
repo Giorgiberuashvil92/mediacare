@@ -1,5 +1,4 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -854,89 +853,70 @@ export default function DoctorDashboard() {
             </TouchableOpacity>
           </View>
           <View style={styles.activityCard}>
-            {recentConsultations.slice(0, 5).map((consultation, index) => (
-              <View key={consultation.id}>
-                <View style={styles.activityItem}>
-                  <View
-                    style={[
-                      styles.activityIcon,
-                      {
-                        backgroundColor: consultation.isPaid
-                          ? "#10B98120"
-                          : "#F59E0B20",
-                      },
-                    ]}
-                  >
-                    <Ionicons
-                      name={
-                        consultation.isPaid ? "checkmark-done" : "time-outline"
-                      }
-                      size={20}
-                      color={consultation.isPaid ? "#10B981" : "#F59E0B"}
-                    />
-                  </View>
-                  <View style={styles.activityInfo}>
-                    <Text style={styles.activityPatient}>
-                      {consultation.patientName}
-                    </Text>
-                    <Text style={styles.activityDetails}>
-                      {consultation.date} • {consultation.time}
-                    </Text>
-                  </View>
-                  <View style={styles.activityAmount}>
-                    <Text style={styles.activityAmountText}>
-                      ${consultation.fee}
-                    </Text>
-                    <Text
+            {recentConsultations.slice(0, 5).map((consultation, index) => {
+              const isVideo = consultation.type === "video";
+              
+              // ფერები და აიქონები ტიპის მიხედვით
+              const iconColor = isVideo 
+                ? (consultation.isPaid ? "#0EA5E9" : "#0EA5E9") 
+                : (consultation.isPaid ? "#10B981" : "#10B981");
+              
+              const backgroundColor = isVideo
+                ? (consultation.isPaid ? "#0EA5E920" : "#0EA5E920")
+                : (consultation.isPaid ? "#10B98120" : "#10B98120");
+              
+              const iconName = isVideo 
+                ? (consultation.isPaid ? "videocam" : "videocam-outline")
+                : (consultation.isPaid ? "home" : "home-outline");
+              
+              return (
+                <View key={consultation.id}>
+                  <View style={styles.activityItem}>
+                    <View
                       style={[
-                        styles.activityStatus,
-                        {
-                          color: consultation.isPaid ? "#10B981" : "#F59E0B",
-                        },
+                        styles.activityIcon,
+                        { backgroundColor },
                       ]}
                     >
-                      {consultation.isPaid ? "გადახდილი" : "მოსალოდნელი"}
-                    </Text>
+                      <Ionicons
+                        name={iconName}
+                        size={20}
+                        color={iconColor}
+                      />
+                    </View>
+                    <View style={styles.activityInfo}>
+                      <Text style={styles.activityPatient}>
+                        {consultation.patientName}
+                      </Text>
+                      <Text style={styles.activityDetails}>
+                        {consultation.date} • {consultation.time} • {isVideo ? "ვიდეო" : "ბინაზე"}
+                      </Text>
+                    </View>
+                    <View style={styles.activityAmount}>
+                      <Text style={styles.activityAmountText}>
+                        ${consultation.fee}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.activityStatus,
+                          {
+                            color: consultation.isPaid ? "#10B981" : "#F59E0B",
+                          },
+                        ]}
+                      >
+                        {consultation.isPaid ? "გადახდილი" : "მოსალოდნელი"}
+                      </Text>
+                    </View>
                   </View>
+                  {index < 4 && <View style={styles.activityDivider} />}
                 </View>
-                {index < 4 && <View style={styles.activityDivider} />}
-              </View>
-            ))}
+              );
+            })}
           </View>
         </View>
 
         {/* Patient Insights */}
-        <View style={[styles.section, { marginBottom: 20 }]}>
-          <Text style={styles.sectionTitle}>პაციენტების მიმოხილვა</Text>
-          <View style={styles.insightsGrid}>
-            <View style={styles.insightCard}>
-              <Ionicons name="people" size={32} color="#06B6D4" />
-              <Text style={styles.insightValue}>{stats.patients.total}</Text>
-              <Text style={styles.insightLabel}>სულ პაციენტები</Text>
-            </View>
-            <View style={styles.insightCard}>
-              <Ionicons name="person-add" size={32} color="#10B981" />
-              <Text style={styles.insightValue}>{stats.patients.new}</Text>
-              <Text style={styles.insightLabel}>ახალი (ამ თვე)</Text>
-            </View>
-            <View style={styles.insightCard}>
-              <MaterialCommunityIcons
-                name="account-check"
-                size={32}
-                color="#8B5CF6"
-              />
-              <Text style={styles.insightValue}>
-                {stats.patients.returning}
-              </Text>
-              <Text style={styles.insightLabel}>დაბრუნებული</Text>
-            </View>
-            <View style={styles.insightCard}>
-              <Ionicons name="pulse" size={32} color="#F59E0B" />
-              <Text style={styles.insightValue}>{stats.visits.total}</Text>
-              <Text style={styles.insightLabel}>სულ ვიზიტები</Text>
-            </View>
-          </View>
-        </View>
+      
       </ScrollView>
       {/* Full list of hours modal */}
       <Modal

@@ -38,6 +38,7 @@ export declare class User {
     doctorStatus?: DoctorStatus;
     specialization?: string;
     licenseDocument?: string;
+    contractDocument?: string;
     degrees?: string;
     experience?: string;
     consultationFee?: number;
@@ -50,6 +51,10 @@ export declare class User {
     reviewCount: number;
     isTopRated?: boolean;
     minWorkingDaysRequired?: number;
+    identomatFaceImage?: string;
+    identomatDocumentFrontImage?: string;
+    identomatDocumentBackImage?: string;
+    identomatFullData?: any;
     createdAt?: Date;
     updatedAt?: Date;
 }

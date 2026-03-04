@@ -64,4 +64,8 @@ export class UpdateProfileDto {
   @IsString()
   @IsOptional()
   location?: string;
+
+  @IsString()
+  @IsOptional()
+  contractDocument?: string;
 }

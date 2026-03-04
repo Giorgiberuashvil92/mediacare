@@ -64,12 +64,12 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="chat"
+        name="ai-assistant"
         options={{
-          title: "ჩატი",
+          title: "AI ასისტენტი",
           headerShown: false,
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="chatbubbles-outline" size={size} color={color} />
+            <Ionicons name="chatbubbles" size={size} color={color} />
           ),
         }}
       />

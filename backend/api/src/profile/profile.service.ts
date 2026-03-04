@@ -65,6 +65,7 @@ export class ProfileService {
           rating: user.rating,
           reviewCount: user.reviewCount,
           doctorStatus: user.doctorStatus,
+          contractDocument: user.contractDocument,
         }),
       },
     };
@@ -147,6 +148,9 @@ export class ProfileService {
       }
       if (updateProfileDto.location !== undefined) {
         updateData.location = updateProfileDto.location;
+      }
+      if (updateProfileDto.contractDocument !== undefined) {
+        updateData.contractDocument = updateProfileDto.contractDocument;
       }
     }
 

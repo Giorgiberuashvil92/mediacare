@@ -104,8 +104,20 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
   // Filter availability by current mode so რომ თითო ტაბში მხოლოდ შესაბამისი ტიპის დღეები ჩანდეს
   // Backend-იდან მოდის type ველი (video ან home-visit), ასე რომ უნდა ვფილტროთ type-ის მიხედვით
   // პაციენტისთვის: მხოლოდ ის დღეები, სადაც არის თავისუფალი დრო (timeSlots არ არის ცარიელი)
+  // ასევე: გავლილი დღეები არ უნდა ჩანდეს
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
   const filteredAvailability: DayAvailability[] = availability
     .filter((day) => {
+      // გავლილი დღეების ფილტრაცია
+      const dayDate = new Date(day.date);
+      dayDate.setHours(0, 0, 0, 0);
+      if (dayDate < today) {
+        console.log(`🚫 [AppointmentScheduler] Filtering out past date: ${day.date}`);
+        return false;
+      }
+
       // თუ day-ს აქვს type ველი, გამოვიყენოთ იგი
       if (day.type) {
         const typeMatches = day.type === mode;
@@ -202,17 +214,46 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
       mode,
     });
 
+    // Get current time
+    const now = new Date();
+    const currentDate = now.toISOString().split('T')[0]; // YYYY-MM-DD
+    const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+    // Helper function to check if a time slot has passed
+    const isTimeSlotPassed = (dateStr: string, timeStr: string): boolean => {
+      // If date is in the past, time slot has passed
+      if (dateStr < currentDate) {
+        return true;
+      }
+      
+      // If date is today, check if time has passed
+      if (dateStr === currentDate) {
+        return timeStr <= currentTime;
+      }
+      
+      // If date is in the future, time slot hasn't passed
+      return false;
+    };
+
     // Full-day override if declared 24/7
     if (isTwentyFourSeven) {
       const fullDaySlots = generateFullDaySlots();
-      // Return ALL slots (including booked ones) so they can be displayed as disabled
-      // The booked slots will be filtered out visually using isBooked check
-      console.log('📅 AppointmentScheduler - 24/7 mode:', {
-        fullDaySlots,
-        bookedSlots: selectedDayAvailability.bookedSlots || [],
+      // Filter out passed time slots
+      const availableSlots = fullDaySlots.filter((time) => {
+        if (!selectedDate) return false;
+        return !isTimeSlotPassed(selectedDate, time);
       });
       
-      return fullDaySlots;
+      console.log('📅 AppointmentScheduler - 24/7 mode (filtered):', {
+        fullDaySlots,
+        availableSlots,
+        bookedSlots: selectedDayAvailability.bookedSlots || [],
+        selectedDate,
+        currentDate,
+        currentTime,
+      });
+      
+      return availableSlots;
     }
 
     const videoSlots = selectedDayAvailability.videoSlots || [];
@@ -230,15 +271,28 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
           ? homeVisitSlots
           : genericSlots;
 
-    // Return ALL slots (including booked ones) so they can be displayed as disabled
+    // Filter out passed time slots
+    const availableSlots = slotsByMode.filter((time) => {
+      if (!selectedDate) return false;
+      return !isTimeSlotPassed(selectedDate, time);
+    });
+
+    // Return filtered slots (excluding passed times)
     // The booked slots will be filtered out visually using isBooked check in render
-    console.log('📅 AppointmentScheduler - Available slots:', {
+    console.log('📅 AppointmentScheduler - Available slots (filtered):', {
       slotsByMode,
+      availableSlots,
       bookedSlots,
-      allSlots: slotsByMode,
+      selectedDate,
+      currentDate,
+      currentTime,
+      passedSlots: slotsByMode.filter((time) => {
+        if (!selectedDate) return false;
+        return isTimeSlotPassed(selectedDate, time);
+      }),
     });
     
-    return slotsByMode;
+    return availableSlots;
   };
 
   // Log availability data when component mounts or availability changes
@@ -554,16 +608,115 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
               return;
             }
 
-            // Regular appointment booking
-            router.push({
-              pathname: "/screens/appointment/make-appointment",
-              params: {
-                doctorId,
-                selectedDate,
-                selectedTime,
-                appointmentType: mode,
-              },
-            });
+            // Get doctor info to calculate payment amount
+            try {
+              const doctorResponse = await apiService.getDoctorById(doctorId);
+              
+              if (!doctorResponse.success || !doctorResponse.data) {
+                Alert.alert(
+                  "შეცდომა",
+                  "ექიმის ინფორმაციის მიღება ვერ მოხერხდა. გთხოვთ სცადოთ თავიდან.",
+                );
+                return;
+              }
+
+              const doctor = doctorResponse.data;
+              
+              // Log full doctor object to see what we're getting
+              console.log("💰 [AppointmentScheduler] Full doctor object:", JSON.stringify(doctor, null, 2));
+              console.log("💰 [AppointmentScheduler] Doctor fee data:", {
+                mode,
+                consultationFee: doctor.consultationFee,
+                videoConsultationFee: doctor.videoConsultationFee,
+                homeVisitFee: doctor.homeVisitFee,
+                followUpFee: doctor.followUpFee,
+                consultationFeeType: typeof doctor.consultationFee,
+                videoConsultationFeeType: typeof doctor.videoConsultationFee,
+                homeVisitFeeType: typeof doctor.homeVisitFee,
+                allDoctorKeys: Object.keys(doctor),
+              });
+              
+              // Determine consultation fee based on appointment type
+              let consultationFee = 0;
+              
+              if (mode === "video") {
+                // Prefer videoConsultationFee, fallback to consultationFee
+                if (typeof doctor.videoConsultationFee === 'number' && doctor.videoConsultationFee > 0) {
+                  consultationFee = doctor.videoConsultationFee;
+                  console.log("✅ [AppointmentScheduler] Using videoConsultationFee:", consultationFee);
+                } else if (typeof doctor.consultationFee === 'number' && doctor.consultationFee > 0) {
+                  consultationFee = doctor.consultationFee;
+                  console.log("✅ [AppointmentScheduler] Using consultationFee (fallback):", consultationFee);
+                } else {
+                  const parsed = parseFloat(String(doctor.videoConsultationFee || doctor.consultationFee || '0').replace(/[^\d.]/g, '')) || 0;
+                  consultationFee = parsed;
+                  console.log("✅ [AppointmentScheduler] Using parsed fee:", consultationFee);
+                }
+              } else if (mode === "home-visit") {
+                // Prefer homeVisitFee, fallback to consultationFee
+                if (typeof doctor.homeVisitFee === 'number' && doctor.homeVisitFee > 0) {
+                  consultationFee = doctor.homeVisitFee;
+                  console.log("✅ [AppointmentScheduler] Using homeVisitFee:", consultationFee);
+                } else if (typeof doctor.consultationFee === 'number' && doctor.consultationFee > 0) {
+                  consultationFee = doctor.consultationFee;
+                  console.log("✅ [AppointmentScheduler] Using consultationFee (fallback):", consultationFee);
+                } else {
+                  const parsed = parseFloat(String(doctor.homeVisitFee || doctor.consultationFee || '0').replace(/[^\d.]/g, '')) || 0;
+                  consultationFee = parsed;
+                  console.log("✅ [AppointmentScheduler] Using parsed fee:", consultationFee);
+                }
+              } else {
+                // Default to consultationFee
+                if (typeof doctor.consultationFee === 'number' && doctor.consultationFee > 0) {
+                  consultationFee = doctor.consultationFee;
+                  console.log("✅ [AppointmentScheduler] Using consultationFee:", consultationFee);
+                } else {
+                  const parsed = parseFloat(String(doctor.consultationFee || '0').replace(/[^\d.]/g, '')) || 0;
+                  consultationFee = parsed;
+                  console.log("✅ [AppointmentScheduler] Using parsed fee:", consultationFee);
+                }
+              }
+              
+              console.log("💰 [AppointmentScheduler] Final consultation fee:", consultationFee);
+              
+              // If still 0, use default fee
+              if (consultationFee === 0 || isNaN(consultationFee)) {
+                console.warn("⚠️ [AppointmentScheduler] Consultation fee is 0 or undefined, using default fee");
+                consultationFee = 10; // Default consultation fee in GEL
+              }
+              
+              const vat = Math.round(consultationFee * 0.05);
+              const totalAmount = consultationFee + vat;
+
+              console.log("💰 [AppointmentScheduler] Payment calculation:", {
+                consultationFee,
+                vat,
+                totalAmount,
+                mode,
+              });
+
+              // Navigate directly to payment page
+              router.push({
+                pathname: "/screens/payment/payment-methods",
+                params: {
+                  doctorId,
+                  selectedDate,
+                  selectedTime,
+                  appointmentType: mode,
+                  amount: totalAmount.toString(),
+                  consultationFee: consultationFee.toString(),
+                  problemDescription: "", // Empty, will be filled later if needed
+                  visitAddress: "", // Empty, will be filled later if needed
+                  uploadedFile: "", // Empty, will be filled later if needed
+                },
+              });
+            } catch (doctorError) {
+              console.error("Failed to get doctor info:", doctorError);
+              Alert.alert(
+                "შეცდომა",
+                "ექიმის ინფორმაციის მიღება ვერ მოხერხდა. გთხოვთ სცადოთ თავიდან.",
+              );
+            }
           } catch (error) {
             console.error("Failed to validate availability before booking", error);
             Alert.alert(

@@ -81,4 +81,8 @@ export class UpdateDoctorDto {
   @IsOptional()
   @IsNumber()
   minWorkingDaysRequired?: number;
+
+  @IsString()
+  @IsOptional()
+  contractDocument?: string;
 }

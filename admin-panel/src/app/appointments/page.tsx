@@ -34,6 +34,7 @@ interface Appointment {
   symptoms?: string;
   laboratoryTests?: LaboratoryTest[];
   documentsCount?: number;
+  homeVisitCompletedAt?: string; // When patient marked home visit as completed
 }
 
 export default function AppointmentsPage() {
@@ -322,9 +323,19 @@ export default function AppointmentsPage() {
                         </div>
                       </td>
                       <td className="p-4">
-                        <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
-                          {appointment.type === 'home-visit' ? 'ბინაზე' : 'ვიდეო'}
-                        </span>
+                        <div className="flex flex-col gap-1">
+                          <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                            {appointment.type === 'home-visit' ? 'ბინაზე' : 'ვიდეო'}
+                          </span>
+                          {appointment.type === 'home-visit' && appointment.homeVisitCompletedAt && (
+                            <span className="flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-300" title={`პაციენტმა მონიშნა: ${new Date(appointment.homeVisitCompletedAt).toLocaleString('ka-GE')}`}>
+                              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              პაციენტმა მონიშნა
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="p-4">
                         <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusColor(appointment.status)}`}>

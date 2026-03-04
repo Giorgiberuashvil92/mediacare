@@ -42,6 +42,7 @@ export function EditDoctorForm({
     isActive: doctor.isActive !== undefined ? doctor.isActive : true,
     gender: doctor.gender || 'male',
     minWorkingDaysRequired: doctor.minWorkingDaysRequired?.toString() || '',
+    contractDocument: (doctor as any).contractDocument || '',
   });
 
   useEffect(() => {
@@ -125,6 +126,7 @@ export function EditDoctorForm({
         approvalStatus: formData.approvalStatus,
         isActive: formData.isActive,
         gender: formData.gender,
+        contractDocument: formData.contractDocument.trim() || undefined,
       };
 
       // Add license document URL if uploaded
@@ -132,21 +134,38 @@ export function EditDoctorForm({
         updateData.licenseDocument = licenseDocumentUrl;
       }
 
-      if (formData.consultationFee) {
+      // Handle fee fields - send even if empty to allow clearing values
+      if (formData.consultationFee !== undefined && formData.consultationFee !== '') {
         updateData.consultationFee = parseFloat(formData.consultationFee);
+      } else if (formData.consultationFee === '') {
+        updateData.consultationFee = undefined;
       }
-      if (formData.followUpFee) {
+      if (formData.followUpFee !== undefined && formData.followUpFee !== '') {
         updateData.followUpFee = parseFloat(formData.followUpFee);
+      } else if (formData.followUpFee === '') {
+        updateData.followUpFee = undefined;
       }
-      if (formData.videoConsultationFee) {
+      if (formData.videoConsultationFee !== undefined && formData.videoConsultationFee !== '') {
         updateData.videoConsultationFee = parseFloat(formData.videoConsultationFee);
+      } else if (formData.videoConsultationFee === '') {
+        updateData.videoConsultationFee = undefined;
       }
-      if (formData.homeVisitFee) {
+      if (formData.homeVisitFee !== undefined && formData.homeVisitFee !== '') {
         updateData.homeVisitFee = parseFloat(formData.homeVisitFee);
+      } else if (formData.homeVisitFee === '') {
+        updateData.homeVisitFee = undefined;
       }
       if (formData.minWorkingDaysRequired) {
         updateData.minWorkingDaysRequired = parseInt(formData.minWorkingDaysRequired, 10);
       }
+
+      console.log('💰 [EditDoctorForm] Sending updateData to API:', {
+        consultationFee: updateData.consultationFee,
+        followUpFee: updateData.followUpFee,
+        videoConsultationFee: updateData.videoConsultationFee,
+        homeVisitFee: updateData.homeVisitFee,
+        fullUpdateData: updateData,
+      });
 
       const response = await apiService.updateDoctor(doctor.id, updateData);
 
@@ -354,8 +373,8 @@ export function EditDoctorForm({
               className="w-full sm:w-1/2"
               type="number"
               name="consultationFee"
-              label="განმეორებითი ვიდეო კონსულტაციის საფასური (₾)"
-              placeholder="100"
+              label="კონსულტაციის საფასური (₾)"
+              placeholder="50"
               value={formData.consultationFee}
               handleChange={handleChange}
               height="sm"
@@ -365,8 +384,8 @@ export function EditDoctorForm({
               className="w-full sm:w-1/2"
               type="number"
               name="followUpFee"
-              label="განმეორებითი ბინაზე ვიზიტის კონსულტაციის საფასური (₾)"
-              placeholder="50"
+              label="განმეორებითი კონსულტაციის საფასური (₾)"
+              placeholder="30"
               value={formData.followUpFee}
               handleChange={handleChange}
               height="sm"
@@ -375,7 +394,7 @@ export function EditDoctorForm({
 
           <div className="mb-5.5">
             <label className="mb-2.5 block text-sm font-medium text-dark dark:text-white">
-              შესახებ
+              ექიმის შესახებ
             </label>
             <textarea
               name="about"
@@ -425,6 +444,24 @@ export function EditDoctorForm({
             </div>
           </div>
 
+          {/* Contract Document */}
+          <div className="mb-5.5">
+            <label className="mb-2.5 block text-sm font-medium text-dark dark:text-white">
+              ხელშეკრულება
+            </label>
+            <textarea
+              name="contractDocument"
+              value={formData.contractDocument}
+              onChange={handleChange}
+              rows={10}
+              placeholder="შეიყვანეთ ექიმის კონკრეტული ხელშეკრულების ტექსტი..."
+              className="w-full rounded-lg border border-stroke bg-transparent px-5 py-3 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
+            />
+            <p className="mt-2 text-xs text-dark-4 dark:text-dark-6">
+              ეს ხელშეკრულება გამოჩნდება ამ ექიმის პროფილში. თუ ცარიელია, გამოჩნდება ზოგადი ხელშეკრულება.
+            </p>
+          </div>
+
           {/* License Document */}
           <div className="mb-5.5">
             <label className="mb-2.5 block text-sm font-medium text-dark dark:text-white">
@@ -437,7 +474,7 @@ export function EditDoctorForm({
                     doctor.licenseDocument.startsWith('http://') ||
                     doctor.licenseDocument.startsWith('https://')
                       ? doctor.licenseDocument
-                      : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/${doctor.licenseDocument}`
+                      : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4001'}/${doctor.licenseDocument}`
                   }
                   target="_blank"
                   rel="noopener noreferrer"

@@ -22,6 +22,7 @@ const cloudinary_module_1 = require("./cloudinary/cloudinary.module");
 const doctors_module_1 = require("./doctors/doctors.module");
 const help_center_module_1 = require("./help-center/help-center.module");
 const notifications_module_1 = require("./notifications/notifications.module");
+const payment_module_1 = require("./payment/payment.module");
 const profile_module_1 = require("./profile/profile.module");
 const shop_module_1 = require("./shop/shop.module");
 const specializations_module_1 = require("./specializations/specializations.module");
@@ -58,6 +59,7 @@ const moduleImports = [
     advisors_module_1.AdvisorsModule,
     help_center_module_1.HelpCenterModule,
     notifications_module_1.NotificationsModule,
+    payment_module_1.PaymentModule,
 ];
 let AppModule = class AppModule {
 };

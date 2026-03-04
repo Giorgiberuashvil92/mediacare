@@ -1,5 +1,6 @@
 'use client';
 
+import { AIAssistant } from '@/components/AIAssistant';
 import { Header } from '@/components/Layouts/header';
 import { Sidebar } from '@/components/Layouts/sidebar';
 import { useAuth } from '@/contexts/AuthContext';
@@ -45,6 +46,7 @@ export function DashboardLayoutWrapper({
           {children}
         </main>
       </div>
+      <AIAssistant />
     </div>
   );
 }

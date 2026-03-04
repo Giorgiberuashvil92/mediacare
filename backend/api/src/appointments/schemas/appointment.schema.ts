@@ -79,6 +79,9 @@ export class Appointment {
   @Prop({ enum: PaymentStatus, default: PaymentStatus.PENDING })
   paymentStatus: PaymentStatus;
 
+  @Prop()
+  paymentOrderId?: string; // BOG payment order ID
+
   @Prop({
     type: {
       name: String,

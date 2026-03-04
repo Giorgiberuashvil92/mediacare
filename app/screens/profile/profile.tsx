@@ -228,12 +228,23 @@ export default function ProfileScreen() {
 
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => router.push({ pathname: "/screens/profile/help-center" } as any)}
+            onPress={() => router.push({ pathname: "/screens/profile/help-center", params: { tab: "faq" } } as any)}
           >
             <View style={styles.menuIconContainer}>
               <Ionicons name="help-circle" size={20} color="#06B6D4" />
             </View>
-            <Text style={styles.menuText}>Help Center</Text>
+            <Text style={styles.menuText}>ხშირად დასმული კითხვები</Text>
+            <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => router.push({ pathname: "/screens/profile/help-center", params: { tab: "contact" } } as any)}
+          >
+            <View style={styles.menuIconContainer}>
+              <Ionicons name="call-outline" size={20} color="#10B981" />
+            </View>
+            <Text style={styles.menuText}>კონტაქტები</Text>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity>
 

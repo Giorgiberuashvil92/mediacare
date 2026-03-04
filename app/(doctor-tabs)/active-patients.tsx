@@ -71,7 +71,7 @@ export default function ActivePatientsScreen() {
       const response = await apiService.getDoctorDashboardAppointments(100);
       
       if (response.success && Array.isArray(response.data)) {
-        const relevantStatuses = ["scheduled", "confirmed", "in-progress", "completed"];
+        const relevantStatuses = ["scheduled", "confirmed", "in-progress"];
         const filtered = response.data
           .filter((apt: any) => {
             // For followup appointments, check originalType instead of type
@@ -128,15 +128,12 @@ export default function ActivePatientsScreen() {
                 fileName: apt.form100.fileName,
                 issueDate: apt.form100.issueDate,
               } : undefined,
-              // Lab results - dynamic from appointment
               labTests,
               labResultsCompleted,
               labResultsTotal,
             };
           });
         
-        // Sort by date and time (earliest first)
-        // Parse dates in local timezone (same as patient side)
         filtered.sort((a: ActivePatient, b: ActivePatient) => {
           const [yearA, monthA, dayA] = a.appointmentDate.split('-').map(Number);
           const [hoursA, minutesA] = a.appointmentTime.split(':').map(Number);
@@ -232,7 +229,7 @@ export default function ActivePatientsScreen() {
             <View style={styles.appointmentRow}>
               <Ionicons name="calendar-outline" size={14} color="#6B7280" />
               <Text style={styles.appointmentText}>
-                {new Date(item.appointmentDate).toLocaleDateString("ka-GE")} • {item.appointmentTime}
+                {item.appointmentDate} • {item.appointmentTime}
               </Text>
             </View>
             {item.problem && (

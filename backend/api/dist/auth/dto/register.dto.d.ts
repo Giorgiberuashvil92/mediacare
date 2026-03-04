@@ -5,6 +5,7 @@ export declare class RegisterDto {
     email: string;
     password: string;
     phone: string;
+    verificationCode: string;
     idNumber: string;
     dateOfBirth?: string;
     gender?: Gender;
@@ -20,4 +21,8 @@ export declare class RegisterDto {
     about?: string;
     location?: string;
     minWorkingDaysRequired?: number;
+    identomatFaceImage?: string;
+    identomatDocumentFrontImage?: string;
+    identomatDocumentBackImage?: string;
+    identomatFullData?: any;
 }

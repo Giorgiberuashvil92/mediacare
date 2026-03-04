@@ -7,6 +7,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -48,7 +49,7 @@ const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
       ? `${doctor.consultationFee} ₾`
       : undefined,
     followUpFee: doctor.followUpFee ? `${doctor.followUpFee} ₾` : undefined,
-    about: doctor.about || "",
+    about: doctor.about || "", // This is now "working language" from onboarding
     workingHours: doctor.workingHours || "24/7",
     availability: doctor.availability || [],
     totalReviews: doctor.reviewCount || 0,
@@ -71,6 +72,7 @@ const DoctorDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { isFavorite, toggleFavorite } = useFavorites();
+  const [showEducationModal, setShowEducationModal] = useState(false);
 
   useEffect(() => {
     loadDoctor();
@@ -224,16 +226,20 @@ const DoctorDetail = () => {
         {/* Basic Information */}
         <View style={styles.basicInfo}>
           {/* Rating above name */}
-          <View style={styles.ratingContainer}>
-            <Ionicons name="star" size={14} color="#FACC15" />
-            <Text style={styles.ratingText}>
-              {doctor.rating ? doctor.rating.toFixed(1) : "0.0"}
-            </Text>
+        
+          <View style={styles.nameRow}>
+            <Text style={styles.doctorName}>{doctor.name}</Text>
+            <TouchableOpacity
+              style={styles.infoButton}
+              onPress={() => setShowEducationModal(true)}
+            >
+              <Ionicons name="information-circle-outline" size={20} color="#06B6D4" />
+            </TouchableOpacity>
           </View>
-          <Text style={styles.doctorName}>{doctor.name}</Text>
           <Text style={styles.specialty}>{doctor.specialization}</Text>
-          <Text style={styles.degrees}>{doctor.degrees}</Text>
-          <Text style={styles.location}>{doctor.location}</Text>
+          {doctor.about && (
+            <Text style={styles.languages}>სამუშაო ენა: {doctor.about}</Text>
+          )}
         </View>
 
         {/* Compact Stats */}
@@ -246,18 +252,11 @@ const DoctorDetail = () => {
             <Text style={styles.metaLabel}>რეიტინგი</Text>
           </View>
           <View style={styles.metaChip}>
-            <Ionicons name="chatbubbles-outline" size={16} color="#4B5563" />
-            <Text style={styles.metaValue}>
-              {doctor.reviewCount || 0}+
-            </Text>
-            <Text style={styles.metaLabel}>შეფასებები</Text>
-          </View>
-          <View style={styles.metaChip}>
             <Ionicons name="briefcase-outline" size={16} color="#4B5563" />
             <Text style={styles.metaValue}>
-              {doctor.experience || "-"}
+              {doctor.experience ? `${doctor.experience} წელი` : "-"}
             </Text>
-            <Text style={styles.metaLabel}>სტაჟი</Text>
+            
           </View>
         </View>
 
@@ -281,10 +280,15 @@ const DoctorDetail = () => {
         </View>
 
         {/* About Doctor */}
-        <View style={styles.aboutSection}>
-          <Text style={styles.aboutTitle}>ექიმის შესახებ</Text>
-          <Text style={styles.aboutText}>{doctor.about}</Text>
-        </View>
+        {doctor.about && (
+          <View style={styles.aboutSection}>
+            <Text style={styles.aboutTitle}>ექიმის შესახებ</Text>
+            <Text style={styles.aboutText}>{doctor.about}</Text>
+          </View>
+        )}
+
+        {/* Payment Information */}
+       
 
       </ScrollView>
 
@@ -308,6 +312,44 @@ const DoctorDetail = () => {
           <Text style={styles.buttonText}>ჯავშნის გაკეთება</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Education and Experience Modal */}
+      <Modal
+        visible={showEducationModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowEducationModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>განათლება და გამოცდილება</Text>
+              <TouchableOpacity
+                onPress={() => setShowEducationModal(false)}
+                style={styles.modalCloseButton}
+              >
+                <Ionicons name="close" size={24} color="#666666" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalScrollView}>
+              {doctor.degrees && (
+                <View style={styles.modalSection}>
+                  <Text style={styles.modalSectionTitle}>განათლება</Text>
+                  <Text style={styles.modalSectionText}>{doctor.degrees}</Text>
+                </View>
+              )}
+              {doctor.experience && (
+                <View style={styles.modalSection}>
+                  <Text style={styles.modalSectionTitle}>გამოცდილება</Text>
+                  <Text style={styles.modalSectionText}>
+                    {doctor.experience} წელი
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -395,11 +437,20 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins-SemiBold",
     color: "#666666",
   },
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+    gap: 8,
+  },
   doctorName: {
     fontSize: 24,
     fontFamily: "Poppins-Bold",
     color: "#333333",
-    marginBottom: 8,
+  },
+  infoButton: {
+    padding: 4,
   },
   specialty: {
     fontSize: 18,
@@ -417,6 +468,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Poppins-Regular",
     color: "#999999",
+  },
+  languages: {
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#666666",
+    marginTop: 4,
   },
   metaRow: {
     flexDirection: "row",
@@ -631,5 +688,50 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Poppins-SemiBold",
     color: "#20BEB8",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    width: "90%",
+    maxHeight: "80%",
+    padding: 20,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontFamily: "Poppins-Bold",
+    color: "#333333",
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalScrollView: {
+    maxHeight: 400,
+  },
+  modalSection: {
+    marginBottom: 20,
+  },
+  modalSectionTitle: {
+    fontSize: 16,
+    fontFamily: "Poppins-SemiBold",
+    color: "#333333",
+    marginBottom: 8,
+  },
+  modalSectionText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#666666",
+    lineHeight: 22,
   },
 });

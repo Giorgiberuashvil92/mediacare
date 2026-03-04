@@ -31,6 +31,10 @@ export class RegisterDto {
 
   @IsString()
   @IsNotEmpty()
+  verificationCode: string; // OTP code received via SMS
+
+  @IsString()
+  @IsNotEmpty()
   idNumber: string;
 
   @IsOptional()
@@ -88,4 +92,20 @@ export class RegisterDto {
   // Minimum working days doctor must have scheduled in the next 2 weeks (set by admin)
   @IsOptional()
   minWorkingDaysRequired?: number;
+
+  // Identomat verification images (for admin panel)
+  @IsString()
+  @IsOptional()
+  identomatFaceImage?: string; // Face image URL from Identomat
+
+  @IsString()
+  @IsOptional()
+  identomatDocumentFrontImage?: string; // Document front image URL from Identomat
+
+  @IsString()
+  @IsOptional()
+  identomatDocumentBackImage?: string; // Document back image URL from Identomat
+
+  @IsOptional()
+  identomatFullData?: any; // Full Identomat response data for admin panel
 }

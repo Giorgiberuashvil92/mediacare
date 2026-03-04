@@ -21,7 +21,9 @@ import {
   View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { WebView, WebViewNavigation } from "react-native-webview";
 import { apiService, Specialization } from "../../_services/api";
+import OTPModal from "../../components/ui/OTPModal";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { showToast } from "../../utils/toast";
@@ -39,6 +41,7 @@ export default function RegisterScreen() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   // Doctor specific fields
   const [selectedSpecializations, setSelectedSpecializations] = useState<string[]>([]);
@@ -79,10 +82,7 @@ export default function RegisterScreen() {
   // Phone verification states
   const [verificationCode, setVerificationCode] = useState("");
   const [isPhoneVerified, setIsPhoneVerified] = useState(false);
-  const [sendingCode, setSendingCode] = useState(false);
-  const [verifyingCode, setVerifyingCode] = useState(false);
-  const [verificationError, setVerificationError] = useState<string | null>(null);
-  const verificationCodeInputRef = useRef<TextInput>(null);
+  const [showOTPModal, setShowOTPModal] = useState(false);
 
   // Patient specific fields
   const [address, setAddress] = useState("");
@@ -98,6 +98,14 @@ export default function RegisterScreen() {
   const [nationality, setNationality] = useState<"georgian" | "non-georgian" | null>(null);
   const [showPassportInfoModal, setShowPassportInfoModal] = useState(false);
 
+  // IDENTOMAT states
+  const [showIdentomatModal, setShowIdentomatModal] = useState(false);
+  const [identomatUrl, setIdentomatUrl] = useState<string>("");
+  const [isIdentomatVerified, setIsIdentomatVerified] = useState(false);
+  const [identomatData, setIdentomatData] = useState<any>(null);
+  const [identomatSessionToken, setIdentomatSessionToken] = useState<string>("");
+  const [identomatLoading, setIdentomatLoading] = useState(false);
+
   const nameInputRef = useRef<TextInput>(null);
   const emailInputRef = useRef<TextInput>(null);
   const idNumberInputRef = useRef<TextInput>(null);
@@ -107,6 +115,7 @@ export default function RegisterScreen() {
   const locationInputRef = useRef<TextInput>(null);
   const aboutInputRef = useRef<TextInput>(null);
   const passwordInputRef = useRef<TextInput>(null);
+  const confirmPasswordInputRef = useRef<TextInput>(null);
   const addressInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
@@ -687,63 +696,60 @@ export default function RegisterScreen() {
     }
   };
 
-  const handleSendVerificationCode = async () => {
-    if (!phone.trim()) {
-      showToast.error("გთხოვთ შეიყვანოთ ტელეფონის ნომერი", "შეცდომა");
-      return;
-    }
-
-    try {
-      setSendingCode(true);
-      setVerificationError(null);
-      const response = await apiService.sendPhoneVerificationCode(phone.trim());
-      if (response.success) {
-        showToast.success("ვერიფიკაციის კოდი გაიგზავნა", "წარმატება");
-      } else {
-        throw new Error(response.message || "ვერ მოხერხდა კოდის გაგზავნა");
-      }
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "ვერ მოხერხდა კოდის გაგზავნა";
-      setVerificationError(errorMessage);
-      showToast.error(errorMessage, "შეცდომა");
-    } finally {
-      setSendingCode(false);
-    }
-  };
-
-  const handleVerifyCode = async () => {
-    if (!verificationCode.trim() || verificationCode.length !== 6) {
-      showToast.error("გთხოვთ შეიყვანოთ 6-ნიშნა კოდი", "შეცდომა");
-      return;
-    }
-
-    try {
-      setVerifyingCode(true);
-      setVerificationError(null);
-      const response = await apiService.verifyPhoneCode(phone.trim(), verificationCode.trim());
-      if (response.success && response.verified) {
-        setIsPhoneVerified(true);
-        showToast.success("ტელეფონი წარმატებით დადასტდა", "წარმატება");
-      } else {
-        throw new Error(response.message || "არასწორი ვერიფიკაციის კოდი");
-      }
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "ვერიფიკაცია ვერ მოხერხდა";
-      setVerificationError(errorMessage);
-      showToast.error(errorMessage, "შეცდომა");
-    } finally {
-      setVerifyingCode(false);
-    }
+  const handleOTPVerified = async (code: string, verificationResponse?: any) => {
+    console.log("✅ [Register] OTP verified:", {
+      code: code,
+      hasVerificationResponse: !!verificationResponse,
+      verified: verificationResponse?.verified,
+    });
+    
+    setVerificationCode(code);
+    setIsPhoneVerified(true);
+    setShowOTPModal(false);
+    
+    // If verification was successful, we can proceed with registration
+    // The actual registration will happen when user clicks "Sign Up" button
+    // This just marks the phone as verified
   };
 
   const handleSignup = async () => {
-    if (!name.trim() || !email.trim() || !password.trim() || !idNumber.trim()) {
+    // Detailed validation logging
+    console.log("🔍 [Register] Validation check:", {
+      name: name.trim(),
+      email: email.trim(),
+      password: password.trim(),
+      idNumber: idNumber.trim(),
+      isDoctor,
+      nationality,
+      phone: phone.trim(),
+      isPhoneVerified,
+      verificationCode: verificationCode.trim(),
+      verificationCodeLength: verificationCode.trim().length,
+      hasAcceptedTos,
+      selectedRole,
+      selectedSpecializations: selectedSpecializations.length,
+      passwordLength: password.length,
+      isIdentomatVerified,
+    });
+
+    // If IDENTOMAT is verified, use idNumber from identomatData if idNumber state is empty
+    let finalIdNumber = idNumber.trim();
+    if (!finalIdNumber && isIdentomatVerified && identomatData?.idNumber) {
+      finalIdNumber = identomatData.idNumber;
+      setIdNumber(finalIdNumber); // Update state for consistency
+    }
+
+    if (!name.trim() || !email.trim() || !password.trim() || !confirmPassword.trim() || !finalIdNumber) {
+      console.log("❌ [Register] Basic fields validation failed:", {
+        name: !!name.trim(),
+        email: !!email.trim(),
+        password: !!password.trim(),
+        confirmPassword: !!confirmPassword.trim(),
+        idNumber: !!finalIdNumber,
+        idNumberState: idNumber.trim(),
+        identomatDataIdNumber: identomatData?.idNumber,
+        isIdentomatVerified,
+      });
       showToast.error(
         t("auth.register.validation.fillAll"),
         t("auth.register.error.default"),
@@ -753,6 +759,7 @@ export default function RegisterScreen() {
 
     // Nationality is required for patients
     if (!isDoctor && nationality === null) {
+      console.log("❌ [Register] Nationality validation failed for patient");
       showToast.error(
         t("auth.register.validation.fillAll"),
         t("auth.register.error.default"),
@@ -760,20 +767,38 @@ export default function RegisterScreen() {
       return;
     }
 
-    // Phone is required only for doctors
-    if (selectedRole === "doctor" && !phone.trim()) {
-      showToast.error("ტელეფონის ნომერი აუცილებელია ექიმებისთვის", "შეცდომა");
+    // Phone is required for all users (doctors and patients)
+    if (!phone.trim()) {
+      console.log("❌ [Register] Phone validation failed:", {
+        role: selectedRole,
+        phone: phone.trim(),
+      });
+      showToast.error("ტელეფონის ნომერი აუცილებელია", "შეცდომა");
       return;
     }
 
-    // Phone verification temporarily disabled
-    // TODO: Re-enable phone verification when SMS service is fully configured
-    // if (!isPhoneVerified) {
-    //   showToast.error("გთხოვთ დადასტუროთ ტელეფონის ნომერი", "შეცდომა");
-    //   return;
-    // }
+    // Phone verification is required for all users
+    if (!isPhoneVerified) {
+      console.log("❌ [Register] Phone verification failed:", {
+        phone: phone.trim(),
+        isPhoneVerified,
+      });
+      showToast.error("გთხოვთ დადასტუროთ ტელეფონის ნომერი", "შეცდომა");
+      return;
+    }
+
+    // Verification code is required for all users
+    if (!verificationCode.trim() || verificationCode.length !== 6) {
+      console.log("❌ [Register] Verification code validation failed:", {
+        verificationCode: verificationCode.trim(),
+        length: verificationCode.trim().length,
+      });
+      showToast.error("გთხოვთ შეიყვანოთ ვერიფიკაციის კოდი", "შეცდომა");
+      return;
+    }
 
     if (!hasAcceptedTos) {
+      console.log("❌ [Register] TOS acceptance validation failed");
       showToast.error(
         t("auth.register.tos.validationRequired"),
         t("auth.register.error.default"),
@@ -783,6 +808,7 @@ export default function RegisterScreen() {
     }
 
     if (selectedRole === "doctor" && selectedSpecializations.length === 0) {
+      console.log("❌ [Register] Specialization validation failed for doctor");
       showToast.error(
         t("auth.register.validation.specialization"),
         t("auth.register.error.default"),
@@ -790,7 +816,37 @@ export default function RegisterScreen() {
       return;
     }
 
+    // Doctor specific required fields validation
+    if (selectedRole === "doctor") {
+      if (!degrees.trim()) {
+        console.log("❌ [Register] Degrees validation failed for doctor");
+        showToast.error("გთხოვთ შეიყვანოთ ხარისხი", "შეცდომა");
+        return;
+      }
+      if (!experience.trim()) {
+        console.log("❌ [Register] Experience validation failed for doctor");
+        showToast.error("გთხოვთ შეიყვანოთ გამოცდილება", "შეცდომა");
+        return;
+      }
+      if (!location.trim()) {
+        console.log("❌ [Register] Location validation failed for doctor");
+        showToast.error("გთხოვთ შეიყვანოთ მდებარეობა", "შეცდომა");
+        return;
+      }
+      if (!dateOfBirth.trim()) {
+        console.log("❌ [Register] Date of birth validation failed for doctor");
+        showToast.error("გთხოვთ აირჩიოთ დაბადების თარიღი", "შეცდომა");
+        return;
+      }
+      if (!about.trim()) {
+        console.log("❌ [Register] Working language validation failed for doctor");
+        showToast.error("გთხოვთ შეიყვანოთ სამუშაო ენა", "შეცდომა");
+        return;
+      }
+    }
+
     if (password.length < 6) {
+      console.log("❌ [Register] Password length validation failed:", password.length);
       showToast.error(
         t("auth.register.validation.passwordLength"),
         t("auth.register.error.default"),
@@ -798,30 +854,48 @@ export default function RegisterScreen() {
       return;
     }
 
+    // Password confirmation validation
+    if (password !== confirmPassword) {
+      console.log("❌ [Register] Password confirmation validation failed");
+      showToast.error("პაროლები არ ემთხვევა", "შეცდომა");
+      return;
+    }
+
+    // IDENTOMAT verification is required for Georgian patients and all doctors
+    if ((!isDoctor && nationality === "georgian" && !isIdentomatVerified) || 
+        (isDoctor && !isIdentomatVerified)) {
+      console.log("❌ [Register] IDENTOMAT validation failed:", {
+        isDoctor,
+        nationality,
+        isIdentomatVerified,
+      });
+      showToast.error(
+        "გთხოვთ გაიაროთ IDENTOMAT-ით იდენტიფიკაცია",
+        "შეცდომა"
+      );
+      return;
+    }
+
+    console.log("✅ [Register] All validations passed");
+
     try {
       setIsLoading(true);
+
+      // Use finalIdNumber (from state or identomatData)
+      const finalIdNumberForRegistration = idNumber.trim() || (isIdentomatVerified && identomatData?.idNumber ? identomatData.idNumber : "");
 
       const registerData: any = {
         name: name.trim(),
         email: email.trim(),
         password,
-        idNumber: idNumber.trim(),
+        idNumber: finalIdNumberForRegistration,
         role: selectedRole,
         phone: phone.trim(), // Phone is required for all users
+        verificationCode: verificationCode.trim(), // OTP code for phone verification
       };
 
-      console.log('📤 [Register] Sending registration data:', {
-        name: registerData.name,
-        email: registerData.email,
-        role: registerData.role,
-        phone: registerData.phone,
-        phoneLength: registerData.phone?.length,
-        idNumber: registerData.idNumber,
-        hasPassword: !!registerData.password,
-        passwordLength: registerData.password?.length,
-      });
+   
 
-      // Add common fields for all users
       if (dateOfBirth && dateOfBirth.trim()) {
         registerData.dateOfBirth = dateOfBirth.trim();
       }
@@ -840,6 +914,22 @@ export default function RegisterScreen() {
         }
         if (identificationDocument?.filePath) {
           registerData.identificationDocument = identificationDocument.filePath;
+        }
+        // Add Identomat images if available
+        if (isIdentomatVerified && identomatData) {
+          if (identomatData.faceImage) {
+            registerData.identomatFaceImage = identomatData.faceImage;
+          }
+          if (identomatData.documentFrontImage) {
+            registerData.identomatDocumentFrontImage = identomatData.documentFrontImage;
+          }
+          if (identomatData.documentBackImage) {
+            registerData.identomatDocumentBackImage = identomatData.documentBackImage;
+          }
+          // Send full Identomat data for admin panel
+          if (identomatData.fullData) {
+            registerData.identomatFullData = identomatData.fullData;
+          }
         }
       }
 
@@ -918,6 +1008,297 @@ export default function RegisterScreen() {
 
   const handleSignin = () => {
     router.push("/screens/auth/login");
+  };
+
+  // Handle IDENTOMAT result
+  const handleIdentomatResult = async () => {
+    if (!identomatSessionToken) {
+      console.error("❌ [IDENTOMAT] No session token available");
+      return;
+    }
+
+    try {
+      setIdentomatLoading(true);
+      
+      const COMPANY_KEY = "699c6dc7915fc8ed730c5034_0c1c01bb7b27253e3abe4d2ab9c573ff0ca5931f";
+      
+      // Step 3: Get IDENTOMAT result (basic data)
+      const resultResponse = await fetch("https://widget.identomat.com/external-api/result/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          company_key: COMPANY_KEY,
+          session_token: identomatSessionToken,
+        }),
+      });
+
+      if (!resultResponse.ok) {
+        throw new Error("IDENTOMAT შედეგის მიღება ვერ მოხერხდა");
+      }
+
+      const resultData = await resultResponse.json();
+      console.log("✅ [IDENTOMAT] Result data:", JSON.stringify(resultData, null, 2));
+
+      // Step 4: Get IDENTOMAT images using /result/card-front/ and /result/card-back/ endpoints
+      // These endpoints return images directly (not JSON), so we need to upload them to Cloudinary
+      let faceImage: string | null = null;
+      let documentFrontImage: string | null = null;
+      let documentBackImage: string | null = null;
+
+      // Helper function to upload image blob to Cloudinary
+      const uploadImageToCloudinary = async (imageBlob: Blob, imageName: string): Promise<string | null> => {
+        try {
+          // Convert blob to base64 for React Native
+          const arrayBuffer = await imageBlob.arrayBuffer();
+          const bytes = new Uint8Array(arrayBuffer);
+          
+          // Convert bytes to base64 string manually (works in both web and React Native)
+          let binary = '';
+          const chunkSize = 8192; // Process in chunks to avoid stack overflow
+          for (let i = 0; i < bytes.byteLength; i += chunkSize) {
+            const chunk = bytes.slice(i, i + chunkSize);
+            binary += String.fromCharCode.apply(null, Array.from(chunk));
+          }
+          
+          // Use btoa if available (web), otherwise use manual base64 encoding
+          let base64String: string;
+          if (typeof btoa !== 'undefined') {
+            base64String = btoa(binary);
+          } else {
+            // Manual base64 encoding for React Native
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+            let result = '';
+            let i = 0;
+            while (i < binary.length) {
+              const a = binary.charCodeAt(i++);
+              const b = i < binary.length ? binary.charCodeAt(i++) : 0;
+              const c = i < binary.length ? binary.charCodeAt(i++) : 0;
+              const bitmap = (a << 16) | (b << 8) | c;
+              result += chars.charAt((bitmap >> 18) & 63);
+              result += chars.charAt((bitmap >> 12) & 63);
+              result += i - 2 < binary.length ? chars.charAt((bitmap >> 6) & 63) : '=';
+              result += i - 1 < binary.length ? chars.charAt(bitmap & 63) : '=';
+            }
+            base64String = result;
+          }
+          
+          // Create FormData for Cloudinary upload
+          const formData = new FormData();
+          const dataUri = `data:image/jpeg;base64,${base64String}`;
+          
+          formData.append('file', {
+            uri: dataUri,
+            name: imageName,
+            type: 'image/jpeg',
+          } as any);
+
+          const uploadResponse = await fetch(`${apiService.getBaseURL()}/uploads/image/public`, {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (uploadResponse.ok) {
+            const uploadData = await uploadResponse.json();
+            console.log(`✅ [IDENTOMAT] ${imageName} uploaded to Cloudinary:`, uploadData.url);
+            return uploadData.url || null;
+          } else {
+            const errorText = await uploadResponse.text();
+            console.warn(`⚠️ [IDENTOMAT] Failed to upload ${imageName} to Cloudinary:`, uploadResponse.status, errorText);
+            return null;
+          }
+        } catch (error) {
+          console.warn(`⚠️ [IDENTOMAT] Error uploading ${imageName} to Cloudinary:`, error);
+          return null;
+        }
+      };
+
+      try {
+        console.log("📸 [IDENTOMAT] Requesting card-front and card-back images...");
+        const formData = new FormData();
+        formData.append('company_key', COMPANY_KEY);
+        formData.append('session_token', identomatSessionToken);
+
+        // Get card front image
+        try {
+          const cardFrontResponse = await fetch("https://widget.identomat.com/external-api/result/card-front/", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (cardFrontResponse.ok) {
+            const contentType = cardFrontResponse.headers.get('content-type');
+            if (contentType && contentType.startsWith('image/')) {
+              // Response is an image, convert to blob and upload to Cloudinary
+              const imageBlob = await cardFrontResponse.blob();
+              console.log("✅ [IDENTOMAT] Card front image received, uploading to Cloudinary...");
+              documentFrontImage = await uploadImageToCloudinary(imageBlob, `identomat-card-front-${identomatSessionToken.substring(0, 10)}.jpg`);
+              console.log("📸 [IDENTOMAT] Card front image uploaded:", documentFrontImage ? "success" : "failed");
+            } else {
+              // Response might be JSON with error
+              const errorData = await cardFrontResponse.json().catch(() => null);
+              if (errorData?.argumentError) {
+                console.warn("⚠️ [IDENTOMAT] Card front error:", errorData.argumentError);
+              }
+            }
+          } else {
+            console.warn("⚠️ [IDENTOMAT] Card front endpoint returned error:", cardFrontResponse.status, cardFrontResponse.statusText);
+          }
+        } catch (cardFrontError) {
+          console.warn("⚠️ [IDENTOMAT] Failed to get card front image:", cardFrontError);
+        }
+
+        // Get card back image
+        try {
+          const cardBackResponse = await fetch("https://widget.identomat.com/external-api/result/card-back/", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (cardBackResponse.ok) {
+            const contentType = cardBackResponse.headers.get('content-type');
+            if (contentType && contentType.startsWith('image/')) {
+              // Response is an image, convert to blob and upload to Cloudinary
+              const imageBlob = await cardBackResponse.blob();
+              console.log("✅ [IDENTOMAT] Card back image received, uploading to Cloudinary...");
+              documentBackImage = await uploadImageToCloudinary(imageBlob, `identomat-card-back-${identomatSessionToken.substring(0, 10)}.jpg`);
+              console.log("📸 [IDENTOMAT] Card back image uploaded:", documentBackImage ? "success" : "failed");
+            } else {
+              // Response might be JSON with error
+              const errorData = await cardBackResponse.json().catch(() => null);
+              if (errorData?.argumentError) {
+                console.warn("⚠️ [IDENTOMAT] Card back error:", errorData.argumentError);
+              }
+            }
+          } else {
+            console.warn("⚠️ [IDENTOMAT] Card back endpoint returned error:", cardBackResponse.status, cardBackResponse.statusText);
+          }
+        } catch (cardBackError) {
+          console.warn("⚠️ [IDENTOMAT] Failed to get card back image:", cardBackError);
+        }
+
+        // Try to get face image (if endpoint exists)
+        try {
+          const faceResponse = await fetch("https://widget.identomat.com/external-api/result/face/", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (faceResponse.ok) {
+            const contentType = faceResponse.headers.get('content-type');
+            if (contentType && contentType.startsWith('image/')) {
+              const imageBlob = await faceResponse.blob();
+              console.log("✅ [IDENTOMAT] Face image received, uploading to Cloudinary...");
+              faceImage = await uploadImageToCloudinary(imageBlob, `identomat-face-${identomatSessionToken.substring(0, 10)}.jpg`);
+              console.log("📸 [IDENTOMAT] Face image uploaded:", faceImage ? "success" : "failed");
+            }
+          }
+        } catch (faceError) {
+          console.warn("⚠️ [IDENTOMAT] Face endpoint not available or failed:", faceError);
+        }
+      } catch (imageError) {
+        console.warn("⚠️ [IDENTOMAT] Failed to get images from Identomat endpoints, falling back to result data:", imageError);
+      }
+
+      // Extract data from IDENTOMAT response
+      // According to Identomat API docs: https://docs.identomat.com/developer-tools/api-reference
+      // The response contains a 'person' object with the extracted data
+      const person = resultData.person || resultData;
+      
+      // Try to get personal_number from person object first, then fallback to root level
+      const idNumber = person.personal_number || person.id_number || person.person_number || 
+                       resultData.personal_number || resultData.id_number || resultData.person_number || resultData.idNumber;
+      
+      // Try to get name from person object first, then fallback to root level
+      const firstName = person.first_name || person.firstName || person.name?.first ||
+                        resultData.first_name || resultData.firstName || resultData.name?.first;
+      const lastName = person.last_name || person.lastName || person.name?.last ||
+                       resultData.last_name || resultData.lastName || resultData.name?.last;
+      
+      // Try to get date of birth from person object first, then fallback to root level
+      // Identomat returns birthday in format like "5/15/1985" or ISO format
+      const dateOfBirth = person.birthday || person.birthday_time || person.date_of_birth || person.dateOfBirth || person.dob ||
+                          resultData.date_of_birth || resultData.dateOfBirth || resultData.dob || resultData.birthday;
+
+      if (idNumber) {
+        // Populate form fields with IDENTOMAT data
+        setIdNumber(idNumber);
+        
+        if (firstName && lastName) {
+          setName(`${firstName} ${lastName}`);
+        } else if (firstName) {
+          setName(firstName);
+        }
+        
+        if (dateOfBirth) {
+          setDateOfBirth(dateOfBirth);
+          try {
+            const dob = new Date(dateOfBirth);
+            if (!isNaN(dob.getTime())) {
+              setSelectedDate(dob);
+            }
+          } catch (e) {
+            console.warn("⚠️ [IDENTOMAT] Could not parse date of birth:", dateOfBirth);
+          }
+        }
+
+        setIsIdentomatVerified(true);
+        // Ensure idNumber is set in state for validation
+        if (idNumber) {
+          setIdNumber(idNumber);
+        }
+        
+        // If images were not found from face-document endpoint, try to extract from result data
+        if (!faceImage) {
+          faceImage = person.face_image || person.face_image_url || resultData.face_image || resultData.face_image_url || null;
+        }
+        if (!documentFrontImage) {
+          documentFrontImage = person.document_front_image || person.document_front_image_url || 
+                               resultData.document_front_image || resultData.document_front_image_url || null;
+        }
+        if (!documentBackImage) {
+          documentBackImage = person.document_back_image || person.document_back_image_url || 
+                              resultData.document_back_image || resultData.document_back_image_url || null;
+        }
+        
+        console.log("📸 [IDENTOMAT] Final extracted images:", {
+          hasFaceImage: !!faceImage,
+          hasDocumentFrontImage: !!documentFrontImage,
+          hasDocumentBackImage: !!documentBackImage,
+        });
+
+        setIdentomatData({
+          idNumber,
+          firstName,
+          lastName,
+          dateOfBirth,
+          faceImage,
+          documentFrontImage,
+          documentBackImage,
+          fullData: resultData,
+        });
+
+        showToast.success("IDENTOMAT-ით იდენტიფიკაცია წარმატებით დასრულდა", "წარმატება");
+
+        // Close modal after short delay
+        setTimeout(() => {
+          setShowIdentomatModal(false);
+          setIdentomatUrl("");
+          setIdentomatSessionToken("");
+        }, 1500);
+      } else {
+        throw new Error("IDENTOMAT-ის შედეგში ID ნომერი ვერ მოიძებნა");
+      }
+    } catch (error) {
+      console.error("❌ [IDENTOMAT] Error getting result:", error);
+      Alert.alert(
+        "შეცდომა",
+        error instanceof Error ? error.message : "IDENTOMAT-ის შედეგის მიღება ვერ მოხერხდა"
+      );
+    } finally {
+      setIdentomatLoading(false);
+    }
   };
 
   const isDoctor = selectedRole === "doctor";
@@ -1026,7 +1407,7 @@ export default function RegisterScreen() {
               {/* Name Input */}
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>
-                  {t("auth.register.name.label")}
+                  {t("auth.register.name.label")} *
                 </Text>
                 <TouchableOpacity
                   activeOpacity={1}
@@ -1057,7 +1438,7 @@ export default function RegisterScreen() {
               {/* Email Input */}
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>
-                  {t("auth.register.email.label")}
+                  {t("auth.register.email.label")} *
                 </Text>
                 <TouchableOpacity
                   activeOpacity={1}
@@ -1092,7 +1473,7 @@ export default function RegisterScreen() {
                   <Text style={styles.label}>
                     {!isDoctor && nationality === "non-georgian"
                       ? t("auth.register.idNumber.label.passport")
-                      : t("auth.register.idNumber.label")}
+                      : t("auth.register.idNumber.label")} *
                   </Text>
                   {!isDoctor && nationality === "non-georgian" && (
                     <TouchableOpacity
@@ -1107,34 +1488,166 @@ export default function RegisterScreen() {
                     </TouchableOpacity>
                   )}
                 </View>
-                <TouchableOpacity
-                  activeOpacity={1}
-                  style={styles.inputWrapper}
-                  onPress={() => idNumberInputRef.current?.focus()}
-                >
-                  <Ionicons
-                    name="card-outline"
-                    size={20}
-                    color="#9CA3AF"
-                    style={styles.inputIcon}
-                  />
-                  <TextInput
-                    ref={idNumberInputRef}
-                    style={styles.input}
-                    placeholder={
-                      !isDoctor && nationality === "non-georgian"
-                        ? t("auth.register.idNumber.placeholder.passport")
-                        : t("auth.register.idNumber.placeholder")
-                    }
-                    placeholderTextColor="#9CA3AF"
-                    value={idNumber}
-                    onChangeText={setIdNumber}
-                    textContentType="none"
-                    autoComplete="off"
-                    autoCorrect={false}
-                    keyboardType="default"
-                  />
-                </TouchableOpacity>
+                <View style={styles.idNumberRow}>
+                  <TouchableOpacity
+                    activeOpacity={1}
+                    style={[styles.inputWrapper, styles.idNumberInputWrapper]}
+                    onPress={() => idNumberInputRef.current?.focus()}
+                  >
+                    <Ionicons
+                      name="card-outline"
+                      size={20}
+                      color="#9CA3AF"
+                      style={styles.inputIcon}
+                    />
+                    <TextInput
+                      ref={idNumberInputRef}
+                      style={styles.input}
+                      placeholder={
+                        !isDoctor && nationality === "non-georgian"
+                          ? t("auth.register.idNumber.placeholder.passport")
+                          : t("auth.register.idNumber.placeholder")
+                      }
+                      placeholderTextColor="#9CA3AF"
+                      value={idNumber}
+                      onChangeText={setIdNumber}
+                      textContentType="none"
+                      autoComplete="off"
+                      autoCorrect={false}
+                      keyboardType="default"
+                      editable={!isIdentomatVerified}
+                    />
+                  </TouchableOpacity>
+                  {((!isDoctor && nationality === "georgian") || isDoctor) && (
+                    <TouchableOpacity
+                      style={[styles.identomatButton, identomatLoading && styles.identomatButtonDisabled]}
+                      onPress={async () => {
+                        if (identomatLoading) return;
+                        
+                        try {
+                          setIdentomatLoading(true);
+                          
+                          const COMPANY_KEY = "699c6dc7915fc8ed730c5034_0c1c01bb7b27253e3abe4d2ab9c573ff0ca5931f";
+                          const beginResponse = await fetch("https://widget.identomat.com/external-api/begin/", {
+                            method: "POST",
+                            headers: {
+                              "Content-Type": "application/json",
+                            },
+                            body: JSON.stringify({
+                              company_key: COMPANY_KEY,
+                              flags: {
+                                skip_agreement: true,
+                                skip_document: true,
+                                skip_face: true,
+                              },
+                              steps: [
+                                {
+                                  type: "liveness",
+                                  key: "liveness",
+                                },
+                              ],
+                            }),
+                          });
+                          
+                          console.log("📨 [IDENTOMAT] Begin response status:", beginResponse.status, beginResponse.statusText);
+                          
+                          if (!beginResponse.ok) {
+                            const errorText = await beginResponse.text();
+                            console.error("❌ [IDENTOMAT] Begin error response:", errorText);
+                            throw new Error(`IDENTOMAT session-ის დაწყება ვერ მოხერხდა: ${beginResponse.status} ${beginResponse.statusText}`);
+                          }
+                          
+                          const beginData = await beginResponse.json();
+                          console.log("✅ [IDENTOMAT] Begin response data:", beginData);
+                          console.log("✅ [IDENTOMAT] Response type:", typeof beginData);
+                          
+                          // API returns session token directly as a string, not as an object
+                          let sessionToken: string;
+                          
+                          if (typeof beginData === "string") {
+                            // Response is a string (session token directly)
+                            sessionToken = beginData;
+                          } else if (typeof beginData === "object" && beginData !== null) {
+                            // Response is an object, try different possible field names
+                            sessionToken = beginData.session_token || beginData.sessionToken || beginData.token || beginData.data?.session_token || beginData.data?.token || "";
+                          } else {
+                            throw new Error(`Unexpected response type: ${typeof beginData}`);
+                          }
+                          
+                          if (!sessionToken || sessionToken.trim() === "") {
+                            console.error("❌ [IDENTOMAT] No session token in response. Response:", beginData);
+                            throw new Error(`Session token-ის მიღება ვერ მოხერხდა. Response: ${JSON.stringify(beginData)}`);
+                          }
+                          
+                          console.log("✅ [IDENTOMAT] Session token received:", sessionToken.substring(0, 20) + "...");
+                          
+                          setIdentomatSessionToken(sessionToken);
+                          
+                          // Step 2: Open WebView with session token
+                          const widgetUrl = `https://widget.identomat.com/?session_token=${sessionToken}`;
+                          setIdentomatUrl(widgetUrl);
+                          setShowIdentomatModal(true);
+                        } catch (error) {
+                          console.error("❌ [IDENTOMAT] Error starting session:", error);
+                          Alert.alert(
+                            "შეცდომა",
+                            error instanceof Error ? error.message : "IDENTOMAT-ის იდენტიფიკაცია ვერ მოხერხდა"
+                          );
+                        } finally {
+                          setIdentomatLoading(false);
+                        }
+                      }}
+                      disabled={identomatLoading}
+                    >
+                      {identomatLoading ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <>
+                          <Ionicons
+                            name="finger-print-outline"
+                            size={20}
+                            color="#FFFFFF"
+                          />
+                          <Text style={styles.identomatButtonText}>IDENTOMAT</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  )}
+                </View>
+                {isIdentomatVerified && (
+                  <View style={styles.identomatSuccessContainer}>
+                    <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                    <Text style={styles.identomatSuccessText}>
+                      IDENTOMAT-ით დადასტურებული
+                    </Text>
+                  </View>
+                )}
+                
+                {/* Skip IDENTOMAT Button (Temporary for development) */}
+                {!isIdentomatVerified && !isDoctor && nationality === "georgian" && (
+                  <TouchableOpacity
+                    style={styles.skipIdentomatButton}
+                    onPress={() => {
+                      // Skip IDENTOMAT verification (temporary)
+                      const placeholderIdNumber = idNumber.trim() || "00000000000";
+                      setIsIdentomatVerified(true);
+                      // Set idNumber in state so validation passes
+                      setIdNumber(placeholderIdNumber);
+                      setIdentomatData({
+                        idNumber: placeholderIdNumber,
+                        firstName: name?.split(" ")[0] || "Skipped",
+                        lastName: name?.split(" ").slice(1).join(" ") || "User",
+                        dateOfBirth: dateOfBirth || "2000-01-01",
+                        fullData: { message: "Identomat skipped for development" },
+                      });
+                      showToast.info("IDENTOMAT-ის იდენტიფიკაცია გამოტოვებულია (დროებით)", "ინფორმაცია");
+                    }}
+                  >
+                    <Text style={styles.skipIdentomatButtonText}>
+                      გამოტოვება (დროებით)
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
 
               {/* Phone Input */}
@@ -1167,69 +1680,28 @@ export default function RegisterScreen() {
                   />
                 </TouchableOpacity>
 
-                {/* Phone Verification Section - Temporarily Disabled */}
-                {/* TODO: Re-enable phone verification when SMS service is fully configured */}
-                {/* {!isPhoneVerified && phone.trim() && (
-                  <View style={styles.verificationContainer}>
-                    <View style={styles.verificationInputRow}>
-                      <TextInput
-                        ref={verificationCodeInputRef}
-                        style={styles.verificationCodeInput}
-                        placeholder="000000"
-                        placeholderTextColor="#9CA3AF"
-                        value={verificationCode}
-                        onChangeText={(text) => {
-                          const numericText = text.replace(/[^0-9]/g, "").slice(0, 6);
-                          setVerificationCode(numericText);
-                          setVerificationError(null);
-                        }}
-                        textContentType="oneTimeCode"
-                        autoComplete="one-time-code"
-                        keyboardType="number-pad"
-                        maxLength={6}
-                        autoCorrect={false}
-                      />
-                      <TouchableOpacity
-                        style={[
-                          styles.verifyButton,
-                          verifyingCode && styles.verifyButtonDisabled,
-                        ]}
-                        onPress={handleVerifyCode}
-                        disabled={verifyingCode || verificationCode.length !== 6}
-                      >
-                        {verifyingCode ? (
-                          <ActivityIndicator size="small" color="#FFFFFF" />
-                        ) : (
-                          <Text style={styles.verifyButtonText}>დადასტურება</Text>
-                        )}
-                      </TouchableOpacity>
-                    </View>
+                {/* Phone Verification Button */}
+                {!isPhoneVerified && phone.trim() && (
+                  <TouchableOpacity
+                    style={styles.verifyPhoneButton}
+                    onPress={() => setShowOTPModal(true)}
+                  >
+                    <Ionicons name="shield-checkmark-outline" size={20} color="#06B6D4" />
+                    <Text style={styles.verifyPhoneButtonText}>
+                      ტელეფონის ვერიფიკაცია
+                    </Text>
+                  </TouchableOpacity>
+                )}
 
-                    <TouchableOpacity
-                      style={[
-                        styles.sendCodeButton,
-                        sendingCode && styles.sendCodeButtonDisabled,
-                      ]}
-                      onPress={handleSendVerificationCode}
-                      disabled={sendingCode}
-                    >
-                      {sendingCode ? (
-                        <ActivityIndicator size="small" color="#06B6D4" />
-                      ) : (
-                        <>
-                          <Ionicons name="send-outline" size={16} color="#06B6D4" />
-                          <Text style={styles.sendCodeButtonText}>
-                            კოდის გაგზავნა
-                          </Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
-
-                    {verificationError && (
-                      <Text style={styles.verificationError}>{verificationError}</Text>
-                    )}
+                {/* Verified Status */}
+                {isPhoneVerified && (
+                  <View style={styles.verifiedContainer}>
+                    <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                    <Text style={styles.verifiedText}>
+                      ტელეფონი დადასტურებულია
+                    </Text>
                   </View>
-                )} */}
+                )}
               </View>
 
               {/* Patient specific fields */}
@@ -1238,7 +1710,7 @@ export default function RegisterScreen() {
                   {/* Gender Selection */}
                   <View style={styles.inputContainer}>
                     <Text style={styles.label}>
-                      სქესი
+                      სქესი *
                     </Text>
                     <View style={styles.genderContainer}>
                       <TouchableOpacity
@@ -1310,7 +1782,7 @@ export default function RegisterScreen() {
                   {/* Address Input */}
                   <View style={styles.inputContainer}>
                     <Text style={styles.label}>
-                      მისამართი
+                      მისამართი *
                     </Text>
                     <TouchableOpacity
                       activeOpacity={1}
@@ -1341,7 +1813,7 @@ export default function RegisterScreen() {
                   {/* Date of Birth */}
                   <View style={styles.inputContainer}>
                     <Text style={styles.label}>
-                      დაბადების თარიღი
+                      დაბადების თარიღი *
                     </Text>
                     <TouchableOpacity
                       style={styles.inputWrapper}
@@ -1498,7 +1970,7 @@ export default function RegisterScreen() {
                 <>
                   <View style={styles.inputContainer}>
                     <Text style={styles.label}>
-                      {t("doctor.specialization.label")}
+                      {t("doctor.specialization.label")} *
                     </Text>
                     {loadingSpecializations ? (
                       <View style={styles.specializationsLoading}>
@@ -1556,7 +2028,7 @@ export default function RegisterScreen() {
                   {/* Degrees Input */}
                   <View style={styles.inputContainer}>
                     <Text style={styles.label}>
-                      {t("doctor.degrees.label")}
+                      {t("doctor.degrees.label")} *
                     </Text>
                     <TouchableOpacity
                       activeOpacity={1}
@@ -1587,7 +2059,7 @@ export default function RegisterScreen() {
                   {/* Experience Input */}
                   <View style={styles.inputContainer}>
                     <Text style={styles.label}>
-                      {t("doctor.experience.label")}
+                      {t("doctor.experience.label")} *
                     </Text>
                     <TouchableOpacity
                       activeOpacity={1}
@@ -1618,7 +2090,7 @@ export default function RegisterScreen() {
                   {/* Location Input */}
                   <View style={styles.inputContainer}>
                     <Text style={styles.label}>
-                      {t("doctor.location.label")}
+                      {t("doctor.location.label")} *
                     </Text>
                     <TouchableOpacity
                       activeOpacity={1}
@@ -1649,7 +2121,7 @@ export default function RegisterScreen() {
                   {/* Date of Birth */}
                   <View style={styles.inputContainer}>
                     <Text style={styles.label}>
-                      {t("doctor.dob.label")}
+                      {t("doctor.dob.label")} *
                     </Text>
                     <TouchableOpacity
                       style={styles.inputWrapper}
@@ -1675,7 +2147,7 @@ export default function RegisterScreen() {
                   {/* Gender Selection */}
                   <View style={styles.inputContainer}>
                     <Text style={styles.label}>
-                      {t("doctor.gender.label")}
+                      {t("doctor.gender.label")} *
                     </Text>
                     <View style={styles.genderContainer}>
                       <TouchableOpacity
@@ -1744,26 +2216,29 @@ export default function RegisterScreen() {
                     </View>
                   </View>
 
-                  {/* About TextArea */}
+                  {/* Working Language Input */}
                   <View style={styles.inputContainer}>
                     <Text style={styles.label}>
-                      {t("doctor.about.label")}
+                      {t("doctor.workingLanguage.label")} *
                     </Text>
                     <TouchableOpacity
                       activeOpacity={1}
-                      style={styles.textAreaWrapper}
+                      style={styles.inputWrapper}
                       onPress={() => aboutInputRef.current?.focus()}
                     >
+                      <Ionicons
+                        name="language-outline"
+                        size={20}
+                        color="#9CA3AF"
+                        style={styles.inputIcon}
+                      />
                       <TextInput
                         ref={aboutInputRef}
-                        style={styles.textArea}
-                        placeholder={t("doctor.about.placeholder")}
+                        style={styles.input}
+                        placeholder={t("doctor.workingLanguage.placeholder")}
                         placeholderTextColor="#9CA3AF"
                         value={about}
                         onChangeText={setAbout}
-                        multiline
-                        numberOfLines={4}
-                        textAlignVertical="top"
                         textContentType="none"
                         autoComplete="off"
                         autoCorrect={false}
@@ -1971,7 +2446,7 @@ export default function RegisterScreen() {
               {/* Password Input */}
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>
-                  {t("auth.register.password.label")}
+                  {t("auth.register.password.label")} *
                 </Text>
                 <TouchableOpacity
                   activeOpacity={1}
@@ -1992,6 +2467,48 @@ export default function RegisterScreen() {
                     placeholderTextColor="#9CA3AF"
                     value={password}
                     onChangeText={setPassword}
+                    textContentType="none"
+                    autoComplete="off"
+                    autoCorrect={false}
+                    keyboardType="default"
+                  />
+                  <TouchableOpacity
+                    onPress={() => setShowPassword(!showPassword)}
+                    style={styles.eyeIcon}
+                  >
+                    <Ionicons
+                      name={showPassword ? "eye-off-outline" : "eye-outline"}
+                      size={20}
+                      color="#9CA3AF"
+                    />
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              </View>
+
+              {/* Confirm Password Input */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>
+                  {t("auth.register.confirmPassword.label")} *
+                </Text>
+                <TouchableOpacity
+                  activeOpacity={1}
+                  style={styles.inputWrapper}
+                  onPress={() => confirmPasswordInputRef.current?.focus()}
+                >
+                  <Ionicons
+                    name="lock-closed-outline"
+                    size={20}
+                    color="#9CA3AF"
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    ref={confirmPasswordInputRef}
+                    style={styles.input}
+                    secureTextEntry={!showPassword}
+                    placeholder={t("auth.register.confirmPassword.placeholder")}
+                    placeholderTextColor="#9CA3AF"
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
                     textContentType="none"
                     autoComplete="off"
                     autoCorrect={false}
@@ -2366,6 +2883,134 @@ export default function RegisterScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* IDENTOMAT Modal */}
+      <Modal
+        visible={showIdentomatModal}
+        transparent={false}
+        animationType="slide"
+        onRequestClose={() => {
+          setShowIdentomatModal(false);
+          setIdentomatUrl("");
+        }}
+      >
+        <SafeAreaView style={styles.identomatModalContainer}>
+          <View style={styles.identomatModalHeader}>
+            <Text style={styles.identomatModalTitle}>IDENTOMAT იდენტიფიკაცია</Text>
+            <TouchableOpacity
+              onPress={async () => {
+                // If modal is closed, try to get result before closing
+                if (identomatSessionToken) {
+                  await handleIdentomatResult();
+                }
+                setShowIdentomatModal(false);
+                setIdentomatUrl("");
+                setIdentomatSessionToken("");
+              }}
+              style={styles.identomatCloseButton}
+            >
+              <Ionicons name="close" size={24} color="#1F2937" />
+            </TouchableOpacity>
+          </View>
+          {identomatUrl ? (
+            <WebView
+              source={{ uri: identomatUrl }}
+              style={styles.identomatWebView}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+              startInLoadingState={true}
+              scalesPageToFit={true}
+              onLoadStart={() => {
+                console.log("🔄 [IDENTOMAT] WebView load started:", identomatUrl);
+              }}
+              onLoadEnd={() => {
+                console.log("✅ [IDENTOMAT] WebView load ended");
+              }}
+              onLoadProgress={({ nativeEvent }) => {
+                console.log("📊 [IDENTOMAT] WebView load progress:", Math.round(nativeEvent.progress * 100) + "%");
+              }}
+              onNavigationStateChange={async (navState: WebViewNavigation) => {
+                // Handle IDENTOMAT callback
+                const url = navState.url;
+                console.log("🔍 [IDENTOMAT] Navigation URL:", url);
+                console.log("🔍 [IDENTOMAT] Navigation state:", {
+                  url: navState.url,
+                  title: navState.title,
+                  loading: navState.loading,
+                  canGoBack: navState.canGoBack,
+                  canGoForward: navState.canGoForward,
+                });
+                
+                // Check if IDENTOMAT process is complete (URL contains success indicators)
+                if (url.includes("success") || url.includes("complete") || url.includes("finished")) {
+                  // Wait a bit for IDENTOMAT to finalize, then get result
+                  setTimeout(async () => {
+                    await handleIdentomatResult();
+                  }, 2000);
+                }
+              }}
+              onError={(syntheticEvent: any) => {
+                const { nativeEvent } = syntheticEvent;
+                console.error("❌ [IDENTOMAT] WebView error:", nativeEvent);
+                console.error("❌ [IDENTOMAT] Error details:", JSON.stringify(nativeEvent, null, 2));
+                Alert.alert(
+                  "შეცდომა",
+                  `IDENTOMAT-ის ჩატვირთვა ვერ მოხერხდა: ${nativeEvent.description || nativeEvent.message || "უცნობი შეცდომა"}`
+                );
+              }}
+              onHttpError={(syntheticEvent: any) => {
+                const { nativeEvent } = syntheticEvent;
+                console.error("❌ [IDENTOMAT] HTTP error:", nativeEvent);
+                console.error("❌ [IDENTOMAT] HTTP error status:", nativeEvent.statusCode);
+                Alert.alert(
+                  "HTTP შეცდომა",
+                  `IDENTOMAT-ის სერვერთან დაკავშირება ვერ მოხერხდა: ${nativeEvent.statusCode || "უცნობი"}`
+                );
+              }}
+              onMessage={(event: any) => {
+                console.log("📨 [IDENTOMAT] WebView message:", event.nativeEvent.data);
+              }}
+              renderError={(errorDomain: string | undefined, errorCode: number, errorDesc: string) => {
+                console.error("❌ [IDENTOMAT] WebView render error:", { errorDomain, errorCode, errorDesc });
+                return (
+                  <View style={styles.identomatErrorContainer}>
+                    <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
+                    <Text style={styles.identomatErrorText}>შეცდომა</Text>
+                    <Text style={styles.identomatErrorDescription}>{errorDesc || "ვერ ჩაიტვირთა"}</Text>
+                    <TouchableOpacity
+                      style={styles.identomatRetryButton}
+                      onPress={() => {
+                        // Reload WebView
+                        setIdentomatUrl("");
+                        setTimeout(() => {
+                          setIdentomatUrl(identomatUrl);
+                        }, 100);
+                      }}
+                    >
+                      <Text style={styles.identomatRetryButtonText}>ხელახლა სცადე</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              }}
+            />
+          ) : (
+            <View style={styles.identomatLoadingContainer}>
+              <ActivityIndicator size="large" color="#6366F1" />
+              <Text style={styles.identomatLoadingText}>იტვირთება...</Text>
+            </View>
+          )}
+        </SafeAreaView>
+      </Modal>
+
+      {/* OTP Verification Modal */}
+      <OTPModal
+        visible={showOTPModal}
+        phone={phone}
+        onClose={() => setShowOTPModal(false)}
+        onVerified={handleOTPVerified}
+        title="ტელეფონის ვერიფიკაცია"
+        subtitle="გთხოვთ შეიყვანოთ 6-ნიშნა კოდი, რომელიც გამოგიგზავნეთ SMS-ით"
+      />
     </View>
   );
 }
@@ -2978,6 +3623,131 @@ const styles = StyleSheet.create({
   inputPlaceholder: {
     color: "#9CA3AF",
   },
+  idNumberRow: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "flex-start",
+  },
+  idNumberInputWrapper: {
+    flex: 1,
+  },
+  identomatButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#6366F1",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    minWidth: 120,
+    justifyContent: "center",
+  },
+  identomatButtonDisabled: {
+    opacity: 0.6,
+  },
+  identomatButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+  },
+  identomatSuccessContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: "#D1FAE5",
+    borderRadius: 8,
+  },
+  identomatSuccessText: {
+    fontSize: 13,
+    fontFamily: "Poppins-Medium",
+    color: "#065F46",
+  },
+  skipIdentomatButton: {
+    marginTop: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: "#F3F4F6",
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    alignItems: "center",
+  },
+  skipIdentomatButtonText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#6B7280",
+  },
+  identomatModalContainer: {
+    flex: 1,
+    marginTop: 20,
+    backgroundColor: "#FFFFFF",
+  },
+  identomatModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+    backgroundColor: "#FFFFFF",
+  },
+  identomatModalTitle: {
+    fontSize: 18,
+    fontFamily: "Poppins-Bold",
+    color: "#1F2937",
+  },
+  identomatCloseButton: {
+    padding: 4,
+  },
+  identomatWebView: {
+    flex: 1,
+  },
+  identomatLoadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 12,
+  },
+  identomatLoadingText: {
+    fontSize: 16,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+  },
+  identomatErrorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+    gap: 12,
+  },
+  identomatErrorText: {
+    fontSize: 20,
+    fontFamily: "Poppins-Bold",
+    color: "#1F2937",
+  },
+  identomatErrorDescription: {
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+    textAlign: "center",
+  },
+  identomatRetryButton: {
+    marginTop: 8,
+    backgroundColor: "#6366F1",
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  identomatRetryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontFamily: "Poppins-SemiBold",
+  },
   datePickerModalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
@@ -3109,5 +3879,36 @@ const styles = StyleSheet.create({
     color: "#EF4444",
     marginTop: 4,
     textAlign: "center",
+  },
+  verifyPhoneButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#ECFEFF",
+    borderWidth: 1,
+    borderColor: "#06B6D4",
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginTop: 12,
+    gap: 8,
+  },
+  verifyPhoneButtonText: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#06B6D4",
+  },
+  verifiedContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F0FDF4",
+    borderWidth: 1,
+    borderColor: "#10B981",
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginTop: 12,
+    gap: 8,
   },
 });

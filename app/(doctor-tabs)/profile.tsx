@@ -332,16 +332,16 @@ export default function DoctorProfile() {
           <View style={styles.menuCard}>
             <TouchableOpacity 
               style={styles.menuItem}
-              onPress={() => router.push({ pathname: "/screens/profile/help-center", params: { tab: "contact" } } as any)}
+              onPress={() => router.push({ pathname: "/screens/profile/help-center", params: { tab: "faq" } } as any)}
             >
               <View style={styles.menuItemLeft}>
                 <View style={styles.menuIconContainer}>
                   <Ionicons name="help-circle" size={22} color="#06B6D4" />
                 </View>
                 <View style={styles.menuItemContent}>
-                  <Text style={styles.menuItemTitle}>დახმარების ცენტრი</Text>
+                  <Text style={styles.menuItemTitle}>ხშირად დასმული კითხვები</Text>
                   <Text style={styles.menuItemSubtitle}>
-                    ხშირად დასმული კითხვები
+                    ხშირად დასმული კითხვები და პასუხები
                   </Text>
                 </View>
               </View>
@@ -350,7 +350,23 @@ export default function DoctorProfile() {
 
             <View style={styles.divider} />
 
-          
+            <TouchableOpacity 
+              style={styles.menuItem}
+              onPress={() => router.push({ pathname: "/screens/profile/help-center", params: { tab: "contact" } } as any)}
+            >
+              <View style={styles.menuItemLeft}>
+                <View style={styles.menuIconContainer}>
+                  <Ionicons name="call-outline" size={22} color="#10B981" />
+                </View>
+                <View style={styles.menuItemContent}>
+                  <Text style={styles.menuItemTitle}>კონტაქტები</Text>
+                  <Text style={styles.menuItemSubtitle}>
+                    საკონტაქტო ინფორმაცია
+                  </Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+            </TouchableOpacity>
 
             <View style={styles.divider} />
 

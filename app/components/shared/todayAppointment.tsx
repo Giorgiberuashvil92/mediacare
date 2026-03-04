@@ -79,10 +79,30 @@ const TodayAppointment = () => {
               }
               
               // Only show appointments for today
-              return appointmentDate === today && 
-                     (appointment.status === "scheduled" || 
-                      appointment.status === "confirmed" || 
-                      appointment.status === "pending");
+              if (appointmentDate !== today) {
+                return false;
+              }
+              
+              // Check status
+              if (appointment.status !== "scheduled" && 
+                  appointment.status !== "confirmed" && 
+                  appointment.status !== "pending" &&
+                  appointment.status !== "in-progress") {
+                return false;
+              }
+              
+              // Check if appointment time has passed
+              const appointmentTime = appointment.appointmentTime || appointment.time || '00:00';
+              const [year, month, day] = appointmentDate.split('-').map(Number);
+              const [hours, minutes] = appointmentTime.split(':').map(Number);
+              const appointmentDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
+              
+              // If appointment time has passed more than 1 hour ago, don't show it
+              const diff = appointmentDateTime.getTime() - now.getTime();
+              const oneHourInMs = 60 * 60 * 1000;
+              
+              // Show if appointment is in the future or within 1 hour after appointment time
+              return diff >= -oneHourInMs;
             })
             .map((appointment: any) => {
               // Format appointment date in local timezone

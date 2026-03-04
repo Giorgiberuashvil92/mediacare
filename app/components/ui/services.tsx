@@ -14,8 +14,8 @@ const QUICK_SERVICES = [
     gradient: ["#06B6D4", "#0891B2"],
     onPress: () =>
       router.push({
-        pathname: "/(tabs)/doctor",
-        params: { appointmentType: "video", lockAppointmentType: "true" },
+        pathname: "/screens/appointments/filtered-appointments",
+        params: { filterType: "video" },
       }),
   },
   {
@@ -32,7 +32,11 @@ const QUICK_SERVICES = [
     description: "ექიმი შენს მისამართზე",
     icon: "home",
     gradient: ["#F59E0B", "#D97706"],
-    onPress: () => router.push("/screens/doctors/home-visit-doctors"),
+    onPress: () =>
+      router.push({
+        pathname: "/screens/appointments/filtered-appointments",
+        params: { filterType: "home-visit" },
+      }),
   },
   {
     id: "advisor",

@@ -259,7 +259,7 @@ export function DoctorDetailsModal({
                       };
                       const licenseUrl = isAbsoluteUrl(doctor.licenseDocument)
                         ? doctor.licenseDocument
-                        : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/${doctor.licenseDocument}`;
+                        : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4001'}/${doctor.licenseDocument}`;
                       return (
                         <a
                           href={licenseUrl}
@@ -355,6 +355,74 @@ export function DoctorDetailsModal({
                   </div>
                 </div>
               </div>
+
+              {/* Identomat Verification Images */}
+              {(doctor.identomatFaceImage || doctor.identomatDocumentFrontImage || doctor.identomatDocumentBackImage) && (
+                <div>
+                  <h3 className="mb-4 text-lg font-semibold text-dark dark:text-white">
+                    IDENTOMAT-ით იდენტიფიკაცია
+                  </h3>
+                  <div className="grid gap-4 md:grid-cols-3">
+                    {doctor.identomatFaceImage && (
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-dark-4 dark:text-dark-6">
+                          სახის ფოტო
+                        </label>
+                        <a
+                          href={doctor.identomatFaceImage}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block overflow-hidden rounded-lg border border-stroke dark:border-dark-3"
+                        >
+                          <img
+                            src={doctor.identomatFaceImage}
+                            alt="Identomat Face"
+                            className="h-48 w-full object-cover transition hover:scale-105"
+                          />
+                        </a>
+                      </div>
+                    )}
+                    {doctor.identomatDocumentFrontImage && (
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-dark-4 dark:text-dark-6">
+                          დოკუმენტის წინა მხარე
+                        </label>
+                        <a
+                          href={doctor.identomatDocumentFrontImage}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block overflow-hidden rounded-lg border border-stroke dark:border-dark-3"
+                        >
+                          <img
+                            src={doctor.identomatDocumentFrontImage}
+                            alt="Identomat Document Front"
+                            className="h-48 w-full object-cover transition hover:scale-105"
+                          />
+                        </a>
+                      </div>
+                    )}
+                    {doctor.identomatDocumentBackImage && (
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-dark-4 dark:text-dark-6">
+                          დოკუმენტის უკანა მხარე
+                        </label>
+                        <a
+                          href={doctor.identomatDocumentBackImage}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block overflow-hidden rounded-lg border border-stroke dark:border-dark-3"
+                        >
+                          <img
+                            src={doctor.identomatDocumentBackImage}
+                            alt="Identomat Document Back"
+                            className="h-48 w-full object-cover transition hover:scale-105"
+                          />
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           ) : null}
         </div>

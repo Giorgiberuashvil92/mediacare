@@ -367,7 +367,7 @@ export class DoctorsService {
           isAvailable: true,
           timeSlots: { $exists: true, $ne: [] },
         })
-        .select('doctorId timeSlots')
+        .select('doctorId timeSlots type')
         .lean();
 
       // Filter to only include records with non-empty timeSlots array
@@ -389,6 +389,28 @@ export class DoctorsService {
       availableDoctors = doctors.filter((doctor) =>
         availableDoctorIds.has((doctor._id as any).toString()),
       );
+
+      // Collect availability types for each doctor
+      const doctorAvailabilityTypes = new Map<string, Set<string>>();
+      availabilityRecords
+        .filter(
+          (record) =>
+            record.timeSlots &&
+            Array.isArray(record.timeSlots) &&
+            record.timeSlots.length > 0,
+        )
+        .forEach((record) => {
+          const doctorIdStr = record.doctorId.toString();
+          if (!doctorAvailabilityTypes.has(doctorIdStr)) {
+            doctorAvailabilityTypes.set(doctorIdStr, new Set());
+          }
+          if (record.type) {
+            doctorAvailabilityTypes.get(doctorIdStr)?.add(record.type);
+          }
+        });
+
+      // Store availability types for use in formattedDoctors
+      (availableDoctors as any).availabilityTypes = doctorAvailabilityTypes;
     }
 
     console.log(
@@ -397,30 +419,43 @@ export class DoctorsService {
     );
 
     // Format doctors
-    const formattedDoctors = availableDoctors.map((doctor) => ({
-      id: (doctor._id as string).toString(),
-      name: doctor.name,
-      email: doctor.email,
-      phone: doctor.phone,
-      idNumber: doctor.idNumber,
-      specialization: (doctor as any).specialization,
-      rating: doctor.rating || 0,
-      reviewCount: doctor.reviewCount || 0,
-      isActive: doctor.isActive,
-      profileImage: doctor.profileImage,
-      degrees: doctor.degrees,
-      location: doctor.location,
-      patients: '100+', // This could be calculated from appointments
-      experience: doctor.experience,
-      about: doctor.about,
-      dateOfBirth: doctor.dateOfBirth,
-      gender: doctor.gender,
-      licenseDocument: doctor.licenseDocument,
-      workingHours: '09:00 - 18:00', // This could be from availability
-      approvalStatus: doctor.approvalStatus,
-      doctorStatus: (doctor as any).doctorStatus,
-      isTopRated: doctor.isTopRated || false,
-    }));
+    const availabilityTypesMap =
+      (availableDoctors as any).availabilityTypes || new Map();
+    const formattedDoctors = availableDoctors.map((doctor) => {
+      const doctorIdStr = (doctor._id as any).toString();
+      const types = availabilityTypesMap.get(doctorIdStr) || new Set<string>();
+      const availabilityTypes = Array.from(types);
+
+      return {
+        id: (doctor._id as string).toString(),
+        name: doctor.name,
+        email: doctor.email,
+        phone: doctor.phone,
+        idNumber: doctor.idNumber,
+        specialization: (doctor as any).specialization,
+        rating: doctor.rating || 0,
+        reviewCount: doctor.reviewCount || 0,
+        isActive: doctor.isActive,
+        profileImage: doctor.profileImage,
+        degrees: doctor.degrees,
+        location: doctor.location,
+        patients: '100+', // This could be calculated from appointments
+        experience: doctor.experience,
+        consultationFee: doctor.consultationFee,
+        followUpFee: doctor.followUpFee,
+        videoConsultationFee: doctor.videoConsultationFee,
+        homeVisitFee: doctor.homeVisitFee,
+        about: doctor.about,
+        dateOfBirth: doctor.dateOfBirth,
+        gender: doctor.gender,
+        licenseDocument: doctor.licenseDocument,
+        workingHours: '09:00 - 18:00', // This could be from availability
+        approvalStatus: doctor.approvalStatus,
+        doctorStatus: (doctor as any).doctorStatus,
+        isTopRated: doctor.isTopRated || false,
+        availabilityTypes, // Array of 'video' | 'home-visit' that doctor offers
+      };
+    });
 
     // Get total count (without availability filter for pending/rejected/awaiting_schedule)
     let totalCount = formattedDoctors.length;
@@ -482,6 +517,19 @@ export class DoctorsService {
       throw new NotFoundException('Doctor not found');
     }
 
+    // Log doctor fee fields from database
+    console.log('💰 [getDoctorById] Doctor fee fields from DB:', {
+      consultationFee: doctor.consultationFee,
+      followUpFee: doctor.followUpFee,
+      videoConsultationFee: doctor.videoConsultationFee,
+      homeVisitFee: doctor.homeVisitFee,
+      consultationFeeType: typeof doctor.consultationFee,
+      followUpFeeType: typeof doctor.followUpFee,
+      videoConsultationFeeType: typeof doctor.videoConsultationFee,
+      homeVisitFeeType: typeof doctor.homeVisitFee,
+      allDoctorKeys: Object.keys(doctor),
+    });
+
     // Get availability using getDoctorAvailability for consistency
     // პაციენტისთვის: forPatient=true, რომ მხოლოდ available slots ჩანდეს
     const availabilityResponse = await this.getDoctorAvailability(
@@ -501,35 +549,52 @@ export class DoctorsService {
       JSON.stringify(formattedAvailability, null, 2),
     );
 
+    // Log what we're returning
+    const responseData = {
+      id: (doctor._id as string).toString(),
+      name: doctor.name,
+      email: doctor.email,
+      phone: doctor.phone,
+      idNumber: doctor.idNumber,
+      specialization: doctor.specialization,
+      rating: doctor.rating || 0,
+      reviewCount: doctor.reviewCount || 0,
+      isActive: doctor.isActive,
+      profileImage: doctor.profileImage,
+      degrees: doctor.degrees,
+      location: doctor.location,
+      patients: '100+',
+      experience: doctor.experience,
+      consultationFee: doctor.consultationFee,
+      followUpFee: doctor.followUpFee,
+      videoConsultationFee: doctor.videoConsultationFee,
+      homeVisitFee: doctor.homeVisitFee,
+      about: doctor.about,
+      dateOfBirth: doctor.dateOfBirth,
+      gender: doctor.gender,
+      licenseDocument: doctor.licenseDocument,
+      workingHours: '09:00 - 18:00',
+      availability: formattedAvailability,
+      reviews,
+      approvalStatus: doctor.approvalStatus,
+      isTopRated: doctor.isTopRated || false,
+      // Identomat verification images (for admin panel)
+      identomatFaceImage: doctor.identomatFaceImage,
+      identomatDocumentFrontImage: doctor.identomatDocumentFrontImage,
+      identomatDocumentBackImage: doctor.identomatDocumentBackImage,
+      identomatFullData: doctor.identomatFullData,
+    };
+
+    console.log('💰 [getDoctorById] Response data with fees:', {
+      consultationFee: responseData.consultationFee,
+      followUpFee: responseData.followUpFee,
+      videoConsultationFee: responseData.videoConsultationFee,
+      homeVisitFee: responseData.homeVisitFee,
+    });
+
     return {
       success: true,
-      data: {
-        id: (doctor._id as string).toString(),
-        name: doctor.name,
-        email: doctor.email,
-        phone: doctor.phone,
-        idNumber: doctor.idNumber,
-        specialization: doctor.specialization,
-        rating: doctor.rating || 0,
-        reviewCount: doctor.reviewCount || 0,
-        isActive: doctor.isActive,
-        profileImage: doctor.profileImage,
-        degrees: doctor.degrees,
-        location: doctor.location,
-        patients: '100+',
-        experience: doctor.experience,
-        consultationFee: doctor.consultationFee,
-        followUpFee: doctor.followUpFee,
-        about: doctor.about,
-        dateOfBirth: doctor.dateOfBirth,
-        gender: doctor.gender,
-        licenseDocument: doctor.licenseDocument,
-        workingHours: '09:00 - 18:00',
-        availability: formattedAvailability,
-        reviews,
-        approvalStatus: doctor.approvalStatus,
-        isTopRated: doctor.isTopRated || false,
-      },
+      data: responseData,
     };
   }
 
@@ -782,10 +847,26 @@ export class DoctorsService {
       }
     });
 
+    // Get today's date for filtering past dates
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     const result = Object.entries(availabilityByDateType)
       .map(([key, value]) => {
         const [dateStr] = key.split('|');
         const { date, type, slots } = value;
+
+        // პაციენტისთვის: გავლილი დღეები არ უნდა ჩანდეს
+        if (forPatient) {
+          const dayDate = new Date(date);
+          dayDate.setHours(0, 0, 0, 0);
+          if (dayDate < today) {
+            console.log(
+              `🚫 [getDoctorAvailability] Filtering out past date for patient: ${dateStr}`,
+            );
+            return null;
+          }
+        }
 
         // დავრწმუნდეთ, რომ type არის 'video' ან 'home-visit'
         const typeKey = type === 'home-visit' ? 'home-visit' : 'video';
@@ -1060,6 +1141,17 @@ export class DoctorsService {
       throw new NotFoundException('Invalid doctor ID format');
     }
 
+    console.log('💰 [updateDoctor] Received DTO:', {
+      consultationFee: updateDoctorDto.consultationFee,
+      followUpFee: updateDoctorDto.followUpFee,
+      videoConsultationFee: updateDoctorDto.videoConsultationFee,
+      homeVisitFee: updateDoctorDto.homeVisitFee,
+      consultationFeeType: typeof updateDoctorDto.consultationFee,
+      followUpFeeType: typeof updateDoctorDto.followUpFee,
+      videoConsultationFeeType: typeof updateDoctorDto.videoConsultationFee,
+      homeVisitFeeType: typeof updateDoctorDto.homeVisitFee,
+    });
+
     const doctor = await this.userModel.findById(doctorId);
 
     if (!doctor) {
@@ -1069,6 +1161,13 @@ export class DoctorsService {
     if (doctor.role !== UserRole.DOCTOR) {
       throw new BadRequestException('User is not a doctor');
     }
+
+    console.log('💰 [updateDoctor] Doctor fees BEFORE update:', {
+      consultationFee: doctor.consultationFee,
+      followUpFee: doctor.followUpFee,
+      videoConsultationFee: doctor.videoConsultationFee,
+      homeVisitFee: doctor.homeVisitFee,
+    });
 
     // Check if email is already taken by another user
     if (updateDoctorDto.email && updateDoctorDto.email !== doctor.email) {
@@ -1109,6 +1208,20 @@ export class DoctorsService {
     if (updateDoctorDto.followUpFee !== undefined) {
       doctor.followUpFee = updateDoctorDto.followUpFee;
     }
+    if (updateDoctorDto.videoConsultationFee !== undefined) {
+      console.log(
+        '💰 [updateDoctor] Setting videoConsultationFee:',
+        updateDoctorDto.videoConsultationFee,
+      );
+      doctor.videoConsultationFee = updateDoctorDto.videoConsultationFee;
+    }
+    if (updateDoctorDto.homeVisitFee !== undefined) {
+      console.log(
+        '💰 [updateDoctor] Setting homeVisitFee:',
+        updateDoctorDto.homeVisitFee,
+      );
+      doctor.homeVisitFee = updateDoctorDto.homeVisitFee;
+    }
     if (updateDoctorDto.about !== undefined) {
       doctor.about = updateDoctorDto.about;
     }
@@ -1131,8 +1244,30 @@ export class DoctorsService {
       (doctor as any).minWorkingDaysRequired =
         updateDoctorDto.minWorkingDaysRequired;
     }
+    if (updateDoctorDto.contractDocument !== undefined) {
+      doctor.contractDocument = updateDoctorDto.contractDocument;
+    }
+
+    console.log(
+      '💰 [updateDoctor] Doctor fees AFTER assignment (before save):',
+      {
+        consultationFee: doctor.consultationFee,
+        followUpFee: doctor.followUpFee,
+        videoConsultationFee: doctor.videoConsultationFee,
+        homeVisitFee: doctor.homeVisitFee,
+      },
+    );
 
     await doctor.save();
+
+    console.log('💰 [updateDoctor] Doctor saved. Verifying from DB...');
+    const savedDoctor = await this.userModel.findById(doctorId).lean();
+    console.log('💰 [updateDoctor] Doctor fees AFTER save (from DB):', {
+      consultationFee: savedDoctor?.consultationFee,
+      followUpFee: savedDoctor?.followUpFee,
+      videoConsultationFee: savedDoctor?.videoConsultationFee,
+      homeVisitFee: savedDoctor?.homeVisitFee,
+    });
 
     return this.getDoctorById(doctorId, true);
   }
@@ -1565,6 +1700,17 @@ export class DoctorsService {
 
     if (!appointment) {
       throw new NotFoundException('Appointment not found');
+    }
+
+    // Validation: For home-visit appointments, patient must mark as completed first
+    if (
+      dto.status === AppointmentStatus.COMPLETED &&
+      appointment.type === AppointmentType.HOME_VISIT &&
+      !appointment.homeVisitCompletedAt
+    ) {
+      throw new BadRequestException(
+        'ბინაზე კონსულტაცია არ შეიძლება დასრულდეს, სანამ პაციენტმა არ მონიშნა როგორც დასრულებული. გთხოვთ დაელოდოთ პაციენტის დადასტურებას.',
+      );
     }
 
     if (dto.status) {

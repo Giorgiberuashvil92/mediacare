@@ -3,8 +3,8 @@ import { ADMIN_DEV_TOKEN } from './dev-token';
 
 const API_BASE_URL = 
   process.env.NEXT_PUBLIC_API_URL || 
-  'https://mediacare-production.up.railway.app';
-  // 'http://localhost:4000';
+  'http://localhost:4001';
+  // 'https://mediacare-production.up.railway.app';
 
 // DEVELOPMENT MODE: Skip auth and use static token (from dev-token.ts)
 const DISABLE_AUTH = true;
@@ -36,6 +36,7 @@ export interface User {
   specialization?: string;
   licenseNumber?: string;
   licenseDocument?: string; // File path/URL for medical license (PDF or Image)
+  contractDocument?: string; // Contract text content as string
   degrees?: string;
   experience?: string;
   consultationFee?: number;
@@ -49,6 +50,11 @@ export interface User {
   isTopRated?: boolean;
   // Minimum working days doctor must have scheduled in the next 2 weeks (set by admin)
   minWorkingDaysRequired?: number;
+  // Identomat verification images (for admin panel)
+  identomatFaceImage?: string; // Face image URL from Identomat
+  identomatDocumentFrontImage?: string; // Document front image URL from Identomat
+  identomatDocumentBackImage?: string; // Document back image URL from Identomat
+  identomatFullData?: any; // Full Identomat response data for admin panel
 }
 
 export interface LoginRequest {

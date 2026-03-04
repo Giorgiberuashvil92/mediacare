@@ -15,6 +15,8 @@ import {
   View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { apiService } from "../../_services/api";
+import OTPModal from "../../components/ui/OTPModal";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { showToast } from "../../utils/toast";
@@ -26,8 +28,12 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
+  const [showPhoneLogin, setShowPhoneLogin] = useState(false);
+  const [phone, setPhone] = useState("");
+  const [showOTPModal, setShowOTPModal] = useState(false);
+  const [pendingLoginEmail, setPendingLoginEmail] = useState<string>("");
 
-  const { login } = useAuth();
+  const { login: loginContext, completeLoginAfterOTP } = useAuth();
   const { language, setLanguage, t } = useLanguage();
 
   const languages = [
@@ -55,8 +61,21 @@ export default function LoginScreen() {
 
     try {
       setIsLoading(true);
-      const authResponse = await login({ email: email.trim(), password });
+      const authResponse = await loginContext({ email: email.trim(), password });
       
+      // ALWAYS require OTP if user has a phone number (after logout, force OTP)
+      if (authResponse.data.user.phone && authResponse.data.user.phone.trim()) {
+        // Store email for OTP verification
+        setPendingLoginEmail(email.trim());
+        // Set phone for OTP Modal
+        setPhone(authResponse.data.user.phone);
+        // Show OTP Modal - always require OTP after logout
+        setShowOTPModal(true);
+        setIsLoading(false);
+        return;
+      }
+      
+      // If user doesn't have a phone number, proceed with normal login
       // Get role from response
       const role = authResponse.data.user.role || authResponse.data.role;
       
@@ -85,6 +104,109 @@ export default function LoginScreen() {
       }
       
       showToast.auth.loginError(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleOTPVerified = async (code: string, authResponse?: any) => {
+    if (!pendingLoginEmail && !authResponse) {
+      showToast.error("შეცდომა: Email არ მოიძებნა", "შეცდომა");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      
+      // If authResponse is already provided from OTPModal, use it directly
+      // Otherwise, verify OTP again (for backward compatibility)
+      let finalAuthResponse = authResponse;
+      if (!finalAuthResponse) {
+        console.log("⚠️ [Login] AuthResponse not provided, verifying OTP again...");
+        finalAuthResponse = await apiService.verifyLoginOTP(
+          pendingLoginEmail!,
+          code,
+        );
+      } else {
+        console.log("✅ [Login] Using authResponse from OTPModal, skipping duplicate verification");
+      }
+
+      // Complete login in AuthContext (tokens are already stored by verifyLoginOTP or will be stored in completeLoginAfterOTP)
+      await completeLoginAfterOTP(finalAuthResponse);
+
+      // Get role from response
+      const role = finalAuthResponse.data.user.role;
+
+      // Show success toast
+      showToast.auth.loginSuccess(
+        finalAuthResponse.data.user.name || "მომხმარებელო",
+      );
+
+      // Close OTP Modal
+      setShowOTPModal(false);
+      setPendingLoginEmail("");
+
+      // Navigate based on role
+      if (role === "doctor") {
+        router.replace("/(doctor-tabs)");
+      } else {
+        router.replace("/(tabs)");
+      }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "OTP ვერიფიკაცია ვერ მოხერხდა";
+      showToast.error(errorMessage, "შეცდომა");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSkipOTP = async () => {
+    // Temporary skip function for development
+    // This bypasses OTP verification by using a dummy code
+    if (!pendingLoginEmail) {
+      showToast.error("შეცდომა: Email არ მოიძებნა", "შეცდომა");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      console.log("⚠️ [Login] Skipping OTP verification (development mode)");
+
+      // Use a dummy code to bypass OTP verification
+      // This is only for development - should be removed in production
+      const authResponse = await apiService.verifyLoginOTP(
+        pendingLoginEmail,
+        "000000", // Dummy code for development
+      );
+
+      // Complete login in AuthContext
+      await completeLoginAfterOTP(authResponse);
+
+      // Get role from response
+      const role = authResponse.data.user.role;
+
+      // Show success toast
+      showToast.info("OTP გამოტოვებულია (დროებით)", "ინფორმაცია");
+
+      // Close OTP Modal
+      setShowOTPModal(false);
+      setPendingLoginEmail("");
+
+      // Navigate based on role
+      if (role === "doctor") {
+        router.replace("/(doctor-tabs)");
+      } else {
+        router.replace("/(tabs)");
+      }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "OTP გამოტოვება ვერ მოხერხდა";
+      showToast.error(errorMessage, "შეცდომა");
     } finally {
       setIsLoading(false);
     }
@@ -252,6 +374,51 @@ export default function LoginScreen() {
                   </Text>
                 </TouchableOpacity>
 
+                {/* Phone Login Option */}
+               
+
+                {showPhoneLogin && (
+                  <View style={styles.phoneLoginContainer}>
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.label}>ტელეფონის ნომერი</Text>
+                      <View style={styles.inputWrapper}>
+                        <Ionicons
+                          name="call-outline"
+                          size={20}
+                          color="#9CA3AF"
+                          style={styles.inputIcon}
+                        />
+                        <TextInput
+                          style={styles.input}
+                          placeholder="555123456"
+                          placeholderTextColor="#9CA3AF"
+                          value={phone}
+                          onChangeText={setPhone}
+                          keyboardType="phone-pad"
+                          autoComplete="tel"
+                        />
+                      </View>
+                    </View>
+                    <TouchableOpacity
+                      style={[
+                        styles.phoneLoginSubmitButton,
+                        (!phone.trim() || isLoading) &&
+                          styles.phoneLoginSubmitButtonDisabled,
+                      ]}
+                      onPress={() => {
+                        if (phone.trim()) {
+                          setShowOTPModal(true);
+                        }
+                      }}
+                      disabled={!phone.trim() || isLoading}
+                    >
+                      <Text style={styles.phoneLoginSubmitButtonText}>
+                        ვერიფიკაციის კოდის მიღება
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
                 <View style={styles.signupContainerInline}>
                   <Text style={styles.signupText}>
                     {t("auth.login.signup.question")}
@@ -317,6 +484,23 @@ export default function LoginScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* OTP Verification Modal */}
+      <OTPModal
+        visible={showOTPModal}
+        phone={phone}
+        onClose={() => {
+          setShowOTPModal(false);
+          setPendingLoginEmail("");
+        }}
+        onVerified={handleOTPVerified}
+        onSkip={handleSkipOTP}
+        showSkipButton={true}
+        isLoginOTP={true}
+        loginEmail={pendingLoginEmail}
+        title="ტელეფონის ვერიფიკაცია"
+        subtitle="გთხოვთ შეიყვანოთ 6-ნიშნა კოდი, რომელიც გამოგიგზავნეთ SMS-ით"
+      />
     </View>
   );
 }
@@ -543,6 +727,45 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Poppins-SemiBold",
     color: "#06B6D4",
+  },
+  phoneLoginButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 16,
+    marginBottom: 16,
+    gap: 8,
+  },
+  phoneLoginButtonText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#06B6D4",
+  },
+  phoneLoginContainer: {
+    marginTop: 16,
+    marginBottom: 16,
+    padding: 16,
+    backgroundColor: "#F9FAFB",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  phoneLoginSubmitButton: {
+    backgroundColor: "#06B6D4",
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 12,
+  },
+  phoneLoginSubmitButtonDisabled: {
+    backgroundColor: "#9CA3AF",
+    opacity: 0.6,
+  },
+  phoneLoginSubmitButtonText: {
+    fontSize: 16,
+    fontFamily: "Poppins-SemiBold",
+    color: "#FFFFFF",
   },
   logoImage: {
     width: 50,

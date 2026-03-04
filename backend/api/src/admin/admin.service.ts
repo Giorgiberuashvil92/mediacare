@@ -107,6 +107,11 @@ export class AdminService {
           reviewCount: user.reviewCount || 0,
           licenseDocument: user.licenseDocument,
         }),
+        // Identomat verification images (for all users who used Identomat)
+        identomatFaceImage: user.identomatFaceImage,
+        identomatDocumentFrontImage: user.identomatDocumentFrontImage,
+        identomatDocumentBackImage: user.identomatDocumentBackImage,
+        identomatFullData: user.identomatFullData,
       };
     });
 
@@ -329,6 +334,7 @@ export class AdminService {
         diagnosis: appointment.diagnosis,
         laboratoryTests: appointment.laboratoryTests || [],
         documentsCount: appointment.documents?.length || 0,
+        homeVisitCompletedAt: appointment.homeVisitCompletedAt,
         createdAt: appointment.createdAt,
         updatedAt: appointment.updatedAt,
       };
@@ -628,6 +634,11 @@ export class AdminService {
           reviewCount: user.reviewCount || 0,
           licenseDocument: user.licenseDocument,
         }),
+        // Identomat verification images (for all users who used Identomat)
+        identomatFaceImage: user.identomatFaceImage,
+        identomatDocumentFrontImage: user.identomatDocumentFrontImage,
+        identomatDocumentBackImage: user.identomatDocumentBackImage,
+        identomatFullData: user.identomatFullData,
       },
     };
   }

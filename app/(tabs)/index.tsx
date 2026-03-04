@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import TodayAppointment from "../components/shared/todayAppointment";
+import AIAssistant from "../components/ui/AIAssistant";
 import Departments from "../components/ui/departments";
 import Header from "../components/ui/header";
 import Services from "../components/ui/services";
@@ -69,79 +70,82 @@ export default function HomeScreen() {
   }).current;
 
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#20BEB8" />
-      }
-    >
-      <SafeAreaView>
-        <Header />
-        {refreshing && (
-          <View style={styles.loaderContainer}>
-            <ActivityIndicator size="small" color="#20BEB8" />
-          </View>
-        )}
-        <TodayAppointment />
-        <Services />
-        <Departments />
-        
-        {/* Promotional Banner Slider */}
-        <View style={styles.promoContainer}>
-          <FlatList
-            ref={flatListRef}
-            data={PROMOTIONAL_BANNERS}
-            renderItem={({ item }) => (
-              <View style={styles.slideContainer}>
-                <LinearGradient
-                  colors={item.colors as [string, string]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.promoCard}
-                >
-                  <View style={styles.promoContent}>
-                    <View style={styles.promoTextContainer}>
-                      <Text style={styles.promoTitle}>{item.title}</Text>
-                      <Text style={styles.promoSubtitle}>{item.subtitle}</Text>
-                      <TouchableOpacity style={styles.promoButton}>
-                        <Text style={styles.promoButtonText}>დეტალები</Text>
-                        <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
-                      </TouchableOpacity>
-                    </View>
-                    <View style={styles.promoIconContainer}>
-                      <Ionicons name={item.icon as any} size={64} color="rgba(255, 255, 255, 0.3)" />
-                    </View>
-                  </View>
-                </LinearGradient>
-              </View>
-            )}
-            keyExtractor={(item) => item.id.toString()}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            onViewableItemsChanged={onViewableItemsChanged}
-            viewabilityConfig={viewabilityConfig}
-            snapToInterval={SLIDER_WIDTH + 16}
-            decelerationRate="fast"
-            contentContainerStyle={styles.sliderContent}
-          />
+    <View style={styles.container}>
+      <ScrollView
+        style={styles.scrollView}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#20BEB8" />
+        }
+      >
+        <SafeAreaView>
+          <Header />
+          {refreshing && (
+            <View style={styles.loaderContainer}>
+              <ActivityIndicator size="small" color="#20BEB8" />
+            </View>
+          )}
+          <TodayAppointment />
+          <Services />
+          <AIAssistant />
+          <Departments />
           
-          {/* Pagination Dots */}
-          <View style={styles.paginationContainer}>
-            {PROMOTIONAL_BANNERS.map((_, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.paginationDot,
-                  index === currentSlideIndex && styles.paginationDotActive,
-                ]}
-              />
-            ))}
+          {/* Promotional Banner Slider */}
+          <View style={styles.promoContainer}>
+            <FlatList
+              ref={flatListRef}
+              data={PROMOTIONAL_BANNERS}
+              renderItem={({ item }) => (
+                <View style={styles.slideContainer}>
+                  <LinearGradient
+                    colors={item.colors as [string, string]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.promoCard}
+                  >
+                    <View style={styles.promoContent}>
+                      <View style={styles.promoTextContainer}>
+                        <Text style={styles.promoTitle}>{item.title}</Text>
+                        <Text style={styles.promoSubtitle}>{item.subtitle}</Text>
+                        <TouchableOpacity style={styles.promoButton}>
+                          <Text style={styles.promoButtonText}>დეტალები</Text>
+                          <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+                        </TouchableOpacity>
+                      </View>
+                      <View style={styles.promoIconContainer}>
+                        <Ionicons name={item.icon as any} size={64} color="rgba(255, 255, 255, 0.3)" />
+                      </View>
+                    </View>
+                  </LinearGradient>
+                </View>
+              )}
+              keyExtractor={(item) => item.id.toString()}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onViewableItemsChanged={onViewableItemsChanged}
+              viewabilityConfig={viewabilityConfig}
+              snapToInterval={SLIDER_WIDTH + 16}
+              decelerationRate="fast"
+              contentContainerStyle={styles.sliderContent}
+            />
+            
+            {/* Pagination Dots */}
+            <View style={styles.paginationContainer}>
+              {PROMOTIONAL_BANNERS.map((_, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.paginationDot,
+                    index === currentSlideIndex && styles.paginationDotActive,
+                  ]}
+                />
+              ))}
+            </View>
           </View>
-        </View>
-        
-      </SafeAreaView>
-    </ScrollView>
+          
+        </SafeAreaView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -149,6 +153,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F2F2F7",
+  },
+  scrollView: {
+    flex: 1,
   },
   loaderContainer: {
     paddingVertical: 8,

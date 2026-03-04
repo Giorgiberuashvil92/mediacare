@@ -1,11 +1,11 @@
 import { Type } from 'class-transformer';
 import {
-    IsEnum,
-    IsNotEmpty,
-    IsNumber,
-    IsOptional,
-    IsString,
-    ValidateNested,
+  IsEnum,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  ValidateNested,
 } from 'class-validator';
 import { AppointmentType, PaymentStatus } from '../schemas/appointment.schema';
 
@@ -71,6 +71,10 @@ export class CreateAppointmentDto {
   @IsOptional()
   @IsEnum(PaymentStatus)
   paymentStatus?: PaymentStatus;
+
+  @IsOptional()
+  @IsString()
+  paymentOrderId?: string;
 
   @IsOptional()
   @ValidateNested()

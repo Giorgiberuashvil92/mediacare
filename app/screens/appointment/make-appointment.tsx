@@ -313,9 +313,28 @@ const MakeAppointment = () => {
       return;
     }
 
-    // Navigate directly to payment page
+    // დროებით: გადახდის გვერდზე ნავიგაცია დაკომენტარებულია
+    // პირდაპირ პაციენტის დეტალების გვერდზე გადავდივართ
+    // // Navigate directly to payment page
+    // router.push({
+    //   pathname: "/screens/payment/payment-methods",
+    //   params: {
+    //     doctorId: doctorId as string,
+    //     selectedDate: selectedDate as string,
+    //     selectedTime: selectedTime as string,
+    //     paymentMethod: selectedPaymentMethod,
+    //     amount: netAmount.toString(),
+    //     consultationFee: consultationFee.toString(),
+    //     appointmentType,
+    //     visitAddress,
+    //     problemDescription,
+    //     uploadedFile: uploadedFile ? JSON.stringify(uploadedFile) : "",
+    //   },
+    // });
+
+    // დროებით: პირდაპირ პაციენტის დეტალების გვერდზე გადავდივართ (გადახდის გარეშე)
     router.push({
-      pathname: "/screens/payment/payment-methods",
+      pathname: "/screens/appointment/patient-details",
       params: {
         doctorId: doctorId as string,
         selectedDate: selectedDate as string,
@@ -325,7 +344,7 @@ const MakeAppointment = () => {
         consultationFee: consultationFee.toString(),
         appointmentType,
         visitAddress,
-        problemDescription,
+        bookingFor: bookingFor,
         uploadedFile: uploadedFile ? JSON.stringify(uploadedFile) : "",
       },
     });

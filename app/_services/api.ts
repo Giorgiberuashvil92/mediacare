@@ -62,13 +62,8 @@ const getDevelopmentIP = (): string | null => {
 };
 
 const getDefaultBaseUrl = () => {
-  // Force Railway URL for testing (both dev and production)
-  const FORCE_RAILWAY = false; // Set to false to use local development
-
-  if (FORCE_RAILWAY) {
-    console.log("🚂 Forcing Railway URL for testing");
-    return "https://mediacare-production.up.railway.app";
-  }
+  // Railway production URL
+  const RAILWAY_URL = "https://mediacare-production.up.railway.app";
 
   const envUrl =
     process.env.EXPO_PUBLIC_API_URL ||
@@ -85,29 +80,41 @@ const getDefaultBaseUrl = () => {
     manifestExtra: (Constants.manifest as any)?.extra?.apiUrl,
   });
 
-  // თუ envUrl არის განსაზღვრული და არ არის localhost, გამოვიყენოთ ის
-  if (envUrl && !envUrl.includes("localhost") && !envUrl.includes("127.0.0.1")) {
-    return envUrl;
+  // Production-ისთვის (არა development) გამოვიყენოთ Railway URL
+  if (!__DEV__) {
+    // თუ envUrl არის განსაზღვრული და არ არის localhost, გამოვიყენოთ ის
+    if (envUrl && !envUrl.includes("localhost") && !envUrl.includes("127.0.0.1")) {
+      console.log("✅ Using production URL from env:", envUrl);
+      return envUrl;
+    }
+    // Production-ისთვის Railway URL
+    console.log("🚂 Using Railway production URL:", RAILWAY_URL);
+    return RAILWAY_URL;
   }
 
   // Development build-ისთვის გამოვიყენოთ ავტომატურად გამოვლენილი IP
-  if (__DEV__) {
-    const devIP = getDevelopmentIP();
-    if (devIP) {
-      const devUrl = `http://${devIP}:4000`;
-      console.log("🔧 Using development URL:", devUrl);
-      return devUrl;
-    }
+  // თუ envUrl არის განსაზღვრული და არ არის localhost, გამოვიყენოთ ის
+  if (envUrl && !envUrl.includes("localhost") && !envUrl.includes("127.0.0.1")) {
+    console.log("✅ Using development URL from env:", envUrl);
+    return envUrl;
   }
 
-  // Production-ისთვის ან fallback
+  // Development-ისთვის IP-ის გამოყენება
+  const devIP = getDevelopmentIP();
+  if (devIP) {
+    const devUrl = `http://${devIP}:4001`;
+    console.log("🔧 Using development URL with IP:", devUrl);
+    return devUrl;
+  }
+
+  // Fallback
   if (envUrl) {
     console.log("✅ Using fallback URL:", envUrl);
     return envUrl;
   }
 
   console.warn("⚠️ No API URL found, using localhost fallback");
-  return "http://localhost:4000";
+  return "http://localhost:4001";
 };
 
 const API_BASE_URL = getDefaultBaseUrl();
@@ -119,6 +126,7 @@ export interface User {
   email: string;
   name: string;
   role: "doctor" | "patient";
+  phone?: string;
   profileImage?: string;
   doctorStatus?: "awaiting_schedule" | "active";
   isActive?: boolean;
@@ -138,6 +146,7 @@ export interface RegisterRequest {
   role: "doctor" | "patient";
   idNumber: string;
   phone: string;
+  verificationCode: string; // OTP code for phone verification
   specialization?: string;
   licenseDocument?: string;
   profileImage?: string;
@@ -146,10 +155,11 @@ export interface RegisterRequest {
 export interface AuthResponse {
   success: boolean;
   message: string;
+  requiresOTP?: boolean; // If true, OTP verification is required before login
   data: {
     user: User;
-    token: string;
-    refreshToken: string;
+    token?: string; // Optional if requiresOTP is true
+    refreshToken?: string; // Optional if requiresOTP is true
   };
 }
 
@@ -214,6 +224,58 @@ export interface Clinic {
 }
 
 export type AppointmentType = "video" | "home-visit";
+
+// AI Assistant Types
+export interface AISession {
+  id: string;
+  initiator_type: "customer" | "doctor";
+  initiator_id: string;
+  status: "active" | "closed";
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateSessionRequest {
+  initiator_id: string;
+  initiator_type: "customer" | "doctor";
+}
+
+export interface AIMessage {
+  id: string;
+  session_id: string;
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+  image_url?: string;
+  // Additional metadata that AI might return (e.g., doctor recommendations)
+  metadata?: {
+    doctors?: {
+      id: string;
+      name: string;
+      specialization: string;
+      rating?: number;
+      reviewCount?: number;
+      image?: string;
+      consultationFee?: string;
+      [key: string]: any;
+    }[];
+    [key: string]: any;
+  };
+}
+
+export interface SendMessageRequest {
+  content: string;
+  image?: {
+    uri: string;
+    type: string;
+    name: string;
+  };
+}
+
+export interface SendMessageResponse {
+  user_message: AIMessage;
+  assistant_message: AIMessage;
+}
 
 class ApiService {
   private baseURL: string;
@@ -298,11 +360,15 @@ class ApiService {
       };
 
       logger.auth.loginSuccess(mockUser);
-      await AsyncStorage.setItem("accessToken", mockResponse.data.token);
-      await AsyncStorage.setItem(
-        "refreshToken",
-        mockResponse.data.refreshToken,
-      );
+      if (mockResponse.data.token) {
+        await AsyncStorage.setItem("accessToken", mockResponse.data.token);
+      }
+      if (mockResponse.data.refreshToken) {
+        await AsyncStorage.setItem(
+          "refreshToken",
+          mockResponse.data.refreshToken,
+        );
+      }
       await AsyncStorage.setItem("user", JSON.stringify(mockUser));
       return mockResponse;
     }
@@ -314,15 +380,24 @@ class ApiService {
 
     logger.auth.loginSuccess(data.data.user);
 
-    // Store tokens only if they exist
-    if (data.data.token) {
-      await AsyncStorage.setItem("accessToken", data.data.token);
-    }
-    if (data.data.refreshToken) {
-      await AsyncStorage.setItem("refreshToken", data.data.refreshToken);
-    }
-    if (data.data.user) {
-      await AsyncStorage.setItem("user", JSON.stringify(data.data.user));
+    // Store tokens only if OTP is NOT required
+    // If OTP is required, tokens will be stored after OTP verification
+    // Also, if user has a phone number, always require OTP (force OTP after logout)
+    if (!data.requiresOTP && (!data.data.user.phone || !data.data.user.phone.trim())) {
+      // Only store tokens if OTP is not required AND user doesn't have a phone
+      if (data.data.token) {
+        await AsyncStorage.setItem("accessToken", data.data.token);
+      }
+      if (data.data.refreshToken) {
+        await AsyncStorage.setItem("refreshToken", data.data.refreshToken);
+      }
+      if (data.data.user) {
+        await AsyncStorage.setItem("user", JSON.stringify(data.data.user));
+      }
+    } else {
+      // OTP required or user has phone - don't store tokens yet
+      // They will be stored after OTP verification in verifyLoginOTP
+      console.log('⚠️ [ApiService] OTP required or user has phone - not storing tokens yet');
     }
 
     return data;
@@ -354,11 +429,15 @@ class ApiService {
       };
 
       logger.auth.registerSuccess(mockUser);
-      await AsyncStorage.setItem("accessToken", mockResponse.data.token);
-      await AsyncStorage.setItem(
-        "refreshToken",
-        mockResponse.data.refreshToken,
-      );
+      if (mockResponse.data.token) {
+        await AsyncStorage.setItem("accessToken", mockResponse.data.token);
+      }
+      if (mockResponse.data.refreshToken) {
+        await AsyncStorage.setItem(
+          "refreshToken",
+          mockResponse.data.refreshToken,
+        );
+      }
       await AsyncStorage.setItem("user", JSON.stringify(mockUser));
       return mockResponse;
     }
@@ -413,6 +492,68 @@ class ApiService {
     );
 
     return this.handleResponse<{ success: boolean; message: string }>(response);
+  }
+
+  async verifyLoginOTP(
+    email: string,
+    verificationCode: string,
+  ): Promise<AuthResponse> {
+    if (USE_MOCK_API) {
+      // In mock mode, always succeed
+      console.log(`[MOCK] Login OTP verified for ${email}`);
+      const mockUser: User = {
+        id: "mock-user-1",
+        email: email,
+        name: "Demo User",
+        role: email.includes("doc") ? "doctor" : "patient",
+      };
+
+      const mockResponse: AuthResponse = {
+        success: true,
+        message: "Login successful (mock)",
+        requiresOTP: false,
+        data: {
+          user: mockUser,
+          token: "mock-access-token",
+          refreshToken: "mock-refresh-token",
+        },
+      };
+
+      if (mockResponse.data.token) {
+        await AsyncStorage.setItem("accessToken", mockResponse.data.token);
+      }
+      if (mockResponse.data.refreshToken) {
+        await AsyncStorage.setItem(
+          "refreshToken",
+          mockResponse.data.refreshToken,
+        );
+      }
+      await AsyncStorage.setItem("user", JSON.stringify(mockUser));
+      return mockResponse;
+    }
+
+    const response = await fetch(`${this.baseURL}/auth/verify-login-otp`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, verificationCode }),
+    });
+
+    const data = await this.handleResponse<AuthResponse>(response);
+
+    // Store tokens only if they exist
+    if (data.data.token) {
+      await AsyncStorage.setItem("accessToken", data.data.token);
+    }
+    if (data.data.refreshToken) {
+      await AsyncStorage.setItem("refreshToken", data.data.refreshToken);
+    }
+    if (data.data.user) {
+      await AsyncStorage.setItem("user", JSON.stringify(data.data.user));
+    }
+
+    return data;
   }
 
   async verifyPhoneCode(
@@ -2222,6 +2363,515 @@ class ApiService {
     return this.apiCall("/help-center", {
       method: "GET",
     });
+  }
+
+  async createAISession(
+    request: CreateSessionRequest
+  ): Promise<{
+    success: boolean;
+    data: AISession;
+  }> {
+    // ALWAYS use external API for session creation (NOT our backend)
+    // HERA Backend API - External AI Assistant Service
+    // HERA XXI Organization: https://hera-youth.ge
+    const EXTERNAL_API_URL = "http://16.16.218.17:8008";
+    const API_KEY = "hera-api-key";
+
+    console.log("🚀 [createAISession] Using EXTERNAL API (NOT backend):", {
+      url: `${EXTERNAL_API_URL}/sessions`,
+      request: request,
+      apiKey: API_KEY,
+    });
+
+    try {
+      const response = await fetch(`${EXTERNAL_API_URL}/sessions`, {
+        method: "POST",
+        headers: {
+          "accept": "application/json",
+          "X-API-Key": API_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(request),
+      });
+
+      console.log("📨 [createAISession] Response status:", response.status, response.statusText);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage =
+          errorData.message || `HTTP error! status: ${response.status}`;
+        console.error("❌ [createAISession] Error response:", errorData);
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      console.log("✅ [createAISession] Session created successfully:", data);
+
+      return {
+        success: true,
+        data: data,
+      };
+    } catch (error: any) {
+      console.error("❌ [createAISession] Exception:", error);
+      throw new Error(error.message || "Session creation failed");
+    }
+  }
+
+  async getAISessions(params?: {
+    skip?: number;
+    limit?: number;
+    initiator_id?: string;
+  }): Promise<{
+    success: boolean;
+    data: AISession[];
+  }> {
+    // ALWAYS use external API for getting sessions (NOT our backend)
+    // DO NOT use this.apiCall - use fetch directly!
+    // HERA Backend API - External AI Assistant Service
+    // HERA XXI Organization: https://hera-youth.ge
+    const EXTERNAL_API_URL = "http://16.16.218.17:8008";
+    const API_KEY = "hera-api-key";
+
+    console.log("🚀🚀🚀 [getAISessions] Using EXTERNAL API (NOT backend) - DO NOT USE apiCall:", {
+      url: `${EXTERNAL_API_URL}/sessions`,
+      params: params,
+      apiKey: API_KEY,
+    });
+
+    try {
+      const queryParams = new URLSearchParams();
+      if (params?.skip !== undefined) {
+        queryParams.append("skip", params.skip.toString());
+      }
+      if (params?.limit !== undefined) {
+        queryParams.append("limit", params.limit.toString());
+      }
+      if (params?.initiator_id) {
+        queryParams.append("initiator_id", params.initiator_id);
+      }
+
+      const queryString = queryParams.toString();
+      const url = `${EXTERNAL_API_URL}/sessions${queryString ? `?${queryString}` : ""}`;
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "accept": "application/json",
+          "X-API-Key": API_KEY,
+        },
+      });
+
+      console.log("📨 [getAISessions] Response status:", response.status, response.statusText);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage =
+          errorData.message || `HTTP error! status: ${response.status}`;
+        console.error("❌ [getAISessions] Error response:", errorData);
+        throw new Error(errorMessage);
+      }
+
+      // External API returns array of sessions directly
+      const sessionsArray = await response.json();
+      
+      console.log("✅ [getAISessions] Sessions received:", {
+        count: sessionsArray.length,
+        sessions: sessionsArray,
+        firstSession: sessionsArray[0] || null,
+        sessionStructure: sessionsArray[0] ? Object.keys(sessionsArray[0]) : [],
+      });
+      
+      // Log each session's details
+      if (sessionsArray.length > 0) {
+        console.log("📋 [getAISessions] Session details:");
+        sessionsArray.forEach((session: any, index: number) => {
+          console.log(`  Session ${index + 1}:`, {
+            id: session.id,
+            initiator_type: session.initiator_type,
+            initiator_id: session.initiator_id,
+            status: session.status,
+            created_at: session.created_at,
+            updated_at: session.updated_at,
+            allFields: Object.keys(session),
+          });
+        });
+      }
+
+      return {
+        success: true,
+        data: sessionsArray,
+      };
+    } catch (error: any) {
+      console.error("❌ [getAISessions] Exception:", error);
+      throw new Error(error.message || "Failed to get sessions");
+    }
+  }
+
+  async getAISession(sessionId: string): Promise<{
+    success: boolean;
+    data: AISession;
+  }> {
+    // ALWAYS use external API for getting session (NOT our backend)
+    // HERA Backend API - External AI Assistant Service
+    // HERA XXI Organization: https://hera-youth.ge
+    const EXTERNAL_API_URL = "http://16.16.218.17:8008";
+    const API_KEY = "hera-api-key";
+
+    console.log("🚀 [getAISession] Using EXTERNAL API (NOT backend):", {
+      url: `${EXTERNAL_API_URL}/sessions/${sessionId}`,
+      sessionId: sessionId,
+    });
+
+    try {
+      const response = await fetch(`${EXTERNAL_API_URL}/sessions/${sessionId}`, {
+        method: "GET",
+        headers: {
+          "accept": "application/json",
+          "X-API-Key": API_KEY,
+        },
+      });
+
+      console.log("📨 [getAISession] Response status:", response.status, response.statusText);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage =
+          errorData.message || `HTTP error! status: ${response.status}`;
+        console.error("❌ [getAISession] Error response:", errorData);
+        throw new Error(errorMessage);
+      }
+
+      const sessionData = await response.json();
+      console.log("✅ [getAISession] Session received:", sessionData);
+
+      return {
+        success: true,
+        data: sessionData,
+      };
+    } catch (error: any) {
+      console.error("❌ [getAISession] Exception:", error);
+      throw new Error(error.message || "Failed to get session");
+    }
+  }
+
+  async updateAISession(
+    sessionId: string,
+    updates: Partial<Pick<AISession, "status">>
+  ): Promise<{
+    success: boolean;
+    data: AISession;
+  }> {
+    if (USE_MOCK_API) {
+      return Promise.resolve({
+        success: true,
+        data: {
+          id: sessionId,
+          initiator_type: "customer",
+          initiator_id: "mock-user",
+          status: updates.status || "active",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      });
+    }
+
+    return this.apiCall(`/sessions/${sessionId}`, {
+      method: "PATCH",
+      body: JSON.stringify(updates),
+    });
+  }
+
+  async deleteAISession(sessionId: string): Promise<{
+    success: boolean;
+    message?: string;
+  }> {
+    if (USE_MOCK_API) {
+      return Promise.resolve({
+        success: true,
+        message: "Session deleted",
+      });
+    }
+
+    return this.apiCall(`/sessions/${sessionId}`, {
+      method: "DELETE",
+    });
+  }
+
+  // AI Assistant - Messages
+  async sendAIMessage(
+    sessionId: string,
+    request: SendMessageRequest
+  ): Promise<{
+    success: boolean;
+    data: SendMessageResponse;
+  }> {
+    // ALWAYS use external API for sending messages (NOT our backend)
+    // HERA Backend API - External AI Assistant Service
+    // HERA XXI Organization: https://hera-youth.ge
+    const EXTERNAL_API_URL = "http://16.16.218.17:8008";
+    const API_KEY = "hera-api-key";
+
+    console.log("🚀 [sendAIMessage] Using EXTERNAL API (NOT backend):", {
+      url: `${EXTERNAL_API_URL}/sessions/${sessionId}/messages`,
+      sessionId: sessionId,
+      hasContent: !!request.content,
+      hasImage: !!request.image,
+    });
+
+    try {
+      // Note: External API currently only supports text content, not images
+      // If image is provided, we'll send it as part of the content description
+      const messageContent = request.content || "";
+      
+      if (request.image) {
+        console.warn("⚠️ [sendAIMessage] Image upload not yet supported by external API, sending text only");
+        // TODO: When external API supports images, implement image upload here
+      }
+
+      const response = await fetch(
+        `${EXTERNAL_API_URL}/sessions/${sessionId}/messages`,
+        {
+          method: "POST",
+          headers: {
+            "accept": "application/json",
+            "X-API-Key": API_KEY,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            content: messageContent,
+          }),
+        }
+      );
+
+      console.log("📨 [sendAIMessage] Response status:", response.status, response.statusText);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage =
+          errorData.message || `HTTP error! status: ${response.status}`;
+        console.error("❌ [sendAIMessage] Error response:", errorData);
+        throw new Error(errorMessage);
+      }
+
+      // External API returns array: [user_message, assistant_message]
+      const messagesArray = await response.json();
+      console.log("✅ [sendAIMessage] Messages received:", JSON.stringify(messagesArray, null, 2));
+
+      // Convert array format to our expected format
+      if (!Array.isArray(messagesArray) || messagesArray.length < 2) {
+        throw new Error("Invalid response format from external API");
+      }
+
+      const userMessage = messagesArray[0];
+      const assistantMessage = messagesArray[1];
+
+      // Parse assistant message content to extract metadata (e.g., doctor recommendations)
+      // AI might return structured data in JSON format within the content
+      let assistantMetadata: any = undefined;
+      try {
+        // Try to parse content as JSON first (in case AI returns structured data)
+        const parsedContent = JSON.parse(assistantMessage.content);
+        if (parsedContent && typeof parsedContent === 'object') {
+          // If content is JSON, extract metadata
+          assistantMetadata = parsedContent.metadata || parsedContent;
+          console.log("📋 [sendAIMessage] Extracted metadata from JSON content:", assistantMetadata);
+        }
+      } catch {
+        // Content is not JSON, check if there's a metadata field in the response
+        if (assistantMessage.metadata) {
+          assistantMetadata = assistantMessage.metadata;
+          console.log("📋 [sendAIMessage] Found metadata in response:", assistantMetadata);
+        }
+        
+        // Also try to extract doctor recommendations from content if it's in a structured format
+        // This handles cases where AI returns doctor info in the content text
+        // Look for patterns that might indicate doctor recommendations
+        // (This is a fallback - ideally the API would return structured data)
+      }
+
+      return {
+        success: true,
+        data: {
+          user_message: {
+            id: userMessage.id,
+            session_id: userMessage.session_id,
+            role: userMessage.role,
+            content: userMessage.content,
+            created_at: userMessage.created_at,
+            image_url: request.image?.uri, // Preserve image URL if provided
+          },
+          assistant_message: {
+            id: assistantMessage.id,
+            session_id: assistantMessage.session_id,
+            role: assistantMessage.role,
+            content: assistantMessage.content,
+            created_at: assistantMessage.created_at,
+            metadata: assistantMetadata, // Include extracted metadata
+          },
+        },
+      };
+    } catch (error: any) {
+      console.error("❌ [sendAIMessage] Exception:", error);
+      throw new Error(error.message || "Failed to send message");
+    }
+  }
+
+  async getAIMessages(
+    sessionId: string,
+    params?: {
+      skip?: number;
+      limit?: number;
+    }
+  ): Promise<{
+    success: boolean;
+    data: AIMessage[];
+  }> {
+    // ALWAYS use external API for getting messages (NOT our backend)
+    // DO NOT use this.apiCall - use fetch directly!
+    // HERA Backend API - External AI Assistant Service
+    // HERA XXI Organization: https://hera-youth.ge
+    const EXTERNAL_API_URL = "http://16.16.218.17:8008";
+    const API_KEY = "hera-api-key";
+
+    console.log("🚀🚀🚀 [getAIMessages] Using EXTERNAL API (NOT backend) - DO NOT USE apiCall:", {
+      url: `${EXTERNAL_API_URL}/sessions/${sessionId}/messages`,
+      sessionId: sessionId,
+      params: params,
+      apiKey: API_KEY,
+    });
+
+    try {
+      const queryParams = new URLSearchParams();
+      if (params?.skip !== undefined) {
+        queryParams.append("skip", params.skip.toString());
+      }
+      if (params?.limit !== undefined) {
+        queryParams.append("limit", params.limit.toString());
+      } else {
+        // Default limit if not provided
+        queryParams.append("limit", "100");
+      }
+
+      const queryString = queryParams.toString();
+      const url = `${EXTERNAL_API_URL}/sessions/${sessionId}/messages${queryString ? `?${queryString}` : ""}`;
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "accept": "application/json",
+          "X-API-Key": API_KEY,
+        },
+      });
+
+      console.log("📨 [getAIMessages] Response status:", response.status, response.statusText);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage =
+          errorData.message || `HTTP error! status: ${response.status}`;
+        console.error("❌ [getAIMessages] Error response:", errorData);
+        throw new Error(errorMessage);
+      }
+
+      // External API returns array of messages directly
+      const messagesArray = await response.json();
+      console.log("✅ [getAIMessages] Messages received:", {
+        count: messagesArray.length,
+        messages: messagesArray,
+        firstMessage: messagesArray[0] || null,
+      });
+
+      return {
+        success: true,
+        data: messagesArray,
+      };
+    } catch (error: any) {
+      console.error("❌ [getAIMessages] Exception:", error);
+      throw new Error(error.message || "Failed to get messages");
+    }
+  }
+
+  // ==================== PAYMENT METHODS ====================
+
+  /**
+   * Create BOG payment order
+   */
+  async createPaymentOrder(params: {
+    amount: number;
+    currency?: string;
+    orderId: string;
+    description: string;
+    callbackUrl: string;
+    captureMethod?: "AUTO" | "MANUAL";
+  }): Promise<{
+    success: boolean;
+    orderId?: string;
+    paymentUrl?: string;
+    orderStatus?: string;
+    error?: string;
+  }> {
+    try {
+      console.log("💳 [ApiService] createPaymentOrder called:", params);
+
+      const result = await this.apiCall<{
+        success: boolean;
+        orderId?: string;
+        paymentUrl?: string;
+        orderStatus?: string;
+        error?: string;
+      }>("/payment/create-order", {
+        method: "POST",
+        body: JSON.stringify({
+          amount: params.amount,
+          currency: params.currency || "GEL",
+          orderId: params.orderId,
+          description: params.description,
+          callbackUrl: params.callbackUrl,
+          captureMethod: params.captureMethod || "AUTO",
+        }),
+      });
+
+      console.log("✅ [ApiService] createPaymentOrder response:", result);
+      return result;
+    } catch (error: any) {
+      console.error("❌ [ApiService] createPaymentOrder error:", error);
+      return {
+        success: false,
+        error: error.message || "Failed to create payment order",
+      };
+    }
+  }
+
+  /**
+   * Get payment status
+   */
+  async getPaymentStatus(orderId: string): Promise<{
+    success: boolean;
+    status?: string;
+    amount?: number;
+    error?: string;
+  }> {
+    try {
+      console.log("💳 [ApiService] getPaymentStatus called:", orderId);
+
+      const result = await this.apiCall<{
+        success: boolean;
+        status?: string;
+        amount?: number;
+        error?: string;
+      }>(`/payment/status/${orderId}`, {
+        method: "GET",
+      });
+
+      console.log("✅ [ApiService] getPaymentStatus response:", result);
+      return result;
+    } catch (error: any) {
+      console.error("❌ [ApiService] getPaymentStatus error:", error);
+      return {
+        success: false,
+        error: error.message || "Failed to get payment status",
+      };
+    }
   }
 }
 

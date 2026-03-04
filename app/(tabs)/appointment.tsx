@@ -2,7 +2,7 @@ import { apiService } from "@/app/_services/api";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Image } from "expo-image";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -33,6 +33,7 @@ interface PatientAppointment {
   diagnosis?: string;
   doctorImage?: any;
   visitAddress?: string;
+  homeVisitCompletedAt?: string; // When patient marked home visit as completed
   instrumentalTests?: any[];
   laboratoryTests?: any[];
   rescheduleRequest?: {
@@ -57,6 +58,10 @@ const getStatusLabel = (status: string) => {
       return "გაუქმებული";
     case "in-progress":
       return "მიმდინარე";
+    case "pending":
+      return "მოლოდინში";
+    case "confirmed":
+      return "დადასტურებული";
     default:
       return status;
   }
@@ -190,6 +195,7 @@ const mapAppointmentFromAPI = (appointment: any, apiBaseUrl: string): PatientApp
     symptoms: appointment.patientDetails?.problem || appointment.notes || "",
     diagnosis: appointment.diagnosis || "",
     visitAddress: appointment.visitAddress,
+    homeVisitCompletedAt: appointment.homeVisitCompletedAt,
     doctorImage: doctorImage,
     rescheduleRequest: appointment.rescheduleRequest ? {
       requestedBy: appointment.rescheduleRequest.requestedBy,
@@ -206,6 +212,7 @@ const mapAppointmentFromAPI = (appointment: any, apiBaseUrl: string): PatientApp
 
 const Appointment = () => {
   const router = useRouter();
+  const params = useLocalSearchParams<{ filterType?: string }>();
   const { isAuthenticated, user } = useAuth();
   const [appointments, setAppointments] = useState<PatientAppointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -214,7 +221,7 @@ const Appointment = () => {
     "all" | "completed" | "scheduled" | "cancelled"
   >("scheduled");
   const [filterType, setFilterType] = useState<"all" | "video" | "home-visit">(
-    "all",
+    (params.filterType as "all" | "video" | "home-visit") || "all",
   );
   const [selectedAppointment, setSelectedAppointment] =
     useState<PatientAppointment | null>(null);
@@ -264,6 +271,13 @@ const Appointment = () => {
     }
      
   }, [isAuthenticated, user?.id]);
+
+  // Update filterType from params
+  useEffect(() => {
+    if (params.filterType && (params.filterType === "video" || params.filterType === "home-visit")) {
+      setFilterType(params.filterType as "video" | "home-visit");
+    }
+  }, [params.filterType]);
 
   // Update current time every minute for countdown
   useEffect(() => {
@@ -675,16 +689,12 @@ const Appointment = () => {
     setLoadingAvailability(true);
     
     try {
-      // Get the doctor ID and appointment type from the original appointment
       const appointmentResponse = await apiService.getAppointmentById(appointment.id);
       if (appointmentResponse.success && appointmentResponse.data) {
         const apt = appointmentResponse.data as any;
         const doctorId = apt.doctorId?._id || apt.doctorId;
         const appointmentType = apt.type || appointment.type; // video or home-visit
-        
-        // Load doctor availability - მხოლოდ იმ ტიპის, რომელიც აქვს appointment-ს
-        // პაციენტისთვის: forPatient=true, რომ დაჯავშნილი სლოტები ჩანდეს
-        const availabilityResponse = await apiService.getDoctorAvailability(
+                const availabilityResponse = await apiService.getDoctorAvailability(
           doctorId, 
           appointmentType as "video" | "home-visit", 
           true
@@ -1199,12 +1209,7 @@ const Appointment = () => {
                     {/* Prescription/Danijnuloba */}
                     <View style={styles.detailSection}>
                       <Text style={styles.detailSectionTitle}>დანიშნულება</Text>
-                      <View style={styles.symptomsCard}>
-                        <Ionicons name="document-text-outline" size={18} color="#6B7280" />
-                        <Text style={styles.symptomsTextExpanded}>
-                          ჯერ არანაირი დანიშნულება არ არის ატვირთული
-                        </Text>
-                      </View>
+                     
                     </View>
 
                     {/* Instrumental Tests */}
@@ -1334,7 +1339,7 @@ const Appointment = () => {
                   </TouchableOpacity>
                 )}
 
-                {/* Reminder & Join Call Section */}
+                {/* Reminder & Join Call Section - Only for video consultations */}
                 {appointment.status === "scheduled" && (
                   <View style={styles.reminderSection}>
                     {getTimeUntilAppointment(appointment) ? (
@@ -1379,91 +1384,131 @@ const Appointment = () => {
                         </Text>
                       </View>
                     ) : null}
-                    <TouchableOpacity
-                      style={[
-                        styles.joinCallButton,
-                        isAppointmentSoon(appointment) &&
-                          styles.joinCallButtonPulsing,
-                        !isJoinButtonActive(appointment) && styles.joinCallButtonDisabled,
-                      ]}
-                      onPress={async () => {
-                        // Check if consultation time has not yet arrived
-                        if (isConsultationTimeNotYet(appointment)) {
-                          setShowConsultationTimeModal(true);
-                          return;
-                        }
-                        
-                        if (!isJoinButtonActive(appointment)) {
-                          // Navigate to waiting screen
+                    {/* Show "Join Call" button only for video consultations */}
+                    {appointment.type === "video" && (
+                      <TouchableOpacity
+                        style={[
+                          styles.joinCallButton,
+                          isAppointmentSoon(appointment) &&
+                            styles.joinCallButtonPulsing,
+                          !isJoinButtonActive(appointment) && styles.joinCallButtonDisabled,
+                        ]}
+                        onPress={async () => {
+                          // Check if consultation time has not yet arrived
+                          if (isConsultationTimeNotYet(appointment)) {
+                            setShowConsultationTimeModal(true);
+                            return;
+                          }
+                          
+                          if (!isJoinButtonActive(appointment)) {
+                            // Navigate to waiting screen
+                            router.push({
+                              pathname: "/screens/appointment-waiting",
+                              params: {
+                                appointmentId: appointment.id,
+                                doctorName: appointment.doctorName,
+                                date: appointment.date,
+                                time: appointment.time,
+                                timeRemaining: getTimeRemaining(appointment) || "",
+                              },
+                            });
+                            return;
+                          }
+                          // Track join time
+                          try {
+                            await apiService.joinCall(appointment.id);
+                          } catch (err) {
+                            console.error("Failed to track join time:", err);
+                          }
                           router.push({
-                            pathname: "/screens/appointment-waiting",
+                            pathname: "/screens/video-call",
                             params: {
                               appointmentId: appointment.id,
                               doctorName: appointment.doctorName,
-                              date: appointment.date,
-                              time: appointment.time,
-                              timeRemaining: getTimeRemaining(appointment) || "",
+                              roomName: `medicare-${appointment.id}`,
                             },
                           });
-                          return;
-                        }
-                        // Track join time
-                        try {
-                          await apiService.joinCall(appointment.id);
-                        } catch (err) {
-                          console.error("Failed to track join time:", err);
-                        }
-                        router.push({
-                          pathname: "/screens/video-call",
-                          params: {
-                            appointmentId: appointment.id,
-                            doctorName: appointment.doctorName,
-                            roomName: `medicare-${appointment.id}`,
-                          },
-                        });
-                      }}
-                      disabled={false}
-                    >
-                      <Ionicons 
-                        name="videocam" 
-                        size={20} 
-                        color={isJoinButtonActive(appointment) ? "#FFFFFF" : "#9CA3AF"} 
-                      />
-                      <Text style={[
-                        styles.joinCallText,
-                        !isJoinButtonActive(appointment) && { color: "#9CA3AF" }
-                      ]}>
-                        შესვლა კონსულტაციაზე
-                      </Text>
-                      {isJoinButtonActive(appointment) && (
-                        <Ionicons
-                          name="arrow-forward"
-                          size={16}
-                          color="#FFFFFF"
+                        }}
+                        disabled={false}
+                      >
+                        <Ionicons 
+                          name="videocam" 
+                          size={20} 
+                          color={isJoinButtonActive(appointment) ? "#FFFFFF" : "#9CA3AF"} 
                         />
-                      )}
-                    </TouchableOpacity>
-                    {appointment.type === "home-visit" && isAppointmentTimePassed(appointment) ? (
+                        <Text style={[
+                          styles.joinCallText,
+                          !isJoinButtonActive(appointment) && { color: "#9CA3AF" }
+                        ]}>
+                          შესვლა კონსულტაციაზე
+                        </Text>
+                        {isJoinButtonActive(appointment) && (
+                          <Ionicons
+                            name="arrow-forward"
+                            size={16}
+                            color="#FFFFFF"
+                          />
+                        )}
+                      </TouchableOpacity>
+                    )}
+                    {appointment.type === "home-visit" && 
+                     (appointment.status === "scheduled" || appointment.status === "in-progress") ? (
                       <TouchableOpacity
-                        style={styles.completeHomeVisitButton}
+                        style={[
+                          styles.completeHomeVisitButton,
+                          appointment.homeVisitCompletedAt && styles.completeHomeVisitButtonDisabled
+                        ]}
+                        disabled={!!appointment.homeVisitCompletedAt}
                         onPress={async () => {
-                          try {
-                            const response = await apiService.completeHomeVisit(appointment.id);
-                            if (response.success) {
-                              Alert.alert("წარმატება", "ბინაზე კონსულტაცია მონიშნულია როგორც ჩატარებული");
-                              await loadAppointments();
-                            } else {
-                              Alert.alert("შეცდომა", response.message || "ოპერაცია ვერ მოხერხდა");
-                            }
-                          } catch (err: any) {
-                            Alert.alert("შეცდომა", err.message || "ოპერაცია ვერ მოხერხდა");
-                          }
+                          Alert.alert(
+                            "დასრულება",
+                            "დარწმუნებული ხართ, რომ ბინაზე კონსულტაცია დასრულდა?",
+                            [
+                              {
+                                text: "გაუქმება",
+                                style: "cancel",
+                              },
+                              {
+                                text: "დასრულება",
+                                style: "default",
+                                onPress: async () => {
+                                  try {
+                                    const response = await apiService.completeHomeVisit(appointment.id);
+                                    if (response.success) {
+                                      Alert.alert("წარმატება", "ბინაზე კონსულტაცია მონიშნულია როგორც ჩატარებული");
+                                      await loadAppointments();
+                                    } else {
+                                      Alert.alert("შეცდომა", response.message || "ოპერაცია ვერ მოხერხდა");
+                                    }
+                                  } catch (err: any) {
+                                    console.error("❌ Complete home visit error:", err);
+                                    const errorMessage = err.message || "ოპერაცია ვერ მოხერხდა";
+                                    Alert.alert("შეცდომა", errorMessage);
+                                  }
+                                },
+                              },
+                            ]
+                          );
                         }}
                       >
-                        <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
-                        <Text style={styles.completeHomeVisitButtonText}>
-                          ბინაზე კონსულტაცია ჩატარდა
+                        <Ionicons 
+                          name={appointment.homeVisitCompletedAt ? "checkmark-done-circle" : "checkmark-circle"} 
+                          size={20} 
+                          color={appointment.homeVisitCompletedAt ? "#10B981" : "#FFFFFF"} 
+                        />
+                        <Text style={[
+                          styles.completeHomeVisitButtonText,
+                          appointment.homeVisitCompletedAt && styles.completeHomeVisitButtonTextDisabled
+                        ]}>
+                          {appointment.homeVisitCompletedAt ? "უკვე დასრულებულია" : "დასრულება"}
                         </Text>
+                        {!appointment.homeVisitCompletedAt && (
+                          <Ionicons
+                            name="arrow-forward"
+                            size={16}
+                            color="#FFFFFF"
+                          />
+                        )}
                       </TouchableOpacity>
                     ) : null}
                   </View>
@@ -1532,8 +1577,10 @@ const Appointment = () => {
                 )}
 
                 {/* Reschedule and Cancel buttons - only for scheduled appointments and if no pending request */}
+                {/* Cancel button is hidden for home-visit appointments */}
                 {(appointment.status === "scheduled" || appointment.status === "pending") && 
-                 !(appointment.rescheduleRequest?.status === 'pending') && (
+                 !(appointment.rescheduleRequest?.status === 'pending') &&
+                 appointment.type !== "home-visit" && (
                   <View style={styles.actionButtonsRow}>
                     <TouchableOpacity
                       style={[styles.rescheduleCardButton, styles.actionButton]}
@@ -1561,36 +1608,6 @@ const Appointment = () => {
                     </TouchableOpacity>
                   </View>
                 )}
-
-                <View style={styles.appointmentFooter}>
-                  <View style={styles.feeRow}>
-                    <Ionicons name="wallet" size={16} color="#6B7280" />
-                    <Text style={styles.feeAmount}>
-                      {typeof appointment.fee === 'number' 
-                        ? `${appointment.fee} ₾`
-                        : appointment.fee || "0 ₾"}
-                    </Text>
-                    <View
-                      style={[
-                        styles.paymentBadge,
-                        appointment.isPaid
-                          ? styles.paymentBadgePaid
-                          : styles.paymentBadgePending,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.paymentText,
-                          appointment.isPaid
-                            ? styles.paymentTextPaid
-                            : styles.paymentTextPending,
-                        ]}
-                      >
-                        {appointment.isPaid ? "გადახდილი" : "მოსალოდნელი"}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
               </View>
             );
             })
@@ -1660,10 +1677,7 @@ const Appointment = () => {
                 {/* Prescription/Danijnuloba */}
                 <View style={styles.detailSection}>
                   <Text style={styles.detailLabel}>დანიშნულება</Text>
-                  <Text style={styles.detailValue}>
-                    ჯერ არანაირი დანიშნულება არ არის ატვირთული
-                  </Text>
-                </View>
+                </View> 
 
                 {selectedAppointment.diagnosis && (
                   <View style={styles.detailSection}>
@@ -2641,11 +2655,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 12,
     marginTop: 12,
+    marginBottom: 12,
+    shadowColor: "#10B981",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  completeHomeVisitButtonDisabled: {
+    backgroundColor: "#E5E7EB",
+    opacity: 0.7,
   },
   completeHomeVisitButtonText: {
     fontSize: 16,
     fontFamily: "Poppins-SemiBold",
     color: "#FFFFFF",
+    letterSpacing: 0.5,
+  },
+  completeHomeVisitButtonTextDisabled: {
+    color: "#6B7280",
   },
   emptyState: {
     alignItems: "center",

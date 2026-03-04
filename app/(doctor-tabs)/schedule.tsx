@@ -1,5 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useEffect, useRef, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Modal,
@@ -218,39 +219,45 @@ export default function DoctorSchedule() {
           console.log(`   🔐 bookedSlots:`, avail.bookedSlots || '[]');
           
           // 🔥 მნიშვნელოვანი: დღე უნდა დაემატოს selectedDates-ში, თუ აქვს timeSlots ან bookedSlots
+          // ⚠️ მაგრამ მხოლოდ თუ არ არის წარსული თარიღი
           if (hasTimeSlots || hasBookedSlots) {
-            console.log(`   ✅ დღე დაემატება selectedDates-ში (${type})`);
-            if (type === "video") {
-              // თუ აქვს timeSlots, შევინახოთ, თუ არა - ცარიელი array
-              if (hasTimeSlots) {
-                loadedVideoSchedules[dateStr] = avail.timeSlots;
-                console.log(`   📝 Video schedule დაემატა: ${dateStr} -> ${avail.timeSlots.length} საათი`);
-              } else {
-                // დაჯავშნილი დღისთვის ცარიელი array, რომ დღე არჩეულად გამოჩნდეს
-                loadedVideoSchedules[dateStr] = [];
-                console.log(`   📝 Video schedule დაემატა (მხოლოდ დაჯავშნილი): ${dateStr} -> []`);
-              }
-              if (!videoDates.includes(dateStr)) {
-                videoDates.push(dateStr);
-                console.log(`   ➕ Video date დაემატა: ${dateStr}`);
-              } else {
-                console.log(`   ⚠️  Video date უკვე არსებობს: ${dateStr}`);
-              }
+            // შევამოწმოთ, არის თუ არა თარიღი წარსული
+            if (isPastDate(dateStr)) {
+              console.log(`   ⏰ წარსული თარიღი - არ დაემატება selectedDates-ში: ${dateStr}`);
             } else {
-              // თუ აქვს timeSlots, შევინახოთ, თუ არა - ცარიელი array
-              if (hasTimeSlots) {
-                loadedHomeVisitSchedules[dateStr] = avail.timeSlots;
-                console.log(`   📝 Home-visit schedule დაემატა: ${dateStr} -> ${avail.timeSlots.length} საათი`);
+              console.log(`   ✅ დღე დაემატება selectedDates-ში (${type})`);
+              if (type === "video") {
+                // თუ აქვს timeSlots, შევინახოთ, თუ არა - ცარიელი array
+                if (hasTimeSlots) {
+                  loadedVideoSchedules[dateStr] = avail.timeSlots;
+                  console.log(`   📝 Video schedule დაემატა: ${dateStr} -> ${avail.timeSlots.length} საათი`);
+                } else {
+                  // დაჯავშნილი დღისთვის ცარიელი array, რომ დღე არჩეულად გამოჩნდეს
+                  loadedVideoSchedules[dateStr] = [];
+                  console.log(`   📝 Video schedule დაემატა (მხოლოდ დაჯავშნილი): ${dateStr} -> []`);
+                }
+                if (!videoDates.includes(dateStr)) {
+                  videoDates.push(dateStr);
+                  console.log(`   ➕ Video date დაემატა: ${dateStr}`);
+                } else {
+                  console.log(`   ⚠️  Video date უკვე არსებობს: ${dateStr}`);
+                }
               } else {
-                // დაჯავშნილი დღისთვის ცარიელი array, რომ დღე არჩეულად გამოჩნდეს
-                loadedHomeVisitSchedules[dateStr] = [];
-                console.log(`   📝 Home-visit schedule დაემატა (მხოლოდ დაჯავშნილი): ${dateStr} -> []`);
-              }
-              if (!homeVisitDates.includes(dateStr)) {
-                homeVisitDates.push(dateStr);
-                console.log(`   ➕ Home-visit date დაემატა: ${dateStr}`);
-              } else {
-                console.log(`   ⚠️  Home-visit date უკვე არსებობს: ${dateStr}`);
+                // თუ აქვს timeSlots, შევინახოთ, თუ არა - ცარიელი array
+                if (hasTimeSlots) {
+                  loadedHomeVisitSchedules[dateStr] = avail.timeSlots;
+                  console.log(`   📝 Home-visit schedule დაემატა: ${dateStr} -> ${avail.timeSlots.length} საათი`);
+                } else {
+                  // დაჯავშნილი დღისთვის ცარიელი array, რომ დღე არჩეულად გამოჩნდეს
+                  loadedHomeVisitSchedules[dateStr] = [];
+                  console.log(`   📝 Home-visit schedule დაემატა (მხოლოდ დაჯავშნილი): ${dateStr} -> []`);
+                }
+                if (!homeVisitDates.includes(dateStr)) {
+                  homeVisitDates.push(dateStr);
+                  console.log(`   ➕ Home-visit date დაემატა: ${dateStr}`);
+                } else {
+                  console.log(`   ⚠️  Home-visit date უკვე არსებობს: ${dateStr}`);
+                }
               }
             }
           } else {
@@ -271,18 +278,23 @@ export default function DoctorSchedule() {
               const dateStr = `${parts[0]}-${parts[1]}-${parts[2]}`;
               const type = parts.slice(3).join('-'); // "video" ან "home-visit"
               
-              if (type === 'video' && !videoDates.includes(dateStr)) {
-                videoDates.push(dateStr);
-                if (!loadedVideoSchedules[dateStr]) {
-                  loadedVideoSchedules[dateStr] = [];
+              // ⚠️ შევამოწმოთ, არის თუ არა თარიღი წარსული
+              if (isPastDate(dateStr)) {
+                console.log(`   ⏰ წარსული თარიღი - არ დაემატება appointments-ებიდან: ${dateStr}`);
+              } else {
+                if (type === 'video' && !videoDates.includes(dateStr)) {
+                  videoDates.push(dateStr);
+                  if (!loadedVideoSchedules[dateStr]) {
+                    loadedVideoSchedules[dateStr] = [];
+                  }
+                  console.log(`   ➕ Video date დაემატა appointments-ებიდან: ${dateStr}`);
+                } else if (type === 'home-visit' && !homeVisitDates.includes(dateStr)) {
+                  homeVisitDates.push(dateStr);
+                  if (!loadedHomeVisitSchedules[dateStr]) {
+                    loadedHomeVisitSchedules[dateStr] = [];
+                  }
+                  console.log(`   ➕ Home-visit date დაემატა appointments-ებიდან: ${dateStr}`);
                 }
-                console.log(`   ➕ Video date დაემატა appointments-ებიდან: ${dateStr}`);
-              } else if (type === 'home-visit' && !homeVisitDates.includes(dateStr)) {
-                homeVisitDates.push(dateStr);
-                if (!loadedHomeVisitSchedules[dateStr]) {
-                  loadedHomeVisitSchedules[dateStr] = [];
-                }
-                console.log(`   ➕ Home-visit date დაემატა appointments-ებიდან: ${dateStr}`);
               }
             }
           }
@@ -300,11 +312,25 @@ export default function DoctorSchedule() {
         console.log(`   📋 Backend Home-visit dates:`, homeVisitDates);
         
         // Combine backend dates with existing dates, removing duplicates
-        const finalVideoDates = Array.from(new Set([...existingVideoDates, ...videoDates]));
-        const finalHomeVisitDates = Array.from(new Set([...existingHomeVisitDates, ...homeVisitDates]));
+        const mergedVideoDates = Array.from(new Set([...existingVideoDates, ...videoDates]));
+        const mergedHomeVisitDates = Array.from(new Set([...existingHomeVisitDates, ...homeVisitDates]));
         
-        console.log(`   ✅ Final Video dates (merged):`, finalVideoDates);
-        console.log(`   ✅ Final Home-visit dates (merged):`, finalHomeVisitDates);
+        // ⚠️ ამოვიღოთ წარსული თარიღები
+        const finalVideoDates = mergedVideoDates.filter(dateStr => !isPastDate(dateStr));
+        const finalHomeVisitDates = mergedHomeVisitDates.filter(dateStr => !isPastDate(dateStr));
+        
+        // ლოგინგი, თუ წარსული თარიღები ამოიღეს
+        const removedVideoDates = mergedVideoDates.filter(dateStr => isPastDate(dateStr));
+        const removedHomeVisitDates = mergedHomeVisitDates.filter(dateStr => isPastDate(dateStr));
+        if (removedVideoDates.length > 0) {
+          console.log(`   ⏰ წარსული Video თარიღები ამოიღეს:`, removedVideoDates);
+        }
+        if (removedHomeVisitDates.length > 0) {
+          console.log(`   ⏰ წარსული Home-visit თარიღები ამოიღეს:`, removedHomeVisitDates);
+        }
+        
+        console.log(`   ✅ Final Video dates (merged, past removed):`, finalVideoDates);
+        console.log(`   ✅ Final Home-visit dates (merged, past removed):`, finalHomeVisitDates);
         
         setVideoSchedules(loadedVideoSchedules);
         setHomeVisitSchedules(loadedHomeVisitSchedules);
@@ -391,6 +417,16 @@ export default function DoctorSchedule() {
     loadAvailability();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
+
+  // Reload availability when screen comes into focus (e.g., returning from another screen)
+  useFocusEffect(
+    useCallback(() => {
+      if (user?.id) {
+        loadAvailability(true); // Pass true to indicate it's a refresh
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user?.id])
+  );
 
   // Close time modal when mode changes
   useEffect(() => {
@@ -521,6 +557,21 @@ export default function DoctorSchedule() {
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
+  };
+
+  // შემოწმება: არის თუ არა თარიღი წარსული (დღესდღეობამდე)
+  const isPastDate = (dateStr: string): boolean => {
+    try {
+      const [year, month, day] = dateStr.split('-').map(Number);
+      const date = new Date(year, month - 1, day);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      date.setHours(0, 0, 0, 0);
+      return date < today;
+    } catch (error) {
+      console.error("Error checking if date is past:", error);
+      return false;
+    }
   };
 
   const isDateSelected = (date: Date) => {
@@ -1687,14 +1738,20 @@ export default function DoctorSchedule() {
         </View>
 
         {/* Selected Days Summary */}
-        {([...videoSelectedDates, ...homeVisitSelectedDates].length > 0) && (
+        {(getCurrentModeSelectedDates().length > 0) && (
           <View style={styles.summaryCard}>
             <View style={styles.summaryHeader}>
               <Text style={styles.summaryTitle}>
                 არჩეული დღეები:{" "}
-                {Array.from(
-                  new Set([...videoSelectedDates, ...homeVisitSelectedDates])
-                ).length}
+                {(() => {
+                  const currentSelected = getCurrentModeSelectedDates();
+                  console.log("📅 არჩეული დღეები:", {
+                    mode,
+                    currentSelected,
+                    count: currentSelected.length
+                  });
+                  return currentSelected.length;
+                })()}
               </Text>
               <TouchableOpacity
                 onPress={() => {

@@ -56,11 +56,11 @@ export default function DoctorTabsLayout() {
           }}
         />
         <Tabs.Screen
-          name="chat"
+          name="ai-assistant"
           options={{
-            title: "ჩატი",
+            title: "AI ასისტენტი",
             tabBarIcon: ({ color, size }) => (
-              <Ionicons name="chatbubbles-outline" size={size} color={color} />
+              <Ionicons name="chatbubbles" size={size} color={color} />
             ),
           }}
         />

@@ -50,7 +50,7 @@ const PatientDetails = () => {
   const [loading, setLoading] = useState(false);
   const [profileLoaded, setProfileLoaded] = useState(false);
 
-  const { appointmentType: appointmentTypeParam, visitAddress, bookingFor, uploadedFile } =
+  const { appointmentType: appointmentTypeParam, visitAddress, bookingFor, uploadedFile, problemDescription } =
     useLocalSearchParams();
   const appointmentType: AppointmentType =
     (appointmentTypeParam as AppointmentType) || "video";
@@ -73,6 +73,16 @@ const PatientDetails = () => {
       }
     }
   }, [uploadedFile]);
+
+  // Load problem description from make-appointment screen
+  useEffect(() => {
+    if (problemDescription && typeof problemDescription === 'string') {
+      setFormData((prev) => ({
+        ...prev,
+        problem: problemDescription,
+      }));
+    }
+  }, [problemDescription]);
 
   // Auto-fill disabled - user always enters data manually
   useEffect(() => {

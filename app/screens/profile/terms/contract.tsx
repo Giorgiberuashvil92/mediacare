@@ -11,11 +11,14 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useAuth } from "../../../contexts/AuthContext";
 
 export default function ContractTermsScreen() {
+  const { user } = useAuth();
   const [content, setContent] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const isDoctor = user?.role === "doctor";
 
   useEffect(() => {
     loadTerms();
@@ -32,6 +35,24 @@ export default function ContractTermsScreen() {
         return;
       }
 
+      // If doctor, try to load their specific contract first
+      if (isDoctor) {
+        try {
+          const profileResponse = await apiService.getProfile();
+          if (profileResponse.success && profileResponse.data) {
+            const contractDoc = (profileResponse.data as any).contractDocument;
+            if (contractDoc && contractDoc.trim()) {
+              setContent(contractDoc);
+              setLoading(false);
+              return;
+            }
+          }
+        } catch (err) {
+          console.log("Could not load doctor's contract, falling back to general contract");
+        }
+      }
+
+      // Fallback to general contract terms
       const response = await apiService.getTerms("contract");
       if (response.success && response.data) {
         setContent(response.data.content || "");

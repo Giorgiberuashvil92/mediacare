@@ -85,6 +85,9 @@ export class User {
   licenseDocument?: string; // File path/URL for medical license (PDF or Image)
 
   @Prop()
+  contractDocument?: string; // Contract text content as string
+
+  @Prop()
   degrees?: string;
 
   @Prop()
@@ -121,6 +124,19 @@ export class User {
   // Admin sets this requirement (e.g., 10 means doctor must have at least 10 days with availability in next 14 days)
   @Prop({ default: 0 })
   minWorkingDaysRequired?: number;
+
+  // Identomat verification images (for admin panel)
+  @Prop()
+  identomatFaceImage?: string; // Face image URL from Identomat
+
+  @Prop()
+  identomatDocumentFrontImage?: string; // Document front image URL from Identomat
+
+  @Prop()
+  identomatDocumentBackImage?: string; // Document back image URL from Identomat
+
+  @Prop({ type: Object })
+  identomatFullData?: any; // Full Identomat response data for admin panel
 
   @Prop()
   createdAt?: Date;

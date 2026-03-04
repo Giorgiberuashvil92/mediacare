@@ -33,6 +33,7 @@ export declare class AuthService {
     login(loginDto: LoginDto): Promise<{
         success: boolean;
         message: string;
+        requiresOTP: boolean;
         data: {
             user: {
                 id: string;
@@ -43,6 +44,42 @@ export declare class AuthService {
                 isVerified: boolean;
                 approvalStatus: ApprovalStatus;
                 isActive: true;
+                doctorStatus: import("../schemas/user.schema").DoctorStatus;
+            };
+        };
+    } | {
+        success: boolean;
+        message: string;
+        requiresOTP: boolean;
+        data: {
+            user: {
+                id: string;
+                role: UserRole;
+                name: string;
+                email: string;
+                phone: string;
+                isVerified: boolean;
+                approvalStatus: ApprovalStatus;
+                isActive: true;
+                doctorStatus: import("../schemas/user.schema").DoctorStatus;
+            };
+            token: string;
+            refreshToken: string;
+        };
+    }>;
+    verifyLoginOTP(email: string, verificationCode: string): Promise<{
+        success: boolean;
+        message: string;
+        data: {
+            user: {
+                id: string;
+                role: UserRole;
+                name: string;
+                email: string;
+                phone: string;
+                isVerified: boolean;
+                approvalStatus: ApprovalStatus;
+                isActive: boolean;
                 doctorStatus: import("../schemas/user.schema").DoctorStatus;
             };
             token: string;

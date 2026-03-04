@@ -4,6 +4,7 @@ import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
 import { SendVerificationCodeDto } from './dto/send-verification-code.dto';
+import { VerifyLoginOTPDto } from './dto/verify-login-otp.dto';
 import { VerifyPhoneDto } from './dto/verify-phone.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { PhoneVerificationService } from './phone-verification.service';
@@ -77,5 +78,10 @@ export class AuthController {
   @Post('verify-phone')
   async verifyPhone(@Body() dto: VerifyPhoneDto) {
     return this.phoneVerificationService.verifyCode(dto.phone, dto.code);
+  }
+
+  @Post('verify-login-otp')
+  async verifyLoginOTP(@Body() dto: VerifyLoginOTPDto) {
+    return this.authService.verifyLoginOTP(dto.email, dto.verificationCode);
   }
 }

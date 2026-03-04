@@ -33,7 +33,7 @@ export class SmsService {
    */
   private normalizePhoneNumber(phone: string): string {
     // Remove all non-digit characters
-    let cleaned = phone.replace(/\D/g, '');
+    const cleaned = phone.replace(/\D/g, '');
 
     // If starts with 995 (Georgia country code without +), add +
     if (cleaned.startsWith('995')) {
@@ -61,6 +61,89 @@ export class SmsService {
       const normalizedPhone = this.normalizePhoneNumber(phone);
       const message = `თქვენი ვერიფიკაციის კოდია: ${code}. კოდი მოქმედებს 10 წუთის განმავლობაში.`;
 
+      // Try sender.ge API first if configured
+      const senderGeApiKey = process.env.SENDER_GE_API_KEY;
+      if (senderGeApiKey) {
+        try {
+          // Extract 9-digit Georgian mobile number (remove +995 prefix if present)
+          const destination = normalizedPhone
+            .replace(/^\+995/, '')
+            .replace(/\s+/g, '');
+          if (destination.length === 9 && destination.startsWith('5')) {
+            // Format is correct (9 digits starting with 5)
+
+            const apiUrl = 'https://sender.ge/api/send.php';
+            // smsno: 1 = with SmsNo (advertising), 2 = without SmsNo (informational)
+            // priority: 1 = skip SMS subscription check (optional)
+            const params = new URLSearchParams({
+              apikey: senderGeApiKey,
+              smsno: '2', // 2 = without SmsNo (informational) - better for verification codes
+              destination: destination,
+              content: message,
+              priority: '1', // Skip subscription check
+            });
+
+            this.logger.log(
+              `📤 Sending SMS via sender.ge to ${destination} with API key: ${senderGeApiKey.substring(0, 8)}...`,
+            );
+
+            // sender.ge API uses POST request with application/x-www-form-urlencoded
+            const response = await fetch(apiUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
+              body: params.toString(),
+            });
+
+            const responseText = await response.text();
+            let responseData;
+            try {
+              responseData = JSON.parse(responseText);
+            } catch (error: any) {
+              this.logger.error(
+                `sender.ge API returned invalid JSON: ${responseText}`,
+              );
+              throw new Error(
+                `Invalid JSON response from sender.ge: ${responseText}`,
+              );
+            }
+
+            this.logger.log(
+              `📥 sender.ge API response: ${JSON.stringify(responseData)}`,
+            );
+
+            if (
+              response.ok &&
+              responseData.data &&
+              responseData.data[0]?.statusId === 1
+            ) {
+              this.logger.log(
+                `SMS sent successfully via sender.ge to ${destination}. Message ID: ${responseData.data[0].messageId}`,
+              );
+              return true;
+            } else {
+              this.logger.error(
+                `sender.ge API error: ${response.status} - ${JSON.stringify(responseData)}`,
+              );
+              // Fall through to Twilio or dev mode
+            }
+          } else {
+            this.logger.warn(
+              `Invalid phone number format for sender.ge: ${destination}. Expected 9-digit Georgian number starting with 5.`,
+            );
+            // Fall through to Twilio or dev mode
+          }
+        } catch (senderGeError: any) {
+          this.logger.error(
+            `sender.ge error sending SMS to ${normalizedPhone}:`,
+            senderGeError.message,
+          );
+          // Fall back to Twilio or dev mode
+          this.logger.warn('Falling back to Twilio or dev mode');
+        }
+      }
+
       // If Twilio is configured, use it
       if (this.twilioClient && process.env.TWILIO_PHONE_NUMBER) {
         try {
@@ -85,13 +168,18 @@ export class SmsService {
       }
 
       // Dev mode: Log the code to console
-      this.logger.log(`[DEV MODE] SMS Verification Code for ${normalizedPhone}: ${code}`);
+      this.logger.log(
+        `[DEV MODE] SMS Verification Code for ${normalizedPhone}: ${code}`,
+      );
       this.logger.log(`[DEV MODE] Message: ${message}`);
       this.logger.warn(
         'SMS service is in development mode. To enable real SMS:',
       );
-      this.logger.warn('1. Install Twilio: npm install twilio');
-      this.logger.warn('2. Set environment variables:');
+      this.logger.warn(
+        '1. Set SENDER_GE_API_KEY environment variable for sender.ge',
+      );
+      this.logger.warn('2. Or install Twilio: npm install twilio');
+      this.logger.warn('3. Set environment variables:');
       this.logger.warn('   - TWILIO_ACCOUNT_SID');
       this.logger.warn('   - TWILIO_AUTH_TOKEN');
       this.logger.warn('   - TWILIO_PHONE_NUMBER');

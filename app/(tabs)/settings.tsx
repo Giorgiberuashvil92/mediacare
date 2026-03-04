@@ -237,9 +237,10 @@ export default function SettingsScreen() {
           <TouchableOpacity
             style={styles.menuItem}
             onPress={() => {
-              console.log("Navigating to help-center");
+              console.log("Navigating to help-center FAQ");
               router.push({
                 pathname: "/screens/profile/help-center",
+                params: { tab: "faq" },
               } as any);
             }}
           >
@@ -250,6 +251,22 @@ export default function SettingsScreen() {
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity>
 
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => {
+              console.log("Navigating to help-center Contact");
+              router.push({
+                pathname: "/screens/profile/help-center",
+                params: { tab: "contact" },
+              } as any);
+            }}
+          >
+            <View style={styles.menuIconContainer}>
+              <Ionicons name="call-outline" size={20} color="#10B981" />
+            </View>
+            <Text style={styles.menuText}>კონტაქტები</Text>
+            <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
+          </TouchableOpacity>
 
           {isAuthenticated && (
             <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>

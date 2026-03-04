@@ -19,6 +19,7 @@ const login_dto_1 = require("./dto/login.dto");
 const refresh_token_dto_1 = require("./dto/refresh-token.dto");
 const register_dto_1 = require("./dto/register.dto");
 const send_verification_code_dto_1 = require("./dto/send-verification-code.dto");
+const verify_login_otp_dto_1 = require("./dto/verify-login-otp.dto");
 const verify_phone_dto_1 = require("./dto/verify-phone.dto");
 const jwt_auth_guard_1 = require("./guards/jwt-auth.guard");
 const phone_verification_service_1 = require("./phone-verification.service");
@@ -75,6 +76,9 @@ let AuthController = class AuthController {
     async verifyPhone(dto) {
         return this.phoneVerificationService.verifyCode(dto.phone, dto.code);
     }
+    async verifyLoginOTP(dto) {
+        return this.authService.verifyLoginOTP(dto.email, dto.verificationCode);
+    }
 };
 exports.AuthController = AuthController;
 __decorate([
@@ -126,6 +130,13 @@ __decorate([
     __metadata("design:paramtypes", [verify_phone_dto_1.VerifyPhoneDto]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "verifyPhone", null);
+__decorate([
+    (0, common_1.Post)('verify-login-otp'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [verify_login_otp_dto_1.VerifyLoginOTPDto]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "verifyLoginOTP", null);
 exports.AuthController = AuthController = __decorate([
     (0, common_1.Controller)('auth'),
     __metadata("design:paramtypes", [auth_service_1.AuthService,

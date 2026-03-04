@@ -603,12 +603,7 @@ export default function LaboratoryScreen() {
           </Text>
         </View>
       </View>
-      <View style={styles.prescribedFooter}>
-        <Text style={styles.prescribedDate}>
-          <Ionicons name="calendar-outline" size={12} color="#9CA3AF" /> {item.prescribedDate}
-        </Text>
-        <Text style={styles.prescribedDoctor}>დანიშნა: {item.doctorName}</Text>
-      </View>
+     
     </View>
   );
 

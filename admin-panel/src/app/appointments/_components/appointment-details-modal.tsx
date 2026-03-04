@@ -53,6 +53,7 @@ interface AppointmentDetails {
   laboratoryTests?: LaboratoryTest[];
   createdAt?: string;
   updatedAt?: string;
+  homeVisitCompletedAt?: string; // When patient marked home visit as completed
 }
 
 interface AppointmentDetailsModalProps {
@@ -148,6 +149,7 @@ export function AppointmentDetailsModal({
           laboratoryTests: data.laboratoryTests || [],
           createdAt: data.createdAt,
           updatedAt: data.updatedAt,
+          homeVisitCompletedAt: data.homeVisitCompletedAt,
         });
       } else {
         setError('აპოინტმენტის დეტალების ჩატვირთვა ვერ მოხერხდა');
@@ -634,6 +636,20 @@ export function AppointmentDetailsModal({
                       <span className="text-dark-4 dark:text-dark-6">მისამართი:</span>
                       <span className="ml-2 font-medium text-dark dark:text-white">
                         {appointment.visitAddress}
+                      </span>
+                    </div>
+                  )}
+                  {appointment.type === 'home-visit' && appointment.homeVisitCompletedAt && (
+                    <div className="col-span-2">
+                      <span className="text-dark-4 dark:text-dark-6">პაციენტმა მონიშნა როგორც დასრულებული:</span>
+                      <span className="ml-2 font-medium text-blue-600 dark:text-blue-400">
+                        {new Date(appointment.homeVisitCompletedAt).toLocaleString('ka-GE', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
                       </span>
                     </div>
                   )}

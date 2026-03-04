@@ -304,6 +304,7 @@ export class AppointmentsService {
       paymentMethod: createAppointmentDto.paymentMethod,
       paymentStatus:
         createAppointmentDto.paymentStatus || PaymentStatus.PENDING,
+      paymentOrderId: createAppointmentDto.paymentOrderId,
       patientDetails: createAppointmentDto.patientDetails,
       documents: createAppointmentDto.documents || [],
       notes: createAppointmentDto.notes,
@@ -1960,39 +1961,76 @@ export class AppointmentsService {
 
   // Complete home visit - called by patient
   async completeHomeVisit(userId: string, appointmentId: string) {
+    console.log('🏠 [completeHomeVisit] Called with:', {
+      userId,
+      appointmentId,
+    });
+
     const appointment = await this.appointmentModel.findById(
       new mongoose.Types.ObjectId(appointmentId),
     );
 
     if (!appointment) {
+      console.error(
+        '🏠 [completeHomeVisit] Appointment not found:',
+        appointmentId,
+      );
       throw new NotFoundException('Appointment not found');
     }
 
+    console.log('🏠 [completeHomeVisit] Appointment found:', {
+      id: (appointment._id as mongoose.Types.ObjectId).toString(),
+      type: appointment.type,
+      patientId: appointment.patientId.toString(),
+      userId,
+      homeVisitCompletedAt: appointment.homeVisitCompletedAt,
+    });
+
     if (appointment.patientId.toString() !== userId.toString()) {
+      console.error('🏠 [completeHomeVisit] Unauthorized - not patient:', {
+        appointmentPatientId: appointment.patientId.toString(),
+        userId,
+      });
       throw new UnauthorizedException(
         'Only patient can mark home visit as completed',
       );
     }
 
     if (appointment.type !== AppointmentType.HOME_VISIT) {
+      console.error('🏠 [completeHomeVisit] Not a home visit:', {
+        type: appointment.type,
+        expected: AppointmentType.HOME_VISIT,
+      });
       throw new BadRequestException('This endpoint is only for home visits');
     }
 
-    // Check if already completed
+    // Check if already marked by patient - if yes, just return success (informational only)
     if (appointment.homeVisitCompletedAt) {
-      throw new BadRequestException('Home visit already marked as completed');
+      console.log(
+        '🏠 [completeHomeVisit] Already marked as completed, returning success (informational)',
+      );
+      return {
+        success: true,
+        message:
+          'Home visit was already marked as completed by patient (informational)',
+        data: appointment,
+      };
     }
 
-    // Mark as completed and set subStatus to conducted
+    // Only set timestamp - informational only, doesn't change status
+    // This is just to notify admin panel that patient marked it as completed
     appointment.homeVisitCompletedAt = new Date();
-    appointment.subStatus = AppointmentSubStatus.CONDUCTED;
-    appointment.status = AppointmentStatus.CONFIRMED; // Keep as confirmed, subStatus shows it's conducted
+    // Don't change status or subStatus - this is just informational
 
     await appointment.save();
 
+    console.log(
+      '🏠 [completeHomeVisit] Successfully marked as completed (informational)',
+    );
+
     return {
       success: true,
-      message: 'Home visit marked as completed',
+      message: 'Home visit completion marked by patient (informational)',
       data: appointment,
     };
   }

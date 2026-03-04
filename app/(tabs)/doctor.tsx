@@ -43,7 +43,8 @@ const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
       ? `$${doctor.consultationFee}`
       : undefined,
     followUpFee: doctor.followUpFee ? `$${doctor.followUpFee}` : undefined,
-    about: doctor.about || "",
+    about: doctor.about || "", // This is "working language" from onboarding
+    availabilityTypes: doctor.availabilityTypes || [], // Array of 'video' | 'home-visit'
   };
 };
 
@@ -58,6 +59,7 @@ const Doctor = () => {
   const hasUsedLockedNavigation = useRef(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFilter, setSelectedFilter] = useState<string>("all");
+  const [selectedAppointmentType, setSelectedAppointmentType] = useState<string>("all"); // 'all' | 'video' | 'home-visit' | 'both'
   const { isFavorite, toggleFavorite } = useFavorites();
   const [selectedDoctor, setSelectedDoctor] = useState<any>(null);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
@@ -140,6 +142,26 @@ const Doctor = () => {
       );
     }
 
+    // Filter by appointment type (availability)
+    if (selectedAppointmentType !== "all") {
+      filtered = filtered.filter((doctor) => {
+        const availabilityTypes = doctor.availabilityTypes || [];
+        const hasVideo = availabilityTypes.includes('video');
+        const hasHomeVisit = availabilityTypes.includes('home-visit');
+        
+        switch (selectedAppointmentType) {
+          case 'video':
+            return hasVideo;
+          case 'home-visit':
+            return hasHomeVisit;
+          case 'both':
+            return hasVideo && hasHomeVisit;
+          default:
+            return true;
+        }
+      });
+    }
+
     // Filter by search query
     if (searchQuery) {
       filtered = filtered.filter((doctor) =>
@@ -151,7 +173,7 @@ const Doctor = () => {
     }
 
     return filtered;
-  }, [doctors, selectedFilter, searchQuery]);
+  }, [doctors, selectedFilter, selectedAppointmentType, searchQuery]);
 
   const handleToggleFavorite = (doctor: (typeof doctors)[0]) => {
     if (isFavorite(doctor.id)) {
@@ -217,20 +239,27 @@ const Doctor = () => {
       <View style={styles.doctorInfo}>
         <Text style={styles.doctorName}>{doctor.name}</Text>
         <Text style={styles.doctorSpecialty}>{doctor.specialization}</Text>
-        <Text style={styles.doctorQualification}>
-          {doctor.degrees || ""}
-        </Text>
+        {doctor.degrees && (
+          <Text style={styles.doctorQualification}>
+            {doctor.degrees}
+          </Text>
+        )}
+        {doctor.about && (
+          <Text style={styles.doctorLanguages}>
+            {doctor.about}
+          </Text>
+        )}
+        {doctor.location && (
+          <Text style={styles.doctorLocation}>
+            {doctor.location}
+          </Text>
+        )}
         <View style={styles.ratingRow}>
           <Ionicons name="star" size={16} color="#F59E0B" />
           <Text style={styles.ratingText}>
-            {doctor.rating} ({doctor.reviewCount || doctor.reviews || 0})
+            {doctor.rating ? doctor.rating.toFixed(1) : "0.0"}
           </Text>
         </View>
-        {doctor.consultationFee && (
-          <Text style={styles.consultationFee}>
-            {doctor.consultationFee}
-          </Text>
-        )}
       </View>
 
       <View style={styles.doctorActions}>
@@ -274,7 +303,55 @@ const Doctor = () => {
 
       </View>
 
-      {/* Filter Chips */}
+      {/* Appointment Type Filter */}
+      <View style={styles.filterContainer}>
+        <FlatList
+          data={[
+            { id: "all", label: "ყველა" },
+            { id: "video", label: "ვიდეო" },
+            { id: "home-visit", label: "ბინაზე" },
+          ]}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={[
+                styles.filterChip,
+                selectedAppointmentType === item.id && styles.filterChipActive,
+              ]}
+              onPress={() => setSelectedAppointmentType(item.id)}
+            >
+              <Ionicons
+                name={
+                  item.id === "video"
+                    ? "videocam"
+                    : item.id === "home-visit"
+                    ? "home"
+                    : item.id === "both"
+                    ? "options"
+                    : "apps"
+                }
+                size={16}
+                color={
+                  selectedAppointmentType === item.id ? "#FFFFFF" : "#6B7280"
+                }
+              />
+              <Text
+                style={[
+                  styles.filterChipText,
+                  selectedAppointmentType === item.id && styles.filterChipTextActive,
+                ]}
+              >
+                {item.label}
+              </Text>
+            </TouchableOpacity>
+          )}
+          contentContainerStyle={styles.filterListContent}
+        />
+      </View>
+
+      {/* Specialization Filter Chips */}
       <View style={styles.filterContainer}>
         <FlatList
           data={filterOptions}
@@ -509,12 +586,15 @@ const styles = StyleSheet.create({
     paddingRight: 20,
   },
   filterChip: {
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: "#E5E7EB",
+    gap: 6,
   },
   filterChipActive: {
     backgroundColor: "#20BEB8",
@@ -573,6 +653,18 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   doctorQualification: {
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+    marginBottom: 4,
+  },
+  doctorLanguages: {
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+    marginBottom: 4,
+  },
+  doctorLocation: {
     fontSize: 12,
     fontFamily: "Poppins-Regular",
     color: "#6B7280",

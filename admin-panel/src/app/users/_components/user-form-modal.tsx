@@ -479,7 +479,7 @@ export default function UserFormModal({
           {/* Edit mode only fields */}
           {mode === 'edit' && (
             <>
-              {/* ექიმის ლიცენზია – ჩანს რედაქტირებაში, გადმოწერადი. ჯერ შეამოწმეთ, შემდეგ „აქტიური“. */}
+              {/* ექიმის ლიცენზია – ჩანს რედაქტირებაში, გადმოწერადი. ჯერ შეამოწმეთ, შემდეგ „აქტიური". */}
               {formData.role === 'doctor' && (
                 <div className="rounded-lg border border-stroke bg-gray-50 p-4 dark:border-dark-3 dark:bg-dark-2">
                   <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
@@ -494,7 +494,7 @@ export default function UserFormModal({
                         };
                         const licenseUrl = isAbsoluteUrl(user.licenseDocument)
                           ? user.licenseDocument
-                          : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/${user.licenseDocument}`;
+                          : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4001'}/${user.licenseDocument}`;
                         return (
                           <>
                             <a
@@ -552,9 +552,77 @@ export default function UserFormModal({
                     </div>
                   ) : (
                     <p className="text-sm text-dark-4 dark:text-dark-6">
-                      ლიცენზია არ არის ატვირთული. „აქტიურის“ მინიჭებამდე გირჩევნიათ ლიცენზიის შემოწმება.
+                      ლიცენზია არ არის ატვირთული. „აქტიურის" მინიჭებამდე გირჩევნიათ ლიცენზიის შემოწმება.
                     </p>
                   )}
+                </div>
+              )}
+
+              {/* Identomat Verification Images */}
+              {(user?.identomatFaceImage || user?.identomatDocumentFrontImage || user?.identomatDocumentBackImage) && (
+                <div className="rounded-lg border border-stroke bg-gray-50 p-4 dark:border-dark-3 dark:bg-dark-2">
+                  <label className="mb-4 block text-sm font-medium text-dark dark:text-white">
+                    IDENTOMAT-ით იდენტიფიკაცია
+                  </label>
+                  <div className="grid gap-4 md:grid-cols-3">
+                    {user.identomatFaceImage && (
+                      <div>
+                        <label className="mb-2 block text-xs font-medium text-dark-4 dark:text-dark-6">
+                          სახის ფოტო
+                        </label>
+                        <a
+                          href={user.identomatFaceImage}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block overflow-hidden rounded-lg border border-stroke dark:border-dark-3"
+                        >
+                          <img
+                            src={user.identomatFaceImage}
+                            alt="Identomat Face"
+                            className="h-32 w-full object-cover transition hover:scale-105"
+                          />
+                        </a>
+                      </div>
+                    )}
+                    {user.identomatDocumentFrontImage && (
+                      <div>
+                        <label className="mb-2 block text-xs font-medium text-dark-4 dark:text-dark-6">
+                          დოკუმენტის წინა მხარე
+                        </label>
+                        <a
+                          href={user.identomatDocumentFrontImage}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block overflow-hidden rounded-lg border border-stroke dark:border-dark-3"
+                        >
+                          <img
+                            src={user.identomatDocumentFrontImage}
+                            alt="Identomat Document Front"
+                            className="h-32 w-full object-cover transition hover:scale-105"
+                          />
+                        </a>
+                      </div>
+                    )}
+                    {user.identomatDocumentBackImage && (
+                      <div>
+                        <label className="mb-2 block text-xs font-medium text-dark-4 dark:text-dark-6">
+                          დოკუმენტის უკანა მხარე
+                        </label>
+                        <a
+                          href={user.identomatDocumentBackImage}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block overflow-hidden rounded-lg border border-stroke dark:border-dark-3"
+                        >
+                          <img
+                            src={user.identomatDocumentBackImage}
+                            alt="Identomat Document Back"
+                            className="h-32 w-full object-cover transition hover:scale-105"
+                          />
+                        </a>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 

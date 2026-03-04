@@ -112,7 +112,7 @@ async function bootstrap() {
   );
   console.log(`📊 Database: ${connection.db?.databaseName || 'medicare'}`);
 
-  const port = process.env.PORT || 4000;
+  const port = process.env.PORT || 4001;
   const host = process.env.HOST || '0.0.0.0'; // Listen on all network interfaces for mobile access
   await app.listen(port, host);
   console.log(`🚀 Server running on http://${host}:${port}`);

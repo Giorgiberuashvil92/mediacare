@@ -3,8 +3,9 @@ import { useAuth } from "@/app/contexts/AuthContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import WebView, { WebViewNavigation } from "react-native-webview";
 
 interface PaymentMethod {
   id: string;
@@ -28,6 +29,9 @@ const PaymentMethods = () => {
   } = useLocalSearchParams();
   const [selectedMethod, setSelectedMethod] = useState<string>("card");
   const [loading, setLoading] = useState(false);
+  const [showPaymentWebView, setShowPaymentWebView] = useState(false);
+  const [paymentUrl, setPaymentUrl] = useState<string>("");
+  const [paymentOrderId, setPaymentOrderId] = useState<string>("");
 
   const paymentMethods: PaymentMethod[] = [
     {
@@ -61,13 +65,111 @@ const PaymentMethods = () => {
       // Validate required fields
       if (!doctorId || !selectedDate || !selectedTime || !amount) {
         Alert.alert("შეცდომა", "დაკარგულია საჭირო ინფორმაცია");
+        setLoading(false);
         return;
       }
 
+      const total = parseFloat(amount as string);
       const fee = consultationFee
         ? parseFloat(consultationFee as string)
-        : parseFloat(amount as string) / 1.05;
+        : total / 1.05;
+
+      // Generate unique order ID (external_order_id for BOG)
+      const externalOrderId = `MEDEKSES-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+      // Create BOG payment order
+      console.log("💳 [Payment] Creating BOG payment order:", {
+        amount: total,
+        externalOrderId,
+        description: `კონსულტაცია - ${selectedDate} ${selectedTime}`,
+      });
+
+      // Get base URL for callback
+      const baseUrl = process.env.EXPO_PUBLIC_API_URL || "http://localhost:4001";
+      const callbackUrl = `${baseUrl}/payment/callback`;
+
+      const paymentResponse = await apiService.createPaymentOrder({
+        amount: total,
+        currency: "GEL",
+        orderId: externalOrderId,
+        description: `კონსულტაცია - ${selectedDate} ${selectedTime}`,
+        callbackUrl: callbackUrl,
+        captureMethod: "AUTO",
+      });
+
+      if (!paymentResponse.success || !paymentResponse.paymentUrl) {
+        Alert.alert(
+          "შეცდომა",
+          paymentResponse.error || "გადახდის შექმნა ვერ მოხერხდა. გთხოვთ სცადოთ თავიდან."
+        );
+        setLoading(false);
+        return;
+      }
+
+      // paymentResponse.orderId is BOG's order ID (UUID), which we need for status checks
+      const bogOrderId = paymentResponse.orderId;
+      if (bogOrderId) {
+        setPaymentOrderId(bogOrderId);
+      }
+
+      console.log("✅ [Payment] Payment order created:", {
+        externalOrderId,
+        bogOrderId: paymentResponse.orderId,
+        paymentUrl: paymentResponse.paymentUrl,
+      });
+
+      // Open payment URL in WebView
+      setPaymentUrl(paymentResponse.paymentUrl);
+      setShowPaymentWebView(true);
+      setLoading(false);
+    } catch (error: any) {
+      console.error("❌ [Payment] Error creating payment order:", error);
+      Alert.alert(
+        "შეცდომა",
+        error.message || "გადახდის დამუშავება ვერ მოხერხდა. გთხოვთ სცადოთ თავიდან."
+      );
+      setLoading(false);
+    }
+  };
+
+  const handlePaymentSuccess = async () => {
+    try {
+      setLoading(true);
+      setShowPaymentWebView(false);
+
+      // Wait a bit for BOG to process the payment
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      // Check payment status
+      const statusResponse = await apiService.getPaymentStatus(paymentOrderId);
+      
+      // BOG API returns status as "completed" for successful payments
+      const isPaymentSuccessful = 
+        statusResponse.status === "SUCCESS" || 
+        statusResponse.status === "PAID" || 
+        statusResponse.status === "completed" ||
+        statusResponse.status?.toLowerCase() === "completed";
+      
+      if (!statusResponse.success || !isPaymentSuccessful) {
+        Alert.alert(
+          "შეცდომა",
+          "გადახდის დადასტურება ვერ მოხერხდა. გთხოვთ დაელოდოთ ან დაგვიკავშირდეთ."
+        );
+        setLoading(false);
+        return;
+      }
+
+      // Validate required fields
+      if (!doctorId || !selectedDate || !selectedTime || !amount) {
+        Alert.alert("შეცდომა", "დაკარგულია საჭირო ინფორმაცია");
+        setLoading(false);
+        return;
+      }
+
       const total = parseFloat(amount as string);
+      const fee = consultationFee
+        ? parseFloat(consultationFee as string)
+        : total / 1.05;
 
       // Create appointment via API
       const appointmentPayload = {
@@ -77,13 +179,13 @@ const PaymentMethods = () => {
         type: (appointmentType as AppointmentType) || "video",
         consultationFee: fee,
         totalAmount: total,
-        paymentMethod: selectedMethod,
-        paymentStatus: "paid", // Payment is completed
+        paymentMethod: "bog_card",
+        paymentStatus: "paid",
+        paymentOrderId: paymentOrderId,
         patientDetails: {
-          // User info is already in the system from registration
           problem: problemDescription as string || "",
         },
-        documents: [], // Documents will be uploaded after appointment creation
+        documents: [],
         notes: problemDescription as string || "",
         visitAddress:
           appointmentType === "home-visit" && visitAddress
@@ -91,7 +193,7 @@ const PaymentMethods = () => {
             : undefined,
       };
 
-      console.log("💳 Creating appointment after payment:", appointmentPayload);
+      console.log("💳 [Payment] Creating appointment after payment:", appointmentPayload);
 
       const response = await apiService.createAppointment(appointmentPayload);
 
@@ -123,7 +225,6 @@ const PaymentMethods = () => {
           }
         } catch (uploadErr: any) {
           console.error("❌ Error uploading document:", uploadErr);
-          // Don't fail the appointment if document upload fails
           Alert.alert(
             "გაფრთხილება",
             "ჯავშანი შეიქმნა, მაგრამ დოკუმენტის ატვირთვა ვერ მოხერხდა. შეგიძლიათ დოკუმენტი მოგვიანებით ატვირთოთ."
@@ -139,20 +240,142 @@ const PaymentMethods = () => {
           appointmentId: appointmentId,
           selectedDate: selectedDate as string,
           selectedTime: selectedTime as string,
-          paymentMethod: selectedMethod,
-          patientName: user.name || "",
+          paymentMethod: "bog_card",
+          patientName: user?.name || "",
           problem: problemDescription as string || "",
           appointmentNumber: response.data?.appointmentNumber || "",
         },
       });
     } catch (error: any) {
-      console.error("Error processing payment:", error);
+      console.error("❌ [Payment] Error processing payment success:", error);
       Alert.alert(
         "შეცდომა",
-        error.message || "გადახდის დამუშავება ვერ მოხერხდა. გთხოვთ სცადოთ თავიდან."
+        error.message || "გადახდის დამუშავება ვერ მოხერხდა. გთხოვთ დაგვიკავშირდეთ."
       );
     } finally {
       setLoading(false);
+    }
+  };
+
+  // დროებით: გადახდის გარეშე ჯავშნის შექმნა
+  const handleBookWithoutPayment = async () => {
+    if (!user) {
+      Alert.alert("შეცდომა", "გთხოვთ შეხვიდეთ სისტემაში");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Validate required fields
+      if (!doctorId || !selectedDate || !selectedTime || !amount) {
+        Alert.alert("შეცდომა", "დაკარგულია საჭირო ინფორმაცია");
+        setLoading(false);
+        return;
+      }
+
+      const total = parseFloat(amount as string);
+      const fee = consultationFee
+        ? parseFloat(consultationFee as string)
+        : total / 1.05;
+
+      // Create appointment without payment
+      const appointmentPayload = {
+        doctorId: doctorId as string,
+        appointmentDate: selectedDate as string,
+        appointmentTime: selectedTime as string,
+        type: (appointmentType as AppointmentType) || "video",
+        consultationFee: fee,
+        totalAmount: total,
+        paymentMethod: "pending",
+        paymentStatus: "pending",
+        patientDetails: {
+          problem: problemDescription as string || "",
+        },
+        documents: [],
+        notes: problemDescription as string || "",
+        visitAddress:
+          appointmentType === "home-visit" && visitAddress
+            ? (visitAddress as string)
+            : undefined,
+      };
+
+      console.log("📅 [Payment] Creating appointment without payment:", appointmentPayload);
+
+      const response = await apiService.createAppointment(appointmentPayload);
+
+      if (!response.success) {
+        Alert.alert("შეცდომა", response.message || "ჯავშნის შექმნა ვერ მოხერხდა");
+        setLoading(false);
+        return;
+      }
+
+      const appointmentId = response.data?._id || response.data?.id || "";
+
+      if (!appointmentId) {
+        Alert.alert("შეცდომა", "ჯავშნის ID ვერ მოიძებნა");
+        setLoading(false);
+        return;
+      }
+
+      // Upload document if one was selected
+      if (uploadedFile) {
+        try {
+          const fileData = JSON.parse(uploadedFile as string);
+          if (fileData.uri && fileData.name && fileData.type) {
+            await apiService.uploadAppointmentDocument(appointmentId, {
+              uri: fileData.uri,
+              name: fileData.name,
+              type: fileData.type,
+            });
+            console.log("✅ Document uploaded successfully");
+          }
+        } catch (uploadErr: any) {
+          console.error("❌ Error uploading document:", uploadErr);
+          Alert.alert(
+            "გაფრთხილება",
+            "ჯავშანი შეიქმნა, მაგრამ დოკუმენტის ატვირთვა ვერ მოხერხდა. შეგიძლიათ დოკუმენტი მოგვიანებით ატვირთოთ."
+          );
+        }
+      }
+
+      // Navigate to success page
+      router.push({
+        pathname: "/screens/appointment/appointment-success",
+        params: {
+          doctorId: doctorId as string,
+          appointmentId: appointmentId,
+          selectedDate: selectedDate as string,
+          selectedTime: selectedTime as string,
+          paymentMethod: "pending",
+          patientName: user?.name || "",
+          problem: problemDescription as string || "",
+          appointmentNumber: response.data?.appointmentNumber || "",
+        },
+      });
+    } catch (error: any) {
+      console.error("❌ [Payment] Error creating appointment without payment:", error);
+      Alert.alert(
+        "შეცდომა",
+        error.message || "ჯავშნის შექმნა ვერ მოხერხდა. გთხოვთ სცადოთ თავიდან."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleWebViewNavigation = (navState: WebViewNavigation): void => {
+    const url = navState.url;
+    console.log("🌐 [Payment] WebView navigation:", url);
+
+    // Check if payment was successful
+    if (url.includes("success") || url.includes("callback") || url.includes("paid")) {
+      console.log("✅ [Payment] Payment success detected");
+      handlePaymentSuccess();
+    } else if (url.includes("cancel") || url.includes("error") || url.includes("fail")) {
+      console.log("❌ [Payment] Payment cancelled or failed");
+      setShowPaymentWebView(false);
+      Alert.alert("გადახდა გაუქმდა", "გადახდა გაუქმდა ან ვერ მოხერხდა. გთხოვთ სცადოთ თავიდან.");
     }
   };
 
@@ -275,6 +498,23 @@ const PaymentMethods = () => {
           <Text style={styles.amountLabel}>გადასახდელი თანხა</Text>
           <Text style={styles.amountValue}>{totalAmount} ₾</Text>
         </View>
+        
+        {/* დროებით: გადახდის გარეშე ჯავშნის გაკეთების ღილაკი */}
+        <TouchableOpacity
+          style={[styles.bookWithoutPaymentButton, loading && styles.bookWithoutPaymentButtonDisabled]}
+          onPress={handleBookWithoutPayment}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color="#0EA5E9" />
+          ) : (
+            <>
+              <Ionicons name="calendar-outline" size={20} color="#0EA5E9" style={{ marginRight: 8 }} />
+              <Text style={styles.bookWithoutPaymentButtonText}>გადახდის გარეშე ჯავშნის გაკეთება</Text>
+            </>
+          )}
+        </TouchableOpacity>
+
         <TouchableOpacity
           style={[styles.payNowButton, loading && styles.payNowButtonDisabled]}
           onPress={handlePayNow}
@@ -290,6 +530,57 @@ const PaymentMethods = () => {
           )}
         </TouchableOpacity>
       </View>
+
+      {/* BOG Payment WebView Modal */}
+      <Modal
+        visible={showPaymentWebView}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => {
+          setShowPaymentWebView(false);
+          Alert.alert("გადახდა გაუქმდა", "გადახდის პროცესი გაუქმდა.");
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <SafeAreaView style={styles.webViewContainer}>
+          <View style={styles.webViewHeader}>
+            <Text style={styles.webViewTitle}>BOG გადახდა</Text>
+            <TouchableOpacity
+              onPress={() => {
+                setShowPaymentWebView(false);
+                Alert.alert("გადახდა გაუქმდა", "გადახდის პროცესი გაუქმდა.");
+              }}
+              style={styles.webViewCloseButton}
+            >
+              <Ionicons name="close" size={24} color="#1F2937" />
+            </TouchableOpacity>
+          </View>
+          {paymentUrl ? (
+            <WebView
+              source={{ uri: paymentUrl }}
+              style={styles.webView}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+              startInLoadingState={true}
+              scalesPageToFit={true}
+              onNavigationStateChange={handleWebViewNavigation}
+              onError={(syntheticEvent: any) => {
+                const { nativeEvent } = syntheticEvent;
+                console.error("❌ [Payment] WebView error:", nativeEvent);
+                Alert.alert("შეცდომა", "გადახდის გვერდის ჩატვირთვა ვერ მოხერხდა.");
+              }}
+            />
+          ) : (
+            <View style={styles.webViewLoading}>
+              <ActivityIndicator size="large" color="#0EA5E9" />
+              <Text style={styles.webViewLoadingText}>იტვირთება...</Text>
+            </View>
+          )}
+            </SafeAreaView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -527,6 +818,85 @@ const styles = StyleSheet.create({
   },
   payNowButtonDisabled: {
     opacity: 0.6,
+  },
+  bookWithoutPaymentButton: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 999,
+    paddingVertical: 16,
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#0EA5E9",
+    marginBottom: 12,
+  },
+  bookWithoutPaymentButtonText: {
+    fontSize: 16,
+    fontFamily: "Poppins-SemiBold",
+    color: "#0EA5E9",
+  },
+  bookWithoutPaymentButtonDisabled: {
+    opacity: 0.6,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    width: "80%",
+    height: "80%",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    overflow: "hidden",
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  webViewContainer: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+  },
+  webViewHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+    backgroundColor: "#FFFFFF",
+  },
+  webViewTitle: {
+    fontSize: 18,
+    fontFamily: "Poppins-SemiBold",
+    color: "#0F172A",
+  },
+  webViewCloseButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#F3F4F6",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  webView: {
+    flex: 1,
+  },
+  webViewLoading: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+  },
+  webViewLoadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
   },
 });
 

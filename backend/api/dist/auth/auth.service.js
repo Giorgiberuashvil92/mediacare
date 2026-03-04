@@ -105,6 +105,30 @@ let AuthService = class AuthService {
             role,
             phoneLength: phone.trim().length,
         });
+        const isPhoneVerified = await this.phoneVerificationService.isPhoneVerified(phone.trim());
+        if (!isPhoneVerified) {
+            console.log('❌ [AuthService] Phone not verified before registration:', {
+                phone: phone.trim(),
+                role,
+            });
+            throw new common_1.BadRequestException('Phone number must be verified before registration. Please verify your phone number first.');
+        }
+        if (!registerDto.verificationCode || !registerDto.verificationCode.trim()) {
+            throw new common_1.BadRequestException('Verification code is required');
+        }
+        console.log('🔐 [AuthService] Verifying OTP:', {
+            phone: phone.trim(),
+            hasCode: !!registerDto.verificationCode,
+            codeLength: registerDto.verificationCode.trim().length,
+        });
+        const verificationResult = await this.phoneVerificationService.verifyCode(phone.trim(), registerDto.verificationCode.trim());
+        if (!verificationResult.verified) {
+            throw new common_1.BadRequestException(verificationResult.message || 'Invalid verification code');
+        }
+        console.log('✅ [AuthService] OTP verified successfully:', {
+            phone: phone.trim(),
+            verified: verificationResult.verified,
+        });
         const [existingUser, existingPhoneUser, existingIdNumberUser] = await Promise.all([
             this.userModel.findOne({ email, role }),
             this.userModel.findOne({ phone: phone.trim(), role }),
@@ -157,6 +181,20 @@ let AuthService = class AuthService {
         if (registerDto.identificationDocument) {
             userDataToSave.identificationDocument =
                 registerDto.identificationDocument;
+        }
+        if (registerDto.identomatFaceImage) {
+            userDataToSave.identomatFaceImage = registerDto.identomatFaceImage;
+        }
+        if (registerDto.identomatDocumentFrontImage) {
+            userDataToSave.identomatDocumentFrontImage =
+                registerDto.identomatDocumentFrontImage;
+        }
+        if (registerDto.identomatDocumentBackImage) {
+            userDataToSave.identomatDocumentBackImage =
+                registerDto.identomatDocumentBackImage;
+        }
+        if (registerDto.identomatFullData) {
+            userDataToSave.identomatFullData = registerDto.identomatFullData;
         }
         console.log('💾 [AuthService] User data to save:', {
             email: userDataToSave.email,
@@ -267,19 +305,132 @@ let AuthService = class AuthService {
     }
     async login(loginDto) {
         const { email, password } = loginDto;
+        console.log('🔐 [AuthService] Login request received:', {
+            email,
+            hasPassword: !!password,
+        });
         const user = await this.userModel.findOne({ email });
         if (!user) {
+            console.log('❌ [AuthService] User not found for email:', email);
             throw new common_1.UnauthorizedException('Invalid credentials');
         }
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
+            console.log('❌ [AuthService] Invalid password for email:', email);
             throw new common_1.UnauthorizedException('Invalid credentials');
         }
         if (!user.isActive) {
+            console.log('❌ [AuthService] Account is deactivated for email:', email);
             throw new common_1.UnauthorizedException('Account is deactivated');
+        }
+        console.log('✅ [AuthService] User found and password valid:', {
+            userId: user._id.toString(),
+            email: user.email,
+            phone: user.phone,
+            hasPhone: !!(user.phone && user.phone.trim()),
+        });
+        if (user.phone && user.phone.trim()) {
+            const isPhoneVerified = await this.phoneVerificationService.isPhoneVerified(user.phone.trim());
+            console.log('📱 [AuthService] Phone verification check:', {
+                phone: user.phone.trim(),
+                isPhoneVerified,
+            });
+            if (!isPhoneVerified) {
+                console.log('📱 [AuthService] OTP verification required for login, frontend will send code:', user.phone.trim());
+                const response = {
+                    success: true,
+                    message: 'OTP verification required',
+                    requiresOTP: true,
+                    data: {
+                        user: {
+                            id: user._id.toString(),
+                            role: user.role,
+                            name: user.name,
+                            email: user.email,
+                            phone: user.phone,
+                            isVerified: user.isVerified,
+                            approvalStatus: user.approvalStatus,
+                            isActive: user.isActive,
+                            doctorStatus: user.doctorStatus,
+                        },
+                    },
+                };
+                console.log('📤 [AuthService] Returning login response (OTP required):', {
+                    requiresOTP: response.requiresOTP,
+                    hasUser: !!response.data.user,
+                    userPhone: response.data.user.phone,
+                    hasToken: false,
+                });
+                return response;
+            }
+        }
+        else {
+            console.warn('⚠️ [AuthService] User has no phone number, allowing login without OTP:', {
+                userId: user._id.toString(),
+                email: user.email,
+            });
         }
         const tokens = await this.generateTokens(user._id.toString());
         return {
+            success: true,
+            message: 'Login successful',
+            requiresOTP: false,
+            data: {
+                user: {
+                    id: user._id.toString(),
+                    role: user.role,
+                    name: user.name,
+                    email: user.email,
+                    phone: user.phone,
+                    isVerified: user.isVerified,
+                    approvalStatus: user.approvalStatus,
+                    isActive: user.isActive,
+                    doctorStatus: user.doctorStatus,
+                },
+                token: tokens.accessToken,
+                refreshToken: tokens.refreshToken,
+            },
+        };
+    }
+    async verifyLoginOTP(email, verificationCode) {
+        console.log('🔐 [AuthService] verifyLoginOTP called:', {
+            email,
+            verificationCodeLength: verificationCode.length,
+            verificationCode: verificationCode.replace(/\d/g, '*'),
+        });
+        const user = await this.userModel.findOne({ email });
+        if (!user) {
+            console.log('❌ [AuthService] User not found for email:', email);
+            throw new common_1.UnauthorizedException('User not found');
+        }
+        if (!user.phone || !user.phone.trim()) {
+            console.log('❌ [AuthService] Phone number not found for user:', {
+                email,
+                userId: user._id.toString(),
+            });
+            throw new common_1.BadRequestException('Phone number not found for this user');
+        }
+        console.log('📱 [AuthService] Verifying OTP for user:', {
+            email,
+            phone: user.phone.trim(),
+            userId: user._id.toString(),
+        });
+        const verificationResult = await this.phoneVerificationService.verifyCode(user.phone.trim(), verificationCode.trim());
+        console.log('✅ [AuthService] OTP verification result:', {
+            verified: verificationResult.verified,
+            success: verificationResult.success,
+            message: verificationResult.message,
+        });
+        if (!verificationResult.verified) {
+            console.log('❌ [AuthService] OTP verification failed:', {
+                email,
+                phone: user.phone.trim(),
+                message: verificationResult.message,
+            });
+            throw new common_1.BadRequestException(verificationResult.message || 'Invalid verification code');
+        }
+        const tokens = await this.generateTokens(user._id.toString());
+        const response = {
             success: true,
             message: 'Login successful',
             data: {
@@ -298,6 +449,13 @@ let AuthService = class AuthService {
                 refreshToken: tokens.refreshToken,
             },
         };
+        console.log('📤 [AuthService] Returning verifyLoginOTP response:', {
+            success: response.success,
+            hasUser: !!response.data.user,
+            hasToken: !!response.data.token,
+            hasRefreshToken: !!response.data.refreshToken,
+        });
+        return response;
     }
     async getDevAdminToken() {
         const admin = await this.userModel.findOne({

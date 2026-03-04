@@ -3,6 +3,7 @@ import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
 import { SendVerificationCodeDto } from './dto/send-verification-code.dto';
+import { VerifyLoginOTPDto } from './dto/verify-login-otp.dto';
 import { VerifyPhoneDto } from './dto/verify-phone.dto';
 import { PhoneVerificationService } from './phone-verification.service';
 export declare class AuthController {
@@ -29,6 +30,24 @@ export declare class AuthController {
     login(loginDto: LoginDto): Promise<{
         success: boolean;
         message: string;
+        requiresOTP: boolean;
+        data: {
+            user: {
+                id: string;
+                role: import("../schemas/user.schema").UserRole;
+                name: string;
+                email: string;
+                phone: string;
+                isVerified: boolean;
+                approvalStatus: import("../schemas/user.schema").ApprovalStatus;
+                isActive: true;
+                doctorStatus: import("../schemas/user.schema").DoctorStatus;
+            };
+        };
+    } | {
+        success: boolean;
+        message: string;
+        requiresOTP: boolean;
         data: {
             user: {
                 id: string;
@@ -79,5 +98,24 @@ export declare class AuthController {
         success: boolean;
         message: string;
         verified: boolean;
+    }>;
+    verifyLoginOTP(dto: VerifyLoginOTPDto): Promise<{
+        success: boolean;
+        message: string;
+        data: {
+            user: {
+                id: string;
+                role: import("../schemas/user.schema").UserRole;
+                name: string;
+                email: string;
+                phone: string;
+                isVerified: boolean;
+                approvalStatus: import("../schemas/user.schema").ApprovalStatus;
+                isActive: boolean;
+                doctorStatus: import("../schemas/user.schema").DoctorStatus;
+            };
+            token: string;
+            refreshToken: string;
+        };
     }>;
 }

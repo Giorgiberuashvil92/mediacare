@@ -60,6 +60,15 @@ export default function ScreensLayout() {
           animation: "slide_from_right",
         }}
       />
+
+      {/* AI Assistant Route */}
+      <Stack.Screen 
+        name="ai-assistant" 
+        options={{
+          presentation: "card",
+          animation: "slide_from_right",
+        }}
+      />
     </Stack>
   );
 }

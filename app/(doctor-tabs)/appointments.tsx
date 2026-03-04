@@ -380,8 +380,6 @@ export default function DoctorAppointments() {
       return isNotFollowup && matchesStatus && matchesType && matchesSearch;
     })
     .sort((a, b) => {
-      // Sort by appointment date and time - earliest upcoming first
-      // Parse dates in local timezone (same as patient side)
       const [yearA, monthA, dayA] = a.date.split('-').map(Number);
       const [hoursA, minutesA] = a.time.split(':').map(Number);
       const dateA = new Date(yearA, monthA - 1, dayA, hoursA, minutesA, 0, 0).getTime();
@@ -390,7 +388,7 @@ export default function DoctorAppointments() {
       const [hoursB, minutesB] = b.time.split(':').map(Number);
       const dateB = new Date(yearB, monthB - 1, dayB, hoursB, minutesB, 0, 0).getTime();
       
-      return dateA - dateB; // Ascending order (earliest first)
+      return dateB - dateA;
     });
 
   // Stats - exclude followup consultations
@@ -775,13 +773,11 @@ export default function DoctorAppointments() {
           followUpDate.toISOString().split("T")[1]?.slice(0, 5) || "";
       }
     }
-    // Parse medications from JSON string to array
     let medications: Medication[] = [];
     if (summary?.medications) {
       try {
         medications = JSON.parse(summary.medications);
       } catch {
-        // Fallback: if not JSON, treat as empty array
         medications = [];
       }
     }
@@ -1764,9 +1760,10 @@ export default function DoctorAppointments() {
                   </TouchableOpacity>
                 )}
 
-                {/* Reminder & Join Call Section */}
+                {/* Reminder & Join Call Section - Only for video consultations */}
                 {(consultation.status === "scheduled" ||
-                  consultation.status === "in-progress") && (
+                  consultation.status === "in-progress") &&
+                  consultation.type === "video" && (
                   <View style={styles.reminderSection}>
                     {getTimeUntilConsultation(consultation) ? (
                       <View
@@ -2763,38 +2760,7 @@ export default function DoctorAppointments() {
                             </Text>
                           </TouchableOpacity>
 
-                          <TouchableOpacity
-                            style={[
-                              styles.typeChip,
-                              appointmentData.followUpType === "home-visit" &&
-                                styles.typeChipActive,
-                            ]}
-                            onPress={() =>
-                              setAppointmentData({
-                                ...appointmentData,
-                                followUpType: "home-visit",
-                              })
-                            }
-                          >
-                            <Ionicons
-                              name="home-outline"
-                              size={18}
-                              color={
-                                appointmentData.followUpType === "home-visit"
-                                  ? "#FFFFFF"
-                                  : "#4B5563"
-                              }
-                            />
-                            <Text
-                              style={[
-                                styles.typeChipText,
-                                appointmentData.followUpType === "home-visit" &&
-                                  styles.typeChipTextActive,
-                              ]}
-                            >
-                              ბინაზე ვიზიტი
-                            </Text>
-                          </TouchableOpacity>
+                         
                         </View>
                       </View>
 
@@ -2936,31 +2902,7 @@ export default function DoctorAppointments() {
                       <Text style={styles.formLabel}>
                         ლაბორატორიული კვლევები
                       </Text>
-                      <TouchableOpacity
-                        style={styles.addMedicationButton}
-                        onPress={() => {
-                          // Show product selection modal (clinic will be selected by patient)
-                          Alert.alert("პროდუქტის არჩევა", "აირჩიეთ პროდუქტი", [
-                            ...laboratoryProducts.map((product) => ({
-                              text: product.name,
-                              onPress: () => {
-                                setSelectedLaboratoryTests([
-                                  ...selectedLaboratoryTests,
-                                  {
-                                    productId: product.id,
-                                    productName: product.name,
-                                    // clinicId and clinicName will be selected by patient when booking
-                                  },
-                                ]);
-                              },
-                            })),
-                            { text: "გაუქმება", style: "cancel" },
-                          ]);
-                        }}
-                      >
-                        <Ionicons name="add-circle" size={20} color="#06B6D4" />
-                        <Text style={styles.addMedicationText}>დამატება</Text>
-                      </TouchableOpacity>
+                     
                     </View>
 
                     {selectedLaboratoryTests.map((test, index) => (
@@ -3019,29 +2961,7 @@ export default function DoctorAppointments() {
                   <View style={styles.formSection}>
                     <View style={styles.medicationsHeader}>
                       <Text style={styles.formLabel}>ინსტრუმენტული კვლევები</Text>
-                      <TouchableOpacity
-                        style={styles.addMedicationButton}
-                        onPress={() => {
-                          Alert.alert("პროდუქტის არჩევა", "აირჩიე ინსტრუმენტული კვლევა", [
-                            ...instrumentalProducts.map((product) => ({
-                              text: product.name,
-                              onPress: () => {
-                                setSelectedInstrumentalTests([
-                                  ...selectedInstrumentalTests,
-                                  {
-                                    productId: product.id,
-                                    productName: product.name,
-                                  },
-                                ]);
-                              },
-                            })),
-                            { text: "გაუქმება", style: "cancel" },
-                          ]);
-                        }}
-                      >
-                        <Ionicons name="add-circle" size={20} color="#8B5CF6" />
-                        <Text style={styles.addMedicationText}>დამატება</Text>
-                      </TouchableOpacity>
+                      
                     </View>
 
                     {selectedInstrumentalTests.map((test, index) => (

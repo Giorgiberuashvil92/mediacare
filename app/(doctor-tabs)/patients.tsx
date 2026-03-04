@@ -1,7 +1,9 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import * as Sharing from "expo-sharing";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -79,6 +81,16 @@ export default function DoctorPatients() {
   const [loadingFollowUpAvailability, setLoadingFollowUpAvailability] =
     useState(false);
 
+  // Expandable consultations state
+  const [expandedConsultations, setExpandedConsultations] = useState<Set<string>>(new Set());
+  const [consultationDocumentsCount, setConsultationDocumentsCount] = useState<Record<string, number>>({});
+  const [consultationDocuments, setConsultationDocuments] = useState<Record<string, {
+    url: string;
+    name?: string;
+    type?: string;
+    uploadedAt?: string;
+  }[]>>({});
+
   // Laboratory tests state
   const [laboratoryProducts, setLaboratoryProducts] = useState<ShopProduct[]>(
     []
@@ -149,7 +161,29 @@ export default function DoctorPatients() {
       // Log response for debugging
 
       if (response.success) {
-        setConsultations(response.data as any);
+        const consultationsData = response.data as any;
+        setConsultations(consultationsData);
+        
+        // Load documents count for each consultation
+        const docsCountPromises = consultationsData.map(async (consultation: Consultation) => {
+          try {
+            const docsResponse = await apiService.getAppointmentDocuments(consultation.id);
+            if (docsResponse.success && docsResponse.data) {
+              return { id: consultation.id, count: docsResponse.data.length };
+            }
+            return { id: consultation.id, count: 0 };
+          } catch (error) {
+            console.error(`Error loading documents for consultation ${consultation.id}:`, error);
+            return { id: consultation.id, count: 0 };
+          }
+        });
+        
+        const docsCounts = await Promise.all(docsCountPromises);
+        const docsCountMap: Record<string, number> = {};
+        docsCounts.forEach(({ id, count }) => {
+          docsCountMap[id] = count;
+        });
+        setConsultationDocumentsCount(docsCountMap);
       } else {
         setError("კონსულტაციების ჩატვირთვა ვერ მოხერხდა");
       }
@@ -292,6 +326,52 @@ export default function DoctorPatients() {
     return `${base}/${normalized}`;
   };
 
+  const downloadAndOpenFile = async (fileUrl: string, fileName?: string) => {
+    try {
+      // Build full URL if needed
+      const fullUrl = fileUrl.startsWith("http") 
+        ? fileUrl 
+        : `${apiService.getBaseURL()}/${fileUrl}`;
+
+      // Try to download and share the file
+      try {
+        // Get file extension from URL or filename
+        const extension = fileName?.split('.').pop() || 'pdf';
+        // Use cacheDirectory if available, otherwise fallback to a temp path
+        // @ts-ignore - FileSystem.cacheDirectory exists at runtime
+        const cacheDir = FileSystem.cacheDirectory || '';
+        const fileUri = `${cacheDir}${fileName || `file_${Date.now()}.${extension}`}`;
+
+        // Download file
+        const downloadResult = await FileSystem.downloadAsync(fullUrl, fileUri);
+
+        if (downloadResult.status === 200) {
+          // Check if sharing is available
+          const isAvailable = await Sharing.isAvailableAsync();
+          
+          if (isAvailable) {
+            // Share/open the file
+            await Sharing.shareAsync(downloadResult.uri);
+            return;
+          }
+        }
+      } catch (downloadError) {
+        console.log("Download failed, falling back to URL:", downloadError);
+      }
+
+      // Fallback to opening URL if download fails or sharing is not available
+      Linking.openURL(fullUrl).catch(() =>
+        Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა")
+      );
+    } catch (error: any) {
+      console.error("Error opening file:", error);
+      Alert.alert(
+        "შეცდომა",
+        error?.message || "ფაილის გახსნა ვერ მოხერხდა"
+      );
+    }
+  };
+
   const openForm100File = (filePath?: string | null) => {
     const url = buildFileUrl(filePath);
     if (!url) {
@@ -332,6 +412,87 @@ export default function DoctorPatients() {
       console.error("Failed to pick Form 100 file", error);
       Alert.alert("შეცდომა", "ფორმა 100-ის ატვირთვა ვერ მოხერხდა");
     }
+  };
+
+  const toggleConsultationExpansion = async (consultation: Consultation) => {
+    const isExpanded = expandedConsultations.has(consultation.id);
+    
+    if (!isExpanded) {
+      // Fetch full appointment details when expanding
+      try {
+        const appointmentResponse = await apiService.getAppointmentById(consultation.id);
+        if (appointmentResponse.success && appointmentResponse.data) {
+          const fullAppointment = appointmentResponse.data as any;
+          
+          // Format date to local timezone if it's in ISO format
+          let formattedDate = fullAppointment.date || consultation.date;
+          if (formattedDate && formattedDate.includes('T')) {
+            const date = new Date(formattedDate);
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            formattedDate = `${year}-${month}-${day}`;
+          }
+          
+          // Update consultation in the list with full details including patient details
+          setConsultations(prev => prev.map(cons => 
+            cons.id === consultation.id 
+              ? { 
+                  ...cons, 
+                  date: formattedDate,
+                  instrumentalTests: fullAppointment.instrumentalTests || [], 
+                  laboratoryTests: fullAppointment.laboratoryTests || [],
+                  symptoms: fullAppointment.symptoms || fullAppointment.patientDetails?.problem || cons.symptoms,
+                  diagnosis: fullAppointment.diagnosis || fullAppointment.consultationSummary?.diagnosis || cons.diagnosis,
+                  patientDetails: fullAppointment.patientDetails || (cons as any).patientDetails,
+                  patientPhone: fullAppointment.patientId?.phone || (cons as any).patientPhone,
+                  patientEmail: fullAppointment.patientId?.email || (cons as any).patientEmail,
+                  patientId: fullAppointment.patientId || (cons as any).patientId,
+                }
+              : cons
+          ));
+        }
+
+        // Load appointment documents
+        try {
+          const docsResponse = await apiService.getAppointmentDocuments(consultation.id);
+          if (docsResponse.success && docsResponse.data) {
+            // Store documents count and full documents
+            setConsultationDocumentsCount(prev => ({
+              ...prev,
+              [consultation.id]: docsResponse.data.length,
+            }));
+            setConsultationDocuments(prev => ({
+              ...prev,
+              [consultation.id]: docsResponse.data,
+            }));
+          } else {
+            setConsultationDocuments(prev => ({
+              ...prev,
+              [consultation.id]: [],
+            }));
+          }
+        } catch (error) {
+          console.error("Error fetching appointment documents:", error);
+          setConsultationDocuments(prev => ({
+            ...prev,
+            [consultation.id]: [],
+          }));
+        }
+      } catch (error) {
+        console.error("Error fetching appointment details:", error);
+      }
+    }
+    
+    setExpandedConsultations(prev => {
+      const newSet = new Set(prev);
+      if (isExpanded) {
+        newSet.delete(consultation.id);
+      } else {
+        newSet.add(consultation.id);
+      }
+      return newSet;
+    });
   };
 
   const openDetails = async (consultation: Consultation) => {
@@ -871,63 +1032,86 @@ export default function DoctorPatients() {
               </Text>
             </View>
           ) : (
-            filteredConsultations.map((consultation) => (
-              <TouchableOpacity
-                key={consultation.id}
-                style={styles.consultationCard}
-                onPress={() => openDetails(consultation)}
-              >
-                <View style={styles.consultationHeader}>
-                  <View style={styles.patientInfo}>
-                    <Image
-                      source={{
-                        uri: `https://picsum.photos/seed/${consultation.patientName}/200/200`,
-                      }}
-                      style={styles.avatarImage}
-                    />
-                    <View style={styles.patientDetails}>
-                      <View style={styles.patientNameRow}>
-                        <Text style={styles.patientName}>
-                          {consultation.patientName}
-                        </Text>
-                        {consultation.status === "scheduled" &&
-                          isConsultationSoon(consultation) && (
-                            <View style={styles.soonBadge}>
-                              <Ionicons
-                                name="alarm"
-                                size={12}
-                                color="#EF4444"
-                              />
-                              <Text style={styles.soonText}>მალე</Text>
+            filteredConsultations.map((consultation) => {
+              const isExpanded = expandedConsultations.has(consultation.id);
+              
+              return (
+              <View key={consultation.id} style={styles.consultationCard}>
+                <TouchableOpacity
+                  style={{ flex: 1 }}
+                  onPress={() => toggleConsultationExpansion(consultation)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.consultationHeader}>
+                    <View style={styles.patientInfo}>
+                      <Image
+                        source={{
+                          uri: `https://picsum.photos/seed/${consultation.patientName}/200/200`,
+                        }}
+                        style={styles.avatarImage}
+                      />
+                      <View style={styles.patientDetails}>
+                        <View style={styles.patientNameRow}>
+                          <Text style={styles.patientName}>
+                            {consultation.patientName}
+                          </Text>
+                          {consultationDocumentsCount[consultation.id] > 0 && (
+                            <View style={styles.fileIndicatorBadge}>
+                              <Ionicons name="document-attach" size={12} color="#0EA5E9" />
+                              <Text style={styles.fileIndicatorBadgeText}>
+                                {consultationDocumentsCount[consultation.id]}
+                              </Text>
                             </View>
                           )}
+                          {consultation.status === "scheduled" &&
+                            isConsultationSoon(consultation) && (
+                              <View style={styles.soonBadge}>
+                                <Ionicons
+                                  name="alarm"
+                                  size={12}
+                                  color="#EF4444"
+                                />
+                                <Text style={styles.soonText}>მალე</Text>
+                              </View>
+                            )}
+                        </View>
+                        <Text style={styles.patientAge}>
+                          {consultation.patientAge} წლის •{" "}
+                          {getConsultationTypeLabel(consultation.type)}
+                        </Text>
                       </View>
-                      <Text style={styles.patientAge}>
-                        {consultation.patientAge} წლის •{" "}
-                        {getConsultationTypeLabel(consultation.type)}
-                      </Text>
                     </View>
-                  </View>
-                  <View
-                    style={[
-                      styles.statusBadge,
-                      {
-                        backgroundColor: `${getStatusColor(
-                          consultation.status
-                        )}20`,
-                      },
-                    ]}
-                  >
-                    <Text
+                    <View
                       style={[
-                        styles.statusText,
-                        { color: getStatusColor(consultation.status) },
+                        styles.statusBadge,
+                        {
+                          backgroundColor: `${getStatusColor(
+                            consultation.status
+                          )}20`,
+                        },
                       ]}
                     >
-                      {getStatusLabel(consultation.status)}
-                    </Text>
+                      <Text
+                        style={[
+                          styles.statusText,
+                          { color: getStatusColor(consultation.status) },
+                        ]}
+                      >
+                        {getStatusLabel(consultation.status)}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => toggleConsultationExpansion(consultation)}
+                      style={styles.expandButton}
+                    >
+                      <Ionicons
+                        name={isExpanded ? "chevron-up" : "chevron-down"}
+                        size={20}
+                        color="#6B7280"
+                      />
+                    </TouchableOpacity>
                   </View>
-                </View>
+                </TouchableOpacity>
 
                 <View style={styles.consultationBody}>
                   <View style={styles.datetimeRow}>
@@ -945,7 +1129,7 @@ export default function DoctorPatients() {
                       <Text style={styles.infoText}>{consultation.time}</Text>
                     </View>
                   </View>
-                  {consultation.type === "home-visit" &&
+                  {(consultation as any).originalType === "home-visit" &&
                     (consultation as any).visitAddress && (
                       <View style={styles.symptomsRow}>
                         <Ionicons
@@ -958,35 +1142,362 @@ export default function DoctorPatients() {
                         </Text>
                       </View>
                     )}
-                  {(consultation.consultationSummary?.symptoms ||
-                    consultation.symptoms) && (
-                    <View style={styles.symptomsRow}>
-                      <Ionicons name="medical" size={16} color="#6B7280" />
-                      <Text style={styles.symptomsText}>
-                        {consultation.consultationSummary?.symptoms ||
-                          consultation.symptoms}
+                  {/* File indicator - show if user has uploaded files */}
+                  {consultationDocumentsCount[consultation.id] > 0 && (
+                    <View style={styles.infoRow}>
+                      <Ionicons name="document-attach-outline" size={16} color="#0EA5E9" />
+                      <Text style={[styles.infoText, { color: "#0EA5E9" }]}>
+                        {consultationDocumentsCount[consultation.id]} ფაილი ატვირთულია
                       </Text>
                     </View>
                   )}
-                  {(consultation.consultationSummary?.diagnosis ||
-                    consultation.diagnosis) && (
-                    <View style={styles.diagnosisRow}>
-                      <MaterialCommunityIcons
-                        name="file-document"
-                        size={16}
-                        color="#10B981"
-                      />
-                      <Text style={styles.diagnosisText}>
-                        {consultation.consultationSummary?.diagnosis ||
-                          consultation.diagnosis}
-                      </Text>
-                    </View>
+                  {/* Symptoms and Diagnosis - Hidden for home-visit consultations */}
+                  {(consultation as any).originalType !== "home-visit" && consultation.type !== "home-visit" && (
+                    <>
+                      {consultation.status === "completed" ? (
+                        <>
+                          {(consultation.consultationSummary?.symptoms ||
+                            consultation.symptoms) && (
+                            <View style={styles.infoRow}>
+                              <Ionicons
+                                name="medical-outline"
+                                size={16}
+                                color="#F59E0B"
+                              />
+                              <Text style={styles.infoText}>
+                                სიმპტომები ჩანს დეტალებში
+                              </Text>
+                            </View>
+                          )}
+                          {(consultation.consultationSummary?.diagnosis ||
+                            consultation.diagnosis) && (
+                            <View style={styles.infoRow}>
+                              <MaterialCommunityIcons
+                                name="file-document"
+                                size={16}
+                                color="#10B981"
+                              />
+                              <Text style={styles.infoText}>
+                                დიაგნოზი ჩანს დეტალებში
+                              </Text>
+                            </View>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          {(consultation.consultationSummary?.symptoms ||
+                            consultation.symptoms) && (
+                            <View style={styles.symptomsRow}>
+                              <Ionicons
+                                name="medical-outline"
+                                size={16}
+                                color="#F59E0B"
+                              />
+                              <Text style={styles.symptomsText} numberOfLines={isExpanded ? undefined : 2}>
+                                {consultation.consultationSummary?.symptoms ||
+                                  consultation.symptoms}
+                              </Text>
+                            </View>
+                          )}
+                          {(consultation.consultationSummary?.diagnosis ||
+                            consultation.diagnosis) && (
+                            <View style={styles.diagnosisRow}>
+                              <MaterialCommunityIcons
+                                name="file-document"
+                                size={16}
+                                color="#10B981"
+                              />
+                              <Text style={styles.diagnosisText} numberOfLines={isExpanded ? undefined : 2}>
+                                {consultation.consultationSummary?.diagnosis ||
+                                  consultation.diagnosis}
+                              </Text>
+                            </View>
+                          )}
+                        </>
+                      )}
+                    </>
                   )}
                 </View>
 
-                {/* Reminder & Join Call Section */}
+                {/* Expanded Details */}
+                {isExpanded && (
+                  <View style={styles.expandedSection}>
+                    {/* Patient Details */}
+                    <View style={styles.detailSection}>
+                      <Text style={styles.detailSectionTitle}>პაციენტის ინფორმაცია</Text>
+                      <View style={styles.patientInfoCard}>
+                        <View style={styles.patientInfoRow}>
+                          <Text style={styles.patientInfoLabel}>სახელი:</Text>
+                          <Text style={styles.patientInfoValue}>
+                            {(consultation as any).patientDetails?.name ||
+                              consultation.patientName ||
+                              "არ არის მითითებული"}
+                          </Text>
+                        </View>
+
+                        {(consultation as any).patientDetails?.lastName && (
+                          <View style={styles.patientInfoRow}>
+                            <Text style={styles.patientInfoLabel}>გვარი:</Text>
+                            <Text style={styles.patientInfoValue}>
+                              {(consultation as any).patientDetails.lastName}
+                            </Text>
+                          </View>
+                        )}
+
+                        <View style={styles.patientInfoRow}>
+                          <Text style={styles.patientInfoLabel}>
+                            დაბადების თარიღი:
+                          </Text>
+                          <Text style={styles.patientInfoValue}>
+                            {(consultation as any).patientDetails?.dateOfBirth
+                              ? new Date(
+                                  (consultation as any).patientDetails.dateOfBirth
+                                ).toLocaleDateString("ka-GE", {
+                                  year: "numeric",
+                                  month: "long",
+                                  day: "numeric",
+                                })
+                              : consultation.patientAge
+                              ? `${consultation.patientAge} წელი`
+                              : "არ არის მითითებული"}
+                          </Text>
+                        </View>
+
+                        {(consultation as any).patientDetails?.personalId && (
+                          <View style={styles.patientInfoRow}>
+                            <Text style={styles.patientInfoLabel}>
+                              პირადი ნომერი:
+                            </Text>
+                            <Text style={styles.patientInfoValue}>
+                              {(consultation as any).patientDetails.personalId}
+                            </Text>
+                          </View>
+                        )}
+
+                        {(consultation as any).patientDetails?.address && (
+                          <View style={styles.patientInfoRow}>
+                            <Text style={styles.patientInfoLabel}>მისამართი:</Text>
+                            <Text style={styles.patientInfoValue}>
+                              {(consultation as any).patientDetails.address}
+                            </Text>
+                          </View>
+                        )}
+
+                        {((consultation as any).patientEmail ||
+                          (consultation as any).patientId?.email) && (
+                          <View style={styles.patientInfoRow}>
+                            <Text style={styles.patientInfoLabel}>Email:</Text>
+                            <Text style={styles.patientInfoValue}>
+                              {(consultation as any).patientEmail ||
+                                (consultation as any).patientId?.email}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+
+                    {/* Symptoms - Full View */}
+                    {(consultation.consultationSummary?.symptoms ||
+                      consultation.symptoms) && (
+                      <View style={styles.detailSection}>
+                        <Text style={styles.detailSectionTitle}>სიმპტომები</Text>
+                        <View style={styles.symptomsCard}>
+                          <Ionicons name="medical-outline" size={18} color="#6B7280" />
+                          <Text style={styles.symptomsTextExpanded}>
+                            {consultation.consultationSummary?.symptoms ||
+                              consultation.symptoms}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Diagnosis - Full View */}
+                    {(consultation.consultationSummary?.diagnosis ||
+                      consultation.diagnosis) && (
+                      <View style={styles.detailSection}>
+                        <Text style={styles.detailSectionTitle}>დიაგნოზი</Text>
+                        <View style={styles.diagnosisCard}>
+                          <MaterialCommunityIcons
+                            name="file-document-outline"
+                            size={18}
+                            color="#10B981"
+                          />
+                          <Text style={styles.diagnosisTextExpanded}>
+                            {consultation.consultationSummary?.diagnosis ||
+                              consultation.diagnosis}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Medications */}
+                    {consultation.consultationSummary?.medications && (
+                      <View style={styles.detailSection}>
+                        <Text style={styles.detailSectionTitle}>დანიშნული მედიკამენტები</Text>
+                        <View style={styles.medicationsCard}>
+                          <Ionicons name="medkit-outline" size={18} color="#8B5CF6" />
+                          <Text style={styles.medicationsTextExpanded}>
+                            {consultation.consultationSummary.medications}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Laboratory Tests */}
+                    {consultation.laboratoryTests &&
+                      consultation.laboratoryTests.length > 0 && (
+                        <View style={styles.detailSection}>
+                          <Text style={styles.detailSectionTitle}>
+                            ლაბორატორიული კვლევები
+                          </Text>
+                          {consultation.laboratoryTests.map((test: any, index: number) => (
+                            <View key={index} style={styles.testCard}>
+                              <View style={styles.testHeader}>
+                                <Ionicons
+                                  name="flask-outline"
+                                  size={18}
+                                  color="#06B6D4"
+                                />
+                                <View style={styles.testInfo}>
+                                  <Text style={styles.testName}>{test.productName}</Text>
+                                  {test.clinicName && (
+                                    <Text style={styles.testNotes}>
+                                      კლინიკა: {test.clinicName}
+                                    </Text>
+                                  )}
+                                </View>
+                              </View>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+
+                    {/* Instrumental Tests */}
+                    {consultation.instrumentalTests &&
+                      (consultation as any).instrumentalTests.length > 0 && (
+                        <View style={styles.detailSection}>
+                          <Text style={styles.detailSectionTitle}>
+                            ინსტრუმენტული კვლევები
+                          </Text>
+                          {(consultation as any).instrumentalTests.map(
+                            (test: any, index: number) => (
+                              <View key={index} style={styles.testCard}>
+                                <View style={styles.testHeader}>
+                                  <Ionicons
+                                    name="pulse-outline"
+                                    size={18}
+                                    color="#8B5CF6"
+                                  />
+                                  <View style={styles.testInfo}>
+                                    <Text style={styles.testName}>{test.productName}</Text>
+                                    {test.notes && (
+                                      <Text style={styles.testNotes}>
+                                        შენიშვნა: {test.notes}
+                                      </Text>
+                                    )}
+                                  </View>
+                                </View>
+                              </View>
+                            )
+                          )}
+                        </View>
+                      )}
+
+                    {/* Notes */}
+                    {consultation.consultationSummary?.notes && (
+                      <View style={styles.detailSection}>
+                        <Text style={styles.detailSectionTitle}>შენიშვნები</Text>
+                        <View style={styles.notesCard}>
+                          <Ionicons name="document-text-outline" size={18} color="#6B7280" />
+                          <Text style={styles.notesTextExpanded}>
+                            {consultation.consultationSummary.notes}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Patient Uploaded Documents */}
+                    {consultationDocuments[consultation.id] &&
+                      consultationDocuments[consultation.id].length > 0 && (
+                        <View style={styles.detailSection}>
+                          <Text style={styles.detailSectionTitle}>
+                            პაციენტის ატვირთული ფაილები
+                            <Text style={{ color: "#0EA5E9", fontWeight: "600" }}>
+                              {" "}({consultationDocuments[consultation.id].length})
+                            </Text>
+                          </Text>
+                          {consultationDocuments[consultation.id].map((doc, index) => (
+                            <TouchableOpacity
+                              key={index}
+                              style={styles.viewFileButton}
+                              onPress={() => {
+                                const url = doc.url.startsWith("http")
+                                  ? doc.url
+                                  : `${apiService.getBaseURL()}/${doc.url}`;
+                                downloadAndOpenFile(url, doc.name);
+                              }}
+                            >
+                              <Ionicons
+                                name={
+                                  doc.type?.startsWith("image/")
+                                    ? "image-outline"
+                                    : "document-text-outline"
+                                }
+                                size={18}
+                                color="#0EA5E9"
+                              />
+                              <Text style={styles.viewFileButtonText}>
+                                ფაილის ნახვა
+                              </Text>
+                              <Ionicons
+                                name="open-outline"
+                                size={16}
+                                color="#0EA5E9"
+                                style={{ marginLeft: "auto" }}
+                              />
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      )}
+
+                    {/* Collapse Button */}
+                    <TouchableOpacity
+                      style={styles.viewDetailsButton}
+                      onPress={() => toggleConsultationExpansion(consultation)}
+                    >
+                      <Text style={styles.viewDetailsButtonText}>
+                        დეტალების დაფარვა
+                      </Text>
+                      <Ionicons
+                        name="chevron-up"
+                        size={18}
+                        color="#0EA5E9"
+                      />
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* View Details Button */}
+                {!isExpanded && (
+                  <TouchableOpacity
+                    style={styles.viewDetailsButton}
+                    onPress={() => toggleConsultationExpansion(consultation)}
+                  >
+                    <Text style={styles.viewDetailsButtonText}>
+                      მეტის ნახვა
+                    </Text>
+                    <Ionicons
+                      name="chevron-down"
+                      size={18}
+                      color="#0EA5E9"
+                    />
+                  </TouchableOpacity>
+                )}
+
+                {/* Reminder & Join Call Section - Only for video consultations */}
                 {(consultation.status === "scheduled" ||
-                  consultation.status === "in-progress") && (
+                  consultation.status === "in-progress") &&
+                  (consultation as any).originalType === "video" && (
                   <View style={styles.reminderSection}>
                     {getTimeUntilConsultation(consultation) && (
                       <View
@@ -1055,20 +1566,7 @@ export default function DoctorPatients() {
 
                 {/* Status Actions */}
                 <View style={styles.statusActionsRow}>
-                  {consultation.status === "scheduled" && (
-                    <TouchableOpacity
-                      style={styles.statusActionButton}
-                      onPress={() =>
-                        handleStatusUpdate(consultation, "in-progress")
-                      }
-                      disabled={
-                        statusActionLoading === `${consultation.id}-in-progress`
-                      }
-                    >
-                      <Ionicons name="play" size={16} color="#2563EB" />
-                      <Text style={styles.statusActionText}>დაწყება</Text>
-                    </TouchableOpacity>
-                  )}
+
 
                   {consultation.status !== "cancelled" && (
                     <TouchableOpacity
@@ -1090,54 +1588,10 @@ export default function DoctorPatients() {
                       </Text>
                     </TouchableOpacity>
                   )}
-
-                  {consultation.status !== "cancelled" && (
-                    <TouchableOpacity
-                      style={styles.statusActionButton}
-                      onPress={() =>
-                        handleStatusUpdate(consultation, "cancelled")
-                      }
-                      disabled={
-                        statusActionLoading === `${consultation.id}-cancelled`
-                      }
-                    >
-                      <Ionicons name="close" size={16} color="#DC2626" />
-                      <Text
-                        style={[styles.statusActionText, { color: "#DC2626" }]}
-                      >
-                        გაუქმება
-                      </Text>
-                    </TouchableOpacity>
-                  )}
                 </View>
-
-                <View style={styles.consultationFooter}>
-                  <View style={styles.feeRow}>
-                    <Ionicons name="wallet" size={16} color="#6B7280" />
-                    <Text style={styles.feeAmount}>${consultation.fee}</Text>
-                    <View
-                      style={[
-                        styles.paymentBadge,
-                        consultation.isPaid
-                          ? styles.paymentBadgePaid
-                          : styles.paymentBadgePending,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.paymentText,
-                          consultation.isPaid
-                            ? styles.paymentTextPaid
-                            : styles.paymentTextPending,
-                        ]}
-                      >
-                        {consultation.isPaid ? "გადახდილი" : "მოსალოდნელი"}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            ))
+              </View>
+              );
+            })
           )}
         </View>
       </ScrollView>
@@ -1464,30 +1918,7 @@ export default function DoctorPatients() {
                   </Text>
                 </View>
 
-                <View style={styles.detailSection}>
-                  <Text style={styles.detailLabel}>გადახდის სტატუსი</Text>
-                  <View
-                    style={[
-                      styles.paymentBadge,
-                      selectedConsultation.isPaid
-                        ? styles.paymentBadgePaid
-                        : styles.paymentBadgePending,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.paymentText,
-                        selectedConsultation.isPaid
-                          ? styles.paymentTextPaid
-                          : styles.paymentTextPending,
-                      ]}
-                    >
-                      {selectedConsultation.isPaid
-                        ? "გადახდილი"
-                        : "მოსალოდნელი"}
-                    </Text>
-                  </View>
-                </View>
+               
               </ScrollView>
             ) : null}
 
@@ -3312,5 +3743,141 @@ const styles = StyleSheet.create({
     color: "#6B7280",
     marginTop: 12,
     textAlign: "center",
+  },
+  fileIndicatorBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: "#E0F2FE",
+    borderRadius: 12,
+  },
+  fileIndicatorBadgeText: {
+    fontSize: 11,
+    fontFamily: "Poppins-Bold",
+    color: "#0EA5E9",
+  },
+  expandButton: {
+    padding: 4,
+  },
+  expandedSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
+  },
+  symptomsCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#F9FAFB",
+    padding: 12,
+    borderRadius: 12,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  symptomsTextExpanded: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#374151",
+    lineHeight: 20,
+  },
+  diagnosisCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#F0FDF4",
+    padding: 12,
+    borderRadius: 12,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: "#D1FAE5",
+  },
+  diagnosisTextExpanded: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#065F46",
+    lineHeight: 20,
+  },
+  medicationsCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#F5F3FF",
+    padding: 12,
+    borderRadius: 12,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: "#E9D5FF",
+  },
+  medicationsTextExpanded: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#6B21A8",
+    lineHeight: 20,
+  },
+  notesCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#F9FAFB",
+    padding: 12,
+    borderRadius: 12,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  notesTextExpanded: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#374151",
+    lineHeight: 20,
+  },
+  testCard: {
+    backgroundColor: "#F9FAFB",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  testHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  testInfo: {
+    flex: 1,
+  },
+  testName: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#1F2937",
+    marginBottom: 4,
+  },
+  testNotes: {
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+  },
+  viewDetailsButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginTop: 8,
+    borderRadius: 10,
+    backgroundColor: "#ECFEFF",
+    borderWidth: 1,
+    borderColor: "#BAE6FD",
+  },
+  viewDetailsButtonText: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#0369A1",
   },
 });
