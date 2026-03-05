@@ -1115,12 +1115,34 @@ export default function RegisterScreen() {
       };
 
       try {
-        console.log("📸 [IDENTOMAT] Requesting card-front and card-back images...");
+        console.log("📸 [IDENTOMAT] Requesting face, card-front and card-back images...");
         const formData = new FormData();
         formData.append('company_key', COMPANY_KEY);
         formData.append('session_token', identomatSessionToken);
 
-        // Get card front image
+        // Step 1: Get face image first (ჯერ სახე)
+        try {
+          const faceResponse = await fetch("https://widget.identomat.com/external-api/result/face/", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (faceResponse.ok) {
+            const contentType = faceResponse.headers.get('content-type');
+            if (contentType && contentType.startsWith('image/')) {
+              const imageBlob = await faceResponse.blob();
+              console.log("✅ [IDENTOMAT] Face image received, uploading to Cloudinary...");
+              faceImage = await uploadImageToCloudinary(imageBlob, `identomat-face-${identomatSessionToken.substring(0, 10)}.jpg`);
+              console.log("📸 [IDENTOMAT] Face image uploaded:", faceImage ? "success" : "failed");
+            }
+          } else {
+            console.warn("⚠️ [IDENTOMAT] Face endpoint returned error:", faceResponse.status, faceResponse.statusText);
+          }
+        } catch (faceError) {
+          console.warn("⚠️ [IDENTOMAT] Failed to get face image:", faceError);
+        }
+
+        // Step 2: Get card front image (მერე წინა)
         try {
           const cardFrontResponse = await fetch("https://widget.identomat.com/external-api/result/card-front/", {
             method: "POST",
@@ -1149,7 +1171,7 @@ export default function RegisterScreen() {
           console.warn("⚠️ [IDENTOMAT] Failed to get card front image:", cardFrontError);
         }
 
-        // Get card back image
+        // Step 3: Get card back image (მერე უკანა)
         try {
           const cardBackResponse = await fetch("https://widget.identomat.com/external-api/result/card-back/", {
             method: "POST",
@@ -1176,26 +1198,6 @@ export default function RegisterScreen() {
           }
         } catch (cardBackError) {
           console.warn("⚠️ [IDENTOMAT] Failed to get card back image:", cardBackError);
-        }
-
-        // Try to get face image (if endpoint exists)
-        try {
-          const faceResponse = await fetch("https://widget.identomat.com/external-api/result/face/", {
-            method: "POST",
-            body: formData,
-          });
-
-          if (faceResponse.ok) {
-            const contentType = faceResponse.headers.get('content-type');
-            if (contentType && contentType.startsWith('image/')) {
-              const imageBlob = await faceResponse.blob();
-              console.log("✅ [IDENTOMAT] Face image received, uploading to Cloudinary...");
-              faceImage = await uploadImageToCloudinary(imageBlob, `identomat-face-${identomatSessionToken.substring(0, 10)}.jpg`);
-              console.log("📸 [IDENTOMAT] Face image uploaded:", faceImage ? "success" : "failed");
-            }
-          }
-        } catch (faceError) {
-          console.warn("⚠️ [IDENTOMAT] Face endpoint not available or failed:", faceError);
         }
       } catch (imageError) {
         console.warn("⚠️ [IDENTOMAT] Failed to get images from Identomat endpoints, falling back to result data:", imageError);
@@ -1537,13 +1539,17 @@ export default function RegisterScreen() {
                               company_key: COMPANY_KEY,
                               flags: {
                                 skip_agreement: true,
-                                skip_document: true,
-                                skip_face: true,
+                                skip_document: false,
+                                skip_face: false,
                               },
                               steps: [
                                 {
-                                  type: "liveness",
-                                  key: "liveness",
+                                  type: "face",
+                                  key: "face",
+                                },
+                                {
+                                  type: "document",
+                                  key: "document",
                                 },
                               ],
                             }),
