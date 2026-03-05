@@ -427,32 +427,32 @@ export class DoctorsService {
       const availabilityTypes = Array.from(types);
 
       return {
-        id: (doctor._id as string).toString(),
-        name: doctor.name,
-        email: doctor.email,
-        phone: doctor.phone,
-        idNumber: doctor.idNumber,
-        specialization: (doctor as any).specialization,
-        rating: doctor.rating || 0,
-        reviewCount: doctor.reviewCount || 0,
-        isActive: doctor.isActive,
-        profileImage: doctor.profileImage,
-        degrees: doctor.degrees,
-        location: doctor.location,
-        patients: '100+', // This could be calculated from appointments
-        experience: doctor.experience,
-        consultationFee: doctor.consultationFee,
-        followUpFee: doctor.followUpFee,
-        videoConsultationFee: doctor.videoConsultationFee,
-        homeVisitFee: doctor.homeVisitFee,
-        about: doctor.about,
-        dateOfBirth: doctor.dateOfBirth,
-        gender: doctor.gender,
-        licenseDocument: doctor.licenseDocument,
-        workingHours: '09:00 - 18:00', // This could be from availability
-        approvalStatus: doctor.approvalStatus,
-        doctorStatus: (doctor as any).doctorStatus,
-        isTopRated: doctor.isTopRated || false,
+      id: (doctor._id as string).toString(),
+      name: doctor.name,
+      email: doctor.email,
+      phone: doctor.phone,
+      idNumber: doctor.idNumber,
+      specialization: (doctor as any).specialization,
+      rating: doctor.rating || 0,
+      reviewCount: doctor.reviewCount || 0,
+      isActive: doctor.isActive,
+      profileImage: doctor.profileImage,
+      degrees: doctor.degrees,
+      location: doctor.location,
+      patients: '100+', // This could be calculated from appointments
+      experience: doctor.experience,
+      consultationFee: doctor.consultationFee,
+      followUpFee: doctor.followUpFee,
+      videoConsultationFee: doctor.videoConsultationFee,
+      homeVisitFee: doctor.homeVisitFee,
+      about: doctor.about,
+      dateOfBirth: doctor.dateOfBirth,
+      gender: doctor.gender,
+      licenseDocument: doctor.licenseDocument,
+      workingHours: '09:00 - 18:00', // This could be from availability
+      approvalStatus: doctor.approvalStatus,
+      doctorStatus: (doctor as any).doctorStatus,
+      isTopRated: doctor.isTopRated || false,
         availabilityTypes, // Array of 'video' | 'home-visit' that doctor offers
       };
     });

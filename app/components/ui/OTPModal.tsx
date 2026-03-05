@@ -1,15 +1,15 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { apiService } from "../../_services/api";
 import { showToast } from "../../utils/toast";
@@ -172,25 +172,25 @@ export default function OTPModal({
           phone: phone.trim(),
           userEnteredCode: verificationCode.trim(),
         });
-        const response = await apiService.verifyPhoneCode(
-          phone.trim(),
-          verificationCode.trim()
-        );
+      const response = await apiService.verifyPhoneCode(
+        phone.trim(),
+        verificationCode.trim()
+      );
         console.log("✅ [OTPModal] verifyPhoneCode response:", {
           success: response.success,
           verified: response.verified,
           userEnteredCode: verificationCode.trim(),
         });
-        if (response.success && response.verified) {
+      if (response.success && response.verified) {
           console.log("🎉 [OTPModal] Phone OTP verification SUCCESSFUL - codes matched!");
           setHasVerified(true); // Mark as verified to prevent duplicate calls
-          showToast.success("ტელეფონი წარმატებით დადასტდა", "წარმატება");
+        showToast.success("ტელეფონი წარმატებით დადასტდა", "წარმატება");
           // Pass both code and verification response for registration flow
           onVerified(verificationCode.trim(), response);
-          handleClose();
-        } else {
+        handleClose();
+      } else {
           console.log("❌ [OTPModal] Phone OTP verification FAILED - codes did not match");
-          throw new Error(response.message || "არასწორი ვერიფიკაციის კოდი");
+        throw new Error(response.message || "არასწორი ვერიფიკაციის კოდი");
         }
       }
     } catch (error) {

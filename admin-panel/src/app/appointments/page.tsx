@@ -324,9 +324,9 @@ export default function AppointmentsPage() {
                       </td>
                       <td className="p-4">
                         <div className="flex flex-col gap-1">
-                          <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
-                            {appointment.type === 'home-visit' ? 'ბინაზე' : 'ვიდეო'}
-                          </span>
+                        <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                          {appointment.type === 'home-visit' ? 'ბინაზე' : 'ვიდეო'}
+                        </span>
                           {appointment.type === 'home-visit' && appointment.homeVisitCompletedAt && (
                             <span className="flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-300" title={`პაციენტმა მონიშნა: ${new Date(appointment.homeVisitCompletedAt).toLocaleString('ka-GE')}`}>
                               <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

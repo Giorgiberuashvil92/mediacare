@@ -3,8 +3,7 @@ import { ADMIN_DEV_TOKEN } from './dev-token';
 
 const API_BASE_URL = 
   process.env.NEXT_PUBLIC_API_URL || 
-  'http://localhost:4001';
-  // 'https://mediacare-production.up.railway.app';
+  'https://mediacare-production.up.railway.app';
 
 // DEVELOPMENT MODE: Skip auth and use static token (from dev-token.ts)
 const DISABLE_AUTH = true;

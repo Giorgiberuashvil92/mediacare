@@ -474,7 +474,7 @@ export function EditDoctorForm({
                     doctor.licenseDocument.startsWith('http://') ||
                     doctor.licenseDocument.startsWith('https://')
                       ? doctor.licenseDocument
-                      : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4001'}/${doctor.licenseDocument}`
+                      : `${process.env.NEXT_PUBLIC_API_URL || 'https://mediacare-production.up.railway.app'}/${doctor.licenseDocument}`
                   }
                   target="_blank"
                   rel="noopener noreferrer"

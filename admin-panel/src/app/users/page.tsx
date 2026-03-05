@@ -261,7 +261,7 @@ export default function UsersPage() {
                   </tr>
                 ) : (
                   users.map((user) => {
-                    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4001';
+                    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'https://mediacare-production.up.railway.app';
                     // Helper function to check if URL is absolute (starts with http:// or https://)
                     const isAbsoluteUrl = (url: string) => {
                       return url && (url.startsWith('http://') || url.startsWith('https://'));

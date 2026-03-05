@@ -259,7 +259,7 @@ export function DoctorDetailsModal({
                       };
                       const licenseUrl = isAbsoluteUrl(doctor.licenseDocument)
                         ? doctor.licenseDocument
-                        : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4001'}/${doctor.licenseDocument}`;
+                        : `${process.env.NEXT_PUBLIC_API_URL || 'https://mediacare-production.up.railway.app'}/${doctor.licenseDocument}`;
                       return (
                         <a
                           href={licenseUrl}

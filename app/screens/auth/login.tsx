@@ -125,8 +125,8 @@ export default function LoginScreen() {
         console.log("⚠️ [Login] AuthResponse not provided, verifying OTP again...");
         finalAuthResponse = await apiService.verifyLoginOTP(
           pendingLoginEmail!,
-          code,
-        );
+        code,
+      );
       } else {
         console.log("✅ [Login] Using authResponse from OTPModal, skipping duplicate verification");
       }

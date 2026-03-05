@@ -494,7 +494,7 @@ export default function UserFormModal({
                         };
                         const licenseUrl = isAbsoluteUrl(user.licenseDocument)
                           ? user.licenseDocument
-                          : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4001'}/${user.licenseDocument}`;
+                          : `${process.env.NEXT_PUBLIC_API_URL || 'https://mediacare-production.up.railway.app'}/${user.licenseDocument}`;
                         return (
                           <>
                             <a

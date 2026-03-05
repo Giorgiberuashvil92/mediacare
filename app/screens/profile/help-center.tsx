@@ -139,37 +139,37 @@ const HelpCenterScreen = () => {
 
       {/* Tab Navigation - Show only if no specific tab is requested */}
       {!params.tab && (
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={styles.tab}
-            onPress={() => handleTabChange("faq")}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={styles.tab}
+          onPress={() => handleTabChange("faq")}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === "faq" && styles.activeTabText,
+            ]}
           >
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === "faq" && styles.activeTabText,
-              ]}
-            >
-              FAQ
-            </Text>
-            {activeTab === "faq" && <View style={styles.tabIndicator} />}
-          </TouchableOpacity>
+            FAQ
+          </Text>
+          {activeTab === "faq" && <View style={styles.tabIndicator} />}
+        </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.tab}
-            onPress={() => handleTabChange("contact")}
+        <TouchableOpacity
+          style={styles.tab}
+          onPress={() => handleTabChange("contact")}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === "contact" && styles.activeTabText,
+            ]}
           >
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === "contact" && styles.activeTabText,
-              ]}
-            >
-              კონტაქტი
-            </Text>
-            {activeTab === "contact" && <View style={styles.tabIndicator} />}
-          </TouchableOpacity>
-        </View>
+            კონტაქტი
+          </Text>
+          {activeTab === "contact" && <View style={styles.tabIndicator} />}
+        </TouchableOpacity>
+      </View>
       )}
 
       {/* Content */}

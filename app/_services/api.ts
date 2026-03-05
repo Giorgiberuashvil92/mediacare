@@ -82,10 +82,10 @@ const getDefaultBaseUrl = () => {
 
   // Production-ისთვის (არა development) გამოვიყენოთ Railway URL
   if (!__DEV__) {
-    // თუ envUrl არის განსაზღვრული და არ არის localhost, გამოვიყენოთ ის
-    if (envUrl && !envUrl.includes("localhost") && !envUrl.includes("127.0.0.1")) {
+  // თუ envUrl არის განსაზღვრული და არ არის localhost, გამოვიყენოთ ის
+  if (envUrl && !envUrl.includes("localhost") && !envUrl.includes("127.0.0.1")) {
       console.log("✅ Using production URL from env:", envUrl);
-      return envUrl;
+    return envUrl;
     }
     // Production-ისთვის Railway URL
     console.log("🚂 Using Railway production URL:", RAILWAY_URL);
@@ -100,11 +100,11 @@ const getDefaultBaseUrl = () => {
   }
 
   // Development-ისთვის IP-ის გამოყენება
-  const devIP = getDevelopmentIP();
-  if (devIP) {
-    const devUrl = `http://${devIP}:4001`;
+    const devIP = getDevelopmentIP();
+    if (devIP) {
+      const devUrl = `http://${devIP}:4001`;
     console.log("🔧 Using development URL with IP:", devUrl);
-    return devUrl;
+      return devUrl;
   }
 
   // Fallback
@@ -385,14 +385,14 @@ class ApiService {
     // Also, if user has a phone number, always require OTP (force OTP after logout)
     if (!data.requiresOTP && (!data.data.user.phone || !data.data.user.phone.trim())) {
       // Only store tokens if OTP is not required AND user doesn't have a phone
-      if (data.data.token) {
-        await AsyncStorage.setItem("accessToken", data.data.token);
-      }
-      if (data.data.refreshToken) {
-        await AsyncStorage.setItem("refreshToken", data.data.refreshToken);
-      }
-      if (data.data.user) {
-        await AsyncStorage.setItem("user", JSON.stringify(data.data.user));
+    if (data.data.token) {
+      await AsyncStorage.setItem("accessToken", data.data.token);
+    }
+    if (data.data.refreshToken) {
+      await AsyncStorage.setItem("refreshToken", data.data.refreshToken);
+    }
+    if (data.data.user) {
+      await AsyncStorage.setItem("user", JSON.stringify(data.data.user));
       }
     } else {
       // OTP required or user has phone - don't store tokens yet

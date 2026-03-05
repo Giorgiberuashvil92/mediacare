@@ -407,10 +407,10 @@ export class AuthService {
       if (!isPhoneVerified) {
         // Don't send OTP automatically - frontend will handle it via OTPModal
         // This prevents duplicate OTP sends and code invalidation issues
-        console.log(
+          console.log(
           '📱 [AuthService] OTP verification required for login, frontend will send code:',
-          user.phone.trim(),
-        );
+            user.phone.trim(),
+          );
 
         const response = {
           success: true,

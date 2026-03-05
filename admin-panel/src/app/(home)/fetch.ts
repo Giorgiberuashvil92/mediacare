@@ -3,7 +3,7 @@ import { ADMIN_DEV_TOKEN } from '@/lib/dev-token';
 import { cookies, headers } from 'next/headers';
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4001';
+  process.env.NEXT_PUBLIC_API_URL || 'https://mediacare-production.up.railway.app';
 
 const FALLBACK_OVERVIEW = {
   users: { value: 0, growthRate: 0 },
