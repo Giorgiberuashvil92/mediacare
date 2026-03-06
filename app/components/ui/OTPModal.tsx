@@ -248,18 +248,6 @@ export default function OTPModal({
     }
   }, [verificationCode, verifyingCode, hasVerified, phone, onVerified, handleClose, isLoginOTP, loginEmail]);
 
-  // Auto-verify when code reaches 6 digits
-  useEffect(() => {
-    if (verificationCode.length === 6 && !verifyingCode && !hasVerified && codeSent) {
-      console.log("🔄 [OTPModal] Auto-verifying code (6 digits entered)");
-      // Small delay to ensure state is updated
-      const timer = setTimeout(() => {
-        handleVerifyCode();
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [verificationCode, verifyingCode, hasVerified, codeSent, handleVerifyCode]);
-
   return (
     <Modal
       visible={visible}
