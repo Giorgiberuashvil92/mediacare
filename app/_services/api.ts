@@ -480,6 +480,11 @@ class ApiService {
       });
     }
 
+    console.log("📞 [API] Sending phone verification code request:", {
+      phone: phone,
+      endpoint: `${this.baseURL}/auth/send-verification-code`,
+    });
+
     const response = await fetch(
       `${this.baseURL}/auth/send-verification-code`,
       {
@@ -491,7 +496,15 @@ class ApiService {
       },
     );
 
-    return this.handleResponse<{ success: boolean; message: string }>(response);
+    const result = await this.handleResponse<{ success: boolean; message: string }>(response);
+    
+    console.log("📞 [API] Phone verification code response:", {
+      success: result.success,
+      message: result.message,
+      phone: phone,
+    });
+
+    return result;
   }
 
   async verifyLoginOTP(

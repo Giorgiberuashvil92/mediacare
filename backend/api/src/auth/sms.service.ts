@@ -55,14 +55,26 @@ export class SmsService {
 
   /**
    * Send SMS verification code
+   * Returns object with success status and additional info
    */
-  async sendVerificationCode(phone: string, code: string): Promise<boolean> {
+  async sendVerificationCode(
+    phone: string,
+    code: string,
+  ): Promise<{ success: boolean; isDevMode?: boolean; provider?: string }> {
     try {
       const normalizedPhone = this.normalizePhoneNumber(phone);
       const message = `თქვენი ვერიფიკაციის კოდია: ${code}. კოდი მოქმედებს 10 წუთის განმავლობაში.`;
 
       // Try sender.ge API first if configured
       const senderGeApiKey = process.env.SENDER_GE_API_KEY;
+      this.logger.log(`🔍 [SMS Service] Checking SMS configuration:`, {
+        hasSenderGeApiKey: !!senderGeApiKey,
+        hasTwilioClient: !!this.twilioClient,
+        hasTwilioPhoneNumber: !!process.env.TWILIO_PHONE_NUMBER,
+        nodeEnv: process.env.NODE_ENV,
+        phone: normalizedPhone,
+      });
+
       if (senderGeApiKey) {
         try {
           // Extract 9-digit Georgian mobile number (remove +995 prefix if present)
@@ -113,20 +125,34 @@ export class SmsService {
               `📥 sender.ge API response: ${JSON.stringify(responseData)}`,
             );
 
+            // Check for success - sender.ge returns statusId: 1 for success
             if (
               response.ok &&
               responseData.data &&
+              Array.isArray(responseData.data) &&
+              responseData.data.length > 0 &&
               responseData.data[0]?.statusId === 1
             ) {
               this.logger.log(
-                `SMS sent successfully via sender.ge to ${destination}. Message ID: ${responseData.data[0].messageId}`,
+                `✅ SMS sent successfully via sender.ge to ${destination}. Message ID: ${responseData.data[0].messageId}`,
               );
-              return true;
+              return { success: true, isDevMode: false, provider: 'sender.ge' };
             } else {
+              // Log detailed error information
+              const errorDetails = {
+                status: response.status,
+                statusText: response.statusText,
+                responseData: responseData,
+                destination: destination,
+                phone: normalizedPhone,
+              };
               this.logger.error(
-                `sender.ge API error: ${response.status} - ${JSON.stringify(responseData)}`,
+                `❌ sender.ge API error: ${JSON.stringify(errorDetails)}`,
               );
-              // Fall through to Twilio or dev mode
+              // Don't fall through - throw error so user knows SMS wasn't sent
+              throw new Error(
+                `sender.ge API error: ${responseData?.message || responseData?.error || 'Unknown error'}`,
+              );
             }
           } else {
             this.logger.warn(
@@ -136,8 +162,13 @@ export class SmsService {
           }
         } catch (senderGeError: any) {
           this.logger.error(
-            `sender.ge error sending SMS to ${normalizedPhone}:`,
-            senderGeError.message,
+            `❌ sender.ge error sending SMS to ${normalizedPhone}:`,
+            senderGeError.message || senderGeError,
+          );
+          // Log full error for debugging
+          this.logger.error(
+            'Full sender.ge error:',
+            JSON.stringify(senderGeError, null, 2),
           );
           // Fall back to Twilio or dev mode
           this.logger.warn('Falling back to Twilio or dev mode');
@@ -156,7 +187,7 @@ export class SmsService {
           this.logger.log(
             `SMS sent successfully to ${normalizedPhone}. SID: ${messageResponse.sid}`,
           );
-          return true;
+          return { success: true, isDevMode: false, provider: 'twilio' };
         } catch (twilioError: any) {
           this.logger.error(
             `Twilio error sending SMS to ${normalizedPhone}:`,
@@ -168,13 +199,30 @@ export class SmsService {
       }
 
       // Dev mode: Log the code to console
-      this.logger.log(
-        `[DEV MODE] SMS Verification Code for ${normalizedPhone}: ${code}`,
-      );
-      this.logger.log(`[DEV MODE] Message: ${message}`);
+      // IMPORTANT: In production, SMS should ALWAYS be sent via real service
+      // Dev mode should only be used for local development
+      const isProduction = process.env.NODE_ENV === 'production';
+
+      if (isProduction) {
+        // In production, we should never reach here - SMS service must be configured
+        this.logger.error(
+          `❌ CRITICAL: SMS service not configured in PRODUCTION! Cannot send SMS to ${normalizedPhone}`,
+        );
+        this.logger.error(
+          'Please configure SENDER_GE_API_KEY or Twilio credentials',
+        );
+        return { success: false, isDevMode: false };
+      }
+
+      // Only allow dev mode in non-production environments
       this.logger.warn(
-        'SMS service is in development mode. To enable real SMS:',
+        `⚠️ [DEV MODE] SMS Verification Code for ${normalizedPhone}: ${code}`,
       );
+      this.logger.warn(`⚠️ [DEV MODE] Message: ${message}`);
+      this.logger.warn(
+        '⚠️ SMS service is in development mode. SMS was NOT sent to phone!',
+      );
+      this.logger.warn('To enable real SMS:');
       this.logger.warn(
         '1. Set SENDER_GE_API_KEY environment variable for sender.ge',
       );
@@ -187,10 +235,10 @@ export class SmsService {
       // Simulate SMS sending delay
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      return true;
+      return { success: true, isDevMode: true, provider: 'console' };
     } catch (error) {
       this.logger.error(`Failed to send SMS to ${phone}:`, error);
-      return false;
+      return { success: false, isDevMode: false };
     }
   }
 }

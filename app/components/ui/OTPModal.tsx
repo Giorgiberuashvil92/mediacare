@@ -1,15 +1,15 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { apiService } from "../../_services/api";
 import { showToast } from "../../utils/toast";
@@ -54,16 +54,55 @@ export default function OTPModal({
       return;
     }
 
+    // Validate phone number format (should be 9 digits starting with 5 for Georgian numbers)
+    const cleanPhone = phone.trim().replace(/\s+/g, '').replace(/^\+995/, '').replace(/^0/, '');
+    if (cleanPhone.length !== 9 || !cleanPhone.startsWith('5')) {
+      const errorMsg = "გთხოვთ შეიყვანოთ სწორი ტელეფონის ნომერი (9 ციფრი, 5-ით დაწყებული)";
+      console.error("❌ [OTPModal] Invalid phone number format:", {
+        input: phone.trim(),
+        cleaned: cleanPhone,
+        length: cleanPhone.length,
+        startsWith5: cleanPhone.startsWith('5'),
+      });
+      setVerificationError(errorMsg);
+      showToast.error(errorMsg, "შეცდომა");
+      return;
+    }
+
     try {
       setSendingCode(true);
       setVerificationError(null);
-      console.log("📤 [OTPModal] Requesting OTP code for phone:", phone.trim());
+      console.log("📤 [OTPModal] Requesting OTP code for phone:", {
+        original: phone.trim(),
+        cleaned: cleanPhone,
+      });
+      
       const response = await apiService.sendPhoneVerificationCode(phone.trim());
+      
+      console.log("📥 [OTPModal] OTP code response received:", {
+        success: response.success,
+        message: response.message,
+        isDevMode: (response as any).isDevMode,
+        code: (response as any).code,
+        phone: phone.trim(),
+      });
+      
       if (response.success) {
         console.log("✅ [OTPModal] OTP code sent successfully to phone:", phone.trim());
         setCodeSent(true);
         setCountdown(60); // 60 seconds countdown
-        showToast.success("ვერიფიკაციის კოდი გაიგზავნა", "წარმატება");
+        
+        // Show dev mode warning if applicable
+        if ((response as any).isDevMode && (response as any).code) {
+          const devModeMessage = `DEV MODE: კოდი არ გაიგზავნა SMS-ით. კოდი: ${(response as any).code}`;
+          console.warn("⚠️ [OTPModal] DEV MODE - SMS not sent:", devModeMessage);
+          showToast.success(
+            `ვერიფიკაციის კოდი: ${(response as any).code} (DEV MODE)`,
+            "წარმატება"
+          );
+        } else {
+          showToast.success("ვერიფიკაციის კოდი გაიგზავნა", "წარმატება");
+        }
       } else {
         throw new Error(response.message || "ვერ მოხერხდა კოდის გაგზავნა");
       }
@@ -72,7 +111,11 @@ export default function OTPModal({
         error instanceof Error
           ? error.message
           : "ვერ მოხერხდა კოდის გაგზავნა";
-      console.error("❌ [OTPModal] Failed to send OTP code:", errorMessage);
+      console.error("❌ [OTPModal] Failed to send OTP code:", {
+        error: errorMessage,
+        phone: phone.trim(),
+        errorDetails: error,
+      });
       setVerificationError(errorMessage);
       showToast.error(errorMessage, "შეცდომა");
     } finally {

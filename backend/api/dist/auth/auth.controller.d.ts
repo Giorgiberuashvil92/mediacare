@@ -93,6 +93,8 @@ export declare class AuthController {
     sendVerificationCode(dto: SendVerificationCodeDto): Promise<{
         success: boolean;
         message: string;
+        isDevMode?: boolean;
+        code?: string;
     }>;
     verifyPhone(dto: VerifyPhoneDto): Promise<{
         success: boolean;

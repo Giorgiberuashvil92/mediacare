@@ -31,9 +31,12 @@ export class PhoneVerificationService {
   /**
    * Send verification code to phone number
    */
-  async sendVerificationCode(
-    phone: string,
-  ): Promise<{ success: boolean; message: string }> {
+  async sendVerificationCode(phone: string): Promise<{
+    success: boolean;
+    message: string;
+    isDevMode?: boolean;
+    code?: string;
+  }> {
     // Normalize phone number to match database format
     const cleanPhone = this.normalizePhoneForDb(phone);
 
@@ -112,23 +115,32 @@ export class PhoneVerificationService {
       expiresAt: expiresAt.toISOString(),
     });
 
-    const smsSent = await this.smsService.sendVerificationCode(
+    const smsResult = await this.smsService.sendVerificationCode(
       cleanPhone,
       code,
     );
 
-    if (!smsSent) {
+    if (!smsResult.success) {
       throw new BadRequestException('Failed to send verification code');
     }
 
     console.log('✅ [PhoneVerification] OTP code sent successfully via SMS:', {
       phone: cleanPhone,
       code: code,
+      isDevMode: smsResult.isDevMode,
+      provider: smsResult.provider,
     });
+
+    // In dev mode, include the code in the response for testing
+    const message = smsResult.isDevMode
+      ? `Verification code sent successfully (DEV MODE). Code: ${code}. Check backend logs for details.`
+      : 'Verification code sent successfully';
 
     return {
       success: true,
-      message: 'Verification code sent successfully',
+      message: message,
+      isDevMode: smsResult.isDevMode,
+      code: smsResult.isDevMode ? code : undefined, // Only return code in dev mode
     };
   }
 
