@@ -143,6 +143,13 @@ export class User {
 
   @Prop()
   updatedAt?: Date;
+
+  // Password reset fields
+  @Prop()
+  passwordResetToken?: string;
+
+  @Prop()
+  passwordResetExpires?: Date;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

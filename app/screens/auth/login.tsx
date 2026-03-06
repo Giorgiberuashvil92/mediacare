@@ -351,7 +351,9 @@ export default function LoginScreen() {
                       {t("auth.login.rememberMe")}
                     </Text>
                   </TouchableOpacity>
-                  <TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => router.push("/screens/auth/forgot-password")}
+                  >
                     <Text style={styles.forgotPassword}>
                       {t("auth.login.forgotPassword")}
                     </Text>

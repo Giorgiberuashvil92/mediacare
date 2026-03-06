@@ -25,8 +25,10 @@ import {
   UserDocument,
   UserRole,
 } from '../schemas/user.schema';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { PhoneVerificationService } from './phone-verification.service';
 
 @Injectable()
@@ -407,10 +409,10 @@ export class AuthService {
       if (!isPhoneVerified) {
         // Don't send OTP automatically - frontend will handle it via OTPModal
         // This prevents duplicate OTP sends and code invalidation issues
-          console.log(
+        console.log(
           '📱 [AuthService] OTP verification required for login, frontend will send code:',
-            user.phone.trim(),
-          );
+          user.phone.trim(),
+        );
 
         const response = {
           success: true,
@@ -686,6 +688,117 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
+    };
+  }
+
+  async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
+    const { phone } = forgotPasswordDto;
+
+    console.log('🔐 [AuthService] Forgot password request received:', {
+      phone,
+    });
+
+    // Normalize phone number
+    const cleanPhone = phone
+      .replace(/\s+/g, '')
+      .replace(/^\+995/, '')
+      .replace(/^0/, '');
+
+    const user = await this.userModel.findOne({
+      $or: [
+        { phone: cleanPhone },
+        { phone: `+995${cleanPhone}` },
+        { phone: `0${cleanPhone}` },
+      ],
+    });
+
+    if (!user) {
+      // Don't reveal if user exists or not for security
+      console.log(
+        '⚠️ [AuthService] User not found for phone (not revealing):',
+        cleanPhone,
+      );
+      return {
+        success: true,
+        message:
+          'თუ ტელეფონის ნომერი არსებობს, ვერიფიკაციის კოდი გაიგზავნა SMS-ით',
+      };
+    }
+
+    // Send OTP code via SMS using phone verification service
+    try {
+      await this.phoneVerificationService.sendVerificationCode(phone);
+
+      console.log('✅ [AuthService] Password reset OTP sent successfully:', {
+        phone: cleanPhone,
+        userId: (user._id as string).toString(),
+      });
+
+      return {
+        success: true,
+        message:
+          'თუ ტელეფონის ნომერი არსებობს, ვერიფიკაციის კოდი გაიგზავნა SMS-ით',
+      };
+    } catch (error) {
+      console.error(
+        '❌ [AuthService] Failed to send password reset OTP:',
+        error,
+      );
+      throw new BadRequestException('ვერ მოხერხდა კოდის გაგზავნა');
+    }
+  }
+
+  async resetPassword(resetPasswordDto: ResetPasswordDto) {
+    const { phone, newPassword } = resetPasswordDto;
+
+    console.log('🔐 [AuthService] Reset password request received:', {
+      phone,
+    });
+
+    // Normalize phone number
+    const cleanPhone = phone
+      .replace(/\s+/g, '')
+      .replace(/^\+995/, '')
+      .replace(/^0/, '');
+
+    const user = await this.userModel.findOne({
+      $or: [
+        { phone: cleanPhone },
+        { phone: `+995${cleanPhone}` },
+        { phone: `0${cleanPhone}` },
+      ],
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Invalid phone number');
+    }
+
+    // Verify that phone is verified (must be verified within last 30 minutes)
+    // This ensures that the user has completed OTP verification before resetting password
+    const isPhoneVerified =
+      await this.phoneVerificationService.isPhoneVerified(phone);
+
+    if (!isPhoneVerified) {
+      throw new UnauthorizedException(
+        'ტელეფონის ნომერი არ არის დადასტურებული. გთხოვთ დაუბრუნდეთ და გაიაროთ ვერიფიკაცია',
+      );
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password
+    user.password = hashedPassword;
+    await user.save();
+
+    console.log('✅ [AuthService] Password reset successful:', {
+      phone: cleanPhone,
+      userId: (user._id as string).toString(),
+    });
+
+    return {
+      success: true,
+      message: 'პაროლი წარმატებით შეიცვალა',
     };
   }
 }

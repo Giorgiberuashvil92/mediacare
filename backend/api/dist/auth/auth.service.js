@@ -543,6 +543,80 @@ let AuthService = class AuthService {
             refreshToken,
         };
     }
+    async forgotPassword(forgotPasswordDto) {
+        const { phone } = forgotPasswordDto;
+        console.log('🔐 [AuthService] Forgot password request received:', {
+            phone,
+        });
+        const cleanPhone = phone
+            .replace(/\s+/g, '')
+            .replace(/^\+995/, '')
+            .replace(/^0/, '');
+        const user = await this.userModel.findOne({
+            $or: [
+                { phone: cleanPhone },
+                { phone: `+995${cleanPhone}` },
+                { phone: `0${cleanPhone}` },
+            ],
+        });
+        if (!user) {
+            console.log('⚠️ [AuthService] User not found for phone (not revealing):', cleanPhone);
+            return {
+                success: true,
+                message: 'თუ ტელეფონის ნომერი არსებობს, ვერიფიკაციის კოდი გაიგზავნა SMS-ით',
+            };
+        }
+        try {
+            await this.phoneVerificationService.sendVerificationCode(phone);
+            console.log('✅ [AuthService] Password reset OTP sent successfully:', {
+                phone: cleanPhone,
+                userId: user._id.toString(),
+            });
+            return {
+                success: true,
+                message: 'თუ ტელეფონის ნომერი არსებობს, ვერიფიკაციის კოდი გაიგზავნა SMS-ით',
+            };
+        }
+        catch (error) {
+            console.error('❌ [AuthService] Failed to send password reset OTP:', error);
+            throw new common_1.BadRequestException('ვერ მოხერხდა კოდის გაგზავნა');
+        }
+    }
+    async resetPassword(resetPasswordDto) {
+        const { phone, newPassword } = resetPasswordDto;
+        console.log('🔐 [AuthService] Reset password request received:', {
+            phone,
+        });
+        const cleanPhone = phone
+            .replace(/\s+/g, '')
+            .replace(/^\+995/, '')
+            .replace(/^0/, '');
+        const user = await this.userModel.findOne({
+            $or: [
+                { phone: cleanPhone },
+                { phone: `+995${cleanPhone}` },
+                { phone: `0${cleanPhone}` },
+            ],
+        });
+        if (!user) {
+            throw new common_1.UnauthorizedException('Invalid phone number');
+        }
+        const isPhoneVerified = await this.phoneVerificationService.isPhoneVerified(phone);
+        if (!isPhoneVerified) {
+            throw new common_1.UnauthorizedException('ტელეფონის ნომერი არ არის დადასტურებული. გთხოვთ დაუბრუნდეთ და გაიაროთ ვერიფიკაცია');
+        }
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        user.password = hashedPassword;
+        await user.save();
+        console.log('✅ [AuthService] Password reset successful:', {
+            phone: cleanPhone,
+            userId: user._id.toString(),
+        });
+        return {
+            success: true,
+            message: 'პაროლი წარმატებით შეიცვალა',
+        };
+    }
 };
 exports.AuthService = AuthService;
 exports.AuthService = AuthService = __decorate([

@@ -27,6 +27,7 @@ export default function ScreensLayout() {
       <Stack.Screen name="auth/roleSelection" />
       <Stack.Screen name="auth/login" />
       <Stack.Screen name="auth/register" />
+      <Stack.Screen name="auth/forgot-password" />
 
       {/* Profile Routes */}
       <Stack.Screen name="profile/profile" />

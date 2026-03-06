@@ -993,6 +993,53 @@ class ApiService {
     });
   }
 
+  async forgotPassword(phone: string): Promise<{
+    success: boolean;
+    message?: string;
+  }> {
+    if (USE_MOCK_API) {
+      return Promise.resolve({
+        success: true,
+        message: "ვერიფიკაციის კოდი გაიგზავნა SMS-ით (mock)",
+      });
+    }
+
+    const response = await fetch(`${this.baseURL}/auth/forgot-password`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ phone }),
+    });
+
+    return this.handleResponse<{ success: boolean; message?: string }>(response);
+  }
+
+  async resetPassword(data: {
+    phone: string;
+    newPassword: string;
+  }): Promise<{
+    success: boolean;
+    message?: string;
+  }> {
+    if (USE_MOCK_API) {
+      return Promise.resolve({
+        success: true,
+        message: "პაროლი წარმატებით შეიცვალა (mock)",
+      });
+    }
+
+    const response = await fetch(`${this.baseURL}/auth/reset-password`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+
+    return this.handleResponse<{ success: boolean; message?: string }>(response);
+  }
+
   // Doctor Dashboard endpoints
   async getDoctorDashboardStats(): Promise<{
     success: boolean;

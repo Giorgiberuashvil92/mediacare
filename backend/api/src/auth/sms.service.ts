@@ -67,15 +67,22 @@ export class SmsService {
 
       // Try sender.ge API first if configured
       const senderGeApiKey = process.env.SENDER_GE_API_KEY;
+
+      // Always log SMS configuration status
       this.logger.log(`🔍 [SMS Service] Checking SMS configuration:`, {
         hasSenderGeApiKey: !!senderGeApiKey,
+        senderGeApiKeyLength: senderGeApiKey?.length || 0,
         hasTwilioClient: !!this.twilioClient,
         hasTwilioPhoneNumber: !!process.env.TWILIO_PHONE_NUMBER,
         nodeEnv: process.env.NODE_ENV,
         phone: normalizedPhone,
+        normalizedPhoneLength: normalizedPhone.length,
       });
 
-      if (senderGeApiKey) {
+      if (senderGeApiKey && senderGeApiKey.trim()) {
+        this.logger.log(
+          `✅ [SMS Service] SENDER_GE_API_KEY found, attempting to send via sender.ge`,
+        );
         try {
           // Extract 9-digit Georgian mobile number (remove +995 prefix if present)
           const destination = normalizedPhone
@@ -155,9 +162,16 @@ export class SmsService {
               );
             }
           } else {
-            this.logger.warn(
-              `Invalid phone number format for sender.ge: ${destination}. Expected 9-digit Georgian number starting with 5.`,
+            this.logger.error(
+              `❌ Invalid phone number format for sender.ge: ${destination}. Expected 9-digit Georgian number starting with 5.`,
             );
+            this.logger.error(`Phone number details:`, {
+              originalPhone: phone,
+              normalizedPhone: normalizedPhone,
+              destination: destination,
+              destinationLength: destination.length,
+              startsWith5: destination.startsWith('5'),
+            });
             // Fall through to Twilio or dev mode
           }
         } catch (senderGeError: any) {
@@ -203,13 +217,27 @@ export class SmsService {
       // Dev mode should only be used for local development
       const isProduction = process.env.NODE_ENV === 'production';
 
+      // Log why we're in dev mode
+      this.logger.warn(
+        `⚠️ [SMS Service] No SMS provider configured. Reasons:`,
+        {
+          hasSenderGeApiKey: !!senderGeApiKey,
+          hasTwilioClient: !!this.twilioClient,
+          hasTwilioPhoneNumber: !!process.env.TWILIO_PHONE_NUMBER,
+          isProduction: isProduction,
+        },
+      );
+
       if (isProduction) {
         // In production, we should never reach here - SMS service must be configured
         this.logger.error(
           `❌ CRITICAL: SMS service not configured in PRODUCTION! Cannot send SMS to ${normalizedPhone}`,
         );
         this.logger.error(
-          'Please configure SENDER_GE_API_KEY or Twilio credentials',
+          'Please configure SENDER_GE_API_KEY or Twilio credentials in Railway environment variables',
+        );
+        this.logger.error(
+          'Go to Railway dashboard → Your service → Variables → Add SENDER_GE_API_KEY',
         );
         return { success: false, isDevMode: false };
       }

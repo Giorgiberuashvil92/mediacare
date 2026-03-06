@@ -3,8 +3,10 @@ import * as mongoose from 'mongoose';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RefreshTokenDocument } from '../schemas/refresh-token.schema';
 import { ApprovalStatus, UserDocument, UserRole } from '../schemas/user.schema';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { PhoneVerificationService } from './phone-verification.service';
 export declare class AuthService {
     private userModel;
@@ -114,4 +116,12 @@ export declare class AuthService {
     }>;
     private generateTokens;
     private generateDevTokens;
+    forgotPassword(forgotPasswordDto: ForgotPasswordDto): Promise<{
+        success: boolean;
+        message: string;
+    }>;
+    resetPassword(resetPasswordDto: ResetPasswordDto): Promise<{
+        success: boolean;
+        message: string;
+    }>;
 }
