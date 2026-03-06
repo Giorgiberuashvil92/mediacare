@@ -114,32 +114,15 @@ export class AuthService {
       );
     }
 
-    // Verify OTP code
-    if (!registerDto.verificationCode || !registerDto.verificationCode.trim()) {
-      throw new BadRequestException('Verification code is required');
-    }
-
-    console.log('🔐 [AuthService] Verifying OTP:', {
-      phone: phone.trim(),
-      hasCode: !!registerDto.verificationCode,
-      codeLength: registerDto.verificationCode.trim().length,
-    });
-
-    const verificationResult = await this.phoneVerificationService.verifyCode(
-      phone.trim(),
-      registerDto.verificationCode.trim(),
+    // Phone is already verified (verified within last 30 minutes)
+    // No need to verify code again - isPhoneVerified already confirms it
+    console.log(
+      '✅ [AuthService] Phone already verified, proceeding with registration:',
+      {
+        phone: phone.trim(),
+        role,
+      },
     );
-
-    if (!verificationResult.verified) {
-      throw new BadRequestException(
-        verificationResult.message || 'Invalid verification code',
-      );
-    }
-
-    console.log('✅ [AuthService] OTP verified successfully:', {
-      phone: phone.trim(),
-      verified: verificationResult.verified,
-    });
 
     const [existingUser, existingPhoneUser, existingIdNumberUser] =
       await Promise.all([

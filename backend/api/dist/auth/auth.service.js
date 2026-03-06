@@ -113,21 +113,9 @@ let AuthService = class AuthService {
             });
             throw new common_1.BadRequestException('Phone number must be verified before registration. Please verify your phone number first.');
         }
-        if (!registerDto.verificationCode || !registerDto.verificationCode.trim()) {
-            throw new common_1.BadRequestException('Verification code is required');
-        }
-        console.log('🔐 [AuthService] Verifying OTP:', {
+        console.log('✅ [AuthService] Phone already verified, proceeding with registration:', {
             phone: phone.trim(),
-            hasCode: !!registerDto.verificationCode,
-            codeLength: registerDto.verificationCode.trim().length,
-        });
-        const verificationResult = await this.phoneVerificationService.verifyCode(phone.trim(), registerDto.verificationCode.trim());
-        if (!verificationResult.verified) {
-            throw new common_1.BadRequestException(verificationResult.message || 'Invalid verification code');
-        }
-        console.log('✅ [AuthService] OTP verified successfully:', {
-            phone: phone.trim(),
-            verified: verificationResult.verified,
+            role,
         });
         const [existingUser, existingPhoneUser, existingIdNumberUser] = await Promise.all([
             this.userModel.findOne({ email, role }),

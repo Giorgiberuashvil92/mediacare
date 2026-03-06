@@ -5,7 +5,7 @@ export declare class RegisterDto {
     email: string;
     password: string;
     phone: string;
-    verificationCode: string;
+    verificationCode?: string;
     idNumber: string;
     dateOfBirth?: string;
     gender?: Gender;

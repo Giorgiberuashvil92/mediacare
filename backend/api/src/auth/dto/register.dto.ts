@@ -30,8 +30,8 @@ export class RegisterDto {
   phone: string;
 
   @IsString()
-  @IsNotEmpty()
-  verificationCode: string; // OTP code received via SMS
+  @IsOptional()
+  verificationCode?: string; // OTP code is optional - phone verification is checked via isPhoneVerified
 
   @IsString()
   @IsNotEmpty()
