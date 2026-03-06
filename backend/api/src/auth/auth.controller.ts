@@ -1,8 +1,10 @@
 import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { SendVerificationCodeDto } from './dto/send-verification-code.dto';
 import { VerifyLoginOTPDto } from './dto/verify-login-otp.dto';
 import { VerifyPhoneDto } from './dto/verify-phone.dto';
@@ -83,5 +85,15 @@ export class AuthController {
   @Post('verify-login-otp')
   async verifyLoginOTP(@Body() dto: VerifyLoginOTPDto) {
     return this.authService.verifyLoginOTP(dto.email, dto.verificationCode);
+  }
+
+  @Post('forgot-password')
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto);
+  }
+
+  @Post('reset-password')
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto);
   }
 }

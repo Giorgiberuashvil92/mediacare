@@ -1,7 +1,9 @@
 import { AuthService } from './auth.service';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { SendVerificationCodeDto } from './dto/send-verification-code.dto';
 import { VerifyLoginOTPDto } from './dto/verify-login-otp.dto';
 import { VerifyPhoneDto } from './dto/verify-phone.dto';
@@ -119,5 +121,13 @@ export declare class AuthController {
             token: string;
             refreshToken: string;
         };
+    }>;
+    forgotPassword(dto: ForgotPasswordDto): Promise<{
+        success: boolean;
+        message: string;
+    }>;
+    resetPassword(dto: ResetPasswordDto): Promise<{
+        success: boolean;
+        message: string;
     }>;
 }

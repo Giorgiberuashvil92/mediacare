@@ -15,9 +15,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthController = void 0;
 const common_1 = require("@nestjs/common");
 const auth_service_1 = require("./auth.service");
+const forgot_password_dto_1 = require("./dto/forgot-password.dto");
 const login_dto_1 = require("./dto/login.dto");
 const refresh_token_dto_1 = require("./dto/refresh-token.dto");
 const register_dto_1 = require("./dto/register.dto");
+const reset_password_dto_1 = require("./dto/reset-password.dto");
 const send_verification_code_dto_1 = require("./dto/send-verification-code.dto");
 const verify_login_otp_dto_1 = require("./dto/verify-login-otp.dto");
 const verify_phone_dto_1 = require("./dto/verify-phone.dto");
@@ -79,6 +81,12 @@ let AuthController = class AuthController {
     async verifyLoginOTP(dto) {
         return this.authService.verifyLoginOTP(dto.email, dto.verificationCode);
     }
+    async forgotPassword(dto) {
+        return this.authService.forgotPassword(dto);
+    }
+    async resetPassword(dto) {
+        return this.authService.resetPassword(dto);
+    }
 };
 exports.AuthController = AuthController;
 __decorate([
@@ -137,6 +145,20 @@ __decorate([
     __metadata("design:paramtypes", [verify_login_otp_dto_1.VerifyLoginOTPDto]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "verifyLoginOTP", null);
+__decorate([
+    (0, common_1.Post)('forgot-password'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [forgot_password_dto_1.ForgotPasswordDto]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "forgotPassword", null);
+__decorate([
+    (0, common_1.Post)('reset-password'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [reset_password_dto_1.ResetPasswordDto]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "resetPassword", null);
 exports.AuthController = AuthController = __decorate([
     (0, common_1.Controller)('auth'),
     __metadata("design:paramtypes", [auth_service_1.AuthService,
