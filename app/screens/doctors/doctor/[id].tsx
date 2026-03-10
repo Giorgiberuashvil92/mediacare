@@ -254,9 +254,7 @@ const DoctorDetail = () => {
             </TouchableOpacity>
           </View>
           <Text style={styles.specialty}>{doctor.specialization}</Text>
-          {doctor.about && (
-            <Text style={styles.languages}>სამუშაო ენა: {doctor.about}</Text>
-          )}
+          {doctor.about && <Text style={styles.languages}>{doctor.about}</Text>}
         </View>
 
         {/* Compact Stats */}
