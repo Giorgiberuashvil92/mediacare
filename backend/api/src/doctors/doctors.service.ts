@@ -570,6 +570,7 @@ export class DoctorsService {
       videoConsultationFee: doctor.videoConsultationFee,
       homeVisitFee: doctor.homeVisitFee,
       about: doctor.about,
+      adminNotes: (doctor as any).adminNotes,
       dateOfBirth: doctor.dateOfBirth,
       gender: doctor.gender,
       licenseDocument: doctor.licenseDocument,
