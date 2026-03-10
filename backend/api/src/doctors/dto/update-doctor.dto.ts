@@ -85,4 +85,9 @@ export class UpdateDoctorDto {
   @IsString()
   @IsOptional()
   contractDocument?: string;
+
+  /** ადმინის ჩანაწერი ექიმის შესახებ დეტალურად */
+  @IsString()
+  @IsOptional()
+  adminNotes?: string;
 }

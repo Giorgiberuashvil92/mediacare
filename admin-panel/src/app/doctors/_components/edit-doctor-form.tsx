@@ -43,6 +43,7 @@ export function EditDoctorForm({
     gender: doctor.gender || 'male',
     minWorkingDaysRequired: doctor.minWorkingDaysRequired?.toString() || '',
     contractDocument: (doctor as any).contractDocument || '',
+    adminNotes: (doctor as any).adminNotes || '',
   });
 
   useEffect(() => {
@@ -127,6 +128,7 @@ export function EditDoctorForm({
         isActive: formData.isActive,
         gender: formData.gender,
         contractDocument: formData.contractDocument.trim() || undefined,
+        adminNotes: formData.adminNotes.trim() || undefined,
       };
 
       // Add license document URL if uploaded
@@ -404,6 +406,23 @@ export function EditDoctorForm({
               placeholder="დაწერე ექიმის შესახებ..."
               className="w-full rounded-lg border border-stroke bg-transparent px-5 py-3 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
             />
+          </div>
+
+          <div className="mb-5.5">
+            <label className="mb-2.5 block text-sm font-medium text-dark dark:text-white">
+              ახალი (დეტალურად ექიმის შესახებ)
+            </label>
+            <textarea
+              name="adminNotes"
+              value={formData.adminNotes}
+              onChange={handleChange}
+              rows={6}
+              placeholder="ჩვენ ვწერთ: დეტალური ჩანაწერი ექიმის შესახებ, ნოტები, შენიშვნები..."
+              className="w-full rounded-lg border border-stroke bg-transparent px-5 py-3 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
+            />
+            <p className="mt-2 text-xs text-dark-4 dark:text-dark-6">
+              მხოლოდ ადმინისთვის ხილული ველი — დეტალური ინფორმაცია/ნოტები ექიმის შესახებ.
+            </p>
           </div>
 
           <div className="mb-5.5 flex flex-col gap-5.5 sm:flex-row">

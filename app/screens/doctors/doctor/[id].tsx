@@ -22,7 +22,7 @@ const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
   let imageSource;
   if (doctor.profileImage) {
     // If profileImage is a full URL, use it; otherwise construct it
-    if (doctor.profileImage.startsWith('http')) {
+    if (doctor.profileImage.startsWith("http")) {
       imageSource = { uri: doctor.profileImage };
     } else {
       imageSource = { uri: `${apiBaseUrl}/${doctor.profileImage}` };
@@ -49,7 +49,8 @@ const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
       ? `${doctor.consultationFee} ₾`
       : undefined,
     followUpFee: doctor.followUpFee ? `${doctor.followUpFee} ₾` : undefined,
-    about: doctor.about || "", // This is now "working language" from onboarding
+    about: doctor.about || "",
+    adminNotes: doctor.adminNotes || "", // ადმინის ჩანაწერი — ჩანს „ექიმის შესახებ“-ის მაგივრად
     workingHours: doctor.workingHours || "24/7",
     availability: doctor.availability || [],
     totalReviews: doctor.reviewCount || 0,
@@ -57,7 +58,13 @@ const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
 };
 
 const DoctorDetail = () => {
-  const { id, appointmentType, lockAppointmentType, followUpAppointmentId, followUp } = useLocalSearchParams<{
+  const {
+    id,
+    appointmentType,
+    lockAppointmentType,
+    followUpAppointmentId,
+    followUp,
+  } = useLocalSearchParams<{
     id: string;
     appointmentType?: string;
     lockAppointmentType?: string;
@@ -65,8 +72,8 @@ const DoctorDetail = () => {
     followUp?: string;
   }>();
   const [doctor, setDoctor] = useState<any>(null);
-  console.log('🏥 Frontend doctor object:', doctor);
-  console.log('🏥 Frontend doctor availability:', doctor?.availability);
+  console.log("🏥 Frontend doctor object:", doctor);
+  console.log("🏥 Frontend doctor availability:", doctor?.availability);
   const [showAppointmentScheduler, setShowAppointmentScheduler] =
     useState(false);
   const [loading, setLoading] = useState(true);
@@ -81,7 +88,7 @@ const DoctorDetail = () => {
 
   // Auto-open scheduler if this is a follow-up appointment
   useEffect(() => {
-    if (followUp === 'true' && followUpAppointmentId && doctor) {
+    if (followUp === "true" && followUpAppointmentId && doctor) {
       setShowAppointmentScheduler(true);
     }
   }, [followUp, followUpAppointmentId, doctor]);
@@ -100,14 +107,23 @@ const DoctorDetail = () => {
       const response = await apiService.getDoctorById(id as string);
 
       if (response.success && response.data) {
-        console.log('🏥 Doctor Detail - API Response:', JSON.stringify(response.data, null, 2));
-        console.log('🏥 Doctor Detail - Availability data:', JSON.stringify(response.data.availability, null, 2));
-        
+        console.log(
+          "🏥 Doctor Detail - API Response:",
+          JSON.stringify(response.data, null, 2),
+        );
+        console.log(
+          "🏥 Doctor Detail - Availability data:",
+          JSON.stringify(response.data.availability, null, 2),
+        );
+
         const apiBaseUrl = apiService.getBaseURL();
         const mappedDoctor = mapDoctorFromAPI(response.data, apiBaseUrl);
-        
-        console.log('🏥 Doctor Detail - Mapped doctor availability:', JSON.stringify(mappedDoctor.availability, null, 2));
-        
+
+        console.log(
+          "🏥 Doctor Detail - Mapped doctor availability:",
+          JSON.stringify(mappedDoctor.availability, null, 2),
+        );
+
         setDoctor(mappedDoctor);
       } else {
         setDoctor(null);
@@ -136,13 +152,8 @@ const DoctorDetail = () => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>
-            {error || "ექიმი არ მოიძებნა"}
-          </Text>
-          <TouchableOpacity
-            style={styles.retryButton}
-            onPress={loadDoctor}
-          >
+          <Text style={styles.errorText}>{error || "ექიმი არ მოიძებნა"}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={loadDoctor}>
             <Text style={styles.retryButtonText}>ხელახლა ცდა</Text>
           </TouchableOpacity>
         </View>
@@ -163,7 +174,9 @@ const DoctorDetail = () => {
           </TouchableOpacity>
           <View style={styles.schedulerHeaderInfo}>
             <Text style={styles.schedulerTitle}>
-              {followUp === 'true' ? 'განმეორებითი ვიზიტის დაჯავშნა' : 'ჯავშნის გაკეთება'}
+              {followUp === "true"
+                ? "განმეორებითი ვიზიტის დაჯავშნა"
+                : "ჯავშნის გაკეთება"}
             </Text>
             <Text style={styles.schedulerSubtitle}>{doctor.name}</Text>
           </View>
@@ -186,7 +199,7 @@ const DoctorDetail = () => {
               }
               lockMode={lockAppointmentType === "true"}
               followUpAppointmentId={followUpAppointmentId}
-              isFollowUp={followUp === 'true'}
+              isFollowUp={followUp === "true"}
             />
           </View>
         </ScrollView>
@@ -226,14 +239,18 @@ const DoctorDetail = () => {
         {/* Basic Information */}
         <View style={styles.basicInfo}>
           {/* Rating above name */}
-        
+
           <View style={styles.nameRow}>
             <Text style={styles.doctorName}>{doctor.name}</Text>
             <TouchableOpacity
               style={styles.infoButton}
               onPress={() => setShowEducationModal(true)}
             >
-              <Ionicons name="information-circle-outline" size={20} color="#06B6D4" />
+              <Ionicons
+                name="information-circle-outline"
+                size={20}
+                color="#06B6D4"
+              />
             </TouchableOpacity>
           </View>
           <Text style={styles.specialty}>{doctor.specialization}</Text>
@@ -246,9 +263,7 @@ const DoctorDetail = () => {
         <View style={styles.metaRow}>
           <View style={styles.metaChip}>
             <Ionicons name="star" size={16} color="#FACC15" />
-            <Text style={styles.metaValue}>
-              {doctor.rating || 0}
-            </Text>
+            <Text style={styles.metaValue}>{doctor.rating || 0}</Text>
             <Text style={styles.metaLabel}>რეიტინგი</Text>
           </View>
           <View style={styles.metaChip}>
@@ -256,7 +271,6 @@ const DoctorDetail = () => {
             <Text style={styles.metaValue}>
               {doctor.experience ? `${doctor.experience} წელი` : "-"}
             </Text>
-            
           </View>
         </View>
 
@@ -280,16 +294,14 @@ const DoctorDetail = () => {
         </View>
 
         {/* About Doctor */}
-        {doctor.about && (
+        {(doctor.adminNotes || doctor.about) && (
           <View style={styles.aboutSection}>
             <Text style={styles.aboutTitle}>ექიმის შესახებ</Text>
-            <Text style={styles.aboutText}>{doctor.about}</Text>
+            <Text style={styles.aboutText}>{doctor.adminNotes}</Text>
           </View>
         )}
 
         {/* Payment Information */}
-       
-
       </ScrollView>
 
       <View style={styles.buttonContainer}>

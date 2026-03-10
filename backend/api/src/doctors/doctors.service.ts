@@ -1247,6 +1247,9 @@ export class DoctorsService {
     if (updateDoctorDto.contractDocument !== undefined) {
       doctor.contractDocument = updateDoctorDto.contractDocument;
     }
+    if (updateDoctorDto.adminNotes !== undefined) {
+      doctor.adminNotes = updateDoctorDto.adminNotes;
+    }
 
     console.log(
       '💰 [updateDoctor] Doctor fees AFTER assignment (before save):',

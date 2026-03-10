@@ -54,6 +54,8 @@ export interface User {
   identomatDocumentFrontImage?: string; // Document front image URL from Identomat
   identomatDocumentBackImage?: string; // Document back image URL from Identomat
   identomatFullData?: any; // Full Identomat response data for admin panel
+  /** ადმინის ჩანაწერი ექიმის შესახებ დეტალურად (ახალი) */
+  adminNotes?: string;
 }
 
 export interface LoginRequest {

@@ -87,6 +87,10 @@ export class User {
   @Prop()
   contractDocument?: string; // Contract text content as string
 
+  /** ადმინის ჩანაწერი ექიმის შესახებ დეტალურად (მხოლოდ ადმინ პანელში) */
+  @Prop()
+  adminNotes?: string;
+
   @Prop()
   degrees?: string;
 

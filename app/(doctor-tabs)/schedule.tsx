@@ -9,27 +9,36 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { apiService } from "../_services/api";
 import { useAuth } from "../contexts/AuthContext";
 
 // 24-საათიანი სლოტები (საათობრივი ინტერვალით)
-const AVAILABLE_HOURS = Array.from({ length: 24 }, (_, h) =>
-  `${String(h).padStart(2, "0")}:00`
+const AVAILABLE_HOURS = Array.from(
+  { length: 24 },
+  (_, h) => `${String(h).padStart(2, "0")}:00`,
 );
 
 export default function DoctorSchedule() {
   const { user, refreshUser } = useAuth();
 
   // ორი ცალკე განრიგი და თარიღები: ვიდეო და ბინაზე ვიზიტები
-  const [videoSchedules, setVideoSchedules] = useState<{ [key: string]: string[] }>({});
-  const [homeVisitSchedules, setHomeVisitSchedules] = useState<{ [key: string]: string[] }>({});
+  const [videoSchedules, setVideoSchedules] = useState<{
+    [key: string]: string[];
+  }>({});
+  const [homeVisitSchedules, setHomeVisitSchedules] = useState<{
+    [key: string]: string[];
+  }>({});
   const [videoSelectedDates, setVideoSelectedDates] = useState<string[]>([]);
-  const [homeVisitSelectedDates, setHomeVisitSelectedDates] = useState<string[]>([]);
+  const [homeVisitSelectedDates, setHomeVisitSelectedDates] = useState<
+    string[]
+  >([]);
   // დაჯავშნილი საათები თითოეული თარიღისთვის და ტიპისთვის
-  const [bookedSlots, setBookedSlots] = useState<{ [key: string]: string[] }>({});
+  const [bookedSlots, setBookedSlots] = useState<{ [key: string]: string[] }>(
+    {},
+  );
 
   const [mode, setMode] = useState<"video" | "home-visit">("video");
   const [showTimeModal, setShowTimeModal] = useState(false);
@@ -37,8 +46,12 @@ export default function DoctorSchedule() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showClearConfirmModal, setShowClearConfirmModal] = useState(false);
-  const [showDateDeleteConfirmModal, setShowDateDeleteConfirmModal] = useState(false);
-  const [dateToDelete, setDateToDelete] = useState<{ date: Date; mode: "video" | "home-visit" } | null>(null);
+  const [showDateDeleteConfirmModal, setShowDateDeleteConfirmModal] =
+    useState(false);
+  const [dateToDelete, setDateToDelete] = useState<{
+    date: Date;
+    mode: "video" | "home-visit";
+  } | null>(null);
   const [hasSaved, setHasSaved] = useState(true);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -69,37 +82,43 @@ export default function DoctorSchedule() {
       } else {
         setLoading(true);
       }
-      
+
       const response = await apiService.getDoctorAvailability(user.id);
 
       // 🔍 Debug: ვნახოთ რა მოდის backend-იდან
       console.log(`\n🌐 [Load] Backend Response:`);
       console.log(`   ✅ success:`, response.success);
       console.log(`   📦 data length:`, response.data?.length || 0);
-      console.log(`   📋 Full response.data:`, JSON.stringify(response.data, null, 2));
+      console.log(
+        `   📋 Full response.data:`,
+        JSON.stringify(response.data, null, 2),
+      );
 
       // დაჯავშნილი სლოტების გამოთვლა appointments-ებიდან
       let appointmentsBookedSlots: { [key: string]: string[] } = {};
       try {
-        const appointmentsResponse = await apiService.getDoctorDashboardAppointments(100);
+        const appointmentsResponse =
+          await apiService.getDoctorDashboardAppointments(100);
         if (appointmentsResponse.success && appointmentsResponse.data) {
-          console.log(`\n📅 [Load] Loading appointments for booked slots calculation...`);
+          console.log(
+            `\n📅 [Load] Loading appointments for booked slots calculation...`,
+          );
           const appointments = appointmentsResponse.data as any[];
-          
+
           appointments.forEach((appointment: any) => {
             // გამოვტოვოთ followup appointments
             if (appointment.type === "followup") return;
-            
+
             // Format date to YYYY-MM-DD
             let appointmentDate = appointment.date;
-            if (appointmentDate && appointmentDate.includes('T')) {
+            if (appointmentDate && appointmentDate.includes("T")) {
               const date = new Date(appointmentDate);
               const year = date.getFullYear();
-              const month = String(date.getMonth() + 1).padStart(2, '0');
-              const day = String(date.getDate()).padStart(2, '0');
+              const month = String(date.getMonth() + 1).padStart(2, "0");
+              const day = String(date.getDate()).padStart(2, "0");
               appointmentDate = `${year}-${month}-${day}`;
             }
-            
+
             // Format time to HH:MM
             let appointmentTime = appointment.time;
             if (appointmentTime && appointmentTime.length === 5) {
@@ -108,31 +127,36 @@ export default function DoctorSchedule() {
               // Try to parse if in different format
               const timeMatch = appointmentTime.match(/(\d{1,2}):(\d{2})/);
               if (timeMatch) {
-                appointmentTime = `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`;
+                appointmentTime = `${timeMatch[1].padStart(2, "0")}:${timeMatch[2]}`;
               }
             }
-            
+
             if (appointmentDate && appointmentTime && appointment.type) {
-              const type = appointment.type === "home-visit" ? "home-visit" : "video";
+              const type =
+                appointment.type === "home-visit" ? "home-visit" : "video";
               const dateKey = `${appointmentDate}-${type}`;
-              
+
               if (!appointmentsBookedSlots[dateKey]) {
                 appointmentsBookedSlots[dateKey] = [];
               }
-              
+
               if (!appointmentsBookedSlots[dateKey].includes(appointmentTime)) {
                 appointmentsBookedSlots[dateKey].push(appointmentTime);
-                console.log(`   🔒 დაჯავშნილი სლოტი: ${dateKey} -> ${appointmentTime}`);
+                console.log(
+                  `   🔒 დაჯავშნილი სლოტი: ${dateKey} -> ${appointmentTime}`,
+                );
               }
             }
           });
-          
+
           console.log(`\n📊 [Load] Appointments booked slots summary:`);
           const bookedKeys = Object.keys(appointmentsBookedSlots);
           if (bookedKeys.length === 0) {
-            console.log(`   ⚠️  დაჯავშნილი სლოტები არ მოიძებნა appointments-ებიდან`);
+            console.log(
+              `   ⚠️  დაჯავშნილი სლოტები არ მოიძებნა appointments-ებიდან`,
+            );
           } else {
-            bookedKeys.forEach(key => {
+            bookedKeys.forEach((key) => {
               const slots = appointmentsBookedSlots[key];
               console.log(`   🔑 ${key}: ${slots.length} დაჯავშნილი ->`, slots);
             });
@@ -152,48 +176,86 @@ export default function DoctorSchedule() {
         response.data.forEach((avail: any) => {
           // 🔍 Debug: ვნახოთ თითოეული availability object-ის სრული შინაარსი
           console.log(`\n📦 [Load] Processing availability object:`);
-          console.log(`   📋 Full avail object:`, JSON.stringify(avail, null, 2));
+          console.log(
+            `   📋 Full avail object:`,
+            JSON.stringify(avail, null, 2),
+          );
           console.log(`   🔑 Available keys:`, Object.keys(avail));
-          console.log(`   📅 avail.date:`, avail.date, `(type: ${typeof avail.date})`);
+          console.log(
+            `   📅 avail.date:`,
+            avail.date,
+            `(type: ${typeof avail.date})`,
+          );
           console.log(`   🎯 avail.type:`, avail.type);
-          console.log(`   ⏱️  avail.timeSlots:`, avail.timeSlots, `(type: ${typeof avail.timeSlots}, isArray: ${Array.isArray(avail.timeSlots)})`);
-          console.log(`   🔒 avail.bookedSlots:`, avail.bookedSlots, `(type: ${typeof avail.bookedSlots}, isArray: ${Array.isArray(avail.bookedSlots)})`);
-          console.log(`   📊 avail.bookedSlots?.length:`, avail.bookedSlots?.length);
-          
+          console.log(
+            `   ⏱️  avail.timeSlots:`,
+            avail.timeSlots,
+            `(type: ${typeof avail.timeSlots}, isArray: ${Array.isArray(avail.timeSlots)})`,
+          );
+          console.log(
+            `   🔒 avail.bookedSlots:`,
+            avail.bookedSlots,
+            `(type: ${typeof avail.bookedSlots}, isArray: ${Array.isArray(avail.bookedSlots)})`,
+          );
+          console.log(
+            `   📊 avail.bookedSlots?.length:`,
+            avail.bookedSlots?.length,
+          );
+
           // შევამოწმოთ სხვა შესაძლო ველები
           if (avail.bookedTimeSlots) {
-            console.log(`   ⚠️  Found 'bookedTimeSlots' field:`, avail.bookedTimeSlots);
+            console.log(
+              `   ⚠️  Found 'bookedTimeSlots' field:`,
+              avail.bookedTimeSlots,
+            );
           }
           if (avail.booked) {
             console.log(`   ⚠️  Found 'booked' field:`, avail.booked);
           }
           if (avail.appointments) {
-            console.log(`   ⚠️  Found 'appointments' field:`, avail.appointments);
+            console.log(
+              `   ⚠️  Found 'appointments' field:`,
+              avail.appointments,
+            );
           }
           const type = avail.type === "home-visit" ? "home-visit" : "video";
           // დავრწმუნდეთ, რომ avail.date არის YYYY-MM-DD ფორმატში
-          const dateStr = typeof avail.date === 'string' ? avail.date : formatDate(new Date(avail.date));
+          const dateStr =
+            typeof avail.date === "string"
+              ? avail.date
+              : formatDate(new Date(avail.date));
           const dateKey = `${dateStr}-${type}`;
 
           // დაჯავშნილი საათების შენახვა - მნიშვნელოვანია, რომ ეს ყოველთვის შევინახოთ, თუნდაც ცარიელი array-ია
           if (avail.bookedSlots && Array.isArray(avail.bookedSlots)) {
             if (avail.bookedSlots.length > 0) {
               loadedBookedSlots[dateKey] = avail.bookedSlots;
-              console.log(`🔒 [Load] ✅ დაჯავშნილი სლოტები ნაპოვნია backend-იდან!`);
+              console.log(
+                `🔒 [Load] ✅ დაჯავშნილი სლოტები ნაპოვნია backend-იდან!`,
+              );
               console.log(`   📅 თარიღი: ${dateStr}`);
               console.log(`   🎯 ტიპი: ${type}`);
               console.log(`   🔑 Key: ${dateKey}`);
               console.log(`   ⏰ დაჯავშნილი საათები:`, avail.bookedSlots);
-              console.log(`   📊 სულ დაჯავშნილი: ${avail.bookedSlots.length} საათი`);
+              console.log(
+                `   📊 სულ დაჯავშნილი: ${avail.bookedSlots.length} საათი`,
+              );
             } else {
-              console.log(`🔒 [Load] ⚠️  bookedSlots არის ცარიელი array: ${dateStr} (${type})`);
+              console.log(
+                `🔒 [Load] ⚠️  bookedSlots არის ცარიელი array: ${dateStr} (${type})`,
+              );
             }
           } else {
-            console.log(`🔒 [Load] ⚠️  bookedSlots არ არის array ან არ არსებობს: ${dateStr} (${type})`);
+            console.log(
+              `🔒 [Load] ⚠️  bookedSlots არ არის array ან არ არსებობს: ${dateStr} (${type})`,
+            );
           }
-          
+
           // შევაერთოთ appointments-ებიდან გამოთვლილი bookedSlots
-          if (appointmentsBookedSlots[dateKey] && appointmentsBookedSlots[dateKey].length > 0) {
+          if (
+            appointmentsBookedSlots[dateKey] &&
+            appointmentsBookedSlots[dateKey].length > 0
+          ) {
             if (!loadedBookedSlots[dateKey]) {
               loadedBookedSlots[dateKey] = [];
             }
@@ -201,7 +263,9 @@ export default function DoctorSchedule() {
             appointmentsBookedSlots[dateKey].forEach((slot: string) => {
               if (!loadedBookedSlots[dateKey].includes(slot)) {
                 loadedBookedSlots[dateKey].push(slot);
-                console.log(`🔒 [Load] ✅ დაემატა appointments-ებიდან: ${dateKey} -> ${slot}`);
+                console.log(
+                  `🔒 [Load] ✅ დაემატა appointments-ებიდან: ${dateKey} -> ${slot}`,
+                );
               }
             });
           }
@@ -209,32 +273,50 @@ export default function DoctorSchedule() {
           // ექიმის სქედულისთვის დღე უნდა გამოჩნდეს მაშინაც კი,
           // თუ ყველა სლოტი უკვე დაჯავშნილია (isAvailable შეიძლება იყოს false),
           // ამიტომ timeSlots-ზე ან bookedSlots-ზე ვამოწმებთ.
-          const hasTimeSlots = avail.timeSlots && Array.isArray(avail.timeSlots) && avail.timeSlots.length > 0;
-          const hasBookedSlots = avail.bookedSlots && Array.isArray(avail.bookedSlots) && avail.bookedSlots.length > 0;
-          
+          const hasTimeSlots =
+            avail.timeSlots &&
+            Array.isArray(avail.timeSlots) &&
+            avail.timeSlots.length > 0;
+          const hasBookedSlots =
+            avail.bookedSlots &&
+            Array.isArray(avail.bookedSlots) &&
+            avail.bookedSlots.length > 0;
+
           console.log(`🔍 [Load] Date ${dateStr} (${type}):`);
-          console.log(`   ⏱️  hasTimeSlots: ${hasTimeSlots}`, hasTimeSlots ? `(${avail.timeSlots.length} საათი)` : '');
-          console.log(`   🔒 hasBookedSlots: ${hasBookedSlots}`, hasBookedSlots ? `(${avail.bookedSlots.length} საათი)` : '');
-          console.log(`   📋 timeSlots:`, avail.timeSlots || '[]');
-          console.log(`   🔐 bookedSlots:`, avail.bookedSlots || '[]');
-          
+          console.log(
+            `   ⏱️  hasTimeSlots: ${hasTimeSlots}`,
+            hasTimeSlots ? `(${avail.timeSlots.length} საათი)` : "",
+          );
+          console.log(
+            `   🔒 hasBookedSlots: ${hasBookedSlots}`,
+            hasBookedSlots ? `(${avail.bookedSlots.length} საათი)` : "",
+          );
+          console.log(`   📋 timeSlots:`, avail.timeSlots || "[]");
+          console.log(`   🔐 bookedSlots:`, avail.bookedSlots || "[]");
+
           // 🔥 მნიშვნელოვანი: დღე უნდა დაემატოს selectedDates-ში, თუ აქვს timeSlots ან bookedSlots
           // ⚠️ მაგრამ მხოლოდ თუ არ არის წარსული თარიღი
           if (hasTimeSlots || hasBookedSlots) {
             // შევამოწმოთ, არის თუ არა თარიღი წარსული
             if (isPastDate(dateStr)) {
-              console.log(`   ⏰ წარსული თარიღი - არ დაემატება selectedDates-ში: ${dateStr}`);
+              console.log(
+                `   ⏰ წარსული თარიღი - არ დაემატება selectedDates-ში: ${dateStr}`,
+              );
             } else {
               console.log(`   ✅ დღე დაემატება selectedDates-ში (${type})`);
               if (type === "video") {
                 // თუ აქვს timeSlots, შევინახოთ, თუ არა - ცარიელი array
                 if (hasTimeSlots) {
                   loadedVideoSchedules[dateStr] = avail.timeSlots;
-                  console.log(`   📝 Video schedule დაემატა: ${dateStr} -> ${avail.timeSlots.length} საათი`);
+                  console.log(
+                    `   📝 Video schedule დაემატა: ${dateStr} -> ${avail.timeSlots.length} საათი`,
+                  );
                 } else {
                   // დაჯავშნილი დღისთვის ცარიელი array, რომ დღე არჩეულად გამოჩნდეს
                   loadedVideoSchedules[dateStr] = [];
-                  console.log(`   📝 Video schedule დაემატა (მხოლოდ დაჯავშნილი): ${dateStr} -> []`);
+                  console.log(
+                    `   📝 Video schedule დაემატა (მხოლოდ დაჯავშნილი): ${dateStr} -> []`,
+                  );
                 }
                 if (!videoDates.includes(dateStr)) {
                   videoDates.push(dateStr);
@@ -246,54 +328,77 @@ export default function DoctorSchedule() {
                 // თუ აქვს timeSlots, შევინახოთ, თუ არა - ცარიელი array
                 if (hasTimeSlots) {
                   loadedHomeVisitSchedules[dateStr] = avail.timeSlots;
-                  console.log(`   📝 Home-visit schedule დაემატა: ${dateStr} -> ${avail.timeSlots.length} საათი`);
+                  console.log(
+                    `   📝 Home-visit schedule დაემატა: ${dateStr} -> ${avail.timeSlots.length} საათი`,
+                  );
                 } else {
                   // დაჯავშნილი დღისთვის ცარიელი array, რომ დღე არჩეულად გამოჩნდეს
                   loadedHomeVisitSchedules[dateStr] = [];
-                  console.log(`   📝 Home-visit schedule დაემატა (მხოლოდ დაჯავშნილი): ${dateStr} -> []`);
+                  console.log(
+                    `   📝 Home-visit schedule დაემატა (მხოლოდ დაჯავშნილი): ${dateStr} -> []`,
+                  );
                 }
                 if (!homeVisitDates.includes(dateStr)) {
                   homeVisitDates.push(dateStr);
                   console.log(`   ➕ Home-visit date დაემატა: ${dateStr}`);
                 } else {
-                  console.log(`   ⚠️  Home-visit date უკვე არსებობს: ${dateStr}`);
+                  console.log(
+                    `   ⚠️  Home-visit date უკვე არსებობს: ${dateStr}`,
+                  );
                 }
               }
             }
           } else {
-            console.log(`   ❌ დღე არ დაემატება (არ აქვს არც timeSlots და არც bookedSlots)`);
+            console.log(
+              `   ❌ დღე არ დაემატება (არ აქვს არც timeSlots და არც bookedSlots)`,
+            );
           }
         });
 
         // დავამატოთ appointments-ებიდან გამოთვლილი bookedSlots იმ დღეებზე, რომლებიც არ არის backend-ის response-ში
-        Object.keys(appointmentsBookedSlots).forEach(dateKey => {
-          if (!loadedBookedSlots[dateKey] || loadedBookedSlots[dateKey].length === 0) {
+        Object.keys(appointmentsBookedSlots).forEach((dateKey) => {
+          if (
+            !loadedBookedSlots[dateKey] ||
+            loadedBookedSlots[dateKey].length === 0
+          ) {
             loadedBookedSlots[dateKey] = [...appointmentsBookedSlots[dateKey]];
-            console.log(`🔒 [Load] ✅ დაემატა appointments-ებიდან (ახალი დღე): ${dateKey} ->`, appointmentsBookedSlots[dateKey]);
-            
+            console.log(
+              `🔒 [Load] ✅ დაემატა appointments-ებიდან (ახალი დღე): ${dateKey} ->`,
+              appointmentsBookedSlots[dateKey],
+            );
+
             // თუ დღე არ არის selectedDates-ში, დავამატოთ
             // dateKey format: "YYYY-MM-DD-video" ან "YYYY-MM-DD-home-visit"
-            const parts = dateKey.split('-');
+            const parts = dateKey.split("-");
             if (parts.length >= 4) {
               const dateStr = `${parts[0]}-${parts[1]}-${parts[2]}`;
-              const type = parts.slice(3).join('-'); // "video" ან "home-visit"
-              
+              const type = parts.slice(3).join("-"); // "video" ან "home-visit"
+
               // ⚠️ შევამოწმოთ, არის თუ არა თარიღი წარსული
               if (isPastDate(dateStr)) {
-                console.log(`   ⏰ წარსული თარიღი - არ დაემატება appointments-ებიდან: ${dateStr}`);
+                console.log(
+                  `   ⏰ წარსული თარიღი - არ დაემატება appointments-ებიდან: ${dateStr}`,
+                );
               } else {
-                if (type === 'video' && !videoDates.includes(dateStr)) {
+                if (type === "video" && !videoDates.includes(dateStr)) {
                   videoDates.push(dateStr);
                   if (!loadedVideoSchedules[dateStr]) {
                     loadedVideoSchedules[dateStr] = [];
                   }
-                  console.log(`   ➕ Video date დაემატა appointments-ებიდან: ${dateStr}`);
-                } else if (type === 'home-visit' && !homeVisitDates.includes(dateStr)) {
+                  console.log(
+                    `   ➕ Video date დაემატა appointments-ებიდან: ${dateStr}`,
+                  );
+                } else if (
+                  type === "home-visit" &&
+                  !homeVisitDates.includes(dateStr)
+                ) {
                   homeVisitDates.push(dateStr);
                   if (!loadedHomeVisitSchedules[dateStr]) {
                     loadedHomeVisitSchedules[dateStr] = [];
                   }
-                  console.log(`   ➕ Home-visit date დაემატა appointments-ებიდან: ${dateStr}`);
+                  console.log(
+                    `   ➕ Home-visit date დაემატა appointments-ებიდან: ${dateStr}`,
+                  );
                 }
               }
             }
@@ -304,89 +409,139 @@ export default function DoctorSchedule() {
         // This prevents losing dates when switching between modes or when backend doesn't return all dates
         const existingVideoDates = videoSelectedDates;
         const existingHomeVisitDates = homeVisitSelectedDates;
-        
+
         console.log(`\n🔄 [Load] Merge პროცესი:`);
         console.log(`   📋 Existing Video dates:`, existingVideoDates);
         console.log(`   📋 Existing Home-visit dates:`, existingHomeVisitDates);
         console.log(`   📋 Backend Video dates:`, videoDates);
         console.log(`   📋 Backend Home-visit dates:`, homeVisitDates);
-        
+
         // Combine backend dates with existing dates, removing duplicates
-        const mergedVideoDates = Array.from(new Set([...existingVideoDates, ...videoDates]));
-        const mergedHomeVisitDates = Array.from(new Set([...existingHomeVisitDates, ...homeVisitDates]));
-        
+        const mergedVideoDates = Array.from(
+          new Set([...existingVideoDates, ...videoDates]),
+        );
+        const mergedHomeVisitDates = Array.from(
+          new Set([...existingHomeVisitDates, ...homeVisitDates]),
+        );
+
         // ⚠️ ამოვიღოთ წარსული თარიღები
-        const finalVideoDates = mergedVideoDates.filter(dateStr => !isPastDate(dateStr));
-        const finalHomeVisitDates = mergedHomeVisitDates.filter(dateStr => !isPastDate(dateStr));
-        
+        const finalVideoDates = mergedVideoDates.filter(
+          (dateStr) => !isPastDate(dateStr),
+        );
+        const finalHomeVisitDates = mergedHomeVisitDates.filter(
+          (dateStr) => !isPastDate(dateStr),
+        );
+
         // ლოგინგი, თუ წარსული თარიღები ამოიღეს
-        const removedVideoDates = mergedVideoDates.filter(dateStr => isPastDate(dateStr));
-        const removedHomeVisitDates = mergedHomeVisitDates.filter(dateStr => isPastDate(dateStr));
+        const removedVideoDates = mergedVideoDates.filter((dateStr) =>
+          isPastDate(dateStr),
+        );
+        const removedHomeVisitDates = mergedHomeVisitDates.filter((dateStr) =>
+          isPastDate(dateStr),
+        );
         if (removedVideoDates.length > 0) {
-          console.log(`   ⏰ წარსული Video თარიღები ამოიღეს:`, removedVideoDates);
+          console.log(
+            `   ⏰ წარსული Video თარიღები ამოიღეს:`,
+            removedVideoDates,
+          );
         }
         if (removedHomeVisitDates.length > 0) {
-          console.log(`   ⏰ წარსული Home-visit თარიღები ამოიღეს:`, removedHomeVisitDates);
+          console.log(
+            `   ⏰ წარსული Home-visit თარიღები ამოიღეს:`,
+            removedHomeVisitDates,
+          );
         }
-        
-        console.log(`   ✅ Final Video dates (merged, past removed):`, finalVideoDates);
-        console.log(`   ✅ Final Home-visit dates (merged, past removed):`, finalHomeVisitDates);
-        
+
+        console.log(
+          `   ✅ Final Video dates (merged, past removed):`,
+          finalVideoDates,
+        );
+        console.log(
+          `   ✅ Final Home-visit dates (merged, past removed):`,
+          finalHomeVisitDates,
+        );
+
         setVideoSchedules(loadedVideoSchedules);
         setHomeVisitSchedules(loadedHomeVisitSchedules);
         setVideoSelectedDates(finalVideoDates);
         setHomeVisitSelectedDates(finalHomeVisitDates);
         setBookedSlots(loadedBookedSlots);
-        
+
         // Debug: ვნახოთ რა bookedSlots ინახება
         console.log(`\n🔒 [Load] დაჯავშნილი სლოტების სრული სია:`);
         const bookedSlotsKeys = Object.keys(loadedBookedSlots);
         if (bookedSlotsKeys.length === 0) {
           console.log(`   ⚠️  დაჯავშნილი სლოტები არ მოიძებნა`);
         } else {
-          bookedSlotsKeys.forEach(key => {
+          bookedSlotsKeys.forEach((key) => {
             const slots = loadedBookedSlots[key];
             console.log(`   🔑 ${key}:`);
             console.log(`      ⏰ ${slots.length} დაჯავშნილი საათი:`, slots);
           });
         }
-        
+
         console.log(`\n📊 [Load] შეჯამება:`);
-        console.log(`   📅 Video dates from backend: ${videoDates.length}`, videoDates);
-        console.log(`   📅 Home-visit dates from backend: ${homeVisitDates.length}`, homeVisitDates);
-        console.log(`   ✅ Final Video selected dates: ${finalVideoDates.length}`, finalVideoDates);
-        console.log(`   ✅ Final Home-visit selected dates: ${finalHomeVisitDates.length}`, finalHomeVisitDates);
+        console.log(
+          `   📅 Video dates from backend: ${videoDates.length}`,
+          videoDates,
+        );
+        console.log(
+          `   📅 Home-visit dates from backend: ${homeVisitDates.length}`,
+          homeVisitDates,
+        );
+        console.log(
+          `   ✅ Final Video selected dates: ${finalVideoDates.length}`,
+          finalVideoDates,
+        );
+        console.log(
+          `   ✅ Final Home-visit selected dates: ${finalHomeVisitDates.length}`,
+          finalHomeVisitDates,
+        );
         console.log(`   🔒 Total booked slots keys: ${bookedSlotsKeys.length}`);
-        
+
         // შევამოწმოთ თითოეული დღე - აქვს თუ არა დაჯავშნილი სლოტები
         console.log(`\n🔍 [Load] დღეების დაჯავშნილი სლოტების შემოწმება:`);
-        [...finalVideoDates, ...finalHomeVisitDates].forEach(dateStr => {
+        [...finalVideoDates, ...finalHomeVisitDates].forEach((dateStr) => {
           const videoKey = `${dateStr}-video`;
           const homeVisitKey = `${dateStr}-home-visit`;
           const videoBooked = loadedBookedSlots[videoKey] || [];
           const homeVisitBooked = loadedBookedSlots[homeVisitKey] || [];
-          
+
           if (videoBooked.length > 0 || homeVisitBooked.length > 0) {
             console.log(`   📅 ${dateStr}:`);
             if (videoBooked.length > 0) {
-              console.log(`      🎥 Video: ${videoBooked.length} დაჯავშნილი ->`, videoBooked);
+              console.log(
+                `      🎥 Video: ${videoBooked.length} დაჯავშნილი ->`,
+                videoBooked,
+              );
             }
             if (homeVisitBooked.length > 0) {
-              console.log(`      🏠 Home-visit: ${homeVisitBooked.length} დაჯავშნილი ->`, homeVisitBooked);
+              console.log(
+                `      🏠 Home-visit: ${homeVisitBooked.length} დაჯავშნილი ->`,
+                homeVisitBooked,
+              );
             }
             const isInVideoDates = finalVideoDates.includes(dateStr);
             const isInHomeVisitDates = finalHomeVisitDates.includes(dateStr);
             console.log(`      ✅ Video selectedDates-ში: ${isInVideoDates}`);
-            console.log(`      ✅ Home-visit selectedDates-ში: ${isInHomeVisitDates}`);
+            console.log(
+              `      ✅ Home-visit selectedDates-ში: ${isInHomeVisitDates}`,
+            );
           }
         });
 
         // შევინახოთ საწყისი თარიღები და საათები, რომლებსაც backend უკვე იცნობს
         initialVideoDatesRef.current = Object.keys(loadedVideoSchedules);
-        initialHomeVisitDatesRef.current = Object.keys(loadedHomeVisitSchedules);
+        initialHomeVisitDatesRef.current = Object.keys(
+          loadedHomeVisitSchedules,
+        );
         // Deep copy schedules for initial state comparison
-        initialVideoSchedulesRef.current = JSON.parse(JSON.stringify(loadedVideoSchedules));
-        initialHomeVisitSchedulesRef.current = JSON.parse(JSON.stringify(loadedHomeVisitSchedules));
+        initialVideoSchedulesRef.current = JSON.parse(
+          JSON.stringify(loadedVideoSchedules),
+        );
+        initialHomeVisitSchedulesRef.current = JSON.parse(
+          JSON.stringify(loadedHomeVisitSchedules),
+        );
       }
     } catch (error) {
       console.error("Error loading availability:", error);
@@ -425,7 +580,7 @@ export default function DoctorSchedule() {
         loadAvailability(true); // Pass true to indicate it's a refresh
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [user?.id])
+    }, [user?.id]),
   );
 
   // Close time modal when mode changes
@@ -448,7 +603,10 @@ export default function DoctorSchedule() {
   // Debug: Log selected dates when mode changes
   useEffect(() => {
     const currentSelected = getCurrentModeSelectedDates();
-    console.log(`🔄 [Mode Change] Mode: ${mode}, Selected dates:`, currentSelected);
+    console.log(
+      `🔄 [Mode Change] Mode: ${mode}, Selected dates:`,
+      currentSelected,
+    );
     console.log(`📊 [Mode Change] Video dates:`, videoSelectedDates);
     console.log(`📊 [Mode Change] Home-visit dates:`, homeVisitSelectedDates);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -461,17 +619,17 @@ export default function DoctorSchedule() {
   //   useCallback(() => {
   //     const currentSchedules = getCurrentModeSchedules();
   //     const currentSelected = getCurrentModeSelectedDates();
-  //     
+  //
   //     // Remove dates that don't have any time slots AND don't have any booked slots
   //     const datesWithSlotsOrBooked = currentSelected.filter((dateStr) => {
   //       const slots = currentSchedules[dateStr];
   //       const hasTimeSlots = slots && slots.length > 0;
-  //       
+  //
   //       // Check if there are booked slots for this date and type
   //       const dateKey = `${dateStr}-${mode}`;
   //       const bookedForDate = bookedSlots[dateKey] || [];
   //       const hasBookedSlots = bookedForDate.length > 0;
-  //       
+  //
   //       // Keep the date if it has time slots OR booked slots
   //       return hasTimeSlots || hasBookedSlots;
   //     });
@@ -499,7 +657,7 @@ export default function DoctorSchedule() {
     const daysInCurrentMonth = new Date(
       currentYear,
       currentMonth + 1,
-      0
+      0,
     ).getDate();
     for (let day = today.getDate(); day <= daysInCurrentMonth; day++) {
       currentMonthDays.push(new Date(currentYear, currentMonth, day));
@@ -529,7 +687,7 @@ export default function DoctorSchedule() {
           {
             month: "long",
             year: "numeric",
-          }
+          },
         ),
         days: nextMonthDays,
       },
@@ -562,7 +720,7 @@ export default function DoctorSchedule() {
   // შემოწმება: არის თუ არა თარიღი წარსული (დღესდღეობამდე)
   const isPastDate = (dateStr: string): boolean => {
     try {
-      const [year, month, day] = dateStr.split('-').map(Number);
+      const [year, month, day] = dateStr.split("-").map(Number);
       const date = new Date(year, month - 1, day);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -578,7 +736,7 @@ export default function DoctorSchedule() {
     const currentSelected = getCurrentModeSelectedDates();
     const dateStr = formatDate(date);
     const isSelected = currentSelected.includes(dateStr);
-    
+
     // Debug: დაჯავშნილი სლოტების შემთხვევაში ლოგინგი
     const dateKey = `${dateStr}-${mode}`;
     const bookedForDate = bookedSlots[dateKey] || [];
@@ -588,10 +746,12 @@ export default function DoctorSchedule() {
       console.log(`   🔒 bookedCount: ${bookedForDate.length}`, bookedForDate);
       console.log(`   ✅ isSelected: ${isSelected}`);
       if (!isSelected && bookedForDate.length > 0) {
-        console.log(`   ⚠️  პრობლემა! დაჯავშნილი სლოტები არის, მაგრამ დღე არ არის selectedDates-ში!`);
+        console.log(
+          `   ⚠️  პრობლემა! დაჯავშნილი სლოტები არის, მაგრამ დღე არ არის selectedDates-ში!`,
+        );
       }
     }
-    
+
     return isSelected;
   };
 
@@ -600,11 +760,11 @@ export default function DoctorSchedule() {
     if (!isDoctorActive) {
       Alert.alert(
         "შეზღუდვა",
-        "გრაფიკის ჩანიშვნა შესაძლებელია მხოლოდ active სტატუსის ექიმებისთვის. გთხოვთ დაელოდოთ ადმინისტრატორის დამტკიცებას."
+        "გრაფიკის ჩანიშვნა შესაძლებელია მხოლოდ active სტატუსის ექიმებისთვის. გთხოვთ დაელოდოთ ადმინისტრატორის დამტკიცებას.",
       );
       return;
     }
-    
+
     const dateStr = formatDate(date);
 
     // სპეციალური ლოგიკა "დღეს" თარიღზე დაჭერისთვის
@@ -624,17 +784,21 @@ export default function DoctorSchedule() {
       const currentSlots = videoSchedules[dateStr] || [];
       const dateKey = `${dateStr}-video`;
       const otherDateKey = `${dateStr}-home-visit`;
-      
+
       // ორივე type-ის appointments გავითვალისწინოთ, რადგან ექიმი არ შეუძლია ერთდროულად იყოს ორ ადგილას
       const bookedForDate = bookedSlots[dateKey] || [];
       const bookedForOtherDate = bookedSlots[otherDateKey] || [];
-      const allBookedSlotsForDate = Array.from(new Set([...bookedForDate, ...bookedForOtherDate]));
+      const allBookedSlotsForDate = Array.from(
+        new Set([...bookedForDate, ...bookedForOtherDate]),
+      );
 
       // თუ საერთოდ არანაირი საათი არ არის ამ დღეზე, გადავდივართ სტანდარტულ ქცევაზე
       if (currentSlots.length > 0) {
         // 1) თუ ამ დღეზე არ არის არც ერთი დაჯავშნილი საათი (ორივე type-ისთვის) -> მოვხსნათ მთელი გრაფიკი დღისთვის
         if (allBookedSlotsForDate.length === 0) {
-          setVideoSelectedDates(videoSelectedDates.filter((d) => d !== dateStr));
+          setVideoSelectedDates(
+            videoSelectedDates.filter((d) => d !== dateStr),
+          );
 
           const updatedSchedules = { ...videoSchedules };
           delete updatedSchedules[dateStr];
@@ -655,14 +819,18 @@ export default function DoctorSchedule() {
                 type: "video" as const,
               },
             ];
-            console.log("📤 [Video] Sending today's date removal to backend:", JSON.stringify(dataToSend, null, 2));
+            console.log(
+              "📤 [Video] Sending today's date removal to backend:",
+              JSON.stringify(dataToSend, null, 2),
+            );
             await apiService.updateAvailability(dataToSend);
             setHasSaved(false);
           } catch (error: any) {
             console.error("Error updating availability for today:", error);
             Alert.alert(
               "შეცდომა",
-              error?.message || "დღევანდელი დღის განრიგის განახლება ვერ მოხერხდა"
+              error?.message ||
+                "დღევანდელი დღის განრიგის განახლება ვერ მოხერხდა",
             );
             // Reload availability from backend to restore the correct state
             await loadAvailability();
@@ -673,7 +841,7 @@ export default function DoctorSchedule() {
 
         // 2) თუ ამ დღეზე არის დაჯავშნილი საათები -> ყველა თავისუფალი საათი მოვხსნათ და დავტოვოთ მხოლოდ დაჯავშნილი
         const newSlots = currentSlots.filter((time) =>
-          bookedForDate.includes(time)
+          bookedForDate.includes(time),
         );
 
         const updatedSchedules = {
@@ -684,7 +852,9 @@ export default function DoctorSchedule() {
 
         // თუ ყველა საათი მოიხსნა (თეორიულად არ უნდა მოხდეს, მაგრამ დაზღვევისათვის)
         if (newSlots.length === 0) {
-          setVideoSelectedDates(videoSelectedDates.filter((d) => d !== dateStr));
+          setVideoSelectedDates(
+            videoSelectedDates.filter((d) => d !== dateStr),
+          );
         }
 
         // ბექენდზე მივყიდოთ განახლებული სლოტები დღევანდელი თარიღისთვის
@@ -702,14 +872,20 @@ export default function DoctorSchedule() {
               type: "video" as const,
             },
           ];
-          console.log("📤 [Video] Sending today's date update (with booked slots) to backend:", JSON.stringify(dataToSend, null, 2));
+          console.log(
+            "📤 [Video] Sending today's date update (with booked slots) to backend:",
+            JSON.stringify(dataToSend, null, 2),
+          );
           await apiService.updateAvailability(dataToSend);
           setHasSaved(false);
         } catch (error: any) {
-          console.error("Error updating availability for today (booked slots kept):", error);
+          console.error(
+            "Error updating availability for today (booked slots kept):",
+            error,
+          );
           Alert.alert(
             "შეცდომა",
-            error?.message || "დღევანდელი დღის განრიგის განახლება ვერ მოხერხდა"
+            error?.message || "დღევანდელი დღის განრიგის განახლება ვერ მოხერხდა",
           );
           // Reload availability from backend to restore the correct state
           await loadAvailability();
@@ -724,16 +900,16 @@ export default function DoctorSchedule() {
       const dateKey = `${dateStr}-video`;
       const bookedForDate = bookedSlots[dateKey] || [];
       const currentSlots = videoSchedules[dateStr] || [];
-      
+
       // თუ დღეს აქვს მხოლოდ bookedSlots (არ აქვს timeSlots), მაშინ არ შეიძლება მოხსნა
       if (currentSlots.length === 0 && bookedForDate.length > 0) {
         Alert.alert(
           "დაჯავშნილი დღე",
-          `ეს დღე ვერ წაიშლება, რადგან მასზე ${bookedForDate.length} საათია დაჯავშნილი. გთხოვთ, ჯერ გააუქმოთ ჯავშნები.`
+          `ეს დღე ვერ წაიშლება, რადგან მასზე ${bookedForDate.length} საათია დაჯავშნილი. გთხოვთ, ჯერ გააუქმოთ ჯავშნები.`,
         );
         return;
       }
-      
+
       // ამოიღე თარიღი
       setVideoSelectedDates(videoSelectedDates.filter((d) => d !== dateStr));
 
@@ -754,11 +930,11 @@ export default function DoctorSchedule() {
     if (!isDoctorActive) {
       Alert.alert(
         "შეზღუდვა",
-        "გრაფიკის ჩანიშვნა შესაძლებელია მხოლოდ active სტატუსის ექიმებისთვის. გთხოვთ დაელოდოთ ადმინისტრატორის დამტკიცებას."
+        "გრაფიკის ჩანიშვნა შესაძლებელია მხოლოდ active სტატუსის ექიმებისთვის. გთხოვთ დაელოდოთ ადმინისტრატორის დამტკიცებას.",
       );
       return;
     }
-    
+
     const dateStr = formatDate(date);
 
     // სპეციალური ლოგიკა "დღეს" თარიღზე დაჭერისთვის
@@ -778,17 +954,21 @@ export default function DoctorSchedule() {
       const currentSlots = homeVisitSchedules[dateStr] || [];
       const dateKey = `${dateStr}-home-visit`;
       const otherDateKey = `${dateStr}-video`;
-      
+
       // ორივე type-ის appointments გავითვალისწინოთ, რადგან ექიმი არ შეუძლია ერთდროულად იყოს ორ ადგილას
       const bookedForDate = bookedSlots[dateKey] || [];
       const bookedForOtherDate = bookedSlots[otherDateKey] || [];
-      const allBookedSlotsForDate = Array.from(new Set([...bookedForDate, ...bookedForOtherDate]));
+      const allBookedSlotsForDate = Array.from(
+        new Set([...bookedForDate, ...bookedForOtherDate]),
+      );
 
       // თუ საერთოდ არანაირი საათი არ არის ამ დღეზე, გადავდივართ სტანდარტულ ქცევაზე
       if (currentSlots.length > 0) {
         // 1) თუ ამ დღეზე არ არის არც ერთი დაჯავშნილი საათი (ორივე type-ისთვის) -> მოვხსნათ მთელი გრაფიკი დღისთვის
         if (allBookedSlotsForDate.length === 0) {
-          setHomeVisitSelectedDates(homeVisitSelectedDates.filter((d) => d !== dateStr));
+          setHomeVisitSelectedDates(
+            homeVisitSelectedDates.filter((d) => d !== dateStr),
+          );
 
           const updatedSchedules = { ...homeVisitSchedules };
           delete updatedSchedules[dateStr];
@@ -809,14 +989,18 @@ export default function DoctorSchedule() {
                 type: "home-visit" as const,
               },
             ];
-            console.log("📤 [Home-Visit] Sending today's date removal to backend:", JSON.stringify(dataToSend, null, 2));
+            console.log(
+              "📤 [Home-Visit] Sending today's date removal to backend:",
+              JSON.stringify(dataToSend, null, 2),
+            );
             await apiService.updateAvailability(dataToSend);
             setHasSaved(false);
           } catch (error: any) {
             console.error("Error updating availability for today:", error);
             Alert.alert(
               "შეცდომა",
-              error?.message || "დღევანდელი დღის განრიგის განახლება ვერ მოხერხდა"
+              error?.message ||
+                "დღევანდელი დღის განრიგის განახლება ვერ მოხერხდა",
             );
             // Reload availability from backend to restore the correct state
             await loadAvailability();
@@ -827,7 +1011,7 @@ export default function DoctorSchedule() {
 
         // 2) თუ ამ დღეზე არის დაჯავშნილი საათები -> ყველა თავისუფალი საათი მოვხსნათ და დავტოვოთ მხოლოდ დაჯავშნილი
         const newSlots = currentSlots.filter((time) =>
-          bookedForDate.includes(time)
+          bookedForDate.includes(time),
         );
 
         const updatedSchedules = {
@@ -838,7 +1022,9 @@ export default function DoctorSchedule() {
 
         // თუ ყველა საათი მოიხსნა (თეორიულად არ უნდა მოხდეს, მაგრამ დაზღვევისათვის)
         if (newSlots.length === 0) {
-          setHomeVisitSelectedDates(homeVisitSelectedDates.filter((d) => d !== dateStr));
+          setHomeVisitSelectedDates(
+            homeVisitSelectedDates.filter((d) => d !== dateStr),
+          );
         }
 
         // ბექენდზე მივყიდოთ განახლებული სლოტები დღევანდელი თარიღისთვის
@@ -856,14 +1042,20 @@ export default function DoctorSchedule() {
               type: "home-visit" as const,
             },
           ];
-          console.log("📤 [Home-Visit] Sending today's date update (with booked slots) to backend:", JSON.stringify(dataToSend, null, 2));
+          console.log(
+            "📤 [Home-Visit] Sending today's date update (with booked slots) to backend:",
+            JSON.stringify(dataToSend, null, 2),
+          );
           await apiService.updateAvailability(dataToSend);
           setHasSaved(false);
         } catch (error: any) {
-          console.error("Error updating availability for today (booked slots kept):", error);
+          console.error(
+            "Error updating availability for today (booked slots kept):",
+            error,
+          );
           Alert.alert(
             "შეცდომა",
-            error?.message || "დღევანდელი დღის განრიგის განახლება ვერ მოხერხდა"
+            error?.message || "დღევანდელი დღის განრიგის განახლება ვერ მოხერხდა",
           );
           // Reload availability from backend to restore the correct state
           await loadAvailability();
@@ -878,18 +1070,20 @@ export default function DoctorSchedule() {
       const dateKey = `${dateStr}-home-visit`;
       const bookedForDate = bookedSlots[dateKey] || [];
       const currentSlots = homeVisitSchedules[dateStr] || [];
-      
+
       // თუ დღეს აქვს მხოლოდ bookedSlots (არ აქვს timeSlots), მაშინ არ შეიძლება მოხსნა
       if (currentSlots.length === 0 && bookedForDate.length > 0) {
         Alert.alert(
           "დაჯავშნილი დღე",
-          `ეს დღე ვერ წაიშლება, რადგან მასზე ${bookedForDate.length} საათია დაჯავშნილი. გთხოვთ, ჯერ გააუქმოთ ჯავშნები.`
+          `ეს დღე ვერ წაიშლება, რადგან მასზე ${bookedForDate.length} საათია დაჯავშნილი. გთხოვთ, ჯერ გააუქმოთ ჯავშნები.`,
         );
         return;
       }
-      
+
       // ამოიღე თარიღი
-      setHomeVisitSelectedDates(homeVisitSelectedDates.filter((d) => d !== dateStr));
+      setHomeVisitSelectedDates(
+        homeVisitSelectedDates.filter((d) => d !== dateStr),
+      );
 
       const updatedSchedules = { ...homeVisitSchedules };
       delete updatedSchedules[dateStr];
@@ -916,11 +1110,11 @@ export default function DoctorSchedule() {
     if (!isDoctorActive) {
       Alert.alert(
         "შეზღუდვა",
-        "გრაფიკის ჩანიშვნა შესაძლებელია მხოლოდ active სტატუსის ექიმებისთვის. გთხოვთ დაელოდოთ ადმინისტრატორის დამტკიცებას."
+        "გრაფიკის ჩანიშვნა შესაძლებელია მხოლოდ active სტატუსის ექიმებისთვის. გთხოვთ დაელოდოთ ადმინისტრატორის დამტკიცებას.",
       );
       return;
     }
-    
+
     setCurrentEditDate(formatDate(date));
     setShowTimeModal(true);
   };
@@ -928,22 +1122,23 @@ export default function DoctorSchedule() {
   // Video რეჟიმისთვის საათის წაშლის შემოწმება
   const canDeleteSlotVideo = (dateStr: string, time: string): boolean => {
     try {
-      const initialSlotsForDate = initialVideoSchedulesRef.current[dateStr] || [];
-      
+      const initialSlotsForDate =
+        initialVideoSchedulesRef.current[dateStr] || [];
+
       // თუ ეს საათი არ იყო საწყის schedules-ში, ეს ახლახან დაემატა და წაშლა შეუძლია
       if (!initialSlotsForDate.includes(time)) {
         return true;
       }
-      
+
       // თუ საათი backend-იდანაა, 24 საათის წესი მოქმედებს
       const [hours, minutes] = time.split(":").map(Number);
       const slotDateTime = new Date(dateStr);
       slotDateTime.setHours(hours, minutes || 0, 0, 0);
-      
+
       const now = new Date();
       const diffMs = slotDateTime.getTime() - now.getTime();
       const diffHours = diffMs / (1000 * 60 * 60);
-      
+
       // თუ დარჩენილია 24 საათი ან მეტი, შეუძლია წაშლა
       return diffHours >= 24;
     } catch (error) {
@@ -955,22 +1150,23 @@ export default function DoctorSchedule() {
   // Home-visit რეჟიმისთვის საათის წაშლის შემოწმება
   const canDeleteSlotHomeVisit = (dateStr: string, time: string): boolean => {
     try {
-      const initialSlotsForDate = initialHomeVisitSchedulesRef.current[dateStr] || [];
-      
+      const initialSlotsForDate =
+        initialHomeVisitSchedulesRef.current[dateStr] || [];
+
       // თუ ეს საათი არ იყო საწყის schedules-ში, ეს ახლახან დაემატა და წაშლა შეუძლია
       if (!initialSlotsForDate.includes(time)) {
         return true;
       }
-      
+
       // თუ საათი backend-იდანაა, 24 საათის წესი მოქმედებს
       const [hours, minutes] = time.split(":").map(Number);
       const slotDateTime = new Date(dateStr);
       slotDateTime.setHours(hours, minutes || 0, 0, 0);
-      
+
       const now = new Date();
       const diffMs = slotDateTime.getTime() - now.getTime();
       const diffHours = diffMs / (1000 * 60 * 60);
-      
+
       // თუ დარჩენილია 24 საათი ან მეტი, შეუძლია წაშლა
       return diffHours >= 24;
     } catch (error) {
@@ -985,11 +1181,11 @@ export default function DoctorSchedule() {
       const [hours, minutes] = time.split(":").map(Number);
       const slotDateTime = new Date(dateStr);
       slotDateTime.setHours(hours, minutes || 0, 0, 0);
-      
+
       const now = new Date();
       const diffMs = slotDateTime.getTime() - now.getTime();
       const diffHours = diffMs / (1000 * 60 * 60);
-      
+
       // ონლაინის შემთხვევაში: 2 საათით ადრე
       return diffHours >= 2;
     } catch (error) {
@@ -1004,11 +1200,11 @@ export default function DoctorSchedule() {
       const [hours, minutes] = time.split(":").map(Number);
       const slotDateTime = new Date(dateStr);
       slotDateTime.setHours(hours, minutes || 0, 0, 0);
-      
+
       const now = new Date();
       const diffMs = slotDateTime.getTime() - now.getTime();
       const diffHours = diffMs / (1000 * 60 * 60);
-      
+
       // ბინაზე ვიზიტისას: 12 საათით ადრე
       return diffHours >= 12;
     } catch (error) {
@@ -1020,11 +1216,11 @@ export default function DoctorSchedule() {
   // Video რეჟიმისთვის საათის არჩევა/მოხსნა
   const toggleTimeSlotVideo = (time: string) => {
     if (!currentEditDate) return;
-    
+
     if (!isDoctorActive) {
       Alert.alert(
         "შეზღუდვა",
-        "გრაფიკის ჩანიშვნა შესაძლებელია მხოლოდ active სტატუსის ექიმებისთვის. გთხოვთ დაელოდოთ ადმინისტრატორის დამტკიცებას."
+        "გრაფიკის ჩანიშვნა შესაძლებელია მხოლოდ active სტატუსის ექიმებისთვის. გთხოვთ დაელოდოთ ადმინისტრატორის დამტკიცებას.",
       );
       return;
     }
@@ -1035,12 +1231,14 @@ export default function DoctorSchedule() {
     const otherDateKey = `${currentEditDate}-home-visit`;
     const bookedForDate = bookedSlots[dateKey] || [];
     const bookedForOtherDate = bookedSlots[otherDateKey] || [];
-    const allBookedSlotsForDate = Array.from(new Set([...bookedForDate, ...bookedForOtherDate]));
-    
+    const allBookedSlotsForDate = Array.from(
+      new Set([...bookedForDate, ...bookedForOtherDate]),
+    );
+
     if (allBookedSlotsForDate.includes(time)) {
       Alert.alert(
         "დაჯავშნილი საათი",
-        "ეს საათი უკვე დაჯავშნილია (ვიდეო ან ბინაზე ვიზიტი) და ვერ შეიცვლება. გთხოვთ აირჩიოთ სხვა საათი."
+        "ეს საათი უკვე დაჯავშნილია (ვიდეო ან ბინაზე ვიზიტი) და ვერ შეიცვლება. გთხოვთ აირჩიოთ სხვა საათი.",
       );
       return;
     }
@@ -1053,7 +1251,7 @@ export default function DoctorSchedule() {
       if (!canDeleteSlotVideo(currentEditDate, time)) {
         Alert.alert(
           "საათის წაშლა შეუძლებელია",
-          "საათის წაშლა შესაძლებელია მხოლოდ 24 საათით ადრე. ამ საათამდე 24 საათზე ნაკლები დარჩენილია."
+          "საათის წაშლა შესაძლებელია მხოლოდ 24 საათით ადრე. ამ საათამდე 24 საათზე ნაკლები დარჩენილია.",
         );
         return;
       }
@@ -1064,16 +1262,16 @@ export default function DoctorSchedule() {
       if (otherModeSlots.includes(time)) {
         Alert.alert(
           "საათი დაკავებულია",
-          "ეს საათი უკვე არჩეულია ბინაზე ვიზიტისთვის. ექიმს არ შეუძლია ერთდროულად იყოს ორ ადგილას. გთხოვთ აირჩიოთ სხვა საათი."
+          "ეს საათი უკვე არჩეულია ბინაზე ვიზიტისთვის. ექიმს არ შეუძლია ერთდროულად იყოს ორ ადგილას. გთხოვთ აირჩიოთ სხვა საათი.",
         );
         return;
       }
-      
+
       // შემოწმება: დარჩენილია თუ არა მინიმუმ 2 საათი
       if (!canAddSlotVideo(currentEditDate, time)) {
         Alert.alert(
           "საათის დამატება შეუძლებელია",
-          "ვიდეო კონსულტაციის საათის დამატება შესაძლებელია მინიმუმ 2 საათით ადრე. ამ საათამდე 2 საათზე ნაკლები დარჩენილია."
+          "ვიდეო კონსულტაციის საათის დამატება შესაძლებელია მინიმუმ 2 საათით ადრე. ამ საათამდე 2 საათზე ნაკლები დარჩენილია.",
         );
         return;
       }
@@ -1087,12 +1285,17 @@ export default function DoctorSchedule() {
     setVideoSchedules(updatedSchedules);
 
     // თუ ახალი საათი დაემატა და დღე არ არის selectedDates-ში, დავამატოთ
-    if (!currentSlots.includes(time) && !videoSelectedDates.includes(currentEditDate)) {
+    if (
+      !currentSlots.includes(time) &&
+      !videoSelectedDates.includes(currentEditDate)
+    ) {
       setVideoSelectedDates([...videoSelectedDates, currentEditDate]);
     }
     // თუ ყველა საათი წაიშალა, დღე ამოვიღოთ selectedDates-დან
     if (newSlots.length === 0 && videoSelectedDates.includes(currentEditDate)) {
-      setVideoSelectedDates(videoSelectedDates.filter((d) => d !== currentEditDate));
+      setVideoSelectedDates(
+        videoSelectedDates.filter((d) => d !== currentEditDate),
+      );
     }
 
     // Reset hasSaved when slots are modified
@@ -1102,11 +1305,11 @@ export default function DoctorSchedule() {
   // Home-visit რეჟიმისთვის საათის არჩევა/მოხსნა
   const toggleTimeSlotHomeVisit = (time: string) => {
     if (!currentEditDate) return;
-    
+
     if (!isDoctorActive) {
       Alert.alert(
         "შეზღუდვა",
-        "გრაფიკის ჩანიშვნა შესაძლებელია მხოლოდ active სტატუსის ექიმებისთვის. გთხოვთ დაელოდოთ ადმინისტრატორის დამტკიცებას."
+        "გრაფიკის ჩანიშვნა შესაძლებელია მხოლოდ active სტატუსის ექიმებისთვის. გთხოვთ დაელოდოთ ადმინისტრატორის დამტკიცებას.",
       );
       return;
     }
@@ -1117,12 +1320,14 @@ export default function DoctorSchedule() {
     const otherDateKey = `${currentEditDate}-video`;
     const bookedForDate = bookedSlots[dateKey] || [];
     const bookedForOtherDate = bookedSlots[otherDateKey] || [];
-    const allBookedSlotsForDate = Array.from(new Set([...bookedForDate, ...bookedForOtherDate]));
-    
+    const allBookedSlotsForDate = Array.from(
+      new Set([...bookedForDate, ...bookedForOtherDate]),
+    );
+
     if (allBookedSlotsForDate.includes(time)) {
       Alert.alert(
         "დაჯავშნილი საათი",
-        "ეს საათი უკვე დაჯავშნილია (ვიდეო ან ბინაზე ვიზიტი) და ვერ შეიცვლება. გთხოვთ აირჩიოთ სხვა საათი."
+        "ეს საათი უკვე დაჯავშნილია (ვიდეო ან ბინაზე ვიზიტი) და ვერ შეიცვლება. გთხოვთ აირჩიოთ სხვა საათი.",
       );
       return;
     }
@@ -1135,7 +1340,7 @@ export default function DoctorSchedule() {
       if (!canDeleteSlotHomeVisit(currentEditDate, time)) {
         Alert.alert(
           "საათის წაშლა შეუძლებელია",
-          "საათის წაშლა შესაძლებელია მხოლოდ 24 საათით ადრე. ამ საათამდე 24 საათზე ნაკლები დარჩენილია."
+          "საათის წაშლა შესაძლებელია მხოლოდ 24 საათით ადრე. ამ საათამდე 24 საათზე ნაკლები დარჩენილია.",
         );
         return;
       }
@@ -1146,16 +1351,16 @@ export default function DoctorSchedule() {
       if (otherModeSlots.includes(time)) {
         Alert.alert(
           "საათი დაკავებულია",
-          "ეს საათი უკვე არჩეულია ვიდეო კონსულტაციისთვის. ექიმს არ შეუძლია ერთდროულად იყოს ორ ადგილას. გთხოვთ აირჩიოთ სხვა საათი."
+          "ეს საათი უკვე არჩეულია ვიდეო კონსულტაციისთვის. ექიმს არ შეუძლია ერთდროულად იყოს ორ ადგილას. გთხოვთ აირჩიოთ სხვა საათი.",
         );
         return;
       }
-      
+
       // შემოწმება: დარჩენილია თუ არა მინიმუმ 12 საათი
       if (!canAddSlotHomeVisit(currentEditDate, time)) {
         Alert.alert(
           "საათის დამატება შეუძლებელია",
-          "ბინაზე ვიზიტის საათის დამატება შესაძლებელია მინიმუმ 12 საათით ადრე. ამ საათამდე 12 საათზე ნაკლები დარჩენილია."
+          "ბინაზე ვიზიტის საათის დამატება შესაძლებელია მინიმუმ 12 საათით ადრე. ამ საათამდე 12 საათზე ნაკლები დარჩენილია.",
         );
         return;
       }
@@ -1169,12 +1374,20 @@ export default function DoctorSchedule() {
     setHomeVisitSchedules(updatedSchedules);
 
     // თუ ახალი საათი დაემატა და დღე არ არის selectedDates-ში, დავამატოთ
-    if (!currentSlots.includes(time) && !homeVisitSelectedDates.includes(currentEditDate)) {
+    if (
+      !currentSlots.includes(time) &&
+      !homeVisitSelectedDates.includes(currentEditDate)
+    ) {
       setHomeVisitSelectedDates([...homeVisitSelectedDates, currentEditDate]);
     }
     // თუ ყველა საათი წაიშალა, დღე ამოვიღოთ selectedDates-დან
-    if (newSlots.length === 0 && homeVisitSelectedDates.includes(currentEditDate)) {
-      setHomeVisitSelectedDates(homeVisitSelectedDates.filter((d) => d !== currentEditDate));
+    if (
+      newSlots.length === 0 &&
+      homeVisitSelectedDates.includes(currentEditDate)
+    ) {
+      setHomeVisitSelectedDates(
+        homeVisitSelectedDates.filter((d) => d !== currentEditDate),
+      );
     }
 
     // Reset hasSaved when slots are modified
@@ -1215,7 +1428,10 @@ export default function DoctorSchedule() {
       // Backend-ზე განახლება - მხოლოდ video რეჟიმისთვის
       try {
         const allVideoDates = Array.from(
-          new Set([...initialVideoDatesRef.current, ...Object.keys(videoSchedules)])
+          new Set([
+            ...initialVideoDatesRef.current,
+            ...Object.keys(videoSchedules),
+          ]),
         );
 
         const availabilityData: {
@@ -1237,18 +1453,23 @@ export default function DoctorSchedule() {
         });
 
         if (availabilityData.length > 0) {
-          console.log("📤 [Clear Video] Sending cleared schedule to backend:", JSON.stringify(availabilityData, null, 2));
+          console.log(
+            "📤 [Clear Video] Sending cleared schedule to backend:",
+            JSON.stringify(availabilityData, null, 2),
+          );
           await apiService.updateAvailability(availabilityData);
         }
 
         // განვაახლოთ initial references - მხოლოდ video-სთვის
         initialVideoDatesRef.current = allVideoDates;
-        initialVideoSchedulesRef.current = JSON.parse(JSON.stringify(clearedVideoSchedules));
+        initialVideoSchedulesRef.current = JSON.parse(
+          JSON.stringify(clearedVideoSchedules),
+        );
       } catch (error: any) {
         console.error("Error clearing schedule:", error);
         Alert.alert(
           "შეცდომა",
-          error?.message || "გრაფიკის გასუფთავება ვერ მოხერხდა"
+          error?.message || "გრაფიკის გასუფთავება ვერ მოხერხდა",
         );
         // Reload availability from backend to restore the correct state
         await loadAvailability();
@@ -1275,7 +1496,10 @@ export default function DoctorSchedule() {
       // Backend-ზე განახლება - მხოლოდ home-visit რეჟიმისთვის
       try {
         const allHomeVisitDates = Array.from(
-          new Set([...initialHomeVisitDatesRef.current, ...Object.keys(homeVisitSchedules)])
+          new Set([
+            ...initialHomeVisitDatesRef.current,
+            ...Object.keys(homeVisitSchedules),
+          ]),
         );
 
         const availabilityData: {
@@ -1297,18 +1521,23 @@ export default function DoctorSchedule() {
         });
 
         if (availabilityData.length > 0) {
-          console.log("📤 [Clear Home-Visit] Sending cleared schedule to backend:", JSON.stringify(availabilityData, null, 2));
+          console.log(
+            "📤 [Clear Home-Visit] Sending cleared schedule to backend:",
+            JSON.stringify(availabilityData, null, 2),
+          );
           await apiService.updateAvailability(availabilityData);
         }
 
         // განვაახლოთ initial references - მხოლოდ home-visit-ისთვის
         initialHomeVisitDatesRef.current = allHomeVisitDates;
-        initialHomeVisitSchedulesRef.current = JSON.parse(JSON.stringify(clearedHomeVisitSchedules));
+        initialHomeVisitSchedulesRef.current = JSON.parse(
+          JSON.stringify(clearedHomeVisitSchedules),
+        );
       } catch (error: any) {
         console.error("Error clearing schedule:", error);
         Alert.alert(
           "შეცდომა",
-          error?.message || "გრაფიკის გასუფთავება ვერ მოხერხდა"
+          error?.message || "გრაფიკის გასუფთავება ვერ მოხერხდა",
         );
         // Reload availability from backend to restore the correct state
         await loadAvailability();
@@ -1321,11 +1550,11 @@ export default function DoctorSchedule() {
     if (!isDoctorActive) {
       Alert.alert(
         "შეზღუდვა",
-        "გრაფიკის შენახვა შესაძლებელია მხოლოდ active სტატუსის ექიმებისთვის. გთხოვთ დაელოდოთ ადმინისტრატორის დამტკიცებას."
+        "გრაფიკის შენახვა შესაძლებელია მხოლოდ active სტატუსის ექიმებისთვის. გთხოვთ დაელოდოთ ადმინისტრატორის დამტკიცებას.",
       );
       return;
     }
-    
+
     try {
       setIsSaving(true);
 
@@ -1333,7 +1562,7 @@ export default function DoctorSchedule() {
 
       // ყველა თარიღი, რომელზეც ოდესმე იყო სქედული (საწყისი + текущი)
       const allDates = Array.from(
-        new Set([...initialDates, ...Object.keys(videoSchedules)])
+        new Set([...initialDates, ...Object.keys(videoSchedules)]),
       );
 
       // შევამოწმოთ, რომ საერთოდ რაღაც დღე მაინც არსებობს.
@@ -1341,20 +1570,23 @@ export default function DoctorSchedule() {
       if (allDates.length === 0) {
         Alert.alert(
           "შეცდომა",
-          "გთხოვთ აირჩიოთ მინიმუმ ერთი დრო, სანამ განრიგს შეინახავთ"
+          "გთხოვთ აირჩიოთ მინიმუმ ერთი დრო, სანამ განრიგს შეინახავთ",
         );
         return;
       }
 
       // შევაგროვოთ ყველა თარიღი, რომელზეც ოდესმე იყო სქედული (video ან home-visit)
       const allVideoDates = Array.from(
-        new Set([...initialDates, ...Object.keys(videoSchedules)])
+        new Set([...initialDates, ...Object.keys(videoSchedules)]),
       );
       const allHomeVisitDates = Array.from(
-        new Set([...initialHomeVisitDatesRef.current, ...Object.keys(homeVisitSchedules)])
+        new Set([
+          ...initialHomeVisitDatesRef.current,
+          ...Object.keys(homeVisitSchedules),
+        ]),
       );
       const allDatesCombined = Array.from(
-        new Set([...allVideoDates, ...allHomeVisitDates])
+        new Set([...allVideoDates, ...allHomeVisitDates]),
       );
 
       // სრული სია backend-ისთვის - ორივე რეჟიმის განრიგი:
@@ -1398,12 +1630,16 @@ export default function DoctorSchedule() {
       // Save to backend
       console.log(
         "📤 [Video] Sending full schedule to backend (both modes):",
-        JSON.stringify(availabilityData, null, 2)
+        JSON.stringify(availabilityData, null, 2),
       );
       console.log("📊 [Video] Schedule summary:", {
         totalDates: availabilityData.length,
-        datesWithSlots: availabilityData.filter(d => d.timeSlots.length > 0).length,
-        totalSlots: availabilityData.reduce((sum, d) => sum + d.timeSlots.length, 0),
+        datesWithSlots: availabilityData.filter((d) => d.timeSlots.length > 0)
+          .length,
+        totalSlots: availabilityData.reduce(
+          (sum, d) => sum + d.timeSlots.length,
+          0,
+        ),
       });
       const response = await apiService.updateAvailability(availabilityData);
 
@@ -1423,7 +1659,9 @@ export default function DoctorSchedule() {
         setVideoSelectedDates(updatedSelectedDates);
         initialVideoDatesRef.current = allVideoDates;
         // განვაახლოთ initial schedules - ახლა ეს არის backend-ზე შენახული მდგომარეობა
-        initialVideoSchedulesRef.current = JSON.parse(JSON.stringify(videoSchedules));
+        initialVideoSchedulesRef.current = JSON.parse(
+          JSON.stringify(videoSchedules),
+        );
 
         // Hide success message after 2 seconds
         setTimeout(() => {
@@ -1432,14 +1670,15 @@ export default function DoctorSchedule() {
       } else {
         Alert.alert(
           "შეცდომა",
-          response.message || "განრიგის შენახვა ვერ მოხერხდა"
+          response.message || "განრიგის შენახვა ვერ მოხერხდა",
         );
       }
     } catch (error: any) {
       console.error("Error saving schedule:", error);
       Alert.alert(
         "შეცდომა",
-        error.message || "განრიგის შენახვა ვერ მოხერხდა. გთხოვთ სცადოთ თავიდან."
+        error.message ||
+          "განრიგის შენახვა ვერ მოხერხდა. გთხოვთ სცადოთ თავიდან.",
       );
       // Reload availability from backend to restore the correct state
       await loadAvailability();
@@ -1453,11 +1692,11 @@ export default function DoctorSchedule() {
     if (!isDoctorActive) {
       Alert.alert(
         "შეზღუდვა",
-        "გრაფიკის შენახვა შესაძლებელია მხოლოდ active სტატუსის ექიმებისთვის. გთხოვთ დაელოდოთ ადმინისტრატორის დამტკიცებას."
+        "გრაფიკის შენახვა შესაძლებელია მხოლოდ active სტატუსის ექიმებისთვის. გთხოვთ დაელოდოთ ადმინისტრატორის დამტკიცებას.",
       );
       return;
     }
-    
+
     try {
       setIsSaving(true);
 
@@ -1465,7 +1704,7 @@ export default function DoctorSchedule() {
 
       // ყველა თარიღი, რომელზეც ოდესმე იყო სქედული (საწყისი + текущი)
       const allDates = Array.from(
-        new Set([...initialDates, ...Object.keys(homeVisitSchedules)])
+        new Set([...initialDates, ...Object.keys(homeVisitSchedules)]),
       );
 
       // შევამოწმოთ, რომ საერთოდ რაღაც დღე მაინც არსებობს.
@@ -1473,20 +1712,23 @@ export default function DoctorSchedule() {
       if (allDates.length === 0) {
         Alert.alert(
           "შეცდომა",
-          "გთხოვთ აირჩიოთ მინიმუმ ერთი დრო, სანამ განრიგს შეინახავთ"
+          "გთხოვთ აირჩიოთ მინიმუმ ერთი დრო, სანამ განრიგს შეინახავთ",
         );
         return;
       }
 
       // შევაგროვოთ ყველა თარიღი, რომელზეც ოდესმე იყო სქედული (video ან home-visit)
       const allVideoDates = Array.from(
-        new Set([...initialVideoDatesRef.current, ...Object.keys(videoSchedules)])
+        new Set([
+          ...initialVideoDatesRef.current,
+          ...Object.keys(videoSchedules),
+        ]),
       );
       const allHomeVisitDates = Array.from(
-        new Set([...initialDates, ...Object.keys(homeVisitSchedules)])
+        new Set([...initialDates, ...Object.keys(homeVisitSchedules)]),
       );
       const allDatesCombined = Array.from(
-        new Set([...allVideoDates, ...allHomeVisitDates])
+        new Set([...allVideoDates, ...allHomeVisitDates]),
       );
 
       // სრული სია backend-ისთვის - ორივე რეჟიმის განრიგი:
@@ -1530,12 +1772,16 @@ export default function DoctorSchedule() {
       // Save to backend
       console.log(
         "📤 [Home-Visit] Sending full schedule to backend (both modes):",
-        JSON.stringify(availabilityData, null, 2)
+        JSON.stringify(availabilityData, null, 2),
       );
       console.log("📊 [Home-Visit] Schedule summary:", {
         totalDates: availabilityData.length,
-        datesWithSlots: availabilityData.filter(d => d.timeSlots.length > 0).length,
-        totalSlots: availabilityData.reduce((sum, d) => sum + d.timeSlots.length, 0),
+        datesWithSlots: availabilityData.filter((d) => d.timeSlots.length > 0)
+          .length,
+        totalSlots: availabilityData.reduce(
+          (sum, d) => sum + d.timeSlots.length,
+          0,
+        ),
       });
       const response = await apiService.updateAvailability(availabilityData);
 
@@ -1555,7 +1801,9 @@ export default function DoctorSchedule() {
         setHomeVisitSelectedDates(updatedSelectedDates);
         initialHomeVisitDatesRef.current = allHomeVisitDates;
         // განვაახლოთ initial schedules - ახლა ეს არის backend-ზე შენახული მდგომარეობა
-        initialHomeVisitSchedulesRef.current = JSON.parse(JSON.stringify(homeVisitSchedules));
+        initialHomeVisitSchedulesRef.current = JSON.parse(
+          JSON.stringify(homeVisitSchedules),
+        );
 
         // Hide success message after 2 seconds
         setTimeout(() => {
@@ -1564,14 +1812,15 @@ export default function DoctorSchedule() {
       } else {
         Alert.alert(
           "შეცდომა",
-          response.message || "განრიგის შენახვა ვერ მოხერხდა"
+          response.message || "განრიგის შენახვა ვერ მოხერხდა",
         );
       }
     } catch (error: any) {
       console.error("Error saving schedule:", error);
       Alert.alert(
         "შეცდომა",
-        error.message || "განრიგის შენახვა ვერ მოხერხდა. გთხოვთ სცადოთ თავიდან."
+        error.message ||
+          "განრიგის შენახვა ვერ მოხერხდა. გთხოვთ სცადოთ თავიდან.",
       );
       // Reload availability from backend to restore the correct state
       await loadAvailability();
@@ -1614,19 +1863,31 @@ export default function DoctorSchedule() {
   // The doctorStatus will be updated to 'active' automatically after they set a schedule
   // Check both approvalStatus and isActive - doctor must be approved AND active
   // If isActive is undefined, default to true (for backward compatibility)
-  const isDoctorActive = user?.approvalStatus === 'approved' && (user?.isActive !== false);
-  
+  const isDoctorActive =
+    user?.approvalStatus === "approved" && user?.isActive !== false;
+
   // Debug log only when user changes (moved to useEffect to prevent multiple logs)
   useEffect(() => {
     if (user?.id) {
-      console.log(user, "user", "isDoctorActive:", isDoctorActive, "approvalStatus:", user?.approvalStatus, "isActive:", user?.isActive);
+      console.log(
+        user,
+        "user",
+        "isDoctorActive:",
+        isDoctorActive,
+        "approvalStatus:",
+        user?.approvalStatus,
+        "isActive:",
+        user?.isActive,
+      );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, isDoctorActive]);
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <View
+          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+        >
           <Text style={{ fontSize: 16, color: "#6B7280" }}>
             განრიგის ჩატვირთვა...
           </Text>
@@ -1637,7 +1898,7 @@ export default function DoctorSchedule() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView 
+      <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -1655,15 +1916,18 @@ export default function DoctorSchedule() {
             <Text style={styles.subtitle}>
               აირჩიეთ რომელ დღეებში და საათებში გინდათ მუშაობა
             </Text>
-            
+
             {/* Warning message if doctor is not active */}
             {!isDoctorActive && (
               <View style={styles.warningCard}>
                 <Ionicons name="alert-circle" size={20} color="#EF4444" />
                 <View style={styles.warningContent}>
-                  <Text style={styles.warningTitle}>გრაფიკის ჩანიშვნა შეზღუდულია</Text>
+                  <Text style={styles.warningTitle}>
+                    გრაფიკის ჩანიშვნა შეზღუდულია
+                  </Text>
                   <Text style={styles.warningText}>
-                    გრაფიკის ჩანიშვნა შესაძლებელია მხოლოდ active სტატუსის ექიმებისთვის. გთხოვთ დაელოდოთ ადმინისტრატორის დამტკიცებას.
+                    გრაფიკის ჩანიშვნა შესაძლებელია მხოლოდ active სტატუსის
+                    ექიმებისთვის. გთხოვთ დაელოდოთ ადმინისტრატორის დამტკიცებას.
                   </Text>
                 </View>
               </View>
@@ -1738,7 +2002,7 @@ export default function DoctorSchedule() {
         </View>
 
         {/* Selected Days Summary */}
-        {(getCurrentModeSelectedDates().length > 0) && (
+        {getCurrentModeSelectedDates().length > 0 && (
           <View style={styles.summaryCard}>
             <View style={styles.summaryHeader}>
               <Text style={styles.summaryTitle}>
@@ -1748,7 +2012,7 @@ export default function DoctorSchedule() {
                   console.log("📅 არჩეული დღეები:", {
                     mode,
                     currentSelected,
-                    count: currentSelected.length
+                    count: currentSelected.length,
                   });
                   return currentSelected.length;
                 })()}
@@ -1768,13 +2032,12 @@ export default function DoctorSchedule() {
                 <Text style={styles.statText}>
                   {
                     Object.values(getCurrentModeSchedules()).filter(
-                      (slots) => slots.length > 0
+                      (slots) => slots.length > 0,
                     ).length
                   }{" "}
                   კონფიგურირებული
                 </Text>
               </View>
-              
             </View>
           </View>
         )}
@@ -1801,12 +2064,12 @@ export default function DoctorSchedule() {
                 const currentSchedules = getCurrentModeSchedules();
                 const hasSchedule = currentSchedules[dateStr]?.length > 0;
                 const today = isToday(date);
-                
+
                 // დაჯავშნილი საათების რაოდენობა
                 const dateKey = `${dateStr}-${mode}`;
                 const bookedForDate = bookedSlots[dateKey] || [];
                 const bookedCount = bookedForDate.length;
-                
+
                 // Debug: დაჯავშნილი სლოტების ლოგინგი
                 if (bookedCount > 0) {
                   console.log(`🔒 [Calendar Render] ${dateStr} (${mode}):`);
@@ -1816,8 +2079,15 @@ export default function DoctorSchedule() {
                   console.log(`   ✅ isSelected: ${isSelected}`);
                   console.log(`   🔒 bookedCount: ${bookedCount}`);
                   console.log(`   ⏰ დაჯავშნილი საათები:`, bookedForDate);
-                  console.log(`   📋 hasSchedule: ${hasSchedule}`, hasSchedule ? `(${currentSchedules[dateStr]?.length} საათი)` : '');
-                  console.log(`   🎨 Badge უნდა გამოჩნდეს: ${isSelected && bookedCount > 0 ? '✅ დიახ' : '❌ არა'}`);
+                  console.log(
+                    `   📋 hasSchedule: ${hasSchedule}`,
+                    hasSchedule
+                      ? `(${currentSchedules[dateStr]?.length} საათი)`
+                      : "",
+                  );
+                  console.log(
+                    `   🎨 Badge უნდა გამოჩნდეს: ${isSelected && bookedCount > 0 ? "✅ დიახ" : "❌ არა"}`,
+                  );
                 }
 
                 return (
@@ -1868,7 +2138,11 @@ export default function DoctorSchedule() {
                     </TouchableOpacity>
                     {isSelected && bookedCount > 0 && (
                       <View style={styles.bookedSlotsIndicator}>
-                        <Ionicons name="lock-closed" size={10} color="#EF4444" />
+                        <Ionicons
+                          name="lock-closed"
+                          size={10}
+                          color="#EF4444"
+                        />
                         <Text style={styles.bookedSlotsIndicatorText}>
                           {bookedCount} დაჯავშნილი
                         </Text>
@@ -1920,23 +2194,32 @@ export default function DoctorSchedule() {
                 const dateStr = formatDate(date);
                 const currentSchedules = getCurrentModeSchedules();
                 const hasSchedule = currentSchedules[dateStr]?.length > 0;
-                
+
                 // დაჯავშნილი საათების რაოდენობა
                 const dateKey = `${dateStr}-${mode}`;
                 const bookedForDate = bookedSlots[dateKey] || [];
                 const bookedCount = bookedForDate.length;
-                
+
                 // Debug: დაჯავშნილი სლოტების ლოგინგი
                 if (bookedCount > 0) {
-                  console.log(`🔒 [Calendar Render - Next Month] ${dateStr} (${mode}):`);
+                  console.log(
+                    `🔒 [Calendar Render - Next Month] ${dateStr} (${mode}):`,
+                  );
                   console.log(`   📅 თარიღი: ${dateStr}`);
                   console.log(`   🎯 რეჟიმი: ${mode}`);
                   console.log(`   🔑 Key: ${dateKey}`);
                   console.log(`   ✅ isSelected: ${isSelected}`);
                   console.log(`   🔒 bookedCount: ${bookedCount}`);
                   console.log(`   ⏰ დაჯავშნილი საათები:`, bookedForDate);
-                  console.log(`   📋 hasSchedule: ${hasSchedule}`, hasSchedule ? `(${currentSchedules[dateStr]?.length} საათი)` : '');
-                  console.log(`   🎨 Badge უნდა გამოჩნდეს: ${isSelected && bookedCount > 0 ? '✅ დიახ' : '❌ არა'}`);
+                  console.log(
+                    `   📋 hasSchedule: ${hasSchedule}`,
+                    hasSchedule
+                      ? `(${currentSchedules[dateStr]?.length} საათი)`
+                      : "",
+                  );
+                  console.log(
+                    `   🎨 Badge უნდა გამოჩნდეს: ${isSelected && bookedCount > 0 ? "✅ დიახ" : "❌ არა"}`,
+                  );
                 }
 
                 return (
@@ -1981,7 +2264,11 @@ export default function DoctorSchedule() {
                     </TouchableOpacity>
                     {isSelected && bookedCount > 0 && (
                       <View style={styles.bookedSlotsIndicator}>
-                        <Ionicons name="lock-closed" size={10} color="#EF4444" />
+                        <Ionicons
+                          name="lock-closed"
+                          size={10}
+                          color="#EF4444"
+                        />
                         <Text style={styles.bookedSlotsIndicatorText}>
                           {bookedCount} დაჯავშნილი
                         </Text>
@@ -2018,54 +2305,52 @@ export default function DoctorSchedule() {
 
       {/* Floating Save Button */}
       {!saveSuccess && !hasSaved && isDoctorActive && (
-          <TouchableOpacity
-            style={[
-              styles.floatingButton,
-              isSaving && styles.floatingButtonSaving,
-            ]}
-            onPress={saveSchedule}
-            activeOpacity={0.8}
-            disabled={isSaving || !isDoctorActive}
-          >
-            {isSaving ? (
-              <View style={styles.floatingButtonContent}>
-                <View style={styles.loadingSpinner}>
-                  <Ionicons name="hourglass" size={28} color="#FFFFFF" />
-                </View>
-                <View style={styles.floatingButtonTextContainer}>
-                  <Text style={styles.floatingButtonText}>შენახვა...</Text>
-                  <Text style={styles.floatingButtonSubtext}>
-                    გთხოვთ დაელოდოთ
-                  </Text>
-                </View>
+        <TouchableOpacity
+          style={[
+            styles.floatingButton,
+            isSaving && styles.floatingButtonSaving,
+          ]}
+          onPress={saveSchedule}
+          activeOpacity={0.8}
+          disabled={isSaving || !isDoctorActive}
+        >
+          {isSaving ? (
+            <View style={styles.floatingButtonContent}>
+              <View style={styles.loadingSpinner}>
+                <Ionicons name="hourglass" size={28} color="#FFFFFF" />
               </View>
-            ) : (
-              <View style={styles.floatingButtonContent}>
-                <View style={styles.iconContainer}>
-                  <Ionicons name="save-outline" size={24} color="#FFFFFF" />
-                </View>
-                <View style={styles.floatingButtonTextContainer}>
-                  <Text style={styles.floatingButtonText}>
-                    განრიგის შენახვა
-                  </Text>
-                  <Text style={styles.floatingButtonSubtext}>
-                    {getCurrentModeSelectedDates().length} დღე •{" "}
-                    {Object.values(getCurrentModeSchedules()).reduce(
-                      (sum, slots) => sum + slots.length,
-                      0
-                    )}{" "}
-                    საათი
-                  </Text>
-                </View>
-                <Ionicons
-                  name="arrow-forward-circle"
-                  size={28}
-                  color="rgba(255, 255, 255, 0.8)"
-                />
+              <View style={styles.floatingButtonTextContainer}>
+                <Text style={styles.floatingButtonText}>შენახვა...</Text>
+                <Text style={styles.floatingButtonSubtext}>
+                  გთხოვთ დაელოდოთ
+                </Text>
               </View>
-            )}
-          </TouchableOpacity>
-        )}
+            </View>
+          ) : (
+            <View style={styles.floatingButtonContent}>
+              <View style={styles.iconContainer}>
+                <Ionicons name="save-outline" size={24} color="#FFFFFF" />
+              </View>
+              <View style={styles.floatingButtonTextContainer}>
+                <Text style={styles.floatingButtonText}>განრიგის შენახვა</Text>
+                <Text style={styles.floatingButtonSubtext}>
+                  {getCurrentModeSelectedDates().length} დღე •{" "}
+                  {Object.values(getCurrentModeSchedules()).reduce(
+                    (sum, slots) => sum + slots.length,
+                    0,
+                  )}{" "}
+                  საათი
+                </Text>
+              </View>
+              <Ionicons
+                name="arrow-forward-circle"
+                size={28}
+                color="rgba(255, 255, 255, 0.8)"
+              />
+            </View>
+          )}
+        </TouchableOpacity>
+      )}
 
       {/* Success Message */}
       {saveSuccess && (
@@ -2114,64 +2399,95 @@ export default function DoctorSchedule() {
             )}
 
             {/* დაჯავშნილი საათების შეტყობინება */}
-            {currentEditDate && (() => {
-              const dateKey = `${currentEditDate}-${mode}`;
-              const otherMode = mode === "video" ? "home-visit" : "video";
-              const otherDateKey = `${currentEditDate}-${otherMode}`;
-              
-              // ორივე type-ის appointments გავითვალისწინოთ, რადგან ექიმი არ შეუძლია ერთდროულად იყოს ორ ადგილას
-              const bookedForDate = bookedSlots[dateKey] || [];
-              const bookedForOtherDate = bookedSlots[otherDateKey] || [];
-              const allBookedSlotsForDate = Array.from(new Set([...bookedForDate, ...bookedForOtherDate]));
-              
-              const currentSchedules = getCurrentModeSchedules();
-              const currentSlots = currentSchedules[currentEditDate] || [];
-              
-              // დათვლა: რამდენი საათია დაჯავშნილი, რამდენია 24 საათზე ნაკლები დარჩენილი (წაშლისთვის), და რამდენია დარჩენილი (დამატებისთვის)
-              const canDeleteFn = mode === "video" ? canDeleteSlotVideo : canDeleteSlotHomeVisit;
-              const canAddFn = mode === "video" ? canAddSlotVideo : canAddSlotHomeVisit;
-              
-              const lockedForDeletion = currentSlots.filter(
-                (time) => !allBookedSlotsForDate.includes(time) && !canDeleteFn(currentEditDate, time)
-              );
-              
-              // დათვლა: რამდენი საათია დარჩენილი (დამატებისთვის)
-              const lockedForAddition = AVAILABLE_HOURS.filter(
-                (time) => !allBookedSlotsForDate.includes(time) && !currentSlots.includes(time) && !canAddFn(currentEditDate, time)
-              );
-              
-              if (allBookedSlotsForDate.length > 0 || lockedForDeletion.length > 0 || lockedForAddition.length > 0) {
-                return (
-                  <View style={styles.bookedSlotsWarningContainer}>
-                    {allBookedSlotsForDate.length > 0 && (
-                      <View style={styles.bookedSlotsWarning}>
-                        <Ionicons name="information-circle" size={18} color="#EF4444" />
-                        <Text style={styles.bookedSlotsWarningText}>
-                          {allBookedSlotsForDate.length} საათი დაჯავშნილია (ვიდეო ან ბინაზე ვიზიტი) და ვერ შეიცვლება
-                        </Text>
-                      </View>
-                    )}
-                    {lockedForDeletion.length > 0 && (
-                      <View style={styles.bookedSlotsWarning}>
-                        <Ionicons name="information-circle" size={18} color="#EF4444" />
-                        <Text style={styles.bookedSlotsWarningText}>
-                          {lockedForDeletion.length} საათი 24 საათზე ნაკლები დარჩენილია და ვერ წაიშლება
-                        </Text>
-                      </View>
-                    )}
-                    {lockedForAddition.length > 0 && (
-                      <View style={styles.bookedSlotsWarning}>
-                        <Ionicons name="information-circle" size={18} color="#EF4444" />
-                        <Text style={styles.bookedSlotsWarningText}>
-                          {lockedForAddition.length} საათი 2.5 საათზე ნაკლები დარჩენილია და ვერ დაემატება
-                        </Text>
-                      </View>
-                    )}
-                  </View>
+            {currentEditDate &&
+              (() => {
+                const dateKey = `${currentEditDate}-${mode}`;
+                const otherMode = mode === "video" ? "home-visit" : "video";
+                const otherDateKey = `${currentEditDate}-${otherMode}`;
+
+                // ორივე type-ის appointments გავითვალისწინოთ, რადგან ექიმი არ შეუძლია ერთდროულად იყოს ორ ადგილას
+                const bookedForDate = bookedSlots[dateKey] || [];
+                const bookedForOtherDate = bookedSlots[otherDateKey] || [];
+                const allBookedSlotsForDate = Array.from(
+                  new Set([...bookedForDate, ...bookedForOtherDate]),
                 );
-              }
-              return null;
-            })()}
+
+                const currentSchedules = getCurrentModeSchedules();
+                const currentSlots = currentSchedules[currentEditDate] || [];
+
+                // დათვლა: რამდენი საათია დაჯავშნილი, რამდენია 24 საათზე ნაკლები დარჩენილი (წაშლისთვის), და რამდენია დარჩენილი (დამატებისთვის)
+                const canDeleteFn =
+                  mode === "video"
+                    ? canDeleteSlotVideo
+                    : canDeleteSlotHomeVisit;
+                const canAddFn =
+                  mode === "video" ? canAddSlotVideo : canAddSlotHomeVisit;
+
+                const lockedForDeletion = currentSlots.filter(
+                  (time) =>
+                    !allBookedSlotsForDate.includes(time) &&
+                    !canDeleteFn(currentEditDate, time),
+                );
+
+                // დათვლა: რამდენი საათია დარჩენილი (დამატებისთვის)
+                const lockedForAddition = AVAILABLE_HOURS.filter(
+                  (time) =>
+                    !allBookedSlotsForDate.includes(time) &&
+                    !currentSlots.includes(time) &&
+                    !canAddFn(currentEditDate, time),
+                );
+
+                if (
+                  allBookedSlotsForDate.length > 0 ||
+                  lockedForDeletion.length > 0 ||
+                  lockedForAddition.length > 0
+                ) {
+                  return (
+                    <View style={styles.bookedSlotsWarningContainer}>
+                      {allBookedSlotsForDate.length > 0 && (
+                        <View style={styles.bookedSlotsWarning}>
+                          <Ionicons
+                            name="information-circle"
+                            size={18}
+                            color="#EF4444"
+                          />
+                          <Text style={styles.bookedSlotsWarningText}>
+                            {allBookedSlotsForDate.length} საათი დაჯავშნილია
+                            (ვიდეო ან ბინაზე ვიზიტი) და ვერ შეიცვლება
+                          </Text>
+                        </View>
+                      )}
+                      {lockedForDeletion.length > 0 && (
+                        <View style={styles.bookedSlotsWarning}>
+                          <Ionicons
+                            name="information-circle"
+                            size={18}
+                            color="#EF4444"
+                          />
+                          <Text style={styles.bookedSlotsWarningText}>
+                            {lockedForDeletion.length} საათი 24 საათზე ნაკლები
+                            დარჩენილია და ვერ წაიშლება
+                          </Text>
+                        </View>
+                      )}
+                      {lockedForAddition.length > 0 && (
+                        <View style={styles.bookedSlotsWarning}>
+                          <Ionicons
+                            name="information-circle"
+                            size={18}
+                            color="#EF4444"
+                          />
+                          <Text style={styles.bookedSlotsWarningText}>
+                            {lockedForAddition.length} საათი 2.5 საათზე ნაკლები
+                            დარჩენილია და ვერ დაემატება
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  );
+                }
+                return null;
+              })()}
 
             <ScrollView style={styles.timeSlotsList}>
               <View style={styles.timeGrid}>
@@ -2180,48 +2496,72 @@ export default function DoctorSchedule() {
                   const isSelected =
                     currentEditDate &&
                     currentSchedules[currentEditDate]?.includes(time);
-                  
+
                   // შემოწმება: არის თუ არა საათი დაჯავშნილი
                   // ორივე type-ის appointments გავითვალისწინოთ, რადგან ექიმი არ შეუძლია ერთდროულად იყოს ორ ადგილას
-                  const dateKey = currentEditDate ? `${currentEditDate}-${mode}` : "";
+                  const dateKey = currentEditDate
+                    ? `${currentEditDate}-${mode}`
+                    : "";
                   const otherMode = mode === "video" ? "home-visit" : "video";
-                  const otherDateKey = currentEditDate ? `${currentEditDate}-${otherMode}` : "";
-                  
+                  const otherDateKey = currentEditDate
+                    ? `${currentEditDate}-${otherMode}`
+                    : "";
+
                   const bookedForDate = bookedSlots[dateKey] || [];
                   const bookedForOtherDate = bookedSlots[otherDateKey] || [];
-                  
+
                   // გავაერთიანოთ ორივე type-ის booked slots
-                  const allBookedSlotsForDate = Array.from(new Set([...bookedForDate, ...bookedForOtherDate]));
+                  const allBookedSlotsForDate = Array.from(
+                    new Set([...bookedForDate, ...bookedForOtherDate]),
+                  );
                   const isBooked = allBookedSlotsForDate.includes(time);
-                  
+
                   // Debug: ვნახოთ რა ხდება
                   if (isBooked) {
-                    console.log(`🔒 [Modal] Time ${time} is booked (${mode} or ${otherMode}) for ${currentEditDate}`, {
-                      dateKey,
-                      otherDateKey,
-                      mode,
-                      bookedForDate,
-                      bookedForOtherDate,
-                      allBookedSlotsForDate,
-                      allBookedSlots: Object.keys(bookedSlots),
-                    });
+                    console.log(
+                      `🔒 [Modal] Time ${time} is booked (${mode} or ${otherMode}) for ${currentEditDate}`,
+                      {
+                        dateKey,
+                        otherDateKey,
+                        mode,
+                        bookedForDate,
+                        bookedForOtherDate,
+                        allBookedSlotsForDate,
+                        allBookedSlots: Object.keys(bookedSlots),
+                      },
+                    );
                   }
-                  
+
                   // შემოწმება: შეიძლება თუ არა საათის წაშლა (თუ არჩეულია და დარჩენილია 24 საათზე ნაკლები)
-                  const canDeleteFn = mode === "video" ? canDeleteSlotVideo : canDeleteSlotHomeVisit;
-                  const canDelete = currentEditDate ? canDeleteFn(currentEditDate, time) : true;
-                  const isLockedForDeletion = isSelected && !canDelete && !isBooked;
-                  
+                  const canDeleteFn =
+                    mode === "video"
+                      ? canDeleteSlotVideo
+                      : canDeleteSlotHomeVisit;
+                  const canDelete = currentEditDate
+                    ? canDeleteFn(currentEditDate, time)
+                    : true;
+                  const isLockedForDeletion =
+                    isSelected && !canDelete && !isBooked;
+
                   // შემოწმება: შეიძლება თუ არა საათის დამატება (თუ არ არის არჩეული)
-                  const canAddFn = mode === "video" ? canAddSlotVideo : canAddSlotHomeVisit;
-                  const canAdd = currentEditDate ? canAddFn(currentEditDate, time) : true;
-                  
+                  const canAddFn =
+                    mode === "video" ? canAddSlotVideo : canAddSlotHomeVisit;
+                  const canAdd = currentEditDate
+                    ? canAddFn(currentEditDate, time)
+                    : true;
+
                   // შემოწმება: არის თუ არა საათი არჩეული სხვა რეჟიმში
-                  const otherModeSchedules = mode === "video" ? homeVisitSchedules : videoSchedules;
-                  const otherModeSlots = currentEditDate ? (otherModeSchedules[currentEditDate] || []) : [];
+                  const otherModeSchedules =
+                    mode === "video" ? homeVisitSchedules : videoSchedules;
+                  const otherModeSlots = currentEditDate
+                    ? otherModeSchedules[currentEditDate] || []
+                    : [];
                   const isSelectedInOtherMode = otherModeSlots.includes(time);
-                  
-                  const isLockedForAddition = !isSelected && (!canAdd || isSelectedInOtherMode) && !isBooked;
+
+                  const isLockedForAddition =
+                    !isSelected &&
+                    (!canAdd || isSelectedInOtherMode) &&
+                    !isBooked;
 
                   return (
                     <TouchableOpacity
@@ -2240,13 +2580,28 @@ export default function DoctorSchedule() {
                       disabled={isBooked || isLockedForAddition}
                     >
                       {isBooked && (
-                        <Ionicons name="lock-closed" size={14} color="#EF4444" style={{ marginRight: 4 }} />
+                        <Ionicons
+                          name="lock-closed"
+                          size={14}
+                          color="#EF4444"
+                          style={{ marginRight: 4 }}
+                        />
                       )}
                       {isLockedForDeletion && !isBooked && (
-                        <Ionicons name="time-outline" size={14} color="#F59E0B" style={{ marginRight: 4 }} />
+                        <Ionicons
+                          name="time-outline"
+                          size={14}
+                          color="#F59E0B"
+                          style={{ marginRight: 4 }}
+                        />
                       )}
                       {isLockedForAddition && !isBooked && (
-                        <Ionicons name="time-outline" size={14} color="#F59E0B" style={{ marginRight: 4 }} />
+                        <Ionicons
+                          name="time-outline"
+                          size={14}
+                          color="#F59E0B"
+                          style={{ marginRight: 4 }}
+                        />
                       )}
                       <Text
                         style={[
@@ -2274,39 +2629,49 @@ export default function DoctorSchedule() {
                 onPress={() => {
                   if (currentEditDate) {
                     const currentSchedules = getCurrentModeSchedules();
-                    const currentSlots = currentSchedules[currentEditDate] || [];
+                    const currentSlots =
+                      currentSchedules[currentEditDate] || [];
                     const dateKey = `${currentEditDate}-${mode}`;
                     const otherMode = mode === "video" ? "home-visit" : "video";
                     const otherDateKey = `${currentEditDate}-${otherMode}`;
-                    
+
                     // ორივე type-ის appointments გავითვალისწინოთ, რადგან ექიმი არ შეუძლია ერთდროულად იყოს ორ ადგილას
                     const bookedForDate = bookedSlots[dateKey] || [];
                     const bookedForOtherDate = bookedSlots[otherDateKey] || [];
-                    const allBookedSlotsForDate = Array.from(new Set([...bookedForDate, ...bookedForOtherDate]));
-                    
-                    // ყველა არჩევა (დაჯავშნილის გარდა, 24 საათზე ნაკლები დარჩენილი წაშლისთვის, და დარჩენილი დამატებისთვის)
-                    const canDeleteFn = mode === "video" ? canDeleteSlotVideo : canDeleteSlotHomeVisit;
-                    const canAddFn = mode === "video" ? canAddSlotVideo : canAddSlotHomeVisit;
-                    
-                    const availableSlots = AVAILABLE_HOURS.filter(
-                      (time) => 
-                        !allBookedSlotsForDate.includes(time) && 
-                        canDeleteFn(currentEditDate, time) &&
-                        canAddFn(currentEditDate, time)
+                    const allBookedSlotsForDate = Array.from(
+                      new Set([...bookedForDate, ...bookedForOtherDate]),
                     );
-                    
+
+                    // ყველა არჩევა (დაჯავშნილის გარდა, 24 საათზე ნაკლები დარჩენილი წაშლისთვის, და დარჩენილი დამატებისთვის)
+                    const canDeleteFn =
+                      mode === "video"
+                        ? canDeleteSlotVideo
+                        : canDeleteSlotHomeVisit;
+                    const canAddFn =
+                      mode === "video" ? canAddSlotVideo : canAddSlotHomeVisit;
+
+                    const availableSlots = AVAILABLE_HOURS.filter(
+                      (time) =>
+                        !allBookedSlotsForDate.includes(time) &&
+                        canDeleteFn(currentEditDate, time) &&
+                        canAddFn(currentEditDate, time),
+                    );
+
                     // დაჯავშნილი და 24 საათზე ნაკლები დარჩენილი საათები (რომლებიც ვერ წაიშლება)
                     // აქ ვტოვებთ მხოლოდ ამ რეჟიმისთვის დაჯავშნილ სლოტებს, რადგან სხვა რეჟიმის დაჯავშნილი სლოტები ამ რეჟიმში არ ჩანს
                     const nonDeletableSlots = currentSlots.filter(
-                      (time) => bookedForDate.includes(time) || !canDeleteFn(currentEditDate, time)
+                      (time) =>
+                        bookedForDate.includes(time) ||
+                        !canDeleteFn(currentEditDate, time),
                     );
 
                     let updatedSchedules: { [key: string]: string[] };
 
                     // შემოწმება: ყველა წაშლადი საათი არჩეულია თუ არა
-                    const allDeletableSelected = availableSlots.every(
-                      (time) => currentSlots.includes(time)
-                    ) && availableSlots.length > 0;
+                    const allDeletableSelected =
+                      availableSlots.every((time) =>
+                        currentSlots.includes(time),
+                      ) && availableSlots.length > 0;
 
                     if (allDeletableSelected) {
                       // ყველა წაშლადი საათის მოხსნა (დაჯავშნილი და 24 საათზე ნაკლები დარჩენილი დარჩება)
@@ -2318,7 +2683,10 @@ export default function DoctorSchedule() {
                       // ყველას არჩევა (დაჯავშნილის გარდა და 24 საათზე ნაკლები დარჩენილი)
                       updatedSchedules = {
                         ...currentSchedules,
-                        [currentEditDate]: [...nonDeletableSlots, ...availableSlots],
+                        [currentEditDate]: [
+                          ...nonDeletableSlots,
+                          ...availableSlots,
+                        ],
                       };
                     }
 
@@ -2327,7 +2695,7 @@ export default function DoctorSchedule() {
                     } else {
                       setHomeVisitSchedules(updatedSchedules);
                     }
-                    
+
                     // Reset hasSaved when slots are modified
                     setHasSaved(false);
                   }
@@ -2339,25 +2707,35 @@ export default function DoctorSchedule() {
                     const dateKey = `${currentEditDate}-${mode}`;
                     const otherMode = mode === "video" ? "home-visit" : "video";
                     const otherDateKey = `${currentEditDate}-${otherMode}`;
-                    
+
                     // ორივე type-ის appointments გავითვალისწინოთ, რადგან ექიმი არ შეუძლია ერთდროულად იყოს ორ ადგილას
                     const bookedForDate = bookedSlots[dateKey] || [];
                     const bookedForOtherDate = bookedSlots[otherDateKey] || [];
-                    const allBookedSlotsForDate = Array.from(new Set([...bookedForDate, ...bookedForOtherDate]));
-                    
-                    const currentSlots = getCurrentModeSchedules()[currentEditDate] || [];
-                    
+                    const allBookedSlotsForDate = Array.from(
+                      new Set([...bookedForDate, ...bookedForOtherDate]),
+                    );
+
+                    const currentSlots =
+                      getCurrentModeSchedules()[currentEditDate] || [];
+
                     // ყველა წაშლადი საათი (დაჯავშნილის გარდა და 24 საათზე ნაკლები დარჩენილი)
-                    const canDeleteFn = mode === "video" ? canDeleteSlotVideo : canDeleteSlotHomeVisit;
+                    const canDeleteFn =
+                      mode === "video"
+                        ? canDeleteSlotVideo
+                        : canDeleteSlotHomeVisit;
                     const availableSlots = AVAILABLE_HOURS.filter(
-                      (time) => !allBookedSlotsForDate.includes(time) && canDeleteFn(currentEditDate, time)
+                      (time) =>
+                        !allBookedSlotsForDate.includes(time) &&
+                        canDeleteFn(currentEditDate, time),
                     );
-                    
+
                     // შემოწმება: ყველა წაშლადი საათი არჩეულია თუ არა
-                    const allDeletableSelected = availableSlots.length > 0 && availableSlots.every(
-                      (time) => currentSlots.includes(time)
-                    );
-                    
+                    const allDeletableSelected =
+                      availableSlots.length > 0 &&
+                      availableSlots.every((time) =>
+                        currentSlots.includes(time),
+                      );
+
                     return allDeletableSelected
                       ? "ყველას მოხსნა"
                       : "ყველას არჩევა";
@@ -2431,19 +2809,23 @@ export default function DoctorSchedule() {
               </View>
               <Text style={styles.clearModalTitle}>თარიღის წაშლა</Text>
               <Text style={styles.clearModalText}>
-                {dateToDelete && (() => {
-                  const dateStr = formatDate(dateToDelete.date);
-                  const dateKey = `${dateStr}-${dateToDelete.mode}`;
-                  const bookedForDate = bookedSlots[dateKey] || [];
-                  const currentSchedules = dateToDelete.mode === "video" ? videoSchedules : homeVisitSchedules;
-                  const currentSlots = currentSchedules[dateStr] || [];
-                  
-                  if (bookedForDate.length > 0) {
-                    return `დარწმუნებული ხართ, რომ გსურთ ამ თარიღის (${dateStr}) წაშლა? დაჯავშნილი ${bookedForDate.length} საათი დარჩება, მაგრამ თარიღი და ${currentSlots.length} თავისუფალი საათი წაიშლება.`;
-                  } else {
-                    return `დარწმუნებული ხართ, რომ გსურთ ამ თარიღის (${dateStr}) წაშლა? ყველა საათი (${currentSlots.length}) წაიშლება.`;
-                  }
-                })()}
+                {dateToDelete &&
+                  (() => {
+                    const dateStr = formatDate(dateToDelete.date);
+                    const dateKey = `${dateStr}-${dateToDelete.mode}`;
+                    const bookedForDate = bookedSlots[dateKey] || [];
+                    const currentSchedules =
+                      dateToDelete.mode === "video"
+                        ? videoSchedules
+                        : homeVisitSchedules;
+                    const currentSlots = currentSchedules[dateStr] || [];
+
+                    if (bookedForDate.length > 0) {
+                      return `დარწმუნებული ხართ, რომ გსურთ ამ თარიღის (${dateStr}) წაშლა? დაჯავშნილი ${bookedForDate.length} საათი დარჩება, მაგრამ თარიღი და ${currentSlots.length} თავისუფალი საათი წაიშლება.`;
+                    } else {
+                      return `დარწმუნებული ხართ, რომ გსურთ ამ თარიღის (${dateStr}) წაშლა? ყველა საათი (${currentSlots.length}) წაიშლება.`;
+                    }
+                  })()}
               </Text>
             </View>
             <View style={styles.clearModalFooter}>
@@ -2460,25 +2842,29 @@ export default function DoctorSchedule() {
                 style={styles.clearModalConfirmButton}
                 onPress={async () => {
                   if (!dateToDelete) return;
-                  
+
                   const dateStr = formatDate(dateToDelete.date);
-                  
+
                   if (dateToDelete.mode === "video") {
                     // ამოიღე თარიღი
-                    setVideoSelectedDates(videoSelectedDates.filter((d) => d !== dateStr));
+                    setVideoSelectedDates(
+                      videoSelectedDates.filter((d) => d !== dateStr),
+                    );
                     const updatedSchedules = { ...videoSchedules };
                     delete updatedSchedules[dateStr];
                     setVideoSchedules(updatedSchedules);
                     setHasSaved(false);
                   } else {
                     // ამოიღე თარიღი
-                    setHomeVisitSelectedDates(homeVisitSelectedDates.filter((d) => d !== dateStr));
+                    setHomeVisitSelectedDates(
+                      homeVisitSelectedDates.filter((d) => d !== dateStr),
+                    );
                     const updatedSchedules = { ...homeVisitSchedules };
                     delete updatedSchedules[dateStr];
                     setHomeVisitSchedules(updatedSchedules);
                     setHasSaved(false);
                   }
-                  
+
                   setShowDateDeleteConfirmModal(false);
                   setDateToDelete(null);
                 }}

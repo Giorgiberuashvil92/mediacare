@@ -20,6 +20,7 @@ import {
   getStatusColor,
   getStatusLabel,
 } from "../../assets/data/doctorDashboard";
+import AIAssistant from "../components/ui/AIAssistant";
 import { apiService } from "../_services/api";
 import { useAuth } from "../contexts/AuthContext";
 import { useSchedule } from "../contexts/ScheduleContext";
@@ -432,6 +433,8 @@ export default function DoctorDashboard() {
             </View>
           </TouchableOpacity>
         )}
+
+        <AIAssistant />
 
         {/* Quick Actions */}
         <View style={styles.quickActionsSection}>
