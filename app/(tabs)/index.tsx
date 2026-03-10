@@ -10,7 +10,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import TodayAppointment from "../components/shared/todayAppointment";
@@ -32,17 +32,17 @@ const PROMOTIONAL_BANNERS = [
   },
   {
     id: 2,
-    title: "ლაბორატორიული კვლევები",
-    subtitle: "სპეციალური ფასები ყველა ანალიზზე",
-    colors: ["#8B5CF6", "#7C3AED"],
-    icon: "flask",
-  },
-  {
-    id: 3,
     title: "ონლაინ კონსულტაცია",
     subtitle: "დაჯავშნე ვიდეო კონსულტაცია და მიიღე ფასდაკლება",
     colors: ["#10B981", "#059669"],
     icon: "videocam",
+  },
+  {
+    id: 3,
+    title: "ლაბორატორიული კვლევები",
+    subtitle: "სპეციალური ფასები ყველა ანალიზზე",
+    colors: ["#8B5CF6", "#7C3AED"],
+    icon: "flask",
   },
 ];
 
@@ -74,7 +74,11 @@ export default function HomeScreen() {
       <ScrollView
         style={styles.scrollView}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#20BEB8" />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#20BEB8"
+          />
         }
       >
         <SafeAreaView>
@@ -88,7 +92,7 @@ export default function HomeScreen() {
           <Services />
           <AIAssistant />
           <Departments />
-          
+
           {/* Promotional Banner Slider */}
           <View style={styles.promoContainer}>
             <FlatList
@@ -105,14 +109,24 @@ export default function HomeScreen() {
                     <View style={styles.promoContent}>
                       <View style={styles.promoTextContainer}>
                         <Text style={styles.promoTitle}>{item.title}</Text>
-                        <Text style={styles.promoSubtitle}>{item.subtitle}</Text>
+                        <Text style={styles.promoSubtitle}>
+                          {item.subtitle}
+                        </Text>
                         <TouchableOpacity style={styles.promoButton}>
                           <Text style={styles.promoButtonText}>დეტალები</Text>
-                          <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+                          <Ionicons
+                            name="arrow-forward"
+                            size={16}
+                            color="#FFFFFF"
+                          />
                         </TouchableOpacity>
                       </View>
                       <View style={styles.promoIconContainer}>
-                        <Ionicons name={item.icon as any} size={64} color="rgba(255, 255, 255, 0.3)" />
+                        <Ionicons
+                          name={item.icon as any}
+                          size={64}
+                          color="rgba(255, 255, 255, 0.3)"
+                        />
                       </View>
                     </View>
                   </LinearGradient>
@@ -128,7 +142,7 @@ export default function HomeScreen() {
               decelerationRate="fast"
               contentContainerStyle={styles.sliderContent}
             />
-            
+
             {/* Pagination Dots */}
             <View style={styles.paginationContainer}>
               {PROMOTIONAL_BANNERS.map((_, index) => (
@@ -142,7 +156,6 @@ export default function HomeScreen() {
               ))}
             </View>
           </View>
-          
         </SafeAreaView>
       </ScrollView>
     </View>

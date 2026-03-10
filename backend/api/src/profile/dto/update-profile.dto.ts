@@ -19,6 +19,10 @@ export class UpdateProfileDto {
   @IsOptional()
   phone?: string;
 
+  @IsString()
+  @IsOptional()
+  idNumber?: string;
+
   @IsOptional()
   dateOfBirth?: string;
 
@@ -29,6 +33,10 @@ export class UpdateProfileDto {
   @IsString()
   @IsOptional()
   address?: string;
+
+  @IsString()
+  @IsOptional()
+  identificationDocument?: string;
 
   @IsString()
   @IsOptional()

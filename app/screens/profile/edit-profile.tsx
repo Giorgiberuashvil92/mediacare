@@ -1,5 +1,7 @@
 import { apiService } from "@/app/_services/api";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as DocumentPicker from "expo-document-picker";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
@@ -8,15 +10,19 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { useAuth } from "../../contexts/AuthContext";
 export default function EditProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -24,6 +30,12 @@ export default function EditProfileScreen() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [idNumber, setIdNumber] = useState("");
+  const [gender, setGender] = useState<"male" | "female" | "other">("other");
+  const [address, setAddress] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
+  const [identificationDocument, setIdentificationDocument] = useState<{ filePath: string; name: string } | null>(null);
+  const [uploadingIdentificationDocument, setUploadingIdentificationDocument] = useState(false);
   const [about, setAbout] = useState("");
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
@@ -36,7 +48,7 @@ export default function EditProfileScreen() {
   const [location, setLocation] = useState("");
   const [degrees, setDegrees] = useState("");
   const [contractDocument, setContractDocument] = useState("");
-  
+
   const isDoctor = (user as any)?.role === "doctor";
 
   useEffect(() => {
@@ -54,6 +66,15 @@ export default function EditProfileScreen() {
         setName(user?.name || "");
         setEmail(user?.email || "");
         setPhone((user as any)?.phone || "");
+        setIdNumber((user as any)?.idNumber || "");
+        setGender(
+          (user as any)?.gender === "male" || (user as any)?.gender === "female"
+            ? (user as any).gender
+            : "male"
+        );
+        setAddress((user as any)?.address || "");
+        setDateOfBirth((user as any)?.dateOfBirth || "");
+        setIdentificationDocument(null);
         setAbout("");
         setProfileImage(null);
         setLoadingProfile(false);
@@ -64,9 +85,33 @@ export default function EditProfileScreen() {
 
       if (response.success && response.data) {
         const profile = response.data;
+        // Support both direct and nested data (identificationDocument like admin/users)
+        const idDoc =
+          (profile as any).identificationDocument ??
+          (profile as any).data?.identificationDocument;
+        console.log("📄 [EditProfile] identificationDocument from API:", {
+          hasIdDoc: !!idDoc,
+          idDocValue: idDoc ? `${String(idDoc).slice(0, 60)}...` : null,
+        });
         setName(profile.name || "");
         setEmail(profile.email || "");
         setPhone(profile.phone || "");
+        setIdNumber(profile.idNumber || "");
+        setGender(
+          profile.gender === "male" || profile.gender === "female"
+            ? profile.gender
+            : "male"
+        );
+        setAddress(profile.address || "");
+        setDateOfBirth(profile.dateOfBirth || "");
+        if (idDoc && String(idDoc).trim()) {
+          setIdentificationDocument({
+            filePath: String(idDoc).trim(),
+            name: "პირადობის მოწმობა",
+          });
+        } else {
+          setIdentificationDocument(null);
+        }
         setAbout(profile.about || "");
         setProfileImage(profile.profileImage || null);
         
@@ -111,7 +156,10 @@ export default function EditProfileScreen() {
         console.log("📸 [EditProfile] uploadResponse:", uploadResponse);
 
         if (uploadResponse.success && uploadResponse.url) {
-          console.log("📸 [EditProfile] Setting profileImage to:", uploadResponse.url);
+          console.log(
+            "📸 [EditProfile] Setting profileImage to:",
+            uploadResponse.url,
+          );
           setProfileImage(uploadResponse.url);
           Alert.alert("წარმატება", "სურათი წარმატებით აიტვირთა");
         } else {
@@ -123,6 +171,58 @@ export default function EditProfileScreen() {
       Alert.alert("შეცდომა", "სურათის ატვირთვა ვერ მოხერხდა");
     } finally {
       setUploadingProfileImage(false);
+    }
+  };
+
+  const handleIdentificationDocumentPick = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["application/pdf", "image/jpeg", "image/jpg", "image/png"],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled) return;
+      const file = result.assets[0];
+      if (file.size && file.size > 5 * 1024 * 1024) {
+        Alert.alert("შეცდომა", "ფაილის ზომა არ უნდა აღემატებოდეს 5MB-ს");
+        return;
+      }
+      setUploadingIdentificationDocument(true);
+      if (apiService.isMockMode()) {
+        setIdentificationDocument({
+          filePath: "/uploads/identification/mock.pdf",
+          name: file.name,
+        });
+        setUploadingIdentificationDocument(false);
+        return;
+      }
+      const formData = new FormData();
+      formData.append("file", {
+        uri: file.uri,
+        name: file.name,
+        type: file.mimeType || "application/pdf",
+      } as any);
+      const token = await AsyncStorage.getItem("accessToken");
+      const response = await fetch(
+        `${apiService.getBaseURL()}/upload/identification`,
+        {
+          method: "POST",
+          body: formData,
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        }
+      );
+      const data = await response.json();
+      if (data.success) {
+        const filePath = data.data?.url || data.data?.filePath;
+        setIdentificationDocument({ filePath, name: file.name });
+      } else {
+        Alert.alert("შეცდომა", data.message || "ფაილის ატვირთვა ვერ მოხერხდა");
+      }
+    } catch (err: any) {
+      Alert.alert("შეცდომა", err?.message || "ფაილის ატვირთვა ვერ მოხერხდა");
+    } finally {
+      setUploadingIdentificationDocument(false);
     }
   };
 
@@ -147,6 +247,19 @@ export default function EditProfileScreen() {
     if (phone.trim()) {
       payload.phone = phone.trim();
     }
+    if (idNumber.trim()) {
+      payload.idNumber = idNumber.trim();
+    }
+    if (gender) {
+      payload.gender = gender;
+    }
+    if (address.trim()) {
+      payload.address = address.trim();
+    }
+    if (dateOfBirth.trim()) {
+      payload.dateOfBirth = dateOfBirth.trim();
+    }
+    payload.identificationDocument = identificationDocument?.filePath ?? "";
 
     if (about.trim()) {
       payload.about = about.trim();
@@ -154,7 +267,10 @@ export default function EditProfileScreen() {
 
     if (profileImage) {
       payload.profileImage = profileImage;
-      console.log("📸 [EditProfile] Saving profile with profileImage:", profileImage);
+      console.log(
+        "📸 [EditProfile] Saving profile with profileImage:",
+        profileImage,
+      );
     } else {
       console.log("📸 [EditProfile] No profileImage to save");
     }
@@ -175,7 +291,10 @@ export default function EditProfileScreen() {
       }
     }
 
-    console.log("📸 [EditProfile] Full payload:", JSON.stringify(payload, null, 2));
+    console.log(
+      "📸 [EditProfile] Full payload:",
+      JSON.stringify(payload, null, 2),
+    );
 
     try {
       setSavingProfile(true);
@@ -186,7 +305,7 @@ export default function EditProfileScreen() {
         return;
       }
       Alert.alert("წარმატება", "პროფილი წარმატებით განახლდა", [
-        { text: "კარგი", onPress: () => router.back() }
+        { text: "კარგი", onPress: () => router.back() },
       ]);
     } catch (err) {
       console.error("Failed to save profile", err);
@@ -200,7 +319,10 @@ export default function EditProfileScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
             <Ionicons name="chevron-back" size={20} color="#1F2937" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>პროფილი</Text>
@@ -224,7 +346,10 @@ export default function EditProfileScreen() {
         <View style={styles.flex}>
           {/* Header */}
           <View style={styles.header}>
-            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => router.back()}
+            >
               <Ionicons name="chevron-back" size={20} color="#1F2937" />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>პროფილი</Text>
@@ -257,7 +382,10 @@ export default function EditProfileScreen() {
                     </View>
                   )}
                   <TouchableOpacity
-                    style={[styles.changePhotoButton, isDoctor && styles.changePhotoButtonDisabled]}
+                    style={[
+                      styles.changePhotoButton,
+                      isDoctor && styles.changePhotoButtonDisabled,
+                    ]}
                     onPress={handleProfileImagePick}
                     disabled={uploadingProfileImage || isDoctor}
                   >
@@ -269,7 +397,7 @@ export default function EditProfileScreen() {
                   </TouchableOpacity>
                 </View>
                 <Text style={styles.profileImageHint}>
-                  {isDoctor 
+                  {isDoctor
                     ? "პროფილის ფოტო შეიძლება შეიცვალოს მხოლოდ ადმინ პანელიდან"
                     : "დააჭირეთ კამერას პროფილის ფოტოს შესაცვლელად"}
                 </Text>
@@ -281,9 +409,15 @@ export default function EditProfileScreen() {
                   <Ionicons name="person-outline" size={20} color="#06B6D4" />
                   <Text style={styles.label}>სახელი</Text>
                 </View>
-                <View style={[styles.input, isDoctor && styles.inputDisabled]} pointerEvents={isDoctor ? "none" : "auto"}>
+                <View
+                  style={[styles.input, isDoctor && styles.inputDisabled]}
+                  pointerEvents={isDoctor ? "none" : "auto"}
+                >
                   <TextInput
-                    style={[styles.textInput, isDoctor && styles.textInputDisabled]}
+                    style={[
+                      styles.textInput,
+                      isDoctor && styles.textInputDisabled,
+                    ]}
                     placeholder="შეიყვანეთ სახელი"
                     placeholderTextColor="#9CA3AF"
                     value={name}
@@ -299,13 +433,19 @@ export default function EditProfileScreen() {
                   <Ionicons name="mail-outline" size={20} color="#06B6D4" />
                   <Text style={styles.label}>ელ. ფოსტა</Text>
                 </View>
-                <View style={[styles.input, isDoctor && styles.inputDisabled]} pointerEvents={isDoctor ? "none" : "auto"}>
+                <View
+                  style={[styles.input, isDoctor && styles.inputDisabled]}
+                  pointerEvents={isDoctor ? "none" : "auto"}
+                >
                   <TextInput
-                    style={[styles.textInput, isDoctor && styles.textInputDisabled]}
+                    style={[
+                      styles.textInput,
+                      isDoctor && styles.textInputDisabled,
+                    ]}
                     placeholder="შეიყვანეთ ელ. ფოსტა"
                     placeholderTextColor="#9CA3AF"
                     value={email}
-                    onChangeText={setEmail} 
+                    onChangeText={setEmail}
                     keyboardType="email-address"
                     autoCapitalize="none"
                     editable={!isDoctor}
@@ -319,9 +459,15 @@ export default function EditProfileScreen() {
                   <Ionicons name="call-outline" size={20} color="#06B6D4" />
                   <Text style={styles.label}>ტელეფონი</Text>
                 </View>
-                <View style={[styles.input, isDoctor && styles.inputDisabled]} pointerEvents={isDoctor ? "none" : "auto"}>
+                <View
+                  style={[styles.input, isDoctor && styles.inputDisabled]}
+                  pointerEvents={isDoctor ? "none" : "auto"}
+                >
                   <TextInput
-                    style={[styles.textInput, isDoctor && styles.textInputDisabled]}
+                    style={[
+                      styles.textInput,
+                      isDoctor && styles.textInputDisabled,
+                    ]}
                     placeholder="შეიყვანეთ ტელეფონი"
                     placeholderTextColor="#9CA3AF"
                     value={phone}
@@ -332,25 +478,156 @@ export default function EditProfileScreen() {
                 </View>
               </View>
 
-              {/* About */}
+              {/* პირადი ნომერი */}
               <View style={styles.formItem}>
                 <View style={styles.labelContainer}>
-                  <Ionicons name="information-circle-outline" size={20} color="#06B6D4" />
-                  <Text style={styles.label}>შესახებ</Text>
+                  <Ionicons name="card-outline" size={20} color="#06B6D4" />
+                  <Text style={styles.label}>პირადი ნომერი</Text>
                 </View>
-                <View style={[styles.input, styles.textAreaInput, isDoctor && styles.inputDisabled]} pointerEvents={isDoctor ? "none" : "auto"}>
+                <View
+                  style={[styles.input, isDoctor && styles.inputDisabled]}
+                  pointerEvents={isDoctor ? "none" : "auto"}
+                >
                   <TextInput
-                    style={[styles.textInput, styles.textArea, isDoctor && styles.textInputDisabled]}
-                    placeholder="დაწერეთ თქვენს შესახებ..."
+                    style={[
+                      styles.textInput,
+                      isDoctor && styles.textInputDisabled,
+                    ]}
+                    placeholder="შეიყვანეთ პირადი ნომერი"
                     placeholderTextColor="#9CA3AF"
-                    value={about}
-                    onChangeText={setAbout}
-                    multiline
-                    numberOfLines={4}
-                    textAlignVertical="top"
+                    value={idNumber}
+                    onChangeText={setIdNumber}
+                    keyboardType="number-pad"
                     editable={!isDoctor}
                   />
                 </View>
+              </View>
+
+              {/* სქესი */}
+              <View style={styles.formItem}>
+                <View style={styles.labelContainer}>
+                  <Ionicons name="person-outline" size={20} color="#06B6D4" />
+                  <Text style={styles.label}>სქესი</Text>
+                </View>
+                <View style={styles.genderRow}>
+                  {(["male", "female"] as const).map((g) => (
+                    <TouchableOpacity
+                      key={g}
+                      style={[styles.genderOption, gender === g && styles.genderOptionSelected]}
+                      onPress={() => !isDoctor && setGender(g)}
+                      disabled={isDoctor}
+                    >
+                      <Ionicons
+                        name={g === "male" ? "male" : "female"}
+                        size={20}
+                        color={gender === g ? "#06B6D4" : "#6B7280"}
+                      />
+                      <Text style={[styles.genderOptionText, gender === g && styles.genderOptionTextSelected]}>
+                        {g === "male" ? "კაცი" : "ქალი"}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* მისამართი */}
+              <View style={styles.formItem}>
+                <View style={styles.labelContainer}>
+                  <Ionicons name="location-outline" size={20} color="#06B6D4" />
+                  <Text style={styles.label}>მისამართი</Text>
+                </View>
+                <View
+                  style={[styles.input, isDoctor && styles.inputDisabled]}
+                  pointerEvents={isDoctor ? "none" : "auto"}
+                >
+                  <TextInput
+                    style={[
+                      styles.textInput,
+                      isDoctor && styles.textInputDisabled,
+                    ]}
+                    placeholder="შეიყვანეთ მისამართი"
+                    placeholderTextColor="#9CA3AF"
+                    value={address}
+                    onChangeText={setAddress}
+                    editable={!isDoctor}
+                  />
+                </View>
+              </View>
+
+              {/* დაბადების თარიღი */}
+              <View style={styles.formItem}>
+                <View style={styles.labelContainer}>
+                  <Ionicons name="calendar-outline" size={20} color="#06B6D4" />
+                  <Text style={styles.label}>დაბადების თარიღი</Text>
+                </View>
+                <View
+                  style={[styles.input, isDoctor && styles.inputDisabled]}
+                  pointerEvents={isDoctor ? "none" : "auto"}
+                >
+                  <TextInput
+                    style={[
+                      styles.textInput,
+                      isDoctor && styles.textInputDisabled,
+                    ]}
+                    placeholder="მაგ: 1990-01-15"
+                    placeholderTextColor="#9CA3AF"
+                    value={dateOfBirth}
+                    onChangeText={setDateOfBirth}
+                    editable={!isDoctor}
+                  />
+                </View>
+              </View>
+
+              {/* პირადობა / პასპორტი */}
+              <View style={styles.formItem}>
+                <View style={styles.labelContainer}>
+                  <Ionicons name="document-attach-outline" size={20} color="#06B6D4" />
+                  <Text style={styles.label}>პირადობა / პასპორტი</Text>
+                </View>
+                {identificationDocument ? (
+                  <View style={styles.documentRow}>
+                    <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                    <Text style={styles.documentName} numberOfLines={1}>{identificationDocument.name}</Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        const path = identificationDocument.filePath;
+                        const url = path.startsWith("http") ? path : `${apiService.getBaseURL().replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
+                        Linking.openURL(url);
+                      }}
+                      style={styles.openDocButton}
+                    >
+                      <Ionicons name="open-outline" size={18} color="#06B6D4" />
+                      <Text style={styles.openDocText}>გახსნა</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setIdentificationDocument(null)}
+                      style={styles.removeDocButton}
+                      disabled={isDoctor}
+                    >
+                      <Text style={styles.removeDocText}>წაშლა</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
+                <TouchableOpacity
+                  style={[styles.filePickerButton, identificationDocument && styles.filePickerButtonActive]}
+                  onPress={handleIdentificationDocumentPick}
+                  disabled={uploadingIdentificationDocument || isDoctor}
+                >
+                  {uploadingIdentificationDocument ? (
+                    <ActivityIndicator size="small" color="#06B6D4" />
+                  ) : (
+                    <>
+                      <Ionicons
+                        name="cloud-upload-outline"
+                        size={20}
+                        color={identificationDocument ? "#10B981" : "#9CA3AF"}
+                      />
+                      <Text style={styles.filePickerText}>
+                        {identificationDocument ? "დოკუმენტი ატვირთულია" : "აირჩიეთ ფაილი (PDF ან სურათი)"}
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
               </View>
 
               {/* Doctor Specific Fields */}
@@ -362,7 +639,10 @@ export default function EditProfileScreen() {
                       <Ionicons name="cash-outline" size={20} color="#10B981" />
                       <Text style={styles.label}>კონსულტაციის ფასი (₾)</Text>
                     </View>
-                    <View style={[styles.input, styles.inputDisabled]} pointerEvents="none">
+                    <View
+                      style={[styles.input, styles.inputDisabled]}
+                      pointerEvents="none"
+                    >
                       <TextInput
                         style={[styles.textInput, styles.textInputDisabled]}
                         placeholder="მაგ: 50"
@@ -378,10 +658,17 @@ export default function EditProfileScreen() {
                   {/* Experience */}
                   <View style={styles.formItem}>
                     <View style={styles.labelContainer}>
-                      <Ionicons name="briefcase-outline" size={20} color="#8B5CF6" />
+                      <Ionicons
+                        name="briefcase-outline"
+                        size={20}
+                        color="#8B5CF6"
+                      />
                       <Text style={styles.label}>გამოცდილება</Text>
                     </View>
-                    <View style={[styles.input, styles.inputDisabled]} pointerEvents="none">
+                    <View
+                      style={[styles.input, styles.inputDisabled]}
+                      pointerEvents="none"
+                    >
                       <TextInput
                         style={[styles.textInput, styles.textInputDisabled]}
                         placeholder="მაგ: 10 წელი"
@@ -396,10 +683,17 @@ export default function EditProfileScreen() {
                   {/* Location */}
                   <View style={styles.formItem}>
                     <View style={styles.labelContainer}>
-                      <Ionicons name="location-outline" size={20} color="#F59E0B" />
+                      <Ionicons
+                        name="location-outline"
+                        size={20}
+                        color="#F59E0B"
+                      />
                       <Text style={styles.label}>მისამართი</Text>
                     </View>
-                    <View style={[styles.input, styles.inputDisabled]} pointerEvents="none">
+                    <View
+                      style={[styles.input, styles.inputDisabled]}
+                      pointerEvents="none"
+                    >
                       <TextInput
                         style={[styles.textInput, styles.textInputDisabled]}
                         placeholder="მაგ: თბილისი, ვაკე"
@@ -414,12 +708,27 @@ export default function EditProfileScreen() {
                   {/* Degrees */}
                   <View style={styles.formItem}>
                     <View style={styles.labelContainer}>
-                      <Ionicons name="school-outline" size={20} color="#06B6D4" />
+                      <Ionicons
+                        name="school-outline"
+                        size={20}
+                        color="#06B6D4"
+                      />
                       <Text style={styles.label}>კვალიფიკაცია / ხარისხი</Text>
                     </View>
-                    <View style={[styles.input, styles.textAreaInput, styles.inputDisabled]} pointerEvents="none">
+                    <View
+                      style={[
+                        styles.input,
+                        styles.textAreaInput,
+                        styles.inputDisabled,
+                      ]}
+                      pointerEvents="none"
+                    >
                       <TextInput
-                        style={[styles.textInput, styles.textArea, styles.textInputDisabled]}
+                        style={[
+                          styles.textInput,
+                          styles.textArea,
+                          styles.textInputDisabled,
+                        ]}
                         placeholder="მაგ: მედიცინის დოქტორი, თსსუ"
                         placeholderTextColor="#9CA3AF"
                         value={degrees}
@@ -439,21 +748,22 @@ export default function EditProfileScreen() {
 
         {/* Sticky Footer Save Button above keyboard */}
         <View
-          style={[
-            styles.footer,
-            { paddingBottom: (insets.bottom || 12) + 12 },
-          ]}
+          style={[styles.footer, { paddingBottom: (insets.bottom || 12) + 12 }]}
         >
           {isDoctor ? (
             <View style={[styles.infoBox, { marginTop: 24 }]}>
               <Ionicons name="information-circle" size={20} color="#06B6D4" />
               <Text style={styles.infoText}>
-                ექიმის ინფორმაციის რედაქტირება შესაძლებელია მხოლოდ ადმინ პანელიდან
+                ექიმის ინფორმაციის რედაქტირება შესაძლებელია მხოლოდ ადმინ
+                პანელიდან
               </Text>
             </View>
           ) : (
             <TouchableOpacity
-              style={[styles.saveButton, savingProfile && styles.saveButtonDisabled]}
+              style={[
+                styles.saveButton,
+                savingProfile && styles.saveButtonDisabled,
+              ]}
               onPress={handleSave}
               disabled={savingProfile}
             >
@@ -654,5 +964,93 @@ const styles = StyleSheet.create({
     color: "#0369A1",
     lineHeight: 20,
   },
+  genderRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  genderOption: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    backgroundColor: "#FFFFFF",
+  },
+  genderOptionSelected: {
+    borderColor: "#06B6D4",
+    backgroundColor: "#E0F2FE",
+  },
+  genderOptionText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+  },
+  genderOptionTextSelected: {
+    color: "#06B6D4",
+    fontFamily: "Poppins-SemiBold",
+  },
+  documentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+    padding: 12,
+    backgroundColor: "#F0FDF4",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#BBF7D0",
+  },
+  documentName: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#166534",
+  },
+  openDocButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  openDocText: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#06B6D4",
+  },
+  removeDocButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  removeDocText: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#DC2626",
+  },
+  filePickerButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    backgroundColor: "#FFFFFF",
+  },
+  filePickerButtonActive: {
+    borderColor: "#10B981",
+    backgroundColor: "#F0FDF4",
+  },
+  filePickerText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+  },
 });
-

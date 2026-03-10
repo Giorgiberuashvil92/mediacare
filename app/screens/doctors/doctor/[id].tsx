@@ -242,16 +242,6 @@ const DoctorDetail = () => {
 
           <View style={styles.nameRow}>
             <Text style={styles.doctorName}>{doctor.name}</Text>
-            <TouchableOpacity
-              style={styles.infoButton}
-              onPress={() => setShowEducationModal(true)}
-            >
-              <Ionicons
-                name="information-circle-outline"
-                size={20}
-                color="#06B6D4"
-              />
-            </TouchableOpacity>
           </View>
           <Text style={styles.specialty}>{doctor.specialization}</Text>
           {doctor.about && <Text style={styles.languages}>{doctor.about}</Text>}

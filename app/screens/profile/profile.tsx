@@ -5,6 +5,7 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
+  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -19,6 +20,7 @@ import { showToast } from "../../utils/toast";
 export default function ProfileScreen() {
   const { user, logout, isAuthenticated } = useAuth();
   const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [identificationDocumentUrl, setIdentificationDocumentUrl] = useState<string | null>(null);
 
   const handleResetOnboarding = async () => {
     await AsyncStorage.removeItem("hasCompletedOnboarding");
@@ -30,13 +32,21 @@ export default function ProfileScreen() {
       const response = await apiService.getProfile();
       console.log("📸 Profile response:", response);
       if (response.success && response.data) {
-        const imageUrl = response.data.profileImage;
+        const data = response.data;
+        const imageUrl = data.profileImage;
         console.log("📸 Profile image URL:", imageUrl);
-        // Set profileImage if it exists and is not empty
         if (imageUrl && imageUrl.trim() !== '') {
           setProfileImage(imageUrl);
         } else {
           setProfileImage(null);
+        }
+        const idDoc = data.identificationDocument ?? (data as any).data?.identificationDocument;
+        if (idDoc && String(idDoc).trim()) {
+          const base = apiService.getBaseURL?.() ?? "https://mediacare-production.up.railway.app";
+          const url = String(idDoc).startsWith("http") ? String(idDoc).trim() : `${base.replace(/\/$/, "")}/${String(idDoc).trim().replace(/^\//, "")}`;
+          setIdentificationDocumentUrl(url);
+        } else {
+          setIdentificationDocumentUrl(null);
         }
       }
     } catch (error) {
@@ -153,6 +163,23 @@ export default function ProfileScreen() {
 
           <View style={styles.separator} />
         </View>
+
+        {/* პირადობა/პასპორტი */}
+        {identificationDocumentUrl ? (
+          <View style={styles.profileSection}>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => Linking.openURL(identificationDocumentUrl)}
+            >
+              <View style={[styles.menuIconContainer, { backgroundColor: "#F0FDF4" }]}>
+                <Ionicons name="document-attach" size={20} color="#10B981" />
+              </View>
+              <Text style={styles.menuText}>პირადობა / პასპორტი</Text>
+              <Ionicons name="open-outline" size={20} color="#06B6D4" />
+            </TouchableOpacity>
+            <View style={styles.separator} />
+          </View>
+        ) : null}
 
         {/* Menu Options */}
         <View style={styles.menuSection}>

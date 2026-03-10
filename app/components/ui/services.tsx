@@ -19,14 +19,6 @@ const QUICK_SERVICES = [
       }),
   },
   {
-    id: "lab",
-    title: "ლაბორატორია",
-    description: "ანალიზები და კვლევები",
-    icon: "flask",
-    gradient: ["#8B5CF6", "#7C3AED"],
-    onPress: () => router.push("/(tabs)/lab"),
-  },
-  {
     id: "home-visit",
     title: "ბინაზე გამოძახება",
     description: "ექიმი შენს მისამართზე",
@@ -39,12 +31,12 @@ const QUICK_SERVICES = [
       }),
   },
   {
-    id: "advisor",
-    title: "მრჩეველი",
-    description: "შეგირჩევთ სწორ ექიმს",
-    icon: "chatbubbles",
-    gradient: ["#10B981", "#059669"],
-    onPress: () => router.push("/screens/advisor"),
+    id: "lab",
+    title: "ლაბორატორია",
+    description: "ანალიზები და კვლევები",
+    icon: "flask",
+    gradient: ["#8B5CF6", "#7C3AED"],
+    onPress: () => router.push("/(tabs)/lab"),
   },
 ];
 

@@ -40,14 +40,16 @@ export class ProfileService {
         role: user.role,
         name: user.name,
         email: user.email,
-        phone: user.phone,
+        phone: user.phone ?? null,
+        idNumber: user.idNumber ?? null,
         dateOfBirth: user.dateOfBirth
           ? user.dateOfBirth.toISOString().split('T')[0]
-          : undefined,
-        gender: user.gender,
-        profileImage: user.profileImage,
-        address: user.address,
-        about: user.about,
+          : null,
+        gender: user.gender ?? null,
+        profileImage: user.profileImage ?? null,
+        address: user.address ?? null,
+        identificationDocument: (user as any).identificationDocument ?? null,
+        about: user.about ?? null,
         isActive: user.isActive,
         isVerified: user.isVerified,
         approvalStatus: user.approvalStatus,
@@ -70,10 +72,14 @@ export class ProfileService {
       },
     };
 
-    console.log(
-      '📸 [ProfileService] Returning profile data with profileImage:',
-      profileData.data.profileImage,
-    );
+    console.log('📸 [ProfileService] Returning profile data:', {
+      profileImage: profileData.data.profileImage,
+      idNumber: profileData.data.idNumber,
+      identificationDocument: profileData.data.identificationDocument
+        ? '(present)'
+        : null,
+      about: profileData.data.about ? '(present)' : null,
+    });
     return profileData;
   }
 
@@ -104,6 +110,9 @@ export class ProfileService {
     if (updateProfileDto.phone !== undefined) {
       updateData.phone = updateProfileDto.phone;
     }
+    if (updateProfileDto.idNumber !== undefined) {
+      updateData.idNumber = updateProfileDto.idNumber;
+    }
     if (updateProfileDto.dateOfBirth !== undefined) {
       updateData.dateOfBirth = new Date(updateProfileDto.dateOfBirth);
     }
@@ -112,6 +121,10 @@ export class ProfileService {
     }
     if (updateProfileDto.address !== undefined) {
       updateData.address = updateProfileDto.address.trim();
+    }
+    if (updateProfileDto.identificationDocument !== undefined) {
+      updateData.identificationDocument =
+        updateProfileDto.identificationDocument;
     }
     if (updateProfileDto.profileImage !== undefined) {
       console.log(
