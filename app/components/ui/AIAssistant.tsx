@@ -53,7 +53,7 @@ export default function AIAssistant() {
             <View style={styles.textContainer}>
               <Text style={styles.title}>AI ასისტენტი</Text>
               <Text style={styles.description}>
-                იკითხე განმარტოვების ნებისმიერ საკითხზე
+                იკითხე ჯანმრთელობის ნებისმიერ საკითხზე
               </Text>
               <View style={styles.buttonsRow}>
                 <TouchableOpacity
@@ -247,7 +247,9 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: "#E0F2FE",
     borderRadius: 24,
-    padding: 20,
+    paddingTop: 16,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
@@ -262,18 +264,19 @@ const styles = StyleSheet.create({
   textContainer: {
     flex: 1,
     marginRight: 16,
+    justifyContent: "flex-start",
   },
   title: {
-    fontSize: 22,
+    fontSize: 14,
     fontFamily: "Poppins-Bold",
     color: "#1F2937",
-    marginBottom: 8,
+    marginBottom: 6,
   },
   description: {
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: "Poppins-Regular",
     color: "#374151",
-    marginBottom: 20,
+    marginBottom: 14,
     lineHeight: 20,
   },
   buttonsRow: {

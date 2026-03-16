@@ -19,8 +19,15 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Svg, { Defs, Path, Rect, Stop, LinearGradient as SvgLinearGradient } from "react-native-svg";
+import Svg, {
+  Defs,
+  Path,
+  Rect,
+  Stop,
+  LinearGradient as SvgLinearGradient,
+} from "react-native-svg";
 import { AIMessage, AISession, apiService } from "../_services/api";
+import AIAssistantBannerGraphic from "../components/ui/AIAssistantBannerGraphic";
 import { useAuth } from "../contexts/AuthContext";
 
 const SUGGESTED_PROMPTS = [
@@ -54,7 +61,9 @@ export default function AIAssistantScreen() {
   const [inputText, setInputText] = useState("");
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showMediaModal, setShowMediaModal] = useState(false);
-  const [selectedImage, setSelectedImage] = useState<SelectedImageType | null>(null);
+  const [selectedImage, setSelectedImage] = useState<SelectedImageType | null>(
+    null,
+  );
   const [currentSession, setCurrentSession] = useState<AISession | null>(null);
   const [messages, setMessages] = useState<AIMessage[]>([]);
   const [sessions, setSessions] = useState<AISession[]>([]);
@@ -68,10 +77,7 @@ export default function AIAssistantScreen() {
     if (Platform.OS !== "web") {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert(
-          "წვდომა",
-          "კამერის გამოსაყენებლად საჭიროა კამერის წვდომა"
-        );
+        Alert.alert("წვდომა", "კამერის გამოსაყენებლად საჭიროა კამერის წვდომა");
         return false;
       }
     }
@@ -81,12 +87,10 @@ export default function AIAssistantScreen() {
   // Request media library permissions
   const requestMediaLibraryPermission = async () => {
     if (Platform.OS !== "web") {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert(
-          "წვდომა",
-          "სურათის არჩევისთვის საჭიროა გალერეის წვდომა"
-        );
+        Alert.alert("წვდომა", "სურათის არჩევისთვის საჭიროა გალერეის წვდომა");
         return false;
       }
     }
@@ -137,7 +141,7 @@ export default function AIAssistantScreen() {
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
-        
+
         // Validate file size (max 10MB)
         if (asset.fileSize && asset.fileSize > 10 * 1024 * 1024) {
           Alert.alert("შეცდომა", "ფაილის ზომა არ უნდა აღემატებოდეს 10MB-ს");
@@ -167,21 +171,24 @@ export default function AIAssistantScreen() {
     }
   };
 
-
   // Reset state when screen loses focus (user navigates away)
   useFocusEffect(
     useCallback(() => {
       // When screen comes into focus, reset everything for fresh start
-      console.log("🔄 [useFocusEffect] Screen focused - resetting for fresh start");
+      console.log(
+        "🔄 [useFocusEffect] Screen focused - resetting for fresh start",
+      );
       setMessages([]);
       setCurrentSession(null);
       setInputText("");
       setSelectedImage(null);
       setIsLoading(false);
-      
+
       // Don't load existing session - always start fresh
-      console.log("📝 [useFocusEffect] Starting fresh - session will be created when user sends first message.");
-      
+      console.log(
+        "📝 [useFocusEffect] Starting fresh - session will be created when user sends first message.",
+      );
+
       return () => {
         // Cleanup when screen loses focus (user navigates away)
         console.log("🧹 [useFocusEffect] Screen unfocused - cleaning up");
@@ -190,14 +197,14 @@ export default function AIAssistantScreen() {
         setInputText("");
         setSelectedImage(null);
       };
-    }, [])
+    }, []),
   );
 
   // Load messages for current session
   const loadMessages = async (sessionId: string) => {
     try {
       console.log("📨 [loadMessages] Loading messages for session:", sessionId);
-      
+
       const messagesResponse = await apiService.getAIMessages(sessionId, {
         limit: 100,
       });
@@ -209,7 +216,10 @@ export default function AIAssistantScreen() {
 
       if (messagesResponse.success) {
         setMessages(messagesResponse.data);
-        console.log("✅ [loadMessages] Messages loaded successfully:", messagesResponse.data.length);
+        console.log(
+          "✅ [loadMessages] Messages loaded successfully:",
+          messagesResponse.data.length,
+        );
         // Scroll to bottom after messages load
         setTimeout(() => {
           scrollViewRef.current?.scrollToEnd({ animated: true });
@@ -227,7 +237,7 @@ export default function AIAssistantScreen() {
     try {
       setIsLoadingHistory(true);
       console.log("📋 [loadSessions] Loading sessions for user:", user.id);
-      
+
       const sessionsResponse = await apiService.getAISessions({
         initiator_id: user.id,
         limit: 100, // Increased limit to get more sessions
@@ -240,7 +250,10 @@ export default function AIAssistantScreen() {
 
       if (sessionsResponse.success) {
         setSessions(sessionsResponse.data);
-        console.log("✅ [loadSessions] Sessions loaded successfully:", sessionsResponse.data.length);
+        console.log(
+          "✅ [loadSessions] Sessions loaded successfully:",
+          sessionsResponse.data.length,
+        );
       }
     } catch (error) {
       console.error("❌ [loadSessions] Error loading sessions:", error);
@@ -269,7 +282,9 @@ export default function AIAssistantScreen() {
       // Create session if it doesn't exist (first message)
       let sessionToUse = currentSession;
       if (!sessionToUse) {
-        console.log("📝 [handleSendMessage] Creating new session for first message");
+        console.log(
+          "📝 [handleSendMessage] Creating new session for first message",
+        );
         const sessionResponse = await apiService.createAISession({
           initiator_id: user.id,
           initiator_type: user.role === "doctor" ? "doctor" : "customer",
@@ -287,17 +302,23 @@ export default function AIAssistantScreen() {
 
       const response = await apiService.sendAIMessage(sessionToUse.id, {
         content,
-        image: selectedImage ? {
-          uri: selectedImage.uri,
-          type: selectedImage.type || "image/jpeg",
-          name: selectedImage.name || `photo_${Date.now()}.jpg`,
-        } : undefined,
+        image: selectedImage
+          ? {
+              uri: selectedImage.uri,
+              type: selectedImage.type || "image/jpeg",
+              name: selectedImage.name || `photo_${Date.now()}.jpg`,
+            }
+          : undefined,
       });
 
       if (response.success) {
         // Add both user and assistant messages to the list
-        setMessages((prev) => [...prev, response.data.user_message, response.data.assistant_message]);
-        
+        setMessages((prev) => [
+          ...prev,
+          response.data.user_message,
+          response.data.assistant_message,
+        ]);
+
         // Clear input
         setInputText("");
         setSelectedImage(null);
@@ -309,7 +330,10 @@ export default function AIAssistantScreen() {
       }
     } catch (error: any) {
       console.error("Send message error:", error);
-      Alert.alert("შეცდომა", error.message || "შეტყობინების გაგზავნა ვერ მოხერხდა");
+      Alert.alert(
+        "შეცდომა",
+        error.message || "შეტყობინების გაგზავნა ვერ მოხერხდა",
+      );
     } finally {
       setIsSending(false);
     }
@@ -326,10 +350,10 @@ export default function AIAssistantScreen() {
     console.log("📋 [handleSessionSelect] Session selected:", session.id);
     setShowHistoryModal(false);
     setCurrentSession(session);
-    
+
     // Save session ID to AsyncStorage
     await AsyncStorage.setItem("ai_session_id", session.id);
-    
+
     // Load messages for this session
     await loadMessages(session.id);
   };
@@ -359,325 +383,363 @@ export default function AIAssistantScreen() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Ionicons name="arrow-back" size={24} color="#1F2937" />
-        </TouchableOpacity>
-        
-        <View style={styles.headerTitleContainer}>
-          <View style={styles.headerIconContainer}>
-            <Svg width={32} height={32} viewBox="0 0 56 56" fill="none">
-              <Rect width={56} height={56} rx={11} fill="#A47CF6" fillOpacity={0.2} />
-              <Path
-                d="M24.6 23.2283L26.0767 18.0633C26.63 16.13 29.37 16.13 29.9233 18.0633L31.3983 23.2283C31.4917 23.555 31.6668 23.8526 31.9071 24.0929C32.1474 24.3332 32.4449 24.5083 32.7717 24.6017L37.9367 26.0767C39.87 26.63 39.87 29.37 37.9367 29.9233L32.7717 31.3983C32.4449 31.4917 32.1474 31.6668 31.9071 31.9071C31.6668 32.1474 31.4917 32.4449 31.3983 32.7717L29.9233 37.9367C29.37 39.87 26.63 39.87 26.0767 37.9367L24.6017 32.7717C24.5083 32.4449 24.3332 32.1474 24.0929 31.9071C23.8526 31.6668 23.555 31.4917 23.2283 31.3983L18.0633 29.9233C16.13 29.37 16.13 26.63 18.0633 26.0767L23.2283 24.6017C23.555 24.5083 23.8526 24.3332 24.0929 24.0929C24.3332 23.8526 24.5083 23.555 24.6017 23.2283M38.1733 35.5117C38.655 34.1067 40.68 34.105 41.16 35.5117L41.2033 35.6567L41.6967 37.6367L43.6767 38.1317C45.2767 38.5317 45.2767 40.8017 43.6767 41.2017L41.6967 41.6967L41.2033 43.6767C40.8033 45.275 38.5317 45.275 38.1317 43.6767L37.6367 41.6967L35.6567 41.2017C34.0567 40.8017 34.0567 38.53 35.6567 38.1317L37.6367 37.6367L38.1317 35.6567L38.1733 35.5117ZM39.6667 39.3283C39.5707 39.4568 39.4568 39.5707 39.3283 39.6667C39.4568 39.7626 39.5707 39.8765 39.6667 40.005C39.7626 39.8765 39.8765 39.7626 40.005 39.6667C39.8764 39.5702 39.7624 39.4557 39.6667 39.3267M14.84 12.1767C15.3367 10.725 17.4817 10.7733 17.87 12.3217L18.3633 14.3017L20.3433 14.7967C21.9433 15.1967 21.9433 17.4667 20.3433 17.8667L18.3633 18.3617L17.87 20.3417C17.47 21.94 15.1983 21.94 14.7983 20.3417L14.3033 18.3617L12.3233 17.8667C10.7233 17.4667 10.7233 15.195 12.3233 14.7967L14.3033 14.3017L14.7983 12.3217L14.84 12.1767ZM16.3333 15.995C16.2373 16.1229 16.1233 16.2362 15.995 16.3317C16.1236 16.4281 16.2375 16.5426 16.3333 16.6717C16.4291 16.5426 16.5431 16.4281 16.6717 16.3317C16.5432 16.2357 16.4292 16.1235 16.3333 15.995Z"
-                fill="url(#paint0_linear_5_1329)"
-              />
-              <Defs>
-                <SvgLinearGradient
-                  id="paint0_linear_5_1329"
-                  x1="24.8298"
-                  y1="15.8108"
-                  x2="40.4274"
-                  y2="21.8217"
-                  gradientUnits="userSpaceOnUse"
-                >
-                  <Stop stopColor="#6366F1" />
-                  <Stop offset={1} stopColor="#A855F7" />
-                </SvgLinearGradient>
-              </Defs>
-            </Svg>
-          </View>
-          <View style={styles.headerTextContainer}>
-            <Text style={styles.headerTitle}>AI ასისტენტი</Text>
-            <Text style={styles.headerSubtitle}>Powered By Hapttic</Text>
-          </View>
-        </View>
-
-        <View style={styles.headerActions}>
+        {/* Header */}
+        <View style={styles.header}>
           <TouchableOpacity
-            style={styles.headerIconButton}
-            onPress={async () => {
-              // Create new session and start fresh
-              if (user?.id) {
-                console.log("✍️ [headerNewChatButton] Creating new session");
-                try {
-                  const sessionResponse = await apiService.createAISession({
-                    initiator_id: user.id,
-                    initiator_type: user.role === "doctor" ? "doctor" : "customer",
-                  });
-                  if (sessionResponse.success) {
-                    setCurrentSession(sessionResponse.data);
-                    await AsyncStorage.setItem("ai_session_id", sessionResponse.data.id);
-                    setMessages([]);
-                    setInputText("");
-                    setSelectedImage(null);
-                    console.log("✅ [headerNewChatButton] New session created:", sessionResponse.data.id);
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Ionicons name="arrow-back" size={24} color="#1F2937" />
+          </TouchableOpacity>
+
+          <View style={styles.headerTitleContainer}>
+            <View style={styles.headerIconContainer}>
+              <Svg width={32} height={32} viewBox="0 0 56 56" fill="none">
+                <Rect
+                  width={56}
+                  height={56}
+                  rx={11}
+                  fill="#A47CF6"
+                  fillOpacity={0.2}
+                />
+                <Path
+                  d="M24.6 23.2283L26.0767 18.0633C26.63 16.13 29.37 16.13 29.9233 18.0633L31.3983 23.2283C31.4917 23.555 31.6668 23.8526 31.9071 24.0929C32.1474 24.3332 32.4449 24.5083 32.7717 24.6017L37.9367 26.0767C39.87 26.63 39.87 29.37 37.9367 29.9233L32.7717 31.3983C32.4449 31.4917 32.1474 31.6668 31.9071 31.9071C31.6668 32.1474 31.4917 32.4449 31.3983 32.7717L29.9233 37.9367C29.37 39.87 26.63 39.87 26.0767 37.9367L24.6017 32.7717C24.5083 32.4449 24.3332 32.1474 24.0929 31.9071C23.8526 31.6668 23.555 31.4917 23.2283 31.3983L18.0633 29.9233C16.13 29.37 16.13 26.63 18.0633 26.0767L23.2283 24.6017C23.555 24.5083 23.8526 24.3332 24.0929 24.0929C24.3332 23.8526 24.5083 23.555 24.6017 23.2283M38.1733 35.5117C38.655 34.1067 40.68 34.105 41.16 35.5117L41.2033 35.6567L41.6967 37.6367L43.6767 38.1317C45.2767 38.5317 45.2767 40.8017 43.6767 41.2017L41.6967 41.6967L41.2033 43.6767C40.8033 45.275 38.5317 45.275 38.1317 43.6767L37.6367 41.6967L35.6567 41.2017C34.0567 40.8017 34.0567 38.53 35.6567 38.1317L37.6367 37.6367L38.1317 35.6567L38.1733 35.5117ZM39.6667 39.3283C39.5707 39.4568 39.4568 39.5707 39.3283 39.6667C39.4568 39.7626 39.5707 39.8765 39.6667 40.005C39.7626 39.8765 39.8765 39.7626 40.005 39.6667C39.8764 39.5702 39.7624 39.4557 39.6667 39.3267M14.84 12.1767C15.3367 10.725 17.4817 10.7733 17.87 12.3217L18.3633 14.3017L20.3433 14.7967C21.9433 15.1967 21.9433 17.4667 20.3433 17.8667L18.3633 18.3617L17.87 20.3417C17.47 21.94 15.1983 21.94 14.7983 20.3417L14.3033 18.3617L12.3233 17.8667C10.7233 17.4667 10.7233 15.195 12.3233 14.7967L14.3033 14.3017L14.7983 12.3217L14.84 12.1767ZM16.3333 15.995C16.2373 16.1229 16.1233 16.2362 15.995 16.3317C16.1236 16.4281 16.2375 16.5426 16.3333 16.6717C16.4291 16.5426 16.5431 16.4281 16.6717 16.3317C16.5432 16.2357 16.4292 16.1235 16.3333 15.995Z"
+                  fill="url(#paint0_linear_5_1329)"
+                />
+                <Defs>
+                  <SvgLinearGradient
+                    id="paint0_linear_5_1329"
+                    x1="24.8298"
+                    y1="15.8108"
+                    x2="40.4274"
+                    y2="21.8217"
+                    gradientUnits="userSpaceOnUse"
+                  >
+                    <Stop stopColor="#6366F1" />
+                    <Stop offset={1} stopColor="#A855F7" />
+                  </SvgLinearGradient>
+                </Defs>
+              </Svg>
+            </View>
+            <View style={styles.headerTextContainer}>
+              <Text style={styles.headerTitle}>AI ასისტენტი</Text>
+              <Text style={styles.headerSubtitle}>Powered By Hapttic</Text>
+            </View>
+          </View>
+
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.headerIconButton}
+              onPress={async () => {
+                // Create new session and start fresh
+                if (user?.id) {
+                  console.log("✍️ [headerNewChatButton] Creating new session");
+                  try {
+                    const sessionResponse = await apiService.createAISession({
+                      initiator_id: user.id,
+                      initiator_type:
+                        user.role === "doctor" ? "doctor" : "customer",
+                    });
+                    if (sessionResponse.success) {
+                      setCurrentSession(sessionResponse.data);
+                      await AsyncStorage.setItem(
+                        "ai_session_id",
+                        sessionResponse.data.id,
+                      );
+                      setMessages([]);
+                      setInputText("");
+                      setSelectedImage(null);
+                      console.log(
+                        "✅ [headerNewChatButton] New session created:",
+                        sessionResponse.data.id,
+                      );
+                    }
+                  } catch (error) {
+                    console.error(
+                      "❌ [headerNewChatButton] Error creating session:",
+                      error,
+                    );
+                    Alert.alert("შეცდომა", "ახალი სესიის შექმნა ვერ მოხერხდა");
                   }
-                } catch (error) {
-                  console.error("❌ [headerNewChatButton] Error creating session:", error);
-                  Alert.alert("შეცდომა", "ახალი სესიის შექმნა ვერ მოხერხდა");
                 }
-              }
-            }}
-          >
-            <Ionicons name="create-outline" size={22} color="#1F2937" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.headerIconButton}
-            onPress={() => setShowHistoryModal(true)}
-          >
-            <Ionicons name="time-outline" size={22} color="#1F2937" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.headerIconButton}>
-            <Ionicons name="ellipsis-vertical" size={22} color="#1F2937" />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <ScrollView
-        ref={scrollViewRef}
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* AI Generated Tag */}
-        <View style={styles.aiTagContainer}>
-          <View style={styles.aiTag}>
-            <Svg width={12} height={12} viewBox="0 0 56 56" fill="none">
-              <Path
-                d="M24.6 23.2283L26.0767 18.0633C26.63 16.13 29.37 16.13 29.9233 18.0633L31.3983 23.2283C31.4917 23.555 31.6668 23.8526 31.9071 24.0929C32.1474 24.3332 32.4449 24.5083 32.7717 24.6017L37.9367 26.0767C39.87 26.63 39.87 29.37 37.9367 29.9233L32.7717 31.3983C32.4449 31.4917 32.1474 31.6668 31.9071 31.9071C31.6668 32.1474 31.4917 32.4449 31.3983 32.7717L29.9233 37.9367C29.37 39.87 26.63 39.87 26.0767 37.9367L24.6017 32.7717C24.5083 32.4449 24.3332 32.1474 24.0929 31.9071C23.8526 31.6668 23.555 31.4917 23.2283 31.3983L18.0633 29.9233C16.13 29.37 16.13 26.63 18.0633 26.0767L23.2283 24.6017C23.555 24.5083 23.8526 24.3332 24.0929 24.0929C24.3332 23.8526 24.5083 23.555 24.6017 23.2283M38.1733 35.5117C38.655 34.1067 40.68 34.105 41.16 35.5117L41.2033 35.6567L41.6967 37.6367L43.6767 38.1317C45.2767 38.5317 45.2767 40.8017 43.6767 41.2017L41.6967 41.6967L41.2033 43.6767C40.8033 45.275 38.5317 45.275 38.1317 43.6767L37.6367 41.6967L35.6567 41.2017C34.0567 40.8017 34.0567 38.53 35.6567 38.1317L37.6367 37.6367L38.1317 35.6567L38.1733 35.5117ZM39.6667 39.3283C39.5707 39.4568 39.4568 39.5707 39.3283 39.6667C39.4568 39.7626 39.5707 39.8765 39.6667 40.005C39.7626 39.8765 39.8765 39.7626 40.005 39.6667C39.8764 39.5702 39.7624 39.4557 39.6667 39.3267M14.84 12.1767C15.3367 10.725 17.4817 10.7733 17.87 12.3217L18.3633 14.3017L20.3433 14.7967C21.9433 15.1967 21.9433 17.4667 20.3433 17.8667L18.3633 18.3617L17.87 20.3417C17.47 21.94 15.1983 21.94 14.7983 20.3417L14.3033 18.3617L12.3233 17.8667C10.7233 17.4667 10.7233 15.195 12.3233 14.7967L14.3033 14.3017L14.7983 12.3217L14.84 12.1767ZM16.3333 15.995C16.2373 16.1229 16.1233 16.2362 15.995 16.3317C16.1236 16.4281 16.2375 16.5426 16.3333 16.6717C16.4291 16.5426 16.5431 16.4281 16.6717 16.3317C16.5432 16.2357 16.4292 16.1235 16.3333 15.995Z"
-                fill="url(#paint0_linear_5_1329)"
-              />
-              <Defs>
-                <SvgLinearGradient
-                  id="paint0_linear_5_1329"
-                  x1="24.8298"
-                  y1="15.8108"
-                  x2="40.4274"
-                  y2="21.8217"
-                  gradientUnits="userSpaceOnUse"
-                >
-                  <Stop stopColor="#6366F1" />
-                  <Stop offset={1} stopColor="#A855F7" />
-                </SvgLinearGradient>
-              </Defs>
-            </Svg>
-            <Text style={styles.aiTagText}>Generated by Al. Review Recommended.</Text>
-          </View>
-          <View style={styles.creditsContainer}>
-            <Text style={styles.creditsText}>100</Text>
-            <TouchableOpacity>
-              <Ionicons name="information-circle-outline" size={18} color="#6B7280" />
+              }}
+            >
+              <Ionicons name="create-outline" size={22} color="#1F2937" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.headerIconButton}
+              onPress={() => setShowHistoryModal(true)}
+            >
+              <Ionicons name="time-outline" size={22} color="#1F2937" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.headerIconButton}>
+              <Ionicons name="ellipsis-vertical" size={22} color="#1F2937" />
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* AI Assistant Banner */}
-        <View style={styles.bannerContainer}>
-          <View style={styles.bannerCard}>
-            <Svg width={120} height={120} viewBox="0 0 56 56" fill="none">
-              <Rect width={56} height={56} rx={11} fill="#A47CF6" fillOpacity={0.2} />
-              <Path
-                d="M24.6 23.2283L26.0767 18.0633C26.63 16.13 29.37 16.13 29.9233 18.0633L31.3983 23.2283C31.4917 23.555 31.6668 23.8526 31.9071 24.0929C32.1474 24.3332 32.4449 24.5083 32.7717 24.6017L37.9367 26.0767C39.87 26.63 39.87 29.37 37.9367 29.9233L32.7717 31.3983C32.4449 31.4917 32.1474 31.6668 31.9071 31.9071C31.6668 32.1474 31.4917 32.4449 31.3983 32.7717L29.9233 37.9367C29.37 39.87 26.63 39.87 26.0767 37.9367L24.6017 32.7717C24.5083 32.4449 24.3332 32.1474 24.0929 31.9071C23.8526 31.6668 23.555 31.4917 23.2283 31.3983L18.0633 29.9233C16.13 29.37 16.13 26.63 18.0633 26.0767L23.2283 24.6017C23.555 24.5083 23.8526 24.3332 24.0929 24.0929C24.3332 23.8526 24.5083 23.555 24.6017 23.2283M38.1733 35.5117C38.655 34.1067 40.68 34.105 41.16 35.5117L41.2033 35.6567L41.6967 37.6367L43.6767 38.1317C45.2767 38.5317 45.2767 40.8017 43.6767 41.2017L41.6967 41.6967L41.2033 43.6767C40.8033 45.275 38.5317 45.275 38.1317 43.6767L37.6367 41.6967L35.6567 41.2017C34.0567 40.8017 34.0567 38.53 35.6567 38.1317L37.6367 37.6367L38.1317 35.6567L38.1733 35.5117ZM39.6667 39.3283C39.5707 39.4568 39.4568 39.5707 39.3283 39.6667C39.4568 39.7626 39.5707 39.8765 39.6667 40.005C39.7626 39.8765 39.8765 39.7626 40.005 39.6667C39.8764 39.5702 39.7624 39.4557 39.6667 39.3267M14.84 12.1767C15.3367 10.725 17.4817 10.7733 17.87 12.3217L18.3633 14.3017L20.3433 14.7967C21.9433 15.1967 21.9433 17.4667 20.3433 17.8667L18.3633 18.3617L17.87 20.3417C17.47 21.94 15.1983 21.94 14.7983 20.3417L14.3033 18.3617L12.3233 17.8667C10.7233 17.4667 10.7233 15.195 12.3233 14.7967L14.3033 14.3017L14.7983 12.3217L14.84 12.1767ZM16.3333 15.995C16.2373 16.1229 16.1233 16.2362 15.995 16.3317C16.1236 16.4281 16.2375 16.5426 16.3333 16.6717C16.4291 16.5426 16.5431 16.4281 16.6717 16.3317C16.5432 16.2357 16.4292 16.1235 16.3333 15.995Z"
-                fill="url(#paint0_linear_5_1329)"
-              />
-              <Defs>
-                <SvgLinearGradient
-                  id="paint0_linear_5_1329"
-                  x1="24.8298"
-                  y1="15.8108"
-                  x2="40.4274"
-                  y2="21.8217"
-                  gradientUnits="userSpaceOnUse"
-                >
-                  <Stop stopColor="#6366F1" />
-                  <Stop offset={1} stopColor="#A855F7" />
-                </SvgLinearGradient>
-              </Defs>
-            </Svg>
-          </View>
-          <Text style={styles.bannerTitle}>AI ასისტენტი</Text>
-          <Text style={styles.bannerDescription}>
-            ჰკითხე ჯანმრთელობის შესახებ ნებისმიერ საკითხზე
-          </Text>
-        </View>
-
-        {/* Messages */}
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#6366F1" />
-            <Text style={styles.loadingText}>სესიის ინიციალიზაცია...</Text>
-          </View>
-        ) : messages.length > 0 ? (
-          <View style={styles.messagesContainer}>
-            {messages.map((message) => (
-              <View key={message.id}>
-                <View
-                  style={[
-                    styles.messageBubble,
-                    message.role === "user" ? styles.userMessage : styles.assistantMessage,
-                  ]}
-                >
-                  {message.image_url && (
-                    <Image source={{ uri: message.image_url }} style={styles.messageImage} />
-                  )}
-                  <Text
-                    style={[
-                      styles.messageText,
-                      message.role === "user" ? styles.userMessageText : styles.assistantMessageText,
-                    ]}
-                  >
-                    {message.content}
-                  </Text>
-                  <Text style={styles.messageTime}>
-                    {new Date(message.created_at).toLocaleTimeString("ka-GE", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </Text>
-                </View>
-                
-                {/* Doctor Recommendations from AI Response */}
-                {message.role === "assistant" && message.metadata?.doctors && message.metadata.doctors.length > 0 && (
-                  <View style={styles.doctorRecommendationsContainer}>
-                    {message.metadata.doctors.map((doctor: any, index: number) => (
-                      <TouchableOpacity
-                        key={doctor.id || index}
-                        style={styles.doctorRecommendationCard}
-                        onPress={() => {
-                          if (doctor.id) {
-                            router.push({
-                              pathname: "/screens/doctors/doctor/[id]",
-                              params: { id: doctor.id },
-                            });
-                          }
-                        }}
-                      >
-                        {doctor.image && (
-                          <Image 
-                            source={{ uri: doctor.image }} 
-                            style={styles.doctorRecommendationImage}
-                          />
-                        )}
-                        <View style={styles.doctorRecommendationInfo}>
-                          <Text style={styles.doctorRecommendationName}>
-                            {doctor.name || "ექიმი"}
-                          </Text>
-                          {doctor.specialization && (
-                            <Text style={styles.doctorRecommendationSpecialty}>
-                              {doctor.specialization}
-                            </Text>
-                          )}
-                          {doctor.rating && (
-                            <View style={styles.doctorRecommendationRating}>
-                              <Ionicons name="star" size={14} color="#F59E0B" />
-                              <Text style={styles.doctorRecommendationRatingText}>
-                                {doctor.rating}
-                                {doctor.reviewCount && ` (${doctor.reviewCount})`}
-                              </Text>
-                            </View>
-                          )}
-                          {doctor.consultationFee && (
-                            <Text style={styles.doctorRecommendationFee}>
-                              {doctor.consultationFee}
-                            </Text>
-                          )}
-                        </View>
-                        <TouchableOpacity
-                          style={styles.doctorRecommendationButton}
-                          onPress={() => {
-                            if (doctor.id) {
-                              router.push({
-                                pathname: "/screens/doctors/doctor/[id]",
-                                params: { id: doctor.id },
-                              });
-                            }
-                          }}
-                        >
-                          <Text style={styles.doctorRecommendationButtonText}>ჩაეწერე</Text>
-                        </TouchableOpacity>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-              </View>
-            ))}
-          </View>
-        ) : (
-          <>
-            {/* Suggested Prompts */}
-            <View style={styles.promptsSection}>
-              <Text style={styles.promptsTitle}>შემოთავაზებული კითხვები</Text>
-              <View style={styles.promptsContainer}>
-                {SUGGESTED_PROMPTS.map((prompt) => (
-                  <TouchableOpacity
-                    key={prompt.id}
-                    style={styles.promptCard}
-                    activeOpacity={0.7}
-                    onPress={() => handlePromptSelect(prompt.text)}
-                  >
-                    <Ionicons name="list-outline" size={20} color="#6B7280" />
-                    <Text style={styles.promptText}>{prompt.text}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          </>
-        )}
-      </ScrollView>
-
-      {/* Input Field */}
-      <View style={styles.inputContainer}>
-        <TouchableOpacity
-          style={styles.inputIconButton}
-          onPress={() => setShowMediaModal(true)}
+        <ScrollView
+          ref={scrollViewRef}
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
         >
-          <Ionicons name="add-circle-outline" size={24} color="#6B7280" />
-        </TouchableOpacity>
-        <View style={styles.inputWrapper}>
-          {selectedImage && (
-            <View style={styles.inputImagePreview}>
-              <Image source={{ uri: selectedImage.uri }} style={styles.inputPreviewImage} />
-              <TouchableOpacity
-                style={styles.inputRemoveImageButton}
-                onPress={() => setSelectedImage(null)}
-              >
-                <Ionicons name="close-circle" size={20} color="#FFFFFF" />
+          {/* AI Generated Tag */}
+          <View style={styles.aiTagContainer}>
+            <View style={styles.aiTag}>
+              <Svg width={12} height={12} viewBox="0 0 56 56" fill="none">
+                <Path
+                  d="M24.6 23.2283L26.0767 18.0633C26.63 16.13 29.37 16.13 29.9233 18.0633L31.3983 23.2283C31.4917 23.555 31.6668 23.8526 31.9071 24.0929C32.1474 24.3332 32.4449 24.5083 32.7717 24.6017L37.9367 26.0767C39.87 26.63 39.87 29.37 37.9367 29.9233L32.7717 31.3983C32.4449 31.4917 32.1474 31.6668 31.9071 31.9071C31.6668 32.1474 31.4917 32.4449 31.3983 32.7717L29.9233 37.9367C29.37 39.87 26.63 39.87 26.0767 37.9367L24.6017 32.7717C24.5083 32.4449 24.3332 32.1474 24.0929 31.9071C23.8526 31.6668 23.555 31.4917 23.2283 31.3983L18.0633 29.9233C16.13 29.37 16.13 26.63 18.0633 26.0767L23.2283 24.6017C23.555 24.5083 23.8526 24.3332 24.0929 24.0929C24.3332 23.8526 24.5083 23.555 24.6017 23.2283M38.1733 35.5117C38.655 34.1067 40.68 34.105 41.16 35.5117L41.2033 35.6567L41.6967 37.6367L43.6767 38.1317C45.2767 38.5317 45.2767 40.8017 43.6767 41.2017L41.6967 41.6967L41.2033 43.6767C40.8033 45.275 38.5317 45.275 38.1317 43.6767L37.6367 41.6967L35.6567 41.2017C34.0567 40.8017 34.0567 38.53 35.6567 38.1317L37.6367 37.6367L38.1317 35.6567L38.1733 35.5117ZM39.6667 39.3283C39.5707 39.4568 39.4568 39.5707 39.3283 39.6667C39.4568 39.7626 39.5707 39.8765 39.6667 40.005C39.7626 39.8765 39.8765 39.7626 40.005 39.6667C39.8764 39.5702 39.7624 39.4557 39.6667 39.3267M14.84 12.1767C15.3367 10.725 17.4817 10.7733 17.87 12.3217L18.3633 14.3017L20.3433 14.7967C21.9433 15.1967 21.9433 17.4667 20.3433 17.8667L18.3633 18.3617L17.87 20.3417C17.47 21.94 15.1983 21.94 14.7983 20.3417L14.3033 18.3617L12.3233 17.8667C10.7233 17.4667 10.7233 15.195 12.3233 14.7967L14.3033 14.3017L14.7983 12.3217L14.84 12.1767ZM16.3333 15.995C16.2373 16.1229 16.1233 16.2362 15.995 16.3317C16.1236 16.4281 16.2375 16.5426 16.3333 16.6717C16.4291 16.5426 16.5431 16.4281 16.6717 16.3317C16.5432 16.2357 16.4292 16.1235 16.3333 15.995Z"
+                  fill="url(#paint0_linear_5_1329)"
+                />
+                <Defs>
+                  <SvgLinearGradient
+                    id="paint0_linear_5_1329"
+                    x1="24.8298"
+                    y1="15.8108"
+                    x2="40.4274"
+                    y2="21.8217"
+                    gradientUnits="userSpaceOnUse"
+                  >
+                    <Stop stopColor="#6366F1" />
+                    <Stop offset={1} stopColor="#A855F7" />
+                  </SvgLinearGradient>
+                </Defs>
+              </Svg>
+              <Text style={styles.aiTagText}>
+                Generated by Al. Review Recommended.
+              </Text>
+            </View>
+            <View style={styles.creditsContainer}>
+              <Text style={styles.creditsText}>100</Text>
+              <TouchableOpacity>
+                <Ionicons
+                  name="information-circle-outline"
+                  size={18}
+                  color="#6B7280"
+                />
               </TouchableOpacity>
             </View>
-          )}
-          <TextInput
-            style={[styles.input, selectedImage && styles.inputWithImage]}
-            placeholder="ჰკითხე ჯანმრთელობაზე"
-            placeholderTextColor="#9CA3AF"
-            value={inputText}
-            onChangeText={setInputText}
-            multiline
-          />
-        </View>
-        <TouchableOpacity style={styles.inputIconButton}>
-          <Ionicons name="mic-outline" size={24} color="#6B7280" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.sendButton}
-          disabled={(!inputText.trim() && !selectedImage) || isSending}
-          onPress={() => handleSendMessage()}
-        >
-          {isSending ? (
-            <ActivityIndicator size="small" color="#6366F1" />
+          </View>
+
+          {/* AI Assistant Banner */}
+          <View style={styles.bannerContainer}>
+            <View style={styles.bannerCard}>
+              <AIAssistantBannerGraphic width={140} height={140} />
+            </View>
+            <Text style={styles.bannerTitle}>AI ასისტენტი</Text>
+            <Text style={styles.bannerDescription}>
+              ჰკითხე ჯანმრთელობის შესახებ ნებისმიერ საკითხზე
+            </Text>
+          </View>
+
+          {/* Messages */}
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#6366F1" />
+              <Text style={styles.loadingText}>სესიის ინიციალიზაცია...</Text>
+            </View>
+          ) : messages.length > 0 ? (
+            <View style={styles.messagesContainer}>
+              {messages.map((message) => (
+                <View key={message.id}>
+                  <View
+                    style={[
+                      styles.messageBubble,
+                      message.role === "user"
+                        ? styles.userMessage
+                        : styles.assistantMessage,
+                    ]}
+                  >
+                    {message.image_url && (
+                      <Image
+                        source={{ uri: message.image_url }}
+                        style={styles.messageImage}
+                      />
+                    )}
+                    <Text
+                      style={[
+                        styles.messageText,
+                        message.role === "user"
+                          ? styles.userMessageText
+                          : styles.assistantMessageText,
+                      ]}
+                    >
+                      {message.content}
+                    </Text>
+                    <Text style={styles.messageTime}>
+                      {new Date(message.created_at).toLocaleTimeString(
+                        "ka-GE",
+                        {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        },
+                      )}
+                    </Text>
+                  </View>
+
+                  {/* Doctor Recommendations from AI Response */}
+                  {message.role === "assistant" &&
+                    message.metadata?.doctors &&
+                    message.metadata.doctors.length > 0 && (
+                      <View style={styles.doctorRecommendationsContainer}>
+                        {message.metadata.doctors.map(
+                          (doctor: any, index: number) => (
+                            <TouchableOpacity
+                              key={doctor.id || index}
+                              style={styles.doctorRecommendationCard}
+                              onPress={() => {
+                                if (doctor.id) {
+                                  router.push({
+                                    pathname: "/screens/doctors/doctor/[id]",
+                                    params: { id: doctor.id },
+                                  });
+                                }
+                              }}
+                            >
+                              {doctor.image && (
+                                <Image
+                                  source={{ uri: doctor.image }}
+                                  style={styles.doctorRecommendationImage}
+                                />
+                              )}
+                              <View style={styles.doctorRecommendationInfo}>
+                                <Text style={styles.doctorRecommendationName}>
+                                  {doctor.name || "ექიმი"}
+                                </Text>
+                                {doctor.specialization && (
+                                  <Text
+                                    style={styles.doctorRecommendationSpecialty}
+                                  >
+                                    {doctor.specialization}
+                                  </Text>
+                                )}
+                                {doctor.rating && (
+                                  <View
+                                    style={styles.doctorRecommendationRating}
+                                  >
+                                    <Ionicons
+                                      name="star"
+                                      size={14}
+                                      color="#F59E0B"
+                                    />
+                                    <Text
+                                      style={
+                                        styles.doctorRecommendationRatingText
+                                      }
+                                    >
+                                      {doctor.rating}
+                                      {doctor.reviewCount &&
+                                        ` (${doctor.reviewCount})`}
+                                    </Text>
+                                  </View>
+                                )}
+                                {doctor.consultationFee && (
+                                  <Text style={styles.doctorRecommendationFee}>
+                                    {doctor.consultationFee}
+                                  </Text>
+                                )}
+                              </View>
+                              <TouchableOpacity
+                                style={styles.doctorRecommendationButton}
+                                onPress={() => {
+                                  if (doctor.id) {
+                                    router.push({
+                                      pathname: "/screens/doctors/doctor/[id]",
+                                      params: { id: doctor.id },
+                                    });
+                                  }
+                                }}
+                              >
+                                <Text
+                                  style={styles.doctorRecommendationButtonText}
+                                >
+                                  ჩაეწერე
+                                </Text>
+                              </TouchableOpacity>
+                            </TouchableOpacity>
+                          ),
+                        )}
+                      </View>
+                    )}
+                </View>
+              ))}
+            </View>
           ) : (
-            <Ionicons
-              name="send"
-              size={20}
-              color={inputText.trim() || selectedImage ? "#6366F1" : "#9CA3AF"}
-            />
+            <>
+              {/* Suggested Prompts */}
+              <View style={styles.promptsSection}>
+                <View style={styles.promptsContainer}>
+                  {SUGGESTED_PROMPTS.map((prompt) => (
+                    <TouchableOpacity
+                      key={prompt.id}
+                      style={styles.promptCard}
+                      activeOpacity={0.7}
+                      onPress={() => handlePromptSelect(prompt.text)}
+                    >
+                      <Ionicons name="list-outline" size={20} color="#6B7280" />
+                      <Text style={styles.promptText}>{prompt.text}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </>
           )}
-        </TouchableOpacity>
-      </View>
+        </ScrollView>
+
+        {/* Input Field */}
+        <View style={styles.inputContainer}>
+          <TouchableOpacity
+            style={styles.inputIconButton}
+            onPress={() => setShowMediaModal(true)}
+          >
+            <Ionicons name="add-circle-outline" size={24} color="#6B7280" />
+          </TouchableOpacity>
+          <View style={styles.inputWrapper}>
+            {selectedImage && (
+              <View style={styles.inputImagePreview}>
+                <Image
+                  source={{ uri: selectedImage.uri }}
+                  style={styles.inputPreviewImage}
+                />
+                <TouchableOpacity
+                  style={styles.inputRemoveImageButton}
+                  onPress={() => setSelectedImage(null)}
+                >
+                  <Ionicons name="close-circle" size={20} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+            )}
+            <TextInput
+              style={[styles.input, selectedImage && styles.inputWithImage]}
+              placeholder="ჰკითხე ჯანმრთელობაზე"
+              placeholderTextColor="#9CA3AF"
+              value={inputText}
+              onChangeText={setInputText}
+              multiline
+            />
+          </View>
+          <TouchableOpacity style={styles.inputIconButton}>
+            <Ionicons name="mic-outline" size={24} color="#6B7280" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.sendButton}
+            disabled={(!inputText.trim() && !selectedImage) || isSending}
+            onPress={() => handleSendMessage()}
+          >
+            {isSending ? (
+              <ActivityIndicator size="small" color="#6366F1" />
+            ) : (
+              <Ionicons
+                name="send"
+                size={20}
+                color={
+                  inputText.trim() || selectedImage ? "#6366F1" : "#9CA3AF"
+                }
+              />
+            )}
+          </TouchableOpacity>
+        </View>
       </KeyboardAvoidingView>
 
       {/* History Modal */}
@@ -692,7 +754,10 @@ export default function AIAssistantScreen() {
           activeOpacity={1}
           onPress={() => setShowHistoryModal(false)}
         >
-          <View style={styles.historyModalContent} onStartShouldSetResponder={() => true}>
+          <View
+            style={styles.historyModalContent}
+            onStartShouldSetResponder={() => true}
+          >
             <View style={styles.historyModalHeader}>
               <View style={styles.historyModalHeaderLeft}>
                 <TouchableOpacity
@@ -702,20 +767,34 @@ export default function AIAssistantScreen() {
                     if (user?.id) {
                       console.log("✍️ [newChatButton] Creating new session");
                       try {
-                        const sessionResponse = await apiService.createAISession({
-                          initiator_id: user.id,
-                          initiator_type: user.role === "doctor" ? "doctor" : "customer",
-                        });
+                        const sessionResponse =
+                          await apiService.createAISession({
+                            initiator_id: user.id,
+                            initiator_type:
+                              user.role === "doctor" ? "doctor" : "customer",
+                          });
                         if (sessionResponse.success) {
                           setCurrentSession(sessionResponse.data);
-                          await AsyncStorage.setItem("ai_session_id", sessionResponse.data.id);
+                          await AsyncStorage.setItem(
+                            "ai_session_id",
+                            sessionResponse.data.id,
+                          );
                           setMessages([]);
                           setShowHistoryModal(false);
-                          console.log("✅ [newChatButton] New session created:", sessionResponse.data.id);
+                          console.log(
+                            "✅ [newChatButton] New session created:",
+                            sessionResponse.data.id,
+                          );
                         }
                       } catch (error) {
-                        console.error("❌ [newChatButton] Error creating session:", error);
-                        Alert.alert("შეცდომა", "ახალი სესიის შექმნა ვერ მოხერხდა");
+                        console.error(
+                          "❌ [newChatButton] Error creating session:",
+                          error,
+                        );
+                        Alert.alert(
+                          "შეცდომა",
+                          "ახალი სესიის შექმნა ვერ მოხერხდა",
+                        );
                       }
                     }
                   }}
@@ -737,7 +816,7 @@ export default function AIAssistantScreen() {
                 <Ionicons name="close" size={24} color="#1F2937" />
               </TouchableOpacity>
             </View>
-            
+
             <ScrollView
               style={styles.historyModalList}
               showsVerticalScrollIndicator={false}
@@ -756,18 +835,32 @@ export default function AIAssistantScreen() {
                   >
                     <View style={styles.historyItemContent}>
                       <Text style={styles.historyItemTitle}>
-                        {session.status === "active" ? "აქტიური სესია" : "დასრულებული სესია"}
+                        {session.status === "active"
+                          ? "აქტიური სესია"
+                          : "დასრულებული სესია"}
                       </Text>
-                      <Text style={styles.historyItemDate}>{formatSessionDate(session.created_at)}</Text>
+                      <Text style={styles.historyItemDate}>
+                        {formatSessionDate(session.created_at)}
+                      </Text>
                     </View>
-                    <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+                    <Ionicons
+                      name="chevron-forward"
+                      size={20}
+                      color="#9CA3AF"
+                    />
                   </TouchableOpacity>
                 ))
               ) : (
                 <View style={styles.historyEmptyState}>
-                  <Ionicons name="chatbubbles-outline" size={64} color="#D1D5DB" />
+                  <Ionicons
+                    name="chatbubbles-outline"
+                    size={64}
+                    color="#D1D5DB"
+                  />
                   <Text style={styles.historyEmptyText}>ისტორია ცარიელია</Text>
-                  <Text style={styles.historyEmptySubtext}>თქვენი ჩატის ისტორია აქ გამოჩნდება</Text>
+                  <Text style={styles.historyEmptySubtext}>
+                    თქვენი ჩატის ისტორია აქ გამოჩნდება
+                  </Text>
                 </View>
               )}
             </ScrollView>
@@ -787,12 +880,21 @@ export default function AIAssistantScreen() {
           activeOpacity={1}
           onPress={() => setShowMediaModal(false)}
         >
-          <View style={styles.mediaModalContent} onStartShouldSetResponder={() => true}>
+          <View
+            style={styles.mediaModalContent}
+            onStartShouldSetResponder={() => true}
+          >
             <View style={styles.mediaModalHeader}>
               <View style={styles.modalHeaderTitleContainer}>
                 <View style={styles.modalHeaderIconContainer}>
                   <Svg width={32} height={32} viewBox="0 0 56 56" fill="none">
-                    <Rect width={56} height={56} rx={11} fill="#A47CF6" fillOpacity={0.2} />
+                    <Rect
+                      width={56}
+                      height={56}
+                      rx={11}
+                      fill="#A47CF6"
+                      fillOpacity={0.2}
+                    />
                     <Path
                       d="M24.6 23.2283L26.0767 18.0633C26.63 16.13 29.37 16.13 29.9233 18.0633L31.3983 23.2283C31.4917 23.555 31.6668 23.8526 31.9071 24.0929C32.1474 24.3332 32.4449 24.5083 32.7717 24.6017L37.9367 26.0767C39.87 26.63 39.87 29.37 37.9367 29.9233L32.7717 31.3983C32.4449 31.4917 32.1474 31.6668 31.9071 31.9071C31.6668 32.1474 31.4917 32.4449 31.3983 32.7717L29.9233 37.9367C29.37 39.87 26.63 39.87 26.0767 37.9367L24.6017 32.7717C24.5083 32.4449 24.3332 32.1474 24.0929 31.9071C23.8526 31.6668 23.555 31.4917 23.2283 31.3983L18.0633 29.9233C16.13 29.37 16.13 26.63 18.0633 26.0767L23.2283 24.6017C23.555 24.5083 23.8526 24.3332 24.0929 24.0929C24.3332 23.8526 24.5083 23.555 24.6017 23.2283M38.1733 35.5117C38.655 34.1067 40.68 34.105 41.16 35.5117L41.2033 35.6567L41.6967 37.6367L43.6767 38.1317C45.2767 38.5317 45.2767 40.8017 43.6767 41.2017L41.6967 41.6967L41.2033 43.6767C40.8033 45.275 38.5317 45.275 38.1317 43.6767L37.6367 41.6967L35.6567 41.2017C34.0567 40.8017 34.0567 38.53 35.6567 38.1317L37.6367 37.6367L38.1317 35.6567L38.1733 35.5117ZM39.6667 39.3283C39.5707 39.4568 39.4568 39.5707 39.3283 39.6667C39.4568 39.7626 39.5707 39.8765 39.6667 40.005C39.7626 39.8765 39.8765 39.7626 40.005 39.6667C39.8764 39.5702 39.7624 39.4557 39.6667 39.3267M14.84 12.1767C15.3367 10.725 17.4817 10.7733 17.87 12.3217L18.3633 14.3017L20.3433 14.7967C21.9433 15.1967 21.9433 17.4667 20.3433 17.8667L18.3633 18.3617L17.87 20.3417C17.47 21.94 15.1983 21.94 14.7983 20.3417L14.3033 18.3617L12.3233 17.8667C10.7233 17.4667 10.7233 15.195 12.3233 14.7967L14.3033 14.3017L14.7983 12.3217L14.84 12.1767ZM16.3333 15.995C16.2373 16.1229 16.1233 16.2362 15.995 16.3317C16.1236 16.4281 16.2375 16.5426 16.3333 16.6717C16.4291 16.5426 16.5431 16.4281 16.6717 16.3317C16.5432 16.2357 16.4292 16.1235 16.3333 15.995Z"
                       fill="url(#paint0_linear_5_1329)"
@@ -814,7 +916,9 @@ export default function AIAssistantScreen() {
                 </View>
                 <View>
                   <Text style={styles.modalHeaderTitle}>AI ასისტენტი</Text>
-                  <Text style={styles.modalHeaderSubtitle}>Powered By Hapttic</Text>
+                  <Text style={styles.modalHeaderSubtitle}>
+                    Powered By Hapttic
+                  </Text>
                 </View>
               </View>
             </View>
@@ -839,7 +943,10 @@ export default function AIAssistantScreen() {
               </TouchableOpacity>
               {selectedImage && (
                 <View style={styles.selectedImageContainer}>
-                  <Image source={{ uri: selectedImage.uri }} style={styles.selectedImage} />
+                  <Image
+                    source={{ uri: selectedImage.uri }}
+                    style={styles.selectedImage}
+                  />
                   <View style={styles.selectedImageBadge}>
                     <Text style={styles.selectedImageBadgeText}>1</Text>
                   </View>
@@ -863,7 +970,9 @@ export default function AIAssistantScreen() {
                   end={{ x: 1, y: 0 }}
                   style={styles.addPhotoButtonGradient}
                 >
-                  <Text style={styles.addPhotoButtonText}>1 ფოტოს დამატება</Text>
+                  <Text style={styles.addPhotoButtonText}>
+                    1 ფოტოს დამატება
+                  </Text>
                 </LinearGradient>
               </TouchableOpacity>
             )}
@@ -877,7 +986,7 @@ export default function AIAssistantScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#F2F2F7",
   },
   flex: {
     flex: 1,
@@ -1022,14 +1131,14 @@ const styles = StyleSheet.create({
   bannerCard: {
     width: 120,
     height: 120,
-    backgroundColor: "#F3E8FF",
+    backgroundColor: "transparent",
     borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 20,
   },
   bannerTitle: {
-    fontSize: 28,
+    fontSize: 18,
     fontFamily: "Poppins-Bold",
     color: "#1F2937",
     marginBottom: 8,
@@ -1058,14 +1167,14 @@ const styles = StyleSheet.create({
   promptCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F9FAFB",
+    backgroundColor: "#FFFFFF",
     borderRadius: 12,
     padding: 16,
     gap: 12,
   },
   promptText: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 14,
     fontFamily: "Poppins-Regular",
     color: "#374151",
     lineHeight: 22,

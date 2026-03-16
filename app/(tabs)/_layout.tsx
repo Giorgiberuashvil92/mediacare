@@ -2,9 +2,12 @@ import AntDesign from "@expo/vector-icons/AntDesign";
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Tabs } from "expo-router";
+import { View } from "react-native";
+import FloatingAIAssistant from "../components/ui/FloatingAIAssistant";
 
 export default function TabLayout() {
   return (
+    <View style={{ flex: 1 }}>
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: "#20BEB8",
@@ -101,5 +104,7 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+    <FloatingAIAssistant />
+    </View>
   );
 }

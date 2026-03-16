@@ -2,11 +2,14 @@ import AntDesign from "@expo/vector-icons/AntDesign";
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Tabs } from "expo-router";
+import { View } from "react-native";
 import { ScheduleProvider } from "../contexts/ScheduleContext";
+import FloatingAIAssistant from "../components/ui/FloatingAIAssistant";
 
 export default function DoctorTabsLayout() {
   return (
     <ScheduleProvider>
+      <View style={{ flex: 1 }}>
       <Tabs
         screenOptions={{
           tabBarActiveTintColor: "#20BEB8",
@@ -87,6 +90,8 @@ export default function DoctorTabsLayout() {
           }}
         />
       </Tabs>
+      <FloatingAIAssistant />
+      </View>
     </ScheduleProvider>
   );
 }
