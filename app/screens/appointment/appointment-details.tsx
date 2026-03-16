@@ -56,7 +56,13 @@ const AppointmentDetails = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [documents, setDocuments] = useState<
-    { url: string; name?: string; type?: string; uploadedAt?: string; isExternalLabResult?: boolean }[]
+    {
+      url: string;
+      name?: string;
+      type?: string;
+      uploadedAt?: string;
+      isExternalLabResult?: boolean;
+    }[]
   >([]);
   const [uploading, setUploading] = useState(false);
   const [uploadingLabResult, setUploadingLabResult] = useState(false);
@@ -79,10 +85,15 @@ const AppointmentDetails = () => {
 
       // Load doctor
       if (doctorId) {
-        const doctorResponse = await apiService.getDoctorById(doctorId as string);
+        const doctorResponse = await apiService.getDoctorById(
+          doctorId as string,
+        );
         if (doctorResponse.success && doctorResponse.data) {
           const apiBaseUrl = apiService.getBaseURL();
-          const mappedDoctor = mapDoctorFromAPI(doctorResponse.data, apiBaseUrl);
+          const mappedDoctor = mapDoctorFromAPI(
+            doctorResponse.data,
+            apiBaseUrl,
+          );
           setDoctor(mappedDoctor);
         }
       }
@@ -90,14 +101,14 @@ const AppointmentDetails = () => {
       // Load appointment details if appointmentId is provided
       if (appointmentId) {
         const appointmentResponse = await apiService.getAppointmentById(
-          appointmentId as string
+          appointmentId as string,
         );
         if (appointmentResponse.success && appointmentResponse.data) {
           setAppointment(appointmentResponse.data);
         }
 
         const docsResponse = await apiService.getAppointmentDocuments(
-          appointmentId as string
+          appointmentId as string,
         );
         if (docsResponse.success && docsResponse.data) {
           setDocuments(docsResponse.data);
@@ -114,7 +125,13 @@ const AppointmentDetails = () => {
     if (!appointmentId) return;
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ["application/pdf", "image/jpeg", "image/jpg", "image/png", "image/webp"],
+        type: [
+          "application/pdf",
+          "image/jpeg",
+          "image/jpg",
+          "image/png",
+          "image/webp",
+        ],
         copyToCacheDirectory: true,
       });
 
@@ -134,7 +151,7 @@ const AppointmentDetails = () => {
           uri: file.uri,
           name: file.name || "document",
           type: file.mimeType || "application/pdf",
-        }
+        },
       );
 
       if (uploadResp.success && uploadResp.data) {
@@ -153,7 +170,7 @@ const AppointmentDetails = () => {
 
   const handleUploadExternalLabResult = async () => {
     if (!appointmentId) return;
-    
+
     Alert.prompt(
       "კვლევის სახელი",
       "შეიყვანეთ კვლევის დასახელება (არასავალდებულო)",
@@ -164,7 +181,13 @@ const AppointmentDetails = () => {
           onPress: async (testName?: string) => {
             try {
               const result = await DocumentPicker.getDocumentAsync({
-                type: ["application/pdf", "image/jpeg", "image/jpg", "image/png", "image/webp"],
+                type: [
+                  "application/pdf",
+                  "image/jpeg",
+                  "image/jpg",
+                  "image/png",
+                  "image/webp",
+                ],
                 copyToCacheDirectory: true,
               });
 
@@ -185,18 +208,24 @@ const AppointmentDetails = () => {
                   name: file.name || "lab-result",
                   type: file.mimeType || "application/pdf",
                 },
-                testName
+                testName,
               );
 
               if (uploadResp.success && uploadResp.data) {
                 setDocuments((prev) => [uploadResp.data as any, ...prev]);
                 Alert.alert("წარმატება", "ლაბორატორიული შედეგი აიტვირთა");
               } else {
-                Alert.alert("შეცდომა", uploadResp?.message || "ატვირთვა ვერ მოხერხდა");
+                Alert.alert(
+                  "შეცდომა",
+                  uploadResp?.message || "ატვირთვა ვერ მოხერხდა",
+                );
               }
             } catch (err: any) {
               console.error("Lab result upload error:", err);
-              Alert.alert("შეცდომა", err?.message || "ფაილის ატვირთვა ვერ მოხერხდა");
+              Alert.alert(
+                "შეცდომა",
+                err?.message || "ფაილის ატვირთვა ვერ მოხერხდა",
+              );
             } finally {
               setUploadingLabResult(false);
             }
@@ -204,14 +233,14 @@ const AppointmentDetails = () => {
         },
       ],
       "plain-text",
-      ""
+      "",
     );
   };
 
   const openDocument = (url?: string) => {
     if (!url) return;
     Linking.openURL(url).catch(() =>
-      Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა")
+      Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა"),
     );
   };
 
@@ -231,10 +260,7 @@ const AppointmentDetails = () => {
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error || "ექიმი არ მოიძებნა"}</Text>
-          <TouchableOpacity
-            style={styles.retryButton}
-            onPress={loadData}
-          >
+          <TouchableOpacity style={styles.retryButton} onPress={loadData}>
             <Text style={styles.retryButtonText}>ხელახლა ცდა</Text>
           </TouchableOpacity>
         </View>
@@ -247,8 +273,9 @@ const AppointmentDetails = () => {
   const appointmentTime = appointment?.appointmentTime || selectedTime;
   const finalPatientName = appointment?.patientDetails?.name || patientName;
   const finalProblem = appointment?.notes || problem;
-  const consultationFee = appointment?.consultationFee || doctor.consultationFee;
-  const totalAmount = appointment?.totalAmount || (consultationFee * 1.05);
+  const consultationFee =
+    appointment?.consultationFee || doctor.consultationFee;
+  const totalAmount = appointment?.totalAmount || consultationFee * 1.05;
 
   // Format the date for display
   const formatDate = (dateString: string) => {
@@ -307,7 +334,9 @@ const AppointmentDetails = () => {
           <Text style={styles.sectionTitle}>ექიმის ინფორმაცია</Text>
           <View style={styles.doctorCard}>
             <View style={styles.doctorImagePlaceholder}>
-              {doctor.image && typeof doctor.image === 'object' && 'uri' in doctor.image ? (
+              {doctor.image &&
+              typeof doctor.image === "object" &&
+              "uri" in doctor.image ? (
                 <Image source={doctor.image} style={styles.doctorImage} />
               ) : (
                 <Text style={styles.doctorInitials}>
@@ -382,7 +411,7 @@ const AppointmentDetails = () => {
             <View style={styles.paymentRow}>
               <Text style={styles.paymentLabel}>კონსულტაციის საფასური</Text>
               <Text style={styles.paymentAmount}>
-                {typeof consultationFee === 'number' 
+                {typeof consultationFee === "number"
                   ? `${consultationFee} ₾`
                   : consultationFee || "0 ₾"}
               </Text>
@@ -390,14 +419,21 @@ const AppointmentDetails = () => {
             <View style={styles.paymentRow}>
               <Text style={styles.paymentLabel}>დღგ (5%)</Text>
               <Text style={styles.paymentAmount}>
-                {Math.round((typeof consultationFee === 'number' ? consultationFee : parseFloat(String(consultationFee).replace(/[^\d.]/g, '')) || 0) * 0.05)} ₾
+                {Math.round(
+                  (typeof consultationFee === "number"
+                    ? consultationFee
+                    : parseFloat(
+                        String(consultationFee).replace(/[^\d.]/g, ""),
+                      ) || 0) * 0.05,
+                )}{" "}
+                ₾
               </Text>
             </View>
             <View style={styles.divider} />
             <View style={styles.paymentRow}>
               <Text style={styles.netAmountLabel}>საერთო თანხა</Text>
               <Text style={styles.netAmountValue}>
-                {typeof totalAmount === 'number' 
+                {typeof totalAmount === "number"
                   ? `${Math.round(totalAmount)} ₾`
                   : totalAmount || "0 ₾"}
               </Text>
@@ -459,7 +495,11 @@ const AppointmentDetails = () => {
                   onPress={handleUploadDocument}
                   disabled={uploading}
                 >
-                  <Ionicons name="cloud-upload-outline" size={16} color="#fff" />
+                  <Ionicons
+                    name="cloud-upload-outline"
+                    size={16}
+                    color="#fff"
+                  />
                   <Text style={styles.uploadBtnText}>
                     {uploading ? "..." : "ფაილი"}
                   </Text>
@@ -468,22 +508,39 @@ const AppointmentDetails = () => {
             </View>
 
             {documents.length === 0 ? (
-              <Text style={styles.emptyDocs}>ჯერჯერობით დოკუმენტი არ არის.</Text>
+              <Text style={styles.emptyDocs}>
+                ჯერჯერობით დოკუმენტი არ არის.
+              </Text>
             ) : (
               documents.map((doc, idx) => (
                 <TouchableOpacity
                   key={`${doc.url}-${idx}`}
-                  style={[styles.docItem, doc.isExternalLabResult && styles.labResultItem]}
+                  style={[
+                    styles.docItem,
+                    doc.isExternalLabResult && styles.labResultItem,
+                  ]}
                   onPress={() => openDocument(doc.url)}
                 >
-                  <Ionicons 
-                    name={doc.isExternalLabResult ? "flask-outline" : "document-text-outline"} 
-                    size={20} 
-                    color={doc.isExternalLabResult ? "#7C3AED" : "#20BEB8"} 
+                  <Ionicons
+                    name={
+                      doc.isExternalLabResult
+                        ? "flask-outline"
+                        : "document-text-outline"
+                    }
+                    size={20}
+                    color={doc.isExternalLabResult ? "#7C3AED" : "#20BEB8"}
                   />
                   <View style={{ flex: 1, marginLeft: 10 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={styles.docName}>{doc.name || "დოკუმენტი"}</Text>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                    >
+                      <Text style={styles.docName}>
+                        {doc.name || "დოკუმენტი"}
+                      </Text>
                       {doc.isExternalLabResult && (
                         <View style={styles.labResultBadge}>
                           <Text style={styles.labResultBadgeText}>კვლევა</Text>

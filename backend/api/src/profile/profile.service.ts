@@ -68,6 +68,7 @@ export class ProfileService {
           reviewCount: user.reviewCount,
           doctorStatus: user.doctorStatus,
           contractDocument: user.contractDocument,
+          minWorkingDaysRequired: (user as any).minWorkingDaysRequired ?? 0,
         }),
       },
     };

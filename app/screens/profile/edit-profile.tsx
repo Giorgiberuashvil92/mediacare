@@ -34,14 +34,18 @@ export default function EditProfileScreen() {
   const [gender, setGender] = useState<"male" | "female" | "other">("other");
   const [address, setAddress] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
-  const [identificationDocument, setIdentificationDocument] = useState<{ filePath: string; name: string } | null>(null);
-  const [uploadingIdentificationDocument, setUploadingIdentificationDocument] = useState(false);
+  const [identificationDocument, setIdentificationDocument] = useState<{
+    filePath: string;
+    name: string;
+  } | null>(null);
+  const [uploadingIdentificationDocument, setUploadingIdentificationDocument] =
+    useState(false);
   const [about, setAbout] = useState("");
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
-  
+
   // Doctor specific fields
   const [consultationFee, setConsultationFee] = useState("");
   const [experience, setExperience] = useState("");
@@ -50,6 +54,8 @@ export default function EditProfileScreen() {
   const [contractDocument, setContractDocument] = useState("");
 
   const isDoctor = (user as any)?.role === "doctor";
+  /** ყველა ველი მხოლოდ ნახვის რეჟიმში — რედაქტირება გამორთულია */
+  const viewOnly = true;
 
   useEffect(() => {
     if (user?.id) {
@@ -70,7 +76,7 @@ export default function EditProfileScreen() {
         setGender(
           (user as any)?.gender === "male" || (user as any)?.gender === "female"
             ? (user as any).gender
-            : "male"
+            : "male",
         );
         setAddress((user as any)?.address || "");
         setDateOfBirth((user as any)?.dateOfBirth || "");
@@ -100,7 +106,7 @@ export default function EditProfileScreen() {
         setGender(
           profile.gender === "male" || profile.gender === "female"
             ? profile.gender
-            : "male"
+            : "male",
         );
         setAddress(profile.address || "");
         setDateOfBirth(profile.dateOfBirth || "");
@@ -114,7 +120,7 @@ export default function EditProfileScreen() {
         }
         setAbout(profile.about || "");
         setProfileImage(profile.profileImage || null);
-        
+
         // Doctor specific fields
         if (profile.consultationFee) {
           setConsultationFee(String(profile.consultationFee));
@@ -210,7 +216,7 @@ export default function EditProfileScreen() {
           headers: {
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
-        }
+        },
       );
       const data = await response.json();
       if (data.success) {
@@ -259,7 +265,7 @@ export default function EditProfileScreen() {
     if (dateOfBirth.trim()) {
       payload.dateOfBirth = dateOfBirth.trim();
     }
-    payload.identificationDocument = identificationDocument?.filePath ?? "";
+    // პირადობა/პასპორტი მხოლოდ ნახვის რეჟიმში — არ იგზავნება განახლებაზე
 
     if (about.trim()) {
       payload.about = about.trim();
@@ -381,26 +387,28 @@ export default function EditProfileScreen() {
                       <Ionicons name="person" size={48} color="#9CA3AF" />
                     </View>
                   )}
-                  <TouchableOpacity
-                    style={[
-                      styles.changePhotoButton,
-                      isDoctor && styles.changePhotoButtonDisabled,
-                    ]}
-                    onPress={handleProfileImagePick}
-                    disabled={uploadingProfileImage || isDoctor}
-                  >
-                    {uploadingProfileImage ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                      <Ionicons name="camera" size={20} color="#FFFFFF" />
-                    )}
-                  </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.changePhotoButton,
+                        isDoctor && styles.changePhotoButtonDisabled,
+                      ]}
+                      onPress={handleProfileImagePick}
+                      disabled={uploadingProfileImage || isDoctor}
+                    >
+                      {uploadingProfileImage ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <Ionicons name="camera" size={20} color="#FFFFFF" />
+                      )}
+                    </TouchableOpacity>
                 </View>
-                <Text style={styles.profileImageHint}>
-                  {isDoctor
-                    ? "პროფილის ფოტო შეიძლება შეიცვალოს მხოლოდ ადმინ პანელიდან"
-                    : "დააჭირეთ კამერას პროფილის ფოტოს შესაცვლელად"}
-                </Text>
+
+                  <Text style={styles.profileImageHint}>
+                    {isDoctor
+                      ? "პროფილის ფოტო შეიძლება შეიცვალოს მხოლოდ ადმინ პანელიდან"
+                      : "დააჭირეთ კამერას პროფილის ფოტოს შესაცვლელად"}
+                  </Text>
               </View>
 
               {/* Name */}
@@ -410,19 +418,16 @@ export default function EditProfileScreen() {
                   <Text style={styles.label}>სახელი</Text>
                 </View>
                 <View
-                  style={[styles.input, isDoctor && styles.inputDisabled]}
-                  pointerEvents={isDoctor ? "none" : "auto"}
+                  style={[styles.input, styles.inputDisabled]}
+                  pointerEvents="none"
                 >
                   <TextInput
-                    style={[
-                      styles.textInput,
-                      isDoctor && styles.textInputDisabled,
-                    ]}
+                    style={[styles.textInput, styles.textInputDisabled]}
                     placeholder="შეიყვანეთ სახელი"
                     placeholderTextColor="#9CA3AF"
                     value={name}
                     onChangeText={setName}
-                    editable={!isDoctor}
+                    editable={false}
                   />
                 </View>
               </View>
@@ -433,22 +438,16 @@ export default function EditProfileScreen() {
                   <Ionicons name="mail-outline" size={20} color="#06B6D4" />
                   <Text style={styles.label}>ელ. ფოსტა</Text>
                 </View>
-                <View
-                  style={[styles.input, isDoctor && styles.inputDisabled]}
-                  pointerEvents={isDoctor ? "none" : "auto"}
-                >
+                <View style={[styles.input, styles.inputDisabled]} pointerEvents="none">
                   <TextInput
-                    style={[
-                      styles.textInput,
-                      isDoctor && styles.textInputDisabled,
-                    ]}
+                    style={[styles.textInput, styles.textInputDisabled]}
                     placeholder="შეიყვანეთ ელ. ფოსტა"
                     placeholderTextColor="#9CA3AF"
                     value={email}
                     onChangeText={setEmail}
                     keyboardType="email-address"
                     autoCapitalize="none"
-                    editable={!isDoctor}
+                    editable={false}
                   />
                 </View>
               </View>
@@ -459,21 +458,15 @@ export default function EditProfileScreen() {
                   <Ionicons name="call-outline" size={20} color="#06B6D4" />
                   <Text style={styles.label}>ტელეფონი</Text>
                 </View>
-                <View
-                  style={[styles.input, isDoctor && styles.inputDisabled]}
-                  pointerEvents={isDoctor ? "none" : "auto"}
-                >
+                <View style={[styles.input, styles.inputDisabled]} pointerEvents="none">
                   <TextInput
-                    style={[
-                      styles.textInput,
-                      isDoctor && styles.textInputDisabled,
-                    ]}
+                    style={[styles.textInput, styles.textInputDisabled]}
                     placeholder="შეიყვანეთ ტელეფონი"
                     placeholderTextColor="#9CA3AF"
                     value={phone}
                     onChangeText={setPhone}
                     keyboardType="phone-pad"
-                    editable={!isDoctor}
+                    editable={false}
                   />
                 </View>
               </View>
@@ -484,21 +477,15 @@ export default function EditProfileScreen() {
                   <Ionicons name="card-outline" size={20} color="#06B6D4" />
                   <Text style={styles.label}>პირადი ნომერი</Text>
                 </View>
-                <View
-                  style={[styles.input, isDoctor && styles.inputDisabled]}
-                  pointerEvents={isDoctor ? "none" : "auto"}
-                >
+                <View style={[styles.input, styles.inputDisabled]} pointerEvents="none">
                   <TextInput
-                    style={[
-                      styles.textInput,
-                      isDoctor && styles.textInputDisabled,
-                    ]}
+                    style={[styles.textInput, styles.textInputDisabled]}
                     placeholder="შეიყვანეთ პირადი ნომერი"
                     placeholderTextColor="#9CA3AF"
                     value={idNumber}
                     onChangeText={setIdNumber}
                     keyboardType="number-pad"
-                    editable={!isDoctor}
+                    editable={false}
                   />
                 </View>
               </View>
@@ -511,21 +498,28 @@ export default function EditProfileScreen() {
                 </View>
                 <View style={styles.genderRow}>
                   {(["male", "female"] as const).map((g) => (
-                    <TouchableOpacity
+                    <View
                       key={g}
-                      style={[styles.genderOption, gender === g && styles.genderOptionSelected]}
-                      onPress={() => !isDoctor && setGender(g)}
-                      disabled={isDoctor}
+                      style={[
+                        styles.genderOption,
+                        gender === g && styles.genderOptionSelected,
+                        viewOnly && styles.inputDisabled,
+                      ]}
                     >
                       <Ionicons
                         name={g === "male" ? "male" : "female"}
                         size={20}
                         color={gender === g ? "#06B6D4" : "#6B7280"}
                       />
-                      <Text style={[styles.genderOptionText, gender === g && styles.genderOptionTextSelected]}>
+                      <Text
+                        style={[
+                          styles.genderOptionText,
+                          gender === g && styles.genderOptionTextSelected,
+                        ]}
+                      >
                         {g === "male" ? "კაცი" : "ქალი"}
                       </Text>
-                    </TouchableOpacity>
+                    </View>
                   ))}
                 </View>
               </View>
@@ -536,20 +530,14 @@ export default function EditProfileScreen() {
                   <Ionicons name="location-outline" size={20} color="#06B6D4" />
                   <Text style={styles.label}>მისამართი</Text>
                 </View>
-                <View
-                  style={[styles.input, isDoctor && styles.inputDisabled]}
-                  pointerEvents={isDoctor ? "none" : "auto"}
-                >
+                <View style={[styles.input, styles.inputDisabled]} pointerEvents="none">
                   <TextInput
-                    style={[
-                      styles.textInput,
-                      isDoctor && styles.textInputDisabled,
-                    ]}
+                    style={[styles.textInput, styles.textInputDisabled]}
                     placeholder="შეიყვანეთ მისამართი"
                     placeholderTextColor="#9CA3AF"
                     value={address}
                     onChangeText={setAddress}
-                    editable={!isDoctor}
+                    editable={false}
                   />
                 </View>
               </View>
@@ -560,38 +548,44 @@ export default function EditProfileScreen() {
                   <Ionicons name="calendar-outline" size={20} color="#06B6D4" />
                   <Text style={styles.label}>დაბადების თარიღი</Text>
                 </View>
-                <View
-                  style={[styles.input, isDoctor && styles.inputDisabled]}
-                  pointerEvents={isDoctor ? "none" : "auto"}
-                >
+                <View style={[styles.input, styles.inputDisabled]} pointerEvents="none">
                   <TextInput
-                    style={[
-                      styles.textInput,
-                      isDoctor && styles.textInputDisabled,
-                    ]}
+                    style={[styles.textInput, styles.textInputDisabled]}
                     placeholder="მაგ: 1990-01-15"
                     placeholderTextColor="#9CA3AF"
                     value={dateOfBirth}
                     onChangeText={setDateOfBirth}
-                    editable={!isDoctor}
+                    editable={false}
                   />
                 </View>
               </View>
 
-              {/* პირადობა / პასპორტი */}
+              {/* პირადობა / პასპორტი (მხოლოდ ნახვა) */}
               <View style={styles.formItem}>
                 <View style={styles.labelContainer}>
-                  <Ionicons name="document-attach-outline" size={20} color="#06B6D4" />
+                  <Ionicons
+                    name="document-attach-outline"
+                    size={20}
+                    color="#06B6D4"
+                  />
                   <Text style={styles.label}>პირადობა / პასპორტი</Text>
                 </View>
                 {identificationDocument ? (
                   <View style={styles.documentRow}>
-                    <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-                    <Text style={styles.documentName} numberOfLines={1}>{identificationDocument.name}</Text>
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={20}
+                      color="#10B981"
+                    />
+                    <Text style={styles.documentName} numberOfLines={1}>
+                      {identificationDocument.name}
+                    </Text>
                     <TouchableOpacity
                       onPress={() => {
                         const path = identificationDocument.filePath;
-                        const url = path.startsWith("http") ? path : `${apiService.getBaseURL().replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
+                        const url = path.startsWith("http")
+                          ? path
+                          : `${apiService.getBaseURL().replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
                         Linking.openURL(url);
                       }}
                       style={styles.openDocButton}
@@ -599,35 +593,12 @@ export default function EditProfileScreen() {
                       <Ionicons name="open-outline" size={18} color="#06B6D4" />
                       <Text style={styles.openDocText}>გახსნა</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => setIdentificationDocument(null)}
-                      style={styles.removeDocButton}
-                      disabled={isDoctor}
-                    >
-                      <Text style={styles.removeDocText}>წაშლა</Text>
-                    </TouchableOpacity>
                   </View>
-                ) : null}
-                <TouchableOpacity
-                  style={[styles.filePickerButton, identificationDocument && styles.filePickerButtonActive]}
-                  onPress={handleIdentificationDocumentPick}
-                  disabled={uploadingIdentificationDocument || isDoctor}
-                >
-                  {uploadingIdentificationDocument ? (
-                    <ActivityIndicator size="small" color="#06B6D4" />
-                  ) : (
-                    <>
-                      <Ionicons
-                        name="cloud-upload-outline"
-                        size={20}
-                        color={identificationDocument ? "#10B981" : "#9CA3AF"}
-                      />
-                      <Text style={styles.filePickerText}>
-                        {identificationDocument ? "დოკუმენტი ატვირთულია" : "აირჩიეთ ფაილი (PDF ან სურათი)"}
-                      </Text>
-                    </>
-                  )}
-                </TouchableOpacity>
+                ) : (
+                  <Text style={styles.documentPlaceholder}>
+                    დოკუმენტი არ არის ატვირთული
+                  </Text>
+                )}
               </View>
 
               {/* Doctor Specific Fields */}
@@ -747,34 +718,6 @@ export default function EditProfileScreen() {
         </View>
 
         {/* Sticky Footer Save Button above keyboard */}
-        <View
-          style={[styles.footer, { paddingBottom: (insets.bottom || 12) + 12 }]}
-        >
-          {isDoctor ? (
-            <View style={[styles.infoBox, { marginTop: 24 }]}>
-              <Ionicons name="information-circle" size={20} color="#06B6D4" />
-              <Text style={styles.infoText}>
-                ექიმის ინფორმაციის რედაქტირება შესაძლებელია მხოლოდ ადმინ
-                პანელიდან
-              </Text>
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={[
-                styles.saveButton,
-                savingProfile && styles.saveButtonDisabled,
-              ]}
-              onPress={handleSave}
-              disabled={savingProfile}
-            >
-              {savingProfile ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <Text style={styles.saveButtonText}>შენახვა</Text>
-              )}
-            </TouchableOpacity>
-          )}
-        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -1052,5 +995,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Poppins-Regular",
     color: "#6B7280",
+  },
+  documentPlaceholder: {
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#9CA3AF",
+    fontStyle: "italic",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
   },
 });

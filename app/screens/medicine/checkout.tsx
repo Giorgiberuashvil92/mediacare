@@ -9,7 +9,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useCart } from "../../contexts/CartContext";
@@ -26,7 +26,12 @@ const Checkout = () => {
 
   const handlePlaceOrder = () => {
     // Validate card data
-    if (!cardData.cardNumber || !cardData.cardHolder || !cardData.expiryDate || !cardData.cvv) {
+    if (
+      !cardData.cardNumber ||
+      !cardData.cardHolder ||
+      !cardData.expiryDate ||
+      !cardData.cvv
+    ) {
       Alert.alert("შეცდომა", "გთხოვთ შეავსოთ ბარათის ყველა დეტალი");
       return;
     }
@@ -43,7 +48,7 @@ const Checkout = () => {
             router.replace("/(tabs)");
           },
         },
-      ]
+      ],
     );
   };
 
@@ -69,7 +74,10 @@ const Checkout = () => {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
           <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>გადახდა</Text>
@@ -83,7 +91,9 @@ const Checkout = () => {
           <View style={styles.orderSummaryCard}>
             {cartItems.map((item) => {
               const isTest = item.clinic || item.clinicId;
-              const displayPrice = isTest ? item.price : item.price * item.quantity;
+              const displayPrice = isTest
+                ? item.price
+                : item.price * item.quantity;
               return (
                 <View key={item.id} style={styles.orderItem}>
                   <View style={styles.itemInfo}>
@@ -100,19 +110,19 @@ const Checkout = () => {
                     )}
                     {!item.homeCollection && (
                       <Text style={styles.itemDetails}>
-                        {isTest ? item.weight : `${item.weight} × ${item.quantity}`}
+                        {isTest
+                          ? item.weight
+                          : `${item.weight} × ${item.quantity}`}
                       </Text>
                     )}
                   </View>
-                  <Text style={styles.itemPrice}>
-                    {displayPrice} ₾
-                  </Text>
+                  <Text style={styles.itemPrice}>{displayPrice} ₾</Text>
                 </View>
               );
             })}
-            
+
             <View style={styles.divider} />
-            
+
             <View style={styles.totalRow}>
               <Text style={styles.totalLabel}>საერთო თანხა</Text>
               <Text style={styles.totalPrice}>{getTotalPrice()} ₾</Text>
@@ -121,32 +131,14 @@ const Checkout = () => {
         </View>
 
         {/* Payment Method */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>გადახდის მეთოდი</Text>
-          <View style={styles.paymentCard}>
-            <TouchableOpacity
-              style={styles.paymentOption}
-              onPress={() => setShowCardModal(true)}
-            >
-              <View style={styles.paymentIconContainer}>
-                <Ionicons name="card-outline" size={28} color="#06B6D4" />
-              </View>
-              <View style={styles.paymentInfo}>
-                <Text style={styles.paymentText}>საბანკო ბარათი</Text>
-                <Text style={styles.paymentSubtext}>
-                  {cardData.cardNumber ? `**** ${cardData.cardNumber.slice(-4)}` : "დაამატეთ ბარათი"}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={24} color="#999999" />
-            </TouchableOpacity>
-          </View>
-        </View>
       </ScrollView>
 
       {/* Place Order Button */}
       <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.placeOrderButton} onPress={handlePlaceOrder}>
-          <Text style={styles.placeOrderButtonText}>შეკვეთის გაფორმება</Text>
+        <TouchableOpacity style={styles.placeOrderButton}>
+          <Text style={styles.placeOrderButtonText}>
+            მალე შესაძლებელი იქნება
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -166,13 +158,21 @@ const Checkout = () => {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+            <ScrollView
+              style={styles.modalBody}
+              showsVerticalScrollIndicator={false}
+            >
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>ბარათის ნომერი *</Text>
                 <TextInput
                   style={styles.input}
                   value={cardData.cardNumber}
-                  onChangeText={(value) => setCardData({ ...cardData, cardNumber: formatCardNumber(value) })}
+                  onChangeText={(value) =>
+                    setCardData({
+                      ...cardData,
+                      cardNumber: formatCardNumber(value),
+                    })
+                  }
                   placeholder="1234 5678 9012 3456"
                   placeholderTextColor="#999999"
                   keyboardType="numeric"
@@ -185,7 +185,12 @@ const Checkout = () => {
                 <TextInput
                   style={styles.input}
                   value={cardData.cardHolder}
-                  onChangeText={(value) => setCardData({ ...cardData, cardHolder: value.toUpperCase() })}
+                  onChangeText={(value) =>
+                    setCardData({
+                      ...cardData,
+                      cardHolder: value.toUpperCase(),
+                    })
+                  }
                   placeholder="JOHN DOE"
                   placeholderTextColor="#999999"
                   autoCapitalize="characters"
@@ -198,7 +203,12 @@ const Checkout = () => {
                   <TextInput
                     style={styles.input}
                     value={cardData.expiryDate}
-                    onChangeText={(value) => setCardData({ ...cardData, expiryDate: formatExpiryDate(value) })}
+                    onChangeText={(value) =>
+                      setCardData({
+                        ...cardData,
+                        expiryDate: formatExpiryDate(value),
+                      })
+                    }
                     placeholder="MM/YY"
                     placeholderTextColor="#999999"
                     keyboardType="numeric"
@@ -211,7 +221,12 @@ const Checkout = () => {
                   <TextInput
                     style={styles.input}
                     value={cardData.cvv}
-                    onChangeText={(value) => setCardData({ ...cardData, cvv: value.replace(/\D/g, "").slice(0, 3) })}
+                    onChangeText={(value) =>
+                      setCardData({
+                        ...cardData,
+                        cvv: value.replace(/\D/g, "").slice(0, 3),
+                      })
+                    }
                     placeholder="123"
                     placeholderTextColor="#999999"
                     keyboardType="numeric"
@@ -226,7 +241,12 @@ const Checkout = () => {
               <TouchableOpacity
                 style={styles.modalButton}
                 onPress={() => {
-                  if (cardData.cardNumber && cardData.cardHolder && cardData.expiryDate && cardData.cvv) {
+                  if (
+                    cardData.cardNumber &&
+                    cardData.cardHolder &&
+                    cardData.expiryDate &&
+                    cardData.cvv
+                  ) {
                     setShowCardModal(false);
                   } else {
                     Alert.alert("შეცდომა", "გთხოვთ შეავსოთ ყველა ველი");

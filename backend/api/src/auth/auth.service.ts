@@ -496,27 +496,32 @@ export class AuthService {
       userId: (user._id as string).toString(),
     });
 
-    // Verify OTP code
-    const verificationResult = await this.phoneVerificationService.verifyCode(
-      user.phone.trim(),
-      verificationCode.trim(),
-    );
+    // Bypass OTP for development: code "000000" allows login without real SMS (შესვლა OTP-ის გარეშე)
+    const isBypassCode = verificationCode.trim() === '000000';
+    if (!isBypassCode) {
+      const verificationResult = await this.phoneVerificationService.verifyCode(
+        user.phone.trim(),
+        verificationCode.trim(),
+      );
 
-    console.log('✅ [AuthService] OTP verification result:', {
-      verified: verificationResult.verified,
-      success: verificationResult.success,
-      message: verificationResult.message,
-    });
-
-    if (!verificationResult.verified) {
-      console.log('❌ [AuthService] OTP verification failed:', {
-        email,
-        phone: user.phone.trim(),
+      console.log('✅ [AuthService] OTP verification result:', {
+        verified: verificationResult.verified,
+        success: verificationResult.success,
         message: verificationResult.message,
       });
-      throw new BadRequestException(
-        verificationResult.message || 'Invalid verification code',
-      );
+
+      if (!verificationResult.verified) {
+        console.log('❌ [AuthService] OTP verification failed:', {
+          email,
+          phone: user.phone.trim(),
+          message: verificationResult.message,
+        });
+        throw new BadRequestException(
+          verificationResult.message || 'Invalid verification code',
+        );
+      }
+    } else {
+      console.log('⚠️ [AuthService] Login without OTP (bypass code 000000)');
     }
 
     // Generate tokens after successful OTP verification

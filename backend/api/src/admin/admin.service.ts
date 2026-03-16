@@ -355,9 +355,13 @@ export class AdminService {
   }
 
   async updateAppointmentStatus(appointmentId: string, status: string) {
+    const updateData: any = { status };
+    if (status === 'cancelled') {
+      updateData.cancelledAt = new Date();
+    }
     const appointment = await this.appointmentModel.findByIdAndUpdate(
       appointmentId,
-      { status },
+      updateData,
       { new: true },
     );
 

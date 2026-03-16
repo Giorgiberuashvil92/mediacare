@@ -2,7 +2,7 @@
   "expo": {
     "name": "medicare",
     "slug": "medicare",
-    "version": "2.0.14",
+    "version": "2.0.16",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
@@ -14,13 +14,10 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "buildNumber": "2.0.14",
+      "buildNumber": "2.0.16",
       "supportsTablet": true,
       "bundleIdentifier": "ge.medcompass",
-      "backgroundModes": [
-        "audio",
-        "voip"
-      ],
+      "backgroundModes": ["audio", "voip"],
       "infoPlist": {
         "NSCameraUsageDescription": "აპლიკაციას სჭირდება კამერის წვდომა ვიდეო კონსულტაციებისთვის",
         "NSMicrophoneUsageDescription": "აპლიკაციას სჭირდება მიკროფონის წვდომა ვიდეო კონსულტაციებისთვის",

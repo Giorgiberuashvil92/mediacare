@@ -36,7 +36,7 @@ interface Appointment {
   patientId: string;
   date: string;
   time: string;
-  type: "video" | "home-visit";
+  type: "video" | "home-visit" | "followup";
   status: string;
 }
 
@@ -314,18 +314,37 @@ export default function LaboratoryScreen() {
               extractedPatientId: aptPatientId,
               testsCount: apt.laboratoryTests.length,
             });
-            
             apt.laboratoryTests.forEach((test: any) => {
-              // Determine test type based on productId using local type map
-              const testType = localTypeMap.get(test.productId) || "laboratory"; // Default to laboratory if not found
+              const testType = localTypeMap.get(test.productId) || "laboratory";
               allPrescribed.push({
-                id: `${apt.id}-${test.productId}`,
+                id: `${apt.id}-lab-${test.productId}`,
                 testId: test.productId,
                 testName: test.productName,
                 patientId: aptPatientId,
                 patientName: aptPatientName,
-                appointmentId: apt.id, // Store appointmentId for filtering
-                type: testType, // Store type for filtering
+                appointmentId: apt.id,
+                type: testType,
+                prescribedDate: apt.date || "",
+                doctorName: "თქვენ",
+                status: test.resultFile ? "completed" : (test.status || "pending"),
+              });
+            });
+          }
+          if (apt.instrumentalTests && Array.isArray(apt.instrumentalTests)) {
+            console.log('🧪 [Laboratory] Processing instrumental tests for appointment:', {
+              aptId: apt.id,
+              patientName: aptPatientName,
+              testsCount: apt.instrumentalTests.length,
+            });
+            apt.instrumentalTests.forEach((test: any) => {
+              allPrescribed.push({
+                id: `${apt.id}-inst-${test.productId}`,
+                testId: test.productId,
+                testName: test.productName,
+                patientId: aptPatientId,
+                patientName: aptPatientName,
+                appointmentId: apt.id,
+                type: "instrumental" as ExamType,
                 prescribedDate: apt.date || "",
                 doctorName: "თქვენ",
                 status: test.resultFile ? "completed" : (test.status || "pending"),
@@ -501,16 +520,16 @@ export default function LaboratoryScreen() {
     }
 
     try {
-      // Call API to assign lab tests to appointment
       const testsToSend = selectedTests.map((test) => ({
         productId: test.id,
         productName: test.name,
       }));
-      
-      const response = await apiService.assignLaboratoryTests(
-        selectedAppointment.id,
-        testsToSend
-      );
+
+      // ლაბორატორიული → laboratory-tests, ინსტრუმენტული → instrumental-tests (ერთმანეთს არ ჩაერთვება)
+      const response =
+        selectedType === "instrumental"
+          ? await apiService.assignInstrumentalTests(selectedAppointment.id, testsToSend)
+          : await apiService.assignLaboratoryTests(selectedAppointment.id, testsToSend);
 
       if (response.success) {
         const newPrescribed: PrescribedTest[] = selectedTests.map((test, idx) => ({
@@ -685,6 +704,7 @@ export default function LaboratoryScreen() {
             onPress={() => {
               // Disable if came from dashboard (has params)
               if (!params.appointmentId && !params.patientId && !params.patientName) {
+                console.log('🧪 [Laboratory] ჯავშნის მოდალი — იხსნება, ჯავშნების ტიპები (ვიდეო / სახლი):', appointments.map((apt) => ({ id: apt.id, patientName: apt.patientName, type: apt.type, typeLabel: apt.type === "video" ? "ვიდეო" : apt.type === "followup" ? "განმეორებითი" : apt.type === "home-visit" ? "სახლში ვიზიტი" : apt.type ?? "უცნობი" })));
                 setShowAppointmentModal(true);
               }
             }}
@@ -836,10 +856,12 @@ export default function LaboratoryScreen() {
                     selectedAppointment?.id === item.id && styles.patientItemSelected,
                   ]}
                   onPress={() => {
-                    console.log('🧪 [Laboratory] Appointment selected:', {
+                    const aptType = item.type === "video" ? "ვიდეო" : item.type === "followup" ? "განმეორებითი" : item.type === "home-visit" ? "სახლში ვიზიტი" : (item.type ?? "უცნობი");
+                    console.log('🧪 [Laboratory] ჯავშნის მოდალი — არჩეული ჯავშანი:', {
                       id: item.id,
-                      patientId: item.patientId,
                       patientName: item.patientName,
+                      type: item.type,
+                      typeLabel: aptType,
                     });
                     // Clear pre-selection flag to allow new selection
                     setPreSelectedApplied(null);
@@ -847,11 +869,18 @@ export default function LaboratoryScreen() {
                     setShowAppointmentModal(false);
                   }}
                 >
-                  <View style={[styles.patientAvatar, { backgroundColor: item.type === "video" ? "#0EA5E9" : "#10B981" }]}>
-                    <Ionicons name={item.type === "video" ? "videocam" : "home"} size={18} color="#FFFFFF" />
+                  <View style={[styles.patientAvatar, { backgroundColor: (item.type === "video" || item.type === "followup") ? "#0EA5E9" : "#10B981" }]}>
+                    <Ionicons name={item.type === "followup" ? "repeat" : (item.type === "video" ? "videocam" : "home")} size={18} color="#FFFFFF" />
                   </View>
                   <View style={styles.patientInfo}>
-                    <Text style={styles.patientName}>{item.patientName}</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                      <Text style={styles.patientName}>{item.patientName}</Text>
+                      {item.type === "followup" && (
+                        <View style={{ backgroundColor: "#0EA5E9", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                          <Text style={{ fontSize: 11, color: "#FFFFFF", fontWeight: "600" }}>განმეორებითი</Text>
+                        </View>
+                      )}
+                    </View>
                     <Text style={styles.patientId}>
                       {item.date} • {item.time} • {item.status === "scheduled" || item.status === "confirmed" ? "დანიშნული" : item.status === "in-progress" ? "მიმდინარე" : "დასრულებული"}
                     </Text>

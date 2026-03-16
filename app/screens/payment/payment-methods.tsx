@@ -27,6 +27,18 @@ const PaymentMethods = () => {
     problemDescription,
     uploadedFile,
   } = useLocalSearchParams();
+
+  // ლოგი: payment-მა რა params მიიღო make-appointment-დან
+  console.log("📥 [payment-methods] მიღებული params:", {
+    doctorId,
+    selectedDate,
+    selectedTime,
+    appointmentType,
+    uploadedFileType: typeof uploadedFile,
+    uploadedFileLength: (uploadedFile as string)?.length ?? 0,
+    uploadedFilePreview: (uploadedFile as string)?.slice(0, 150) ?? "",
+  });
+
   const [selectedMethod, setSelectedMethod] = useState<string>("card");
   const [loading, setLoading] = useState(false);
   const [showPaymentWebView, setShowPaymentWebView] = useState(false);
@@ -211,25 +223,43 @@ const PaymentMethods = () => {
         return;
       }
 
-      // Upload document if one was selected
+      // Upload documents (one or multiple)
       if (uploadedFile) {
         try {
-          const fileData = JSON.parse(uploadedFile as string);
-          if (fileData.uri && fileData.name && fileData.type) {
-            await apiService.uploadAppointmentDocument(appointmentId, {
-              uri: fileData.uri,
-              name: fileData.name,
-              type: fileData.type,
-            });
-            console.log("✅ Document uploaded successfully");
+          const parsed = JSON.parse(uploadedFile as string);
+          const files = Array.isArray(parsed) ? parsed : [parsed];
+          console.log("📤 [payment-methods] დოკუმენტების ატვირთვა:", {
+            appointmentId,
+            parsedIsArray: Array.isArray(parsed),
+            filesCount: files.length,
+            files: files.map((f: any) => ({ name: f?.name, type: f?.type, hasUri: !!f?.uri })),
+          });
+          for (let i = 0; i < files.length; i++) {
+            const fileData = files[i];
+            if (fileData?.uri && fileData?.name && fileData?.type) {
+              console.log(`📤 [payment-methods] ატვირთვა ${i + 1}/${files.length}:`, fileData.name);
+              const uploadRes = await apiService.uploadAppointmentDocument(appointmentId, {
+                uri: fileData.uri,
+                name: fileData.name,
+                type: fileData.type,
+              });
+              console.log(`✅ [payment-methods] ატვირთული ${i + 1}:`, uploadRes?.success, uploadRes?.data);
+            } else {
+              console.warn(`⚠️ [payment-methods] ფაილი ${i + 1} გამოტოვებული (არასრული):`, fileData);
+            }
+          }
+          if (files.length > 0) {
+            console.log(`✅ [payment-methods] სულ ${files.length} დოკუმენტის ატვირთვა დასრულებული`);
           }
         } catch (uploadErr: any) {
-          console.error("❌ Error uploading document:", uploadErr);
+          console.error("❌ [payment-methods] დოკუმენტის ატვირთვის შეცდომა:", uploadErr);
           Alert.alert(
             "გაფრთხილება",
             "ჯავშანი შეიქმნა, მაგრამ დოკუმენტის ატვირთვა ვერ მოხერხდა. შეგიძლიათ დოკუმენტი მოგვიანებით ატვირთოთ."
           );
         }
+      } else {
+        console.log("📥 [payment-methods] uploadedFile params არ არის — დოკუმენტი არ იტვირთება");
       }
 
       // Navigate to success page
@@ -318,20 +348,30 @@ const PaymentMethods = () => {
         return;
       }
 
-      // Upload document if one was selected
+      // Upload documents (one or multiple) — გადახდის გარეშე ფლოუ
       if (uploadedFile) {
         try {
-          const fileData = JSON.parse(uploadedFile as string);
-          if (fileData.uri && fileData.name && fileData.type) {
-            await apiService.uploadAppointmentDocument(appointmentId, {
-              uri: fileData.uri,
-              name: fileData.name,
-              type: fileData.type,
-            });
-            console.log("✅ Document uploaded successfully");
+          const parsed = JSON.parse(uploadedFile as string);
+          const files = Array.isArray(parsed) ? parsed : [parsed];
+          console.log("📤 [payment-methods] (free) დოკუმენტების ატვირთვა:", {
+            appointmentId,
+            filesCount: files.length,
+            files: files.map((f: any) => ({ name: f?.name, type: f?.type, hasUri: !!f?.uri })),
+          });
+          for (const fileData of files) {
+            if (fileData?.uri && fileData?.name && fileData?.type) {
+              await apiService.uploadAppointmentDocument(appointmentId, {
+                uri: fileData.uri,
+                name: fileData.name,
+                type: fileData.type,
+              });
+            }
+          }
+          if (files.length > 0) {
+            console.log(`✅ [payment-methods] (free) ${files.length} document(s) uploaded`);
           }
         } catch (uploadErr: any) {
-          console.error("❌ Error uploading document:", uploadErr);
+          console.error("❌ [payment-methods] (free) დოკუმენტის ატვირთვის შეცდომა:", uploadErr);
           Alert.alert(
             "გაფრთხილება",
             "ჯავშანი შეიქმნა, მაგრამ დოკუმენტის ატვირთვა ვერ მოხერხდა. შეგიძლიათ დოკუმენტი მოგვიანებით ატვირთოთ."

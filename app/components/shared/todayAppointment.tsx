@@ -204,6 +204,16 @@ const TodayAppointment = () => {
     return diff >= -oneHourInMs;
   };
 
+  // კონსულტაციის დრო + 1 საათი გავიდა — ღილაკის ნაცვლად "დრო უკვე გავიდა"
+  const isConsultationTimePassed = () => {
+    const appointmentDate = appointment.formattedDate || appointment.date || '';
+    const appointmentTime = appointment.time || appointment.appointmentTime || '00:00';
+    const appointmentDateTime = new Date(`${appointmentDate}T${appointmentTime}`);
+    const diff = appointmentDateTime.getTime() - currentTime.getTime();
+    const oneHourInMs = 60 * 60 * 1000;
+    return diff < -oneHourInMs;
+  };
+
   return (
     <>
       <TouchableOpacity
@@ -286,7 +296,12 @@ const TodayAppointment = () => {
                 </View>
               </View>
 
-              {isJoinButtonActive() && (
+              {isConsultationTimePassed() ? (
+                <View style={styles.timePassedContainer}>
+                  <Ionicons name="time-outline" size={20} color="#9CA3AF" />
+                  <Text style={styles.timePassedText}>დრო უკვე გავიდა</Text>
+                </View>
+              ) : isJoinButtonActive() ? (
                 <TouchableOpacity
                   style={[styles.joinCallButton, isUrgent() && styles.joinCallButtonUrgent]}
                   onPress={() => {
@@ -307,7 +322,7 @@ const TodayAppointment = () => {
                   </Text>
                   <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
                 </TouchableOpacity>
-              )}
+              ) : null}
 
               <TouchableOpacity
                 style={styles.viewAllButton}
@@ -466,6 +481,21 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins-Bold",
     color: "#FFFFFF",
     letterSpacing: 0.5,
+  },
+  timePassedContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    marginBottom: 8,
+    borderRadius: 12,
+    backgroundColor: "#F3F4F6",
+  },
+  timePassedText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
   },
   viewAllButton: {
     flexDirection: "row",

@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -12,6 +12,18 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { apiService } from "../_services/api";
 
+interface PeriodStats {
+  year: number;
+  month: number;
+  dateFrom?: string;
+  dateTo?: string;
+  videoCount: number;
+  homeVisitCount: number;
+  videoEarnings: number;
+  homeVisitEarnings: number;
+  totalEarnings: number;
+}
+
 interface DashboardStats {
   earnings: {
     paid: number;
@@ -19,35 +31,12 @@ interface DashboardStats {
     thisMonth: number;
     lastMonth: number;
   };
-  appointments: {
-    completed: number;
-    inProgress: number;
-    uncompleted: number;
-    total: number;
-  };
-  patients: {
-    total: number;
-    new: number;
-    returning: number;
-  };
-  visits: {
-    today: number;
-    thisWeek: number;
-    thisMonth: number;
-    total: number;
-  };
-  videoConsultations?: {
-    total: number;
-    completed: number;
-    thisMonth: number;
-    lastMonth: number;
-  };
-  homeVisits?: {
-    total: number;
-    completed: number;
-    thisMonth: number;
-    lastMonth: number;
-  };
+  appointments: { completed: number; inProgress: number; uncompleted: number; total: number };
+  patients: { total: number; new: number; returning: number };
+  visits: { today: number; thisWeek: number; thisMonth: number; total: number };
+  videoConsultations?: { total: number; completed: number; thisMonth: number; lastMonth?: number };
+  homeVisits?: { total: number; completed: number; thisMonth: number; lastMonth?: number };
+  periodStats?: PeriodStats;
 }
 
 const MONTHS = [
@@ -65,26 +54,59 @@ const MONTHS = [
   { key: "12", label: "დეკემბერი" },
 ];
 
+const WEEKDAYS = ["ორშ", "სამ", "ოთხ", "ხუთ", "პარ", "შაბ", "კვი"];
+
+function getCalendarGrid(year: number, month: number): (number | null)[] {
+  const first = new Date(year, month - 1, 1);
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const startOffset = (first.getDay() + 6) % 7;
+  const grid: (number | null)[] = Array(startOffset).fill(null);
+  for (let d = 1; d <= daysInMonth; d++) grid.push(d);
+  while (grid.length < 42) grid.push(null);
+  return grid.slice(0, 42);
+}
+
+function toYYYYMMDD(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function formatDateLabel(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const monthLabel = MONTHS.find((x) => parseInt(x.key, 10) === m)?.label ?? "";
+  return `${d} ${monthLabel} ${y}`;
+}
+
+const startOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
+
 export default function RevenueDetails() {
   const router = useRouter();
+  const now = new Date();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState<string>(
-    String(new Date().getMonth() + 1).padStart(2, "0")
+  const [dateFrom, setDateFrom] = useState<string>(() =>
+    toYYYYMMDD(startOfMonth(now)),
+  );
+  const [dateTo, setDateTo] = useState<string>(() => toYYYYMMDD(now));
+  const [calendarOpenFor, setCalendarOpenFor] = useState<"from" | "to" | null>(
+    null,
+  );
+  const [calendarViewYear, setCalendarViewYear] = useState(now.getFullYear());
+  const [calendarViewMonth, setCalendarViewMonth] = useState(
+    now.getMonth() + 1,
   );
 
-  useEffect(() => {
-    fetchStats();
-  }, [selectedMonth]);
-
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-
-      const response = await apiService.getDoctorDashboardStats();
-
+      const response = await apiService.getDoctorDashboardStats({
+        dateFrom,
+        dateTo,
+      });
       if (response.success && response.data) {
         setStats(response.data as DashboardStats);
       } else {
@@ -96,7 +118,11 @@ export default function RevenueDetails() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [dateFrom, dateTo]);
+
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
 
   if (loading) {
     return (
@@ -128,27 +154,17 @@ export default function RevenueDetails() {
     );
   }
 
-  // Calculate percentages
-  const revenueChange =
-    stats.earnings.thisMonth > stats.earnings.lastMonth ? "up" : "down";
-  const revenueChangePercent =
-    stats.earnings.lastMonth > 0
-      ? Math.abs(
-          Math.round(
-            ((stats.earnings.thisMonth - stats.earnings.lastMonth) /
-              stats.earnings.lastMonth) *
-              100
-          )
-        )
-      : 0;
-
-  // Calculate total revenue
-  const totalRevenue = stats.earnings.paid + stats.earnings.pending;
+  const period = stats?.periodStats;
+  const periodLabel =
+    period != null
+      ? period.dateFrom != null && period.dateTo != null
+        ? `${formatDateLabel(period.dateFrom)} — ${formatDateLabel(period.dateTo)}`
+        : `${MONTHS.find((m) => parseInt(m.key, 10) === period.month)?.label ?? ""} ${period.year}`
+      : "";
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
@@ -160,253 +176,184 @@ export default function RevenueDetails() {
           <View style={styles.placeholder} />
         </View>
 
-        {/* Month Filter */}
-        <View style={styles.monthFilterSection}>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.monthFilterContent}
-          >
-            {MONTHS.map((month) => (
-              <TouchableOpacity
-                key={month.key}
-                style={[
-                  styles.monthFilterItem,
-                  selectedMonth === month.key && styles.monthFilterItemActive,
-                ]}
-                onPress={() => setSelectedMonth(month.key)}
-              >
-                <Text
-                  style={[
-                    styles.monthFilterText,
-                    selectedMonth === month.key && styles.monthFilterTextActive,
-                  ]}
+        {/* პერიოდი — დან / მდე */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>პერიოდი</Text>
+          <View style={styles.periodRangeRow}>
+            <TouchableOpacity
+              style={styles.periodRangeField}
+              onPress={() => {
+                const [y, m] = dateFrom.split("-").map(Number);
+                setCalendarViewYear(y);
+                setCalendarViewMonth(m);
+                setCalendarOpenFor("from");
+              }}
+            >
+              <Text style={styles.periodRangeLabel}>დან</Text>
+              <Text style={styles.periodRangeValue}>{formatDateLabel(dateFrom)}</Text>
+              <Ionicons name="calendar-outline" size={20} color="#06B6D4" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.periodRangeField}
+              onPress={() => {
+                const [y, m] = dateTo.split("-").map(Number);
+                setCalendarViewYear(y);
+                setCalendarViewMonth(m);
+                setCalendarOpenFor("to");
+              }}
+            >
+              <Text style={styles.periodRangeLabel}>მდე</Text>
+              <Text style={styles.periodRangeValue}>{formatDateLabel(dateTo)}</Text>
+              <Ionicons name="calendar-outline" size={20} color="#06B6D4" />
+            </TouchableOpacity>
+          </View>
+
+          {calendarOpenFor != null && (
+            <View style={styles.customCalendar}>
+              <View style={styles.calendarHeader}>
+                <TouchableOpacity
+                  hitSlop={12}
+                  onPress={() => {
+                    if (calendarViewMonth === 1) {
+                      setCalendarViewMonth(12);
+                      setCalendarViewYear(calendarViewYear - 1);
+                    } else {
+                      setCalendarViewMonth(calendarViewMonth - 1);
+                    }
+                  }}
+                  style={styles.calendarNavButton}
                 >
-                  {month.label}
+                  <Ionicons name="chevron-back" size={24} color="#1F2937" />
+                </TouchableOpacity>
+                <Text style={styles.calendarTitle}>
+                  {MONTHS.find((m) => parseInt(m.key, 10) === calendarViewMonth)?.label ?? ""}{" "}
+                  {calendarViewYear}
                 </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+                <TouchableOpacity
+                  hitSlop={12}
+                  onPress={() => {
+                    if (calendarViewMonth === 12) {
+                      setCalendarViewMonth(1);
+                      setCalendarViewYear(calendarViewYear + 1);
+                    } else {
+                      setCalendarViewMonth(calendarViewMonth + 1);
+                    }
+                  }}
+                  style={styles.calendarNavButton}
+                >
+                  <Ionicons name="chevron-forward" size={24} color="#1F2937" />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.weekdayRow}>
+                {WEEKDAYS.map((wd) => (
+                  <Text key={wd} style={styles.weekdayLabel}>
+                    {wd}
+                  </Text>
+                ))}
+              </View>
+              <View style={styles.calendarGrid}>
+                {getCalendarGrid(calendarViewYear, calendarViewMonth).map(
+                  (day, i) => {
+                    if (day === null) {
+                      return <View key={i} style={styles.calendarCell} />;
+                    }
+                    const cellDate = toYYYYMMDD(
+                      new Date(calendarViewYear, calendarViewMonth - 1, day),
+                    );
+                    const isSelected =
+                      (calendarOpenFor === "from" && cellDate === dateFrom) ||
+                      (calendarOpenFor === "to" && cellDate === dateTo);
+                    const isToday = cellDate === toYYYYMMDD(now);
+                    return (
+                      <TouchableOpacity
+                        key={i}
+                        style={styles.calendarCell}
+                        onPress={() => {
+                          if (calendarOpenFor === "from") {
+                            setDateFrom(cellDate);
+                            if (cellDate > dateTo) setDateTo(cellDate);
+                          } else {
+                            setDateTo(cellDate);
+                            if (cellDate < dateFrom) setDateFrom(cellDate);
+                          }
+                          setCalendarOpenFor(null);
+                        }}
+                      >
+                        <View
+                          style={[
+                            styles.calendarDayInner,
+                            isToday && styles.calendarDayToday,
+                            isSelected && styles.calendarDaySelected,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.calendarDayText,
+                              isToday && styles.calendarDayTextToday,
+                              isSelected && styles.calendarDayTextToday,
+                            ]}
+                          >
+                            {day}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  },
+                )}
+              </View>
+            </View>
+          )}
         </View>
 
-        {/* Consultation Types Overview */}
+        {/* კონსულტაციების ტიპები - არჩეული პერიოდის მიხედვით */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>კონსულტაციების ტიპები</Text>
           <View style={styles.consultationTypesRow}>
-            {/* Video Consultations */}
             <View style={styles.consultationTypeCard}>
               <View style={[styles.consultationTypeIcon, { backgroundColor: "#E0F2FE" }]}>
                 <Ionicons name="videocam" size={28} color="#0EA5E9" />
               </View>
               <Text style={styles.consultationTypeValue}>
-                {stats?.videoConsultations?.thisMonth || 0}
+                {period?.videoCount ?? 0}
               </Text>
               <Text style={styles.consultationTypeLabel}>ვიდეო კონსულტაციები</Text>
-              <Text style={styles.consultationTypeSubLabel}>
-                სულ: {stats?.videoConsultations?.total || 0}
-              </Text>
             </View>
-
-            {/* Home Visits */}
             <View style={styles.consultationTypeCard}>
               <View style={[styles.consultationTypeIcon, { backgroundColor: "#DCFCE7" }]}>
                 <Ionicons name="home" size={28} color="#10B981" />
               </View>
               <Text style={styles.consultationTypeValue}>
-                {stats?.homeVisits?.thisMonth || 0}
+                {period?.homeVisitCount ?? 0}
               </Text>
               <Text style={styles.consultationTypeLabel}>ბინაზე ვიზიტები</Text>
-              <Text style={styles.consultationTypeSubLabel}>
-                სულ: {stats?.homeVisits?.total || 0}
-              </Text>
             </View>
           </View>
         </View>
 
-        {/* Financial Overview */}
-        <View style={styles.section}>
+        {/* ფინანსური მიმოხილვა - არჩეული პერიოდის შემოსავალი (ექიმის წილი) */}
+        <View style={[styles.section, { marginBottom: 24 }]}>
           <Text style={styles.sectionTitle}>ფინანსური მიმოხილვა</Text>
           <View style={styles.revenueCard}>
-            <View style={styles.revenueHeader}>
-              <View>
-                <Text style={styles.revenueLabel}>მიმდინარე თვე</Text>
-                <Text style={styles.revenueValue}>
-                  ₾{stats.earnings.thisMonth.toLocaleString()}
-                </Text>
-              </View>
-              <View
-                style={[
-                  styles.changeIndicator,
-                  revenueChange === "up" ? styles.changeUp : styles.changeDown,
-                ]}
-              >
-                <Ionicons
-                  name={
-                    revenueChange === "up" ? "trending-up" : "trending-down"
-                  }
-                  size={16}
-                  color={revenueChange === "up" ? "#10B981" : "#EF4444"}
-                />
-                <Text
-                  style={[
-                    styles.changeText,
-                    revenueChange === "up"
-                      ? styles.changeTextUp
-                      : styles.changeTextDown,
-                  ]}
-                >
-                  {revenueChangePercent}%
-                </Text>
-              </View>
-            </View>
+            <Text style={styles.revenueLabel}>
+              {periodLabel ? `${periodLabel} — თქვენი შემოსავალი` : "არჩეული პერიოდი"}
+            </Text>
+            <Text style={styles.revenueValue}>
+              ₾{(period?.totalEarnings ?? 0).toLocaleString()}
+            </Text>
             <View style={styles.revenueDivider} />
             <View style={styles.revenueDetails}>
               <View style={styles.revenueItem}>
-                <View style={styles.revenueIndicator} />
-                <View>
-                  <Text style={styles.revenueItemLabel}>გადახდილი</Text>
-                  <Text style={styles.revenueItemValue}>
-                    ₾{stats.earnings.paid.toLocaleString()}
-                  </Text>
-                </View>
-              </View>
-             
-            </View>
-          </View>
-        </View>
-
-        {/* Revenue Breakdown */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>შემოსავლების დაყოფა</Text>
-          <View style={styles.breakdownGrid}>
-            <View style={styles.breakdownCard}>
-              <View style={styles.breakdownIcon}>
-                <Ionicons name="checkmark-circle" size={24} color="#10B981" />
-              </View>
-              <Text style={styles.breakdownValue}>
-                ₾{stats.earnings.paid.toLocaleString()}
-              </Text>
-              <Text style={styles.breakdownLabel}>გადახდილი</Text>
-              <Text style={styles.breakdownPercentage}>
-                {Math.round((stats.earnings.paid / totalRevenue) * 100)}%
-              </Text>
-            </View>
-            <View style={styles.breakdownCard}>
-              <View style={styles.breakdownIcon}>
-                <Ionicons name="time" size={24} color="#F59E0B" />
-              </View>
-              <Text style={styles.breakdownValue}>
-                ₾{stats.earnings.pending.toLocaleString()}
-              </Text>
-              <Text style={styles.breakdownLabel}>მოსალოდნელი</Text>
-              <Text style={styles.breakdownPercentage}>
-                {Math.round((stats.earnings.pending / totalRevenue) * 100)}%
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Monthly Revenue History */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>ყოველთვიური შემოსავალი</Text>
-          <View style={styles.historyCard}>
-            <View style={styles.emptyState}>
-              <Ionicons name="calendar-outline" size={48} color="#D1D5DB" />
-              <Text style={styles.emptyStateText}>
-                ყოველთვიური ისტორია ჯერ არ არის ხელმისაწვდომი
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Top Patients by Revenue */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            პაციენტების სტატისტიკა
-          </Text>
-          <View style={styles.patientsCard}>
-            <View style={styles.patientStatsGrid}>
-              <View style={styles.patientStatItem}>
-                <Ionicons name="people" size={24} color="#06B6D4" />
-                <Text style={styles.patientStatValue}>
-                  {stats.patients.total}
+                <Text style={styles.revenueItemLabel}>ვიდეო (60%)</Text>
+                <Text style={styles.revenueItemValue}>
+                  ₾{(period?.videoEarnings ?? 0).toLocaleString()}
                 </Text>
-                <Text style={styles.patientStatLabel}>სულ პაციენტები</Text>
               </View>
-              <View style={styles.patientStatItem}>
-                <Ionicons name="person-add" size={24} color="#10B981" />
-                <Text style={styles.patientStatValue}>
-                  {stats.patients.new}
+              <View style={styles.revenueItem}>
+                <Text style={styles.revenueItemLabel}>ბინაზე ვიზიტი (50%)</Text>
+                <Text style={styles.revenueItemValue}>
+                  ₾{(period?.homeVisitEarnings ?? 0).toLocaleString()}
                 </Text>
-                <Text style={styles.patientStatLabel}>ახალი</Text>
               </View>
-              <View style={styles.patientStatItem}>
-                <Ionicons name="repeat" size={24} color="#F59E0B" />
-                <Text style={styles.patientStatValue}>
-                  {stats.patients.returning}
-                </Text>
-                <Text style={styles.patientStatLabel}>განმეორებითი</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Appointment Statistics */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>ჯავშნების სტატისტიკა</Text>
-          <View style={styles.appointmentStatsGrid}>
-            <View style={[styles.appointmentStatCard, styles.appointmentStatCompleted]}>
-              <Ionicons name="checkmark-circle" size={28} color="#10B981" />
-              <Text style={styles.appointmentStatValue}>{stats.appointments.completed}</Text>
-              <Text style={styles.appointmentStatLabel}>დასრულებული</Text>
-            </View>
-            <View style={[styles.appointmentStatCard, styles.appointmentStatInProgress]}>
-              <Ionicons name="time" size={28} color="#F59E0B" />
-              <Text style={styles.appointmentStatValue}>{stats.appointments.inProgress}</Text>
-              <Text style={styles.appointmentStatLabel}>მიმდინარე</Text>
-            </View>
-            <View style={[styles.appointmentStatCard, styles.appointmentStatCancelled]}>
-              <Ionicons name="close-circle" size={28} color="#EF4444" />
-              <Text style={styles.appointmentStatValue}>{stats.appointments.uncompleted}</Text>
-              <Text style={styles.appointmentStatLabel}>გაუქმებული</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Revenue Statistics */}
-        <View style={[styles.section, { marginBottom: 20 }]}>
-          <Text style={styles.sectionTitle}>შემოსავლის სტატისტიკა</Text>
-          <View style={styles.statsGrid}>
-            <View style={styles.statCard}>
-              <Ionicons name="trending-up" size={32} color="#10B981" />
-              <Text style={styles.statValue}>
-                ₾{stats.earnings.thisMonth.toLocaleString()}
-              </Text>
-              <Text style={styles.statLabel}>მიმდინარე თვე</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Ionicons name="calendar" size={32} color="#06B6D4" />
-              <Text style={styles.statValue}>
-                {stats.visits.thisMonth}
-              </Text>
-              <Text style={styles.statLabel}>ამ თვის ვიზიტები</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Ionicons name="cash" size={32} color="#F59E0B" />
-              <Text style={styles.statValue}>
-                ₾
-                {stats.appointments.total > 0
-                  ? Math.round(
-                      totalRevenue / stats.appointments.total
-                    ).toLocaleString()
-                  : 0}
-              </Text>
-              <Text style={styles.statLabel}>საშუალო ღირებულება</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Ionicons name="people" size={32} color="#8B5CF6" />
-              <Text style={styles.statValue}>{stats.patients.total}</Text>
-              <Text style={styles.statLabel}>სულ პაციენტები</Text>
             </View>
           </View>
         </View>
@@ -449,32 +396,110 @@ const styles = StyleSheet.create({
   placeholder: {
     width: 44,
   },
-  // Month Filter
-  monthFilterSection: {
-    marginBottom: 20,
+  periodRangeRow: {
+    flexDirection: "row",
+    gap: 12,
   },
-  monthFilterContent: {
-    paddingHorizontal: 20,
+  periodRangeField: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
-  },
-  monthFilterItem: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
     backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
     borderWidth: 1,
     borderColor: "#E5E7EB",
   },
-  monthFilterItemActive: {
-    backgroundColor: "#06B6D4",
-    borderColor: "#06B6D4",
-  },
-  monthFilterText: {
-    fontSize: 13,
+  periodRangeLabel: {
+    fontSize: 12,
     fontFamily: "Poppins-Medium",
-    color: "#4B5563",
+    color: "#6B7280",
+    marginRight: 4,
   },
-  monthFilterTextActive: {
+  periodRangeValue: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#1F2937",
+  },
+  customCalendar: {
+    marginTop: 16,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  calendarHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+    paddingHorizontal: 4,
+  },
+  calendarNavButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#F1F5F9",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  calendarTitle: {
+    fontSize: 17,
+    fontFamily: "Poppins-SemiBold",
+    color: "#1F2937",
+  },
+  weekdayRow: {
+    flexDirection: "row",
+    marginBottom: 8,
+  },
+  weekdayLabel: {
+    flex: 1,
+    textAlign: "center",
+    fontSize: 12,
+    fontFamily: "Poppins-Medium",
+    color: "#64748B",
+  },
+  calendarGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  calendarCell: {
+    width: "14.28%",
+    aspectRatio: 1,
+    padding: 2,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  calendarDayInner: {
+    width: "100%",
+    aspectRatio: 1,
+    maxWidth: 36,
+    maxHeight: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  calendarDayToday: {
+    backgroundColor: "#06B6D4",
+  },
+  calendarDaySelected: {
+    backgroundColor: "#06B6D4",
+  },
+  calendarDayText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#334155",
+  },
+  calendarDayTextToday: {
     color: "#FFFFFF",
   },
   // Consultation Types Row

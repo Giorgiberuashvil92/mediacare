@@ -39,6 +39,7 @@ export declare class User {
     specialization?: string;
     licenseDocument?: string;
     contractDocument?: string;
+    adminNotes?: string;
     degrees?: string;
     experience?: string;
     consultationFee?: number;

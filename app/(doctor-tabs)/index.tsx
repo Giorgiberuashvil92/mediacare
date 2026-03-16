@@ -20,8 +20,8 @@ import {
   getStatusColor,
   getStatusLabel,
 } from "../../assets/data/doctorDashboard";
-import AIAssistant from "../components/ui/AIAssistant";
 import { apiService } from "../_services/api";
+import AIAssistant from "../components/ui/AIAssistant";
 import { useAuth } from "../contexts/AuthContext";
 import { useSchedule } from "../contexts/ScheduleContext";
 
@@ -78,8 +78,8 @@ export default function DoctorDashboard() {
       // Parse date and time in local timezone (same as patient side)
       // This ensures consistent time display across doctor and patient apps
       try {
-        const [year, month, day] = date.split('-').map(Number);
-        const [hours, minutes] = time.split(':').map(Number);
+        const [year, month, day] = date.split("-").map(Number);
+        const [hours, minutes] = time.split(":").map(Number);
         const dateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
         return isNaN(dateTime.getTime()) ? null : dateTime;
       } catch {
@@ -99,7 +99,9 @@ export default function DoctorDashboard() {
         // Check if consultation is today
         const consultationDate = new Date(c.dateTime);
         consultationDate.setHours(0, 0, 0, 0);
-        return consultationDate.getTime() === today.getTime() && c.dateTime >= now;
+        return (
+          consultationDate.getTime() === today.getTime() && c.dateTime >= now
+        );
       })
       .sort((a, b) => a.dateTime.getTime() - b.dateTime.getTime());
 
@@ -171,36 +173,53 @@ export default function DoctorDashboard() {
         Array.isArray(availabilityResponse.data)
       ) {
         // 🔍 დეტალური ლოგირება availability response-ისთვის
-        console.log('\n📊 [Dashboard] getDoctorAvailability Response:');
-        console.log('   ✅ success:', availabilityResponse.success);
-        console.log('   📦 data length:', availabilityResponse.data.length);
-        console.log('   📋 Full response.data:', JSON.stringify(availabilityResponse.data, null, 2));
-        
+        console.log("\n📊 [Dashboard] getDoctorAvailability Response:");
+        console.log("   ✅ success:", availabilityResponse.success);
+        console.log("   📦 data length:", availabilityResponse.data.length);
+        console.log(
+          "   📋 Full response.data:",
+          JSON.stringify(availabilityResponse.data, null, 2),
+        );
+
         // თითოეული availability object-ის დეტალური ანალიზი
         availabilityResponse.data.forEach((avail: any, index: number) => {
           console.log(`\n   📦 [${index}] Availability Object:`);
-          console.log('      📅 date:', avail.date, `(type: ${typeof avail.date})`);
-          console.log('      🎯 type:', avail.type);
-          console.log('      ⏱️  timeSlots:', avail.timeSlots, `(length: ${avail.timeSlots?.length || 0})`);
-          console.log('      🔒 bookedSlots:', avail.bookedSlots, `(length: ${avail.bookedSlots?.length || 0})`);
-          console.log('      ✅ isAvailable:', avail.isAvailable);
-          console.log('      📆 dayOfWeek:', avail.dayOfWeek);
-          
+          console.log(
+            "      📅 date:",
+            avail.date,
+            `(type: ${typeof avail.date})`,
+          );
+          console.log("      🎯 type:", avail.type);
+          console.log(
+            "      ⏱️  timeSlots:",
+            avail.timeSlots,
+            `(length: ${avail.timeSlots?.length || 0})`,
+          );
+          console.log(
+            "      🔒 bookedSlots:",
+            avail.bookedSlots,
+            `(length: ${avail.bookedSlots?.length || 0})`,
+          );
+          console.log("      ✅ isAvailable:", avail.isAvailable);
+          console.log("      📆 dayOfWeek:", avail.dayOfWeek);
+
           // დამატებითი ველების შემოწმება
           if (avail.bookedTimeSlots) {
-            console.log('      ⚠️  bookedTimeSlots:', avail.bookedTimeSlots);
+            console.log("      ⚠️  bookedTimeSlots:", avail.bookedTimeSlots);
           }
           if (avail.appointments) {
-            console.log('      ⚠️  appointments:', avail.appointments);
+            console.log("      ⚠️  appointments:", avail.appointments);
           }
         });
-        
+
         setAvailability(availabilityResponse.data as any[]);
       } else {
-        console.log('\n❌ [Dashboard] getDoctorAvailability - Invalid response:');
-        console.log('   success:', availabilityResponse.success);
-        console.log('   data:', availabilityResponse.data);
-        console.log('   isArray:', Array.isArray(availabilityResponse.data));
+        console.log(
+          "\n❌ [Dashboard] getDoctorAvailability - Invalid response:",
+        );
+        console.log("   success:", availabilityResponse.success);
+        console.log("   data:", availabilityResponse.data);
+        console.log("   isArray:", Array.isArray(availabilityResponse.data));
       }
     } catch (err) {
       console.error("Error fetching dashboard data:", err);
@@ -220,7 +239,7 @@ export default function DoctorDashboard() {
   useFocusEffect(
     useCallback(() => {
       void loadDashboardData();
-    }, [loadDashboardData])
+    }, [loadDashboardData]),
   );
 
   const onRefresh = useCallback(async () => {
@@ -345,12 +364,10 @@ export default function DoctorDashboard() {
           <TouchableOpacity
             activeOpacity={0.9}
             onPress={() =>
-              router.push(
-                {
-                  pathname: "/(doctor-tabs)/appointments" as any,
-                  params: { id: upcomingConsultation.id },
-                } as any,
-              )
+              router.push({
+                pathname: "/(doctor-tabs)/appointments" as any,
+                params: { id: upcomingConsultation.id },
+              } as any)
             }
             style={[
               styles.upcomingCard,
@@ -363,11 +380,18 @@ export default function DoctorDashboard() {
                   <View
                     style={[
                       styles.upcomingBadge,
-                      { backgroundColor: getTypeMeta(upcomingConsultation.type).chipColor },
+                      {
+                        backgroundColor: getTypeMeta(upcomingConsultation.type)
+                          .chipColor,
+                      },
                     ]}
                   >
                     <Ionicons
-                      name={upcomingConsultation.type === "home-visit" ? "home" : "videocam"}
+                      name={
+                        upcomingConsultation.type === "home-visit"
+                          ? "home"
+                          : "videocam"
+                      }
                       size={16}
                       color={getTypeMeta(upcomingConsultation.type).color}
                     />
@@ -386,11 +410,14 @@ export default function DoctorDashboard() {
                   დღეს გაქვთ კონსულტაცია {upcomingConsultation.patientName}-თან
                 </Text>
                 <Text style={styles.upcomingSubtitle}>
-                  {new Date(upcomingConsultation.dateTime).toLocaleDateString("ka-GE", {
-                    weekday: "long",
-                    month: "short",
-                    day: "numeric",
-                  })}
+                  {new Date(upcomingConsultation.dateTime).toLocaleDateString(
+                    "ka-GE",
+                    {
+                      weekday: "long",
+                      month: "short",
+                      day: "numeric",
+                    },
+                  )}
                   , {upcomingConsultation.time}
                 </Text>
 
@@ -401,7 +428,9 @@ export default function DoctorDashboard() {
                       size={16}
                       color={getTypeMeta(upcomingConsultation.type).color}
                     />
-                    <Text style={styles.upcomingMetaText}>{upcomingConsultation.time}</Text>
+                    <Text style={styles.upcomingMetaText}>
+                      {upcomingConsultation.time}
+                    </Text>
                   </View>
                   <View style={styles.upcomingMetaPill}>
                     <Ionicons
@@ -410,7 +439,9 @@ export default function DoctorDashboard() {
                       color={getTypeMeta(upcomingConsultation.type).color}
                     />
                     <Text style={styles.upcomingMetaText}>
-                      {upcomingConsultation.type === "home-visit" ? "ბინაზე ვიზიტი" : "ონლაინ"}
+                      {upcomingConsultation.type === "home-visit"
+                        ? "ბინაზე ვიზიტი"
+                        : "ონლაინ"}
                     </Text>
                   </View>
                 </View>
@@ -420,7 +451,9 @@ export default function DoctorDashboard() {
                 <View
                   style={[
                     styles.upcomingAvatar,
-                    { borderColor: getTypeMeta(upcomingConsultation.type).color },
+                    {
+                      borderColor: getTypeMeta(upcomingConsultation.type).color,
+                    },
                   ]}
                 >
                   <Ionicons
@@ -434,23 +467,25 @@ export default function DoctorDashboard() {
           </TouchableOpacity>
         )}
 
-        <AIAssistant />
-
         {/* Quick Actions */}
         <View style={styles.quickActionsSection}>
           <Text style={styles.quickActionsTitle}>სწრაფი მოქმედებები</Text>
           <View style={styles.quickActionsGrid}>
             {/* Chat */}
             <TouchableOpacity
-              style={[styles.quickActionCard, styles.quickActionChat]}
-              onPress={() => router.push("/(doctor-tabs)/chat" as any)}
+              style={[styles.quickActionCard, styles.quickActionHomeVisit]}
+              onPress={() =>
+                router.push(
+                  "/(doctor-tabs)/active-patients?type=home-visit" as any,
+                )
+              }
               activeOpacity={0.85}
             >
               <View style={styles.quickActionIconWrapper}>
-                <Ionicons name="chatbubbles" size={28} color="#FFFFFF" />
+                <Ionicons name="home" size={28} color="#FFFFFF" />
               </View>
-              <Text style={styles.quickActionLabel}>ჩატი</Text>
-              <Text style={styles.quickActionSubLabel}>პაციენტებთან</Text>
+              <Text style={styles.quickActionLabel}>ბინაზე</Text>
+              <Text style={styles.quickActionSubLabel}>აქტიური პაციენტები</Text>
             </TouchableOpacity>
 
             {/* Active Patients - Video */}
@@ -469,25 +504,14 @@ export default function DoctorDashboard() {
             </TouchableOpacity>
 
             {/* Active Patients - Home Visit */}
-            <TouchableOpacity
-              style={[styles.quickActionCard, styles.quickActionHomeVisit]}
-              onPress={() =>
-                router.push(
-                  "/(doctor-tabs)/active-patients?type=home-visit" as any
-                )
-              }
-              activeOpacity={0.85}
-            >
-              <View style={styles.quickActionIconWrapper}>
-                <Ionicons name="home" size={28} color="#FFFFFF" />
-              </View>
-              <Text style={styles.quickActionLabel}>ბინაზე</Text>
-              <Text style={styles.quickActionSubLabel}>აქტიური პაციენტები</Text>
-            </TouchableOpacity>
 
             {/* Laboratory */}
             <TouchableOpacity
-              style={[styles.quickActionCard, styles.quickActionLab]}
+              style={[
+                styles.quickActionCard,
+                styles.quickActionLab,
+                styles.quickActionCardWide,
+              ]}
               onPress={() => router.push("/(doctor-tabs)/laboratory" as any)}
               activeOpacity={0.85}
             >
@@ -501,7 +525,7 @@ export default function DoctorDashboard() {
         </View>
 
         {/* Quick Stats */}
-       
+        <AIAssistant />
 
         {/* My Available Schedule */}
         {selectedDates.length > 0 && (
@@ -526,7 +550,7 @@ export default function DoctorDashboard() {
                   <Text style={styles.availabilitySubtitle}>
                     {Object.values(schedules).reduce(
                       (sum, slots) => sum + slots.length,
-                      0
+                      0,
                     )}{" "}
                     ხელმისაწვდომი საათი (სულ)
                   </Text>
@@ -652,7 +676,7 @@ export default function DoctorDashboard() {
                   activeOpacity={0.8}
                   onPress={() =>
                     setScheduleFilter(
-                      scheduleFilter === "video" ? "all" : "video"
+                      scheduleFilter === "video" ? "all" : "video",
                     )
                   }
                 >
@@ -684,7 +708,7 @@ export default function DoctorDashboard() {
                   activeOpacity={0.8}
                   onPress={() =>
                     setScheduleFilter(
-                      scheduleFilter === "home-visit" ? "all" : "home-visit"
+                      scheduleFilter === "home-visit" ? "all" : "home-visit",
                     )
                   }
                 >
@@ -742,7 +766,7 @@ export default function DoctorDashboard() {
                           styles.statusBadge,
                           {
                             backgroundColor: `${getStatusColor(
-                              consultation.status
+                              consultation.status,
                             )}20`,
                           },
                         ]}
@@ -767,8 +791,8 @@ export default function DoctorDashboard() {
                     {scheduleFilter === "all"
                       ? "ყველა ტიპი"
                       : scheduleFilter === "video"
-                      ? "ვიდეო"
-                      : "ბინაზე"}
+                        ? "ვიდეო"
+                        : "ბინაზე"}
                     )
                   </Text>
                   {upcomingDateKeys.slice(0, 5).map((dateKey) => {
@@ -858,41 +882,45 @@ export default function DoctorDashboard() {
           <View style={styles.activityCard}>
             {recentConsultations.slice(0, 5).map((consultation, index) => {
               const isVideo = consultation.type === "video";
-              
+
               // ფერები და აიქონები ტიპის მიხედვით
-              const iconColor = isVideo 
-                ? (consultation.isPaid ? "#0EA5E9" : "#0EA5E9") 
-                : (consultation.isPaid ? "#10B981" : "#10B981");
-              
+              const iconColor = isVideo
+                ? consultation.isPaid
+                  ? "#0EA5E9"
+                  : "#0EA5E9"
+                : consultation.isPaid
+                  ? "#10B981"
+                  : "#10B981";
+
               const backgroundColor = isVideo
-                ? (consultation.isPaid ? "#0EA5E920" : "#0EA5E920")
-                : (consultation.isPaid ? "#10B98120" : "#10B98120");
-              
-              const iconName = isVideo 
-                ? (consultation.isPaid ? "videocam" : "videocam-outline")
-                : (consultation.isPaid ? "home" : "home-outline");
-              
+                ? consultation.isPaid
+                  ? "#0EA5E920"
+                  : "#0EA5E920"
+                : consultation.isPaid
+                  ? "#10B98120"
+                  : "#10B98120";
+
+              const iconName = isVideo
+                ? consultation.isPaid
+                  ? "videocam"
+                  : "videocam-outline"
+                : consultation.isPaid
+                  ? "home"
+                  : "home-outline";
+
               return (
                 <View key={consultation.id}>
                   <View style={styles.activityItem}>
-                    <View
-                      style={[
-                        styles.activityIcon,
-                        { backgroundColor },
-                      ]}
-                    >
-                      <Ionicons
-                        name={iconName}
-                        size={20}
-                        color={iconColor}
-                      />
+                    <View style={[styles.activityIcon, { backgroundColor }]}>
+                      <Ionicons name={iconName} size={20} color={iconColor} />
                     </View>
                     <View style={styles.activityInfo}>
                       <Text style={styles.activityPatient}>
                         {consultation.patientName}
                       </Text>
                       <Text style={styles.activityDetails}>
-                        {consultation.date} • {consultation.time} • {isVideo ? "ვიდეო" : "ბინაზე"}
+                        {consultation.date} • {consultation.time} •{" "}
+                        {isVideo ? "ვიდეო" : "ბინაზე"}
                       </Text>
                     </View>
                     <View style={styles.activityAmount}>
@@ -919,7 +947,6 @@ export default function DoctorDashboard() {
         </View>
 
         {/* Patient Insights */}
-      
       </ScrollView>
       {/* Full list of hours modal */}
       <Modal
@@ -1118,6 +1145,9 @@ const styles = StyleSheet.create<any>({
   },
   quickActionLab: {
     backgroundColor: "#F59E0B",
+  },
+  quickActionCardWide: {
+    width: "100%",
   },
   quickActionIconWrapper: {
     width: 56,

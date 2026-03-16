@@ -61,12 +61,11 @@ const MakeAppointment = () => {
   const [visitAddress, setVisitAddress] = useState("");
   const [bookingFor, setBookingFor] = useState<"myself" | "other">("myself");
   const [problemDescription, setProblemDescription] = useState("");
-  const [uploadedFile, setUploadedFile] = useState<{
-    uri: string;
-    name: string;
-    type: string;
-  } | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<
+    { uri: string; name: string; type: string }[]
+  >([]);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const MAX_FILES = 10;
   const isLockedType = !!appointmentTypeParam;
 
   useEffect(() => {
@@ -115,7 +114,8 @@ const MakeAppointment = () => {
             onPress: async () => {
               try {
                 // Request permissions
-                const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                const { status } =
+                  await ImagePicker.requestMediaLibraryPermissionsAsync();
                 if (status !== "granted") {
                   Alert.alert(
                     "წვდომა",
@@ -131,7 +131,11 @@ const MakeAppointment = () => {
                   quality: 0.8,
                 });
 
-                if (result.canceled || !result.assets || result.assets.length === 0) {
+                if (
+                  result.canceled ||
+                  !result.assets ||
+                  result.assets.length === 0
+                ) {
                   return;
                 }
 
@@ -143,18 +147,31 @@ const MakeAppointment = () => {
 
                 // Validate file size (max 10MB)
                 if (asset.fileSize && asset.fileSize > 10 * 1024 * 1024) {
-                  Alert.alert("შეცდომა", "ფაილის ზომა არ უნდა აღემატებოდეს 10MB-ს");
+                  Alert.alert(
+                    "შეცდომა",
+                    "ფაილის ზომა არ უნდა აღემატებოდეს 10MB-ს",
+                  );
                   return;
                 }
 
-                await uploadFile({
+                if (uploadedFiles.length >= MAX_FILES) {
+                  Alert.alert(
+                    "ლიმიტი",
+                    `მაქსიმუმ ${MAX_FILES} ფაილის დამატება შეგიძლიათ.`,
+                  );
+                  return;
+                }
+                addFile({
                   uri: asset.uri,
                   name: asset.fileName || `appointment_${Date.now()}.jpg`,
                   type: asset.mimeType || "image/jpeg",
                 });
               } catch (error: any) {
                 console.error("Image pick error:", error);
-                Alert.alert("შეცდომა", error.message || "ფოტოს არჩევა ვერ მოხერხდა");
+                Alert.alert(
+                  "შეცდომა",
+                  error.message || "ფოტოს არჩევა ვერ მოხერხდა",
+                );
               }
             },
           },
@@ -162,32 +179,66 @@ const MakeAppointment = () => {
             text: "დოკუმენტი",
             onPress: async () => {
               try {
+                setUploadingFile(true);
+                if (uploadedFiles.length >= MAX_FILES) {
+                  Alert.alert(
+                    "ლიმიტი",
+                    `მაქსიმუმ ${MAX_FILES} დოკუმენტის დამატება შეგიძლიათ.`,
+                  );
+                  return;
+                }
                 const result = await DocumentPicker.getDocumentAsync({
-                  type: ["application/pdf", "image/jpeg", "image/jpg", "image/png", "image/webp"],
+                  type: [
+                    "application/pdf",
+                    "image/jpeg",
+                    "image/jpg",
+                    "image/png",
+                    "image/webp",
+                  ],
                   copyToCacheDirectory: true,
-                  multiple: false,
+                  multiple: true,
                 });
 
-                if (result.canceled || !result.assets || result.assets.length === 0) {
+                if (
+                  result.canceled ||
+                  !result.assets ||
+                  result.assets.length === 0
+                ) {
                   return;
                 }
 
-                const file = result.assets[0];
-                
-                // Validate file size (max 10MB)
-                if (file.size && file.size > 10 * 1024 * 1024) {
-                  Alert.alert("შეცდომა", "ფაილის ზომა არ უნდა აღემატებოდეს 10MB-ს");
-                  return;
+                const toAdd = result.assets.slice(
+                  0,
+                  MAX_FILES - uploadedFiles.length,
+                );
+                for (const file of toAdd) {
+                  if (file.size && file.size > 10 * 1024 * 1024) {
+                    Alert.alert(
+                      "შეცდომა",
+                      `ფაილი „${file.name}" აღემატება 10MB-ს.`,
+                    );
+                    continue;
+                  }
+                  addFile({
+                    uri: file.uri,
+                    name: file.name || "document",
+                    type: file.mimeType || "application/pdf",
+                  });
                 }
-
-                await uploadFile({
-                  uri: file.uri,
-                  name: file.name || "document",
-                  type: file.mimeType || "application/pdf",
-                });
+                if (toAdd.length > 0) {
+                  Alert.alert(
+                    "წარმატება",
+                    `${toAdd.length} ფაილი მომზადებულია ატვირთვისთვის`,
+                  );
+                }
               } catch (error: any) {
                 console.error("Document picker error:", error);
-                Alert.alert("შეცდომა", error.message || "დოკუმენტის არჩევა ვერ მოხერხდა");
+                Alert.alert(
+                  "შეცდომა",
+                  error.message || "დოკუმენტის არჩევა ვერ მოხერხდა",
+                );
+              } finally {
+                setUploadingFile(false);
               }
             },
           },
@@ -196,7 +247,7 @@ const MakeAppointment = () => {
             style: "cancel",
           },
         ],
-        { cancelable: true }
+        { cancelable: true },
       );
     } catch (error: any) {
       console.error("File pick error:", error);
@@ -204,29 +255,16 @@ const MakeAppointment = () => {
     }
   };
 
-  const uploadFile = async (file: { uri: string; name: string; type: string }) => {
-    try {
-      setUploadingFile(true);
-      
-      // Just store the file info, don't upload yet - will upload in patient-details
-      setUploadedFile({
-        uri: file.uri,
-        name: file.name,
-        type: file.type,
-      });
-      Alert.alert("წარმატება", "ფაილი მომზადებულია ატვირთვისთვის");
-    } catch (error: any) {
-      console.error("File selection error:", error);
-      Alert.alert("შეცდომა", error.message || "ფაილის არჩევა ვერ მოხერხდა");
-    } finally {
-      setUploadingFile(false);
-    }
+  const addFile = (file: { uri: string; name: string; type: string }) => {
+    setUploadedFiles((prev) => {
+      if (prev.length >= MAX_FILES) return prev;
+      return [...prev, file];
+    });
   };
 
-  const removeFile = () => {
-    setUploadedFile(null);
+  const removeFile = (index: number) => {
+    setUploadedFiles((prev) => prev.filter((_, i) => i !== index));
   };
-
 
   if (loading) {
     return (
@@ -244,10 +282,7 @@ const MakeAppointment = () => {
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error || "ექიმი არ მოიძებნა"}</Text>
-          <TouchableOpacity
-            style={styles.retryButton}
-            onPress={loadDoctor}
-          >
+          <TouchableOpacity style={styles.retryButton} onPress={loadDoctor}>
             <Text style={styles.retryButtonText}>ხელახლა ცდა</Text>
           </TouchableOpacity>
         </View>
@@ -255,9 +290,10 @@ const MakeAppointment = () => {
     );
   }
 
-  const consultationFee = typeof doctor.consultationFee === 'number' 
-    ? doctor.consultationFee 
-    : parseFloat(String(doctor.consultationFee).replace(/[^\d.]/g, '')) || 0;
+  const consultationFee =
+    typeof doctor.consultationFee === "number"
+      ? doctor.consultationFee
+      : parseFloat(String(doctor.consultationFee).replace(/[^\d.]/g, "")) || 0;
   const vat = Math.round(consultationFee * 0.05);
   const netAmount = consultationFee + vat;
 
@@ -282,7 +318,7 @@ const MakeAppointment = () => {
   };
 
   const appointmentDateTime = `${formatDate(
-    selectedDate as string
+    selectedDate as string,
   )} | ${selectedTime}`;
 
   const handleMakeAppointment = async () => {
@@ -313,28 +349,25 @@ const MakeAppointment = () => {
       return;
     }
 
-    // დროებით: გადახდის გვერდზე ნავიგაცია დაკომენტარებულია
-    // პირდაპირ პაციენტის დეტალების გვერდზე გადავდივართ
-    // // Navigate directly to payment page
-    // router.push({
-    //   pathname: "/screens/payment/payment-methods",
-    //   params: {
-    //     doctorId: doctorId as string,
-    //     selectedDate: selectedDate as string,
-    //     selectedTime: selectedTime as string,
-    //     paymentMethod: selectedPaymentMethod,
-    //     amount: netAmount.toString(),
-    //     consultationFee: consultationFee.toString(),
-    //     appointmentType,
-    //     visitAddress,
-    //     problemDescription,
-    //     uploadedFile: uploadedFile ? JSON.stringify(uploadedFile) : "",
-    //   },
-    // });
+    const uploadedFileParam =
+      uploadedFiles.length > 0 ? JSON.stringify(uploadedFiles) : "";
 
-    // დროებით: პირდაპირ პაციენტის დეტალების გვერდზე გადავდივართ (გადახდის გარეშე)
+    // ლოგი: make-appointment-დან რას ვაგზავნით payment-ზე
+    console.log("📤 [make-appointment] ჯავშნის გაკეთება — რას ვაგზავნით payment-ზე:", {
+      doctorId,
+      selectedDate,
+      selectedTime,
+      appointmentType,
+      problemDescriptionLength: problemDescription.length,
+      uploadedFilesCount: uploadedFiles.length,
+      uploadedFiles: uploadedFiles.map((f) => ({ name: f.name, type: f.type, uriPreview: f.uri ? `${f.uri.slice(0, 60)}...` : null })),
+      uploadedFileParamLength: uploadedFileParam.length,
+      uploadedFileParamPreview: uploadedFileParam.slice(0, 200),
+    });
+
+    // make-appointment-ის შემდეგ გადახდის გვერდზე
     router.push({
-      pathname: "/screens/appointment/patient-details",
+      pathname: "/screens/payment/payment-methods",
       params: {
         doctorId: doctorId as string,
         selectedDate: selectedDate as string,
@@ -344,8 +377,8 @@ const MakeAppointment = () => {
         consultationFee: consultationFee.toString(),
         appointmentType,
         visitAddress,
-        bookingFor: bookingFor,
-        uploadedFile: uploadedFile ? JSON.stringify(uploadedFile) : "",
+        problemDescription,
+        uploadedFile: uploadedFileParam,
       },
     });
   };
@@ -362,7 +395,9 @@ const MakeAppointment = () => {
         </TouchableOpacity>
         <View style={styles.headerTitles}>
           <Text style={styles.headerTitle}>ახალი ჯავშანი</Text>
-          <Text style={styles.headerSubtitle}>აირჩიე ტიპი და დაადასტურე ვიზიტი</Text>
+          <Text style={styles.headerSubtitle}>
+            აირჩიე ტიპი და დაადასტურე ვიზიტი
+          </Text>
         </View>
         <View style={styles.placeholder} />
       </View>
@@ -562,7 +597,7 @@ const MakeAppointment = () => {
 
         {/* Problem Description Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>პრობლემის აღწერა</Text>
+          <Text style={styles.sectionTitle}>ჩივილები </Text>
           <Text style={styles.sectionSubtitle}>
             აღწერეთ თქვენი პრობლემა ან სიმპტომები დეტალურად
           </Text>
@@ -578,36 +613,57 @@ const MakeAppointment = () => {
           />
         </View>
 
-        {/* File Upload Section */}
+        {/* File Upload Section - რამდენიმე დოკუმენტი */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>ფაილის დამატება (არასავალდებულო)</Text>
+          <Text style={styles.sectionTitle}>
+            დოკუმენტების დამატება (არასავალდებულო)
+          </Text>
           <Text style={styles.sectionSubtitle}>
-            შეგიძლიათ დაურთოთ ფოტო ან დოკუმენტი თქვენი პრობლემის ან სიმპტომების შესახებ
+            შეგიძლიათ დაურთოთ რამდენიმე ფოტო ან დოკუმენტი (მაქს. {MAX_FILES})
           </Text>
 
-          {uploadedFile ? (
-            <View style={styles.filePreviewContainer}>
-              {uploadedFile.type.startsWith("image/") ? (
-                <Image source={{ uri: uploadedFile.uri }} style={styles.filePreview} />
-              ) : (
-                <View style={styles.documentPreview}>
-                  <Ionicons name="document-text-outline" size={48} color="#0EA5E9" />
-                  <Text style={styles.documentName} numberOfLines={1}>
-                    {uploadedFile.name}
-                  </Text>
-                  <Text style={styles.documentType}>
-                    {uploadedFile.type.includes("pdf") ? "PDF" : uploadedFile.type.split("/")[1]?.toUpperCase() || "დოკუმენტი"}
-                  </Text>
+          {uploadedFiles.length > 0 && (
+            <View style={styles.uploadedFilesList}>
+              {uploadedFiles.map((file, index) => (
+                <View
+                  key={`${file.uri}-${index}`}
+                  style={styles.filePreviewContainer}
+                >
+                  {file.type.startsWith("image/") ? (
+                    <Image
+                      source={{ uri: file.uri }}
+                      style={styles.filePreview}
+                    />
+                  ) : (
+                    <View style={styles.documentPreview}>
+                      <Ionicons
+                        name="document-text-outline"
+                        size={48}
+                        color="#0EA5E9"
+                      />
+                      <Text style={styles.documentName} numberOfLines={1}>
+                        {file.name}
+                      </Text>
+                      <Text style={styles.documentType}>
+                        {file.type.includes("pdf")
+                          ? "PDF"
+                          : file.type.split("/")[1]?.toUpperCase() ||
+                            "დოკუმენტი"}
+                      </Text>
+                    </View>
+                  )}
+                  <TouchableOpacity
+                    style={styles.removeFileButton}
+                    onPress={() => removeFile(index)}
+                  >
+                    <Ionicons name="close-circle" size={24} color="#EF4444" />
+                  </TouchableOpacity>
                 </View>
-              )}
-              <TouchableOpacity
-                style={styles.removeFileButton}
-                onPress={removeFile}
-              >
-                <Ionicons name="close-circle" size={24} color="#EF4444" />
-              </TouchableOpacity>
+              ))}
             </View>
-          ) : (
+          )}
+
+          {uploadedFiles.length < MAX_FILES && (
             <TouchableOpacity
               style={styles.fileUploadButton}
               onPress={handleFilePick}
@@ -619,7 +675,9 @@ const MakeAppointment = () => {
                 <>
                   <Ionicons name="attach-outline" size={24} color="#0EA5E9" />
                   <Text style={styles.fileUploadButtonText}>
-                    ფაილის არჩევა
+                    {uploadedFiles.length === 0
+                      ? "ფაილის არჩევა"
+                      : "კიდევ ფაილის დამატება"}
                   </Text>
                 </>
               )}
@@ -635,9 +693,6 @@ const MakeAppointment = () => {
             <Text style={styles.paymentLabel}>კონსულტაციის საფასური</Text>
             <Text style={styles.paymentAmount}>{consultationFee} ₾</Text>
           </View>
-
-        
-
 
           <View style={styles.paymentRow}>
             <Text style={styles.netAmountLabel}>საერთო თანხა</Text>
@@ -1100,6 +1155,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Poppins-Regular",
     color: "#6B7280",
+    marginBottom: 12,
+  },
+  uploadedFilesList: {
+    gap: 12,
     marginBottom: 12,
   },
   fileUploadButton: {

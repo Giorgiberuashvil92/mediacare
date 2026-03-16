@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   ScrollView,
@@ -256,9 +257,10 @@ export default function AIAssistantScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showHistoryModal]);
 
-  // Handle send message with image
-  const handleSendMessage = async () => {
-    if ((!inputText.trim() && !selectedImage) || isSending) return;
+  // Handle send message with image (textOverride = when sent from suggested prompt)
+  const handleSendMessage = async (textOverride?: string) => {
+    const content = (textOverride ?? inputText.trim()) || "";
+    if ((!content && !selectedImage) || isSending) return;
     if (!user?.id) return;
 
     try {
@@ -284,7 +286,7 @@ export default function AIAssistantScreen() {
       }
 
       const response = await apiService.sendAIMessage(sessionToUse.id, {
-        content: inputText.trim() || "",
+        content,
         image: selectedImage ? {
           uri: selectedImage.uri,
           type: selectedImage.type || "image/jpeg",
@@ -313,9 +315,10 @@ export default function AIAssistantScreen() {
     }
   };
 
-  // Handle prompt selection
+  // შემოთავაზებული კითხვა — ჩაწერა და ავტომატური გაგზავნა
   const handlePromptSelect = (promptText: string) => {
     setInputText(promptText);
+    handleSendMessage(promptText);
   };
 
   // Handle session selection from history
@@ -351,6 +354,11 @@ export default function AIAssistantScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+      >
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
@@ -657,7 +665,7 @@ export default function AIAssistantScreen() {
         <TouchableOpacity
           style={styles.sendButton}
           disabled={(!inputText.trim() && !selectedImage) || isSending}
-          onPress={handleSendMessage}
+          onPress={() => handleSendMessage()}
         >
           {isSending ? (
             <ActivityIndicator size="small" color="#6366F1" />
@@ -670,7 +678,7 @@ export default function AIAssistantScreen() {
           )}
         </TouchableOpacity>
       </View>
-
+      </KeyboardAvoidingView>
 
       {/* History Modal */}
       <Modal
@@ -870,6 +878,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FFFFFF",
+  },
+  flex: {
+    flex: 1,
   },
   header: {
     flexDirection: "row",

@@ -14,7 +14,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { apiService } from "../_services/api";
@@ -59,7 +59,9 @@ export default function ActivePatientsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedPatient, setSelectedPatient] = useState<ActivePatient | null>(null);
+  const [selectedPatient, setSelectedPatient] = useState<ActivePatient | null>(
+    null,
+  );
   const [showLabModal, setShowLabModal] = useState(false);
 
   const isVideoType = type === "video";
@@ -69,83 +71,123 @@ export default function ActivePatientsScreen() {
   const loadPatients = useCallback(async () => {
     try {
       const response = await apiService.getDoctorDashboardAppointments(100);
-      
+
       if (response.success && Array.isArray(response.data)) {
         const relevantStatuses = ["scheduled", "confirmed", "in-progress"];
         const filtered = response.data
           .filter((apt: any) => {
             // For followup appointments, check originalType instead of type
             // For regular appointments, check type directly
-            const matchesType = apt.type === "followup" 
-              ? apt.originalType === type 
-              : apt.type === type;
+            const matchesType =
+              apt.type === "followup"
+                ? apt.originalType === type
+                : apt.type === type;
             const isRelevant = relevantStatuses.includes(apt.status);
             return matchesType && isRelevant;
           })
           .map((apt: any): ActivePatient => {
             if (apt.laboratoryTests && apt.laboratoryTests.length > 0) {
-              console.log('🧪 [ActivePatients] Lab tests for appointment:', apt._id || apt.id);
-              console.log('🧪 [ActivePatients] Patient:', apt.patientName);
-              console.log('🧪 [ActivePatients] Raw laboratoryTests:', JSON.stringify(apt.laboratoryTests, null, 2));
+              console.log(
+                "🧪 [ActivePatients] Lab tests for appointment:",
+                apt._id || apt.id,
+              );
+              console.log("🧪 [ActivePatients] Patient:", apt.patientName);
+              console.log(
+                "🧪 [ActivePatients] Raw laboratoryTests:",
+                JSON.stringify(apt.laboratoryTests, null, 2),
+              );
             }
-            
+
             // Extract lab tests from appointment
-            const labTests: LabTest[] = (apt.laboratoryTests || []).map((test: any) => {
-              return {
-                id: test._id || test.productId,
-                productId: test.productId,
-                productName: test.productName || "უცნობი კვლევა",
-                status: test.resultFile?.url ? "completed" : (test.status || "pending"),
-                hasResult: !!(test.resultFile?.url),
-                resultFileUrl: test.resultFile?.url || null,
-              };
-            });
-            
-            const labResultsCompleted = labTests.filter(t => t.hasResult).length;
+            const labTests: LabTest[] = (apt.laboratoryTests || []).map(
+              (test: any) => {
+                return {
+                  id: test._id || test.productId,
+                  productId: test.productId,
+                  productName: test.productName || "უცნობი კვლევა",
+                  status: test.resultFile?.url
+                    ? "completed"
+                    : test.status || "pending",
+                  hasResult: !!test.resultFile?.url,
+                  resultFileUrl: test.resultFile?.url || null,
+                };
+              },
+            );
+
+            const labResultsCompleted = labTests.filter(
+              (t) => t.hasResult,
+            ).length;
             const labResultsTotal = labTests.length;
 
             return {
               id: apt._id || apt.id,
               patientId: apt.patientId?._id || apt.patientId || "",
               // patientName comes directly from dashboard API, or fallback to patientDetails
-              patientName: apt.patientName 
-                || (apt.patientDetails?.name && apt.patientDetails?.lastName
+              patientName:
+                apt.patientName ||
+                (apt.patientDetails?.name && apt.patientDetails?.lastName
                   ? `${apt.patientDetails.name} ${apt.patientDetails.lastName}`
                   : apt.patientId?.name || "უცნობი პაციენტი"),
               patientImage: apt.patientId?.profileImage,
               // date/time might come as 'date'/'time' or 'appointmentDate'/'appointmentTime'
-              appointmentDate: apt.date || apt.appointmentDate?.split("T")[0] || "",
+              appointmentDate:
+                apt.date || apt.appointmentDate?.split("T")[0] || "",
               appointmentTime: apt.time || apt.appointmentTime || "",
-              status: apt.status === "scheduled" ? "confirmed" : (apt.status || "confirmed"),
+              status:
+                apt.status === "scheduled"
+                  ? "confirmed"
+                  : apt.status || "confirmed",
               type: apt.type || "video",
-              problem: apt.symptoms || apt.patientDetails?.problem || apt.notes,
+              problem: apt.symptoms || undefined,
               visitAddress: apt.visitAddress,
               // Form 100 status
               hasForm100: !!(apt.form100?.pdfUrl || apt.form100?.id),
-              form100: apt.form100 ? {
-                id: apt.form100.id,
-                pdfUrl: apt.form100.pdfUrl,
-                fileName: apt.form100.fileName,
-                issueDate: apt.form100.issueDate,
-              } : undefined,
+              form100: apt.form100
+                ? {
+                    id: apt.form100.id,
+                    pdfUrl: apt.form100.pdfUrl,
+                    fileName: apt.form100.fileName,
+                    issueDate: apt.form100.issueDate,
+                  }
+                : undefined,
               labTests,
               labResultsCompleted,
               labResultsTotal,
             };
           });
-        
+
         filtered.sort((a: ActivePatient, b: ActivePatient) => {
-          const [yearA, monthA, dayA] = a.appointmentDate.split('-').map(Number);
-          const [hoursA, minutesA] = a.appointmentTime.split(':').map(Number);
-          const dateTimeA = new Date(yearA, monthA - 1, dayA, hoursA, minutesA, 0, 0);
-          
-          const [yearB, monthB, dayB] = b.appointmentDate.split('-').map(Number);
-          const [hoursB, minutesB] = b.appointmentTime.split(':').map(Number);
-          const dateTimeB = new Date(yearB, monthB - 1, dayB, hoursB, minutesB, 0, 0);
-          
+          const [yearA, monthA, dayA] = a.appointmentDate
+            .split("-")
+            .map(Number);
+          const [hoursA, minutesA] = a.appointmentTime.split(":").map(Number);
+          const dateTimeA = new Date(
+            yearA,
+            monthA - 1,
+            dayA,
+            hoursA,
+            minutesA,
+            0,
+            0,
+          );
+
+          const [yearB, monthB, dayB] = b.appointmentDate
+            .split("-")
+            .map(Number);
+          const [hoursB, minutesB] = b.appointmentTime.split(":").map(Number);
+          const dateTimeB = new Date(
+            yearB,
+            monthB - 1,
+            dayB,
+            hoursB,
+            minutesB,
+            0,
+            0,
+          );
+
           return dateTimeA.getTime() - dateTimeB.getTime();
         });
-        
+
         setPatients(filtered);
       }
     } catch (error) {
@@ -166,32 +208,42 @@ export default function ActivePatientsScreen() {
   }, [loadPatients]);
 
   const filteredPatients = patients.filter((p) =>
-    p.patientName.toLowerCase().includes(searchQuery.toLowerCase())
+    p.patientName.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case "confirmed": return "დანიშნული";
-      case "in-progress": return "მიმდინარე";
-      case "completed": return "დასრულებული";
-      default: return status;
+      case "confirmed":
+        return "დანიშნული";
+      case "in-progress":
+        return "მიმდინარე";
+      case "completed":
+        return "დასრულებული";
+      default:
+        return status;
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "confirmed": return "#10B981";
-      case "in-progress": return "#0EA5E9";
-      case "completed": return "#6B7280";
-      default: return "#6B7280";
+      case "confirmed":
+        return "#10B981";
+      case "in-progress":
+        return "#0EA5E9";
+      case "completed":
+        return "#6B7280";
+      default:
+        return "#6B7280";
     }
   };
 
   const renderPatientItem = ({ item }: { item: ActivePatient }) => {
     // Lab status: complete if all results are received, or no tests assigned
     const hasLabTests = item.labResultsTotal > 0;
-    const labComplete = hasLabTests && item.labResultsCompleted === item.labResultsTotal;
-    const labPending = hasLabTests && item.labResultsCompleted < item.labResultsTotal;
+    const labComplete =
+      hasLabTests && item.labResultsCompleted === item.labResultsTotal;
+    const labPending =
+      hasLabTests && item.labResultsCompleted < item.labResultsTotal;
 
     return (
       <TouchableOpacity
@@ -199,9 +251,10 @@ export default function ActivePatientsScreen() {
         onPress={() => {
           // If it's a followup consultation, navigate to patients (recurring) tab
           // Otherwise, navigate to appointments (current) tab
-          const targetPath = item.type === "followup" 
-            ? "/(doctor-tabs)/patients" 
-            : "/(doctor-tabs)/appointments";
+          const targetPath =
+            item.type === "followup"
+              ? "/(doctor-tabs)/patients"
+              : "/(doctor-tabs)/appointments";
           router.push({
             pathname: targetPath as any,
             params: { appointmentId: item.id },
@@ -219,24 +272,61 @@ export default function ActivePatientsScreen() {
                 contentFit="cover"
               />
             ) : (
-              <View style={[styles.avatarPlaceholder, { backgroundColor: accentColor }]}>
-                <Ionicons name="person" size={24} color="#FFFFFF" />
+              <View
+                style={[
+                  styles.avatarPlaceholder,
+                  {
+                    backgroundColor:
+                      item.type === "followup" ? "#0EA5E9" : accentColor,
+                  },
+                ]}
+              >
+                <Ionicons
+                  name={item.type === "followup" ? "repeat" : "person"}
+                  size={24}
+                  color="#FFFFFF"
+                />
               </View>
             )}
           </View>
           <View style={styles.patientInfo}>
-            <Text style={styles.patientName}>{item.patientName}</Text>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 6,
+                flexWrap: "wrap",
+              }}
+            >
+              <Text style={styles.patientName}>{item.patientName}</Text>
+              {item.type === "followup" && (
+                <View
+                  style={{
+                    backgroundColor: "#0EA5E9",
+                    paddingHorizontal: 6,
+                    paddingVertical: 2,
+                    borderRadius: 4,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      color: "#FFFFFF",
+                      fontWeight: "600",
+                    }}
+                  >
+                    განმეორებითი
+                  </Text>
+                </View>
+              )}
+            </View>
             <View style={styles.appointmentRow}>
               <Ionicons name="calendar-outline" size={14} color="#6B7280" />
               <Text style={styles.appointmentText}>
                 {item.appointmentDate} • {item.appointmentTime}
               </Text>
             </View>
-            {item.problem && (
-              <Text style={styles.problemText} numberOfLines={1}>
-                {item.problem}
-              </Text>
-            )}
+
             {!isVideoType && item.visitAddress && (
               <View style={styles.addressRow}>
                 <Ionicons name="location-outline" size={12} color="#10B981" />
@@ -246,8 +336,18 @@ export default function ActivePatientsScreen() {
               </View>
             )}
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: `${getStatusColor(item.status)}20` }]}>
-            <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
+          <View
+            style={[
+              styles.statusBadge,
+              { backgroundColor: `${getStatusColor(item.status)}20` },
+            ]}
+          >
+            <Text
+              style={[
+                styles.statusText,
+                { color: getStatusColor(item.status) },
+              ]}
+            >
               {getStatusLabel(item.status)}
             </Text>
           </View>
@@ -277,12 +377,15 @@ export default function ActivePatientsScreen() {
               size={18}
               color={item.hasForm100 ? "#10B981" : "#EF4444"}
             />
-            <Text style={[styles.statusItemText, { color: item.hasForm100 ? "#10B981" : "#EF4444" }]}>
+            <Text
+              style={[
+                styles.statusItemText,
+                { color: item.hasForm100 ? "#10B981" : "#EF4444" },
+              ]}
+            >
               {item.hasForm100 ? "ფორმა 100 ✓" : "ფორმა 100 ❌"}
             </Text>
-            {!item.hasForm100 && (
-              <View style={styles.alertDot} />
-            )}
+            {!item.hasForm100 && <View style={styles.alertDot} />}
           </TouchableOpacity>
 
           {/* Lab Results - Temporarily commented out */}
@@ -325,17 +428,13 @@ export default function ActivePatientsScreen() {
 
         {/* Action Buttons */}
         <View style={styles.actionRow}>
-          
-
-          
-
           <TouchableOpacity
             style={[styles.actionButton, { backgroundColor: "#F59E0B20" }]}
             onPress={() => {
               router.push({
                 pathname: "/(doctor-tabs)/laboratory" as any,
-                params: { 
-                  patientId: item.patientId, 
+                params: {
+                  patientId: item.patientId,
                   patientName: item.patientName,
                   appointmentId: item.id,
                 },
@@ -343,7 +442,9 @@ export default function ActivePatientsScreen() {
             }}
           >
             <Ionicons name="flask-outline" size={18} color="#F59E0B" />
-            <Text style={[styles.actionButtonText, { color: "#F59E0B" }]}>კვლევები</Text>
+            <Text style={[styles.actionButtonText, { color: "#F59E0B" }]}>
+              კვლევები
+            </Text>
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
@@ -393,14 +494,20 @@ export default function ActivePatientsScreen() {
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
           <Text style={[styles.statValue, { color: "#EF4444" }]}>
-            {patients.filter(p => !p.hasForm100).length}
+            {patients.filter((p) => !p.hasForm100).length}
           </Text>
           <Text style={styles.statLabel}>ფორმა 100 ❌</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
           <Text style={[styles.statValue, { color: "#F59E0B" }]}>
-            {patients.filter(p => p.labResultsTotal > 0 && p.labResultsCompleted < p.labResultsTotal).length}
+            {
+              patients.filter(
+                (p) =>
+                  p.labResultsTotal > 0 &&
+                  p.labResultsCompleted < p.labResultsTotal,
+              ).length
+            }
           </Text>
           <Text style={styles.statLabel}>ლაბ. მოლოდინში</Text>
         </View>
@@ -441,7 +548,8 @@ export default function ActivePatientsScreen() {
             />
             <Text style={styles.emptyTitle}>პაციენტები არ მოიძებნა</Text>
             <Text style={styles.emptySubtitle}>
-              აქტიური {isVideoType ? "ვიდეო კონსულტაციები" : "ბინაზე ვიზიტები"} აქ გამოჩნდება
+              აქტიური {isVideoType ? "ვიდეო კონსულტაციები" : "ბინაზე ვიზიტები"}{" "}
+              აქ გამოჩნდება
             </Text>
           </View>
         }
@@ -465,7 +573,8 @@ export default function ActivePatientsScreen() {
                 <Text style={styles.labModalTitle}>ლაბორატორიული კვლევები</Text>
                 {selectedPatient && (
                   <Text style={styles.labModalSubtitle}>
-                    {selectedPatient.patientName} • {selectedPatient.appointmentDate}
+                    {selectedPatient.patientName} •{" "}
+                    {selectedPatient.appointmentDate}
                   </Text>
                 )}
               </View>
@@ -484,20 +593,27 @@ export default function ActivePatientsScreen() {
                   {/* Summary */}
                   <View style={styles.labSummary}>
                     <View style={styles.labSummaryItem}>
-                      <Text style={styles.labSummaryValue}>{selectedPatient.labResultsTotal}</Text>
+                      <Text style={styles.labSummaryValue}>
+                        {selectedPatient.labResultsTotal}
+                      </Text>
                       <Text style={styles.labSummaryLabel}>სულ კვლევა</Text>
                     </View>
                     <View style={styles.labSummaryDivider} />
                     <View style={styles.labSummaryItem}>
-                      <Text style={[styles.labSummaryValue, { color: "#10B981" }]}>
+                      <Text
+                        style={[styles.labSummaryValue, { color: "#10B981" }]}
+                      >
                         {selectedPatient.labResultsCompleted}
                       </Text>
                       <Text style={styles.labSummaryLabel}>დასრულებული</Text>
                     </View>
                     <View style={styles.labSummaryDivider} />
                     <View style={styles.labSummaryItem}>
-                      <Text style={[styles.labSummaryValue, { color: "#F59E0B" }]}>
-                        {selectedPatient.labResultsTotal - selectedPatient.labResultsCompleted}
+                      <Text
+                        style={[styles.labSummaryValue, { color: "#F59E0B" }]}
+                      >
+                        {selectedPatient.labResultsTotal -
+                          selectedPatient.labResultsCompleted}
                       </Text>
                       <Text style={styles.labSummaryLabel}>მოლოდინში</Text>
                     </View>
@@ -506,39 +622,72 @@ export default function ActivePatientsScreen() {
                   {/* Tests List */}
                   <Text style={styles.labTestsHeader}>დანიშნული კვლევები:</Text>
                   {selectedPatient.labTests.map((test, index) => (
-                    <View key={`${test.id}-${index}`} style={styles.labTestItem}>
-                      <View style={[
-                        styles.labTestStatusDot,
-                        { backgroundColor: test.hasResult ? "#10B981" : "#F59E0B" }
-                      ]} />
+                    <View
+                      key={`${test.id}-${index}`}
+                      style={styles.labTestItem}
+                    >
+                      <View
+                        style={[
+                          styles.labTestStatusDot,
+                          {
+                            backgroundColor: test.hasResult
+                              ? "#10B981"
+                              : "#F59E0B",
+                          },
+                        ]}
+                      />
                       <View style={styles.labTestInfo}>
-                        <Text style={styles.labTestName}>{test.productName}</Text>
-                        <Text style={[
-                          styles.labTestStatus,
-                          { color: test.hasResult ? "#10B981" : "#F59E0B" }
-                        ]}>
-                          {test.hasResult ? "✓ შედეგი მიღებულია" : "⏳ მოლოდინში"}
+                        <Text style={styles.labTestName}>
+                          {test.productName}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.labTestStatus,
+                            { color: test.hasResult ? "#10B981" : "#F59E0B" },
+                          ]}
+                        >
+                          {test.hasResult
+                            ? "✓ შედეგი მიღებულია"
+                            : "⏳ მოლოდინში"}
                         </Text>
                       </View>
                       {test.hasResult && test.resultFileUrl && (
-                        <TouchableOpacity 
+                        <TouchableOpacity
                           style={styles.labTestViewButton}
                           onPress={async () => {
-                            console.log('🧪 [ActivePatients] Opening result file:', test.resultFileUrl);
+                            console.log(
+                              "🧪 [ActivePatients] Opening result file:",
+                              test.resultFileUrl,
+                            );
                             try {
-                              const canOpen = await Linking.canOpenURL(test.resultFileUrl!);
+                              const canOpen = await Linking.canOpenURL(
+                                test.resultFileUrl!,
+                              );
                               if (canOpen) {
                                 await Linking.openURL(test.resultFileUrl!);
                               } else {
-                                Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა");
+                                Alert.alert(
+                                  "შეცდომა",
+                                  "ფაილის გახსნა ვერ მოხერხდა",
+                                );
                               }
                             } catch (error) {
-                              console.error('Error opening result file:', error);
-                              Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა");
+                              console.error(
+                                "Error opening result file:",
+                                error,
+                              );
+                              Alert.alert(
+                                "შეცდომა",
+                                "ფაილის გახსნა ვერ მოხერხდა",
+                              );
                             }
                           }}
                         >
-                          <Ionicons name="eye-outline" size={20} color="#0EA5E9" />
+                          <Ionicons
+                            name="eye-outline"
+                            size={20}
+                            color="#0EA5E9"
+                          />
                         </TouchableOpacity>
                       )}
                     </View>
@@ -574,7 +723,9 @@ export default function ActivePatientsScreen() {
                 }}
               >
                 <Ionicons name="add-circle-outline" size={22} color="#FFFFFF" />
-                <Text style={styles.addLabTestButtonText}>ახალი კვლევის დამატება</Text>
+                <Text style={styles.addLabTestButtonText}>
+                  ახალი კვლევის დამატება
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1029,4 +1180,3 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
 });
-

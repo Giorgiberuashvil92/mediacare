@@ -212,6 +212,57 @@ export default function LoginScreen() {
     }
   };
 
+  /** შესვლა OTP-ის გარეშე — ერთი ღილაკით ლოგინი და ოტპის გამოტოვება */
+  const handleLoginWithoutOTP = async () => {
+    if (!email.trim() || !password.trim()) {
+      showToast.error(
+        t("auth.login.validation.fillAll"),
+        t("auth.login.error.default"),
+      );
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const authResponse = await loginContext({ email: email.trim(), password });
+
+      if (authResponse.data.user.phone && authResponse.data.user.phone.trim()) {
+        // OTP საჭირო იქნებოდა — ვერიფიკაციას ვაკეთებთ კოდით გამოტოვებით
+        const verifyResponse = await apiService.verifyLoginOTP(
+          email.trim(),
+          "000000",
+        );
+        await completeLoginAfterOTP(verifyResponse);
+        showToast.info("შესვლა OTP-ის გარეშე", "ინფორმაცია");
+        const role = verifyResponse.data.user.role;
+        if (role === "doctor") {
+          router.replace("/(doctor-tabs)");
+        } else {
+          router.replace("/(tabs)");
+        }
+      } else {
+        showToast.auth.loginSuccess(authResponse.data.user.name || "მომხმარებელო");
+        const role = authResponse.data.user.role || authResponse.data.role;
+        if (role === "doctor") {
+          router.replace("/(doctor-tabs)");
+        } else {
+          router.replace("/(tabs)");
+        }
+      }
+    } catch (err) {
+      let errorMessage = t("auth.login.error.default");
+      if (err instanceof Error) {
+        if (err.message.includes("Invalid credentials")) errorMessage = t("auth.login.error.invalidCredentials");
+        else if (err.message.includes("User not found")) errorMessage = t("auth.login.error.userNotFound");
+        else if (err.message.includes("Invalid email")) errorMessage = t("auth.login.error.invalidEmail");
+        else errorMessage = err.message;
+      }
+      showToast.auth.loginError(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSignup = () => {
     router.push("/screens/auth/roleSelection");
   };
@@ -373,6 +424,20 @@ export default function LoginScreen() {
                     {isLoading
                       ? t("auth.login.submitting")
                       : t("auth.login.submit")}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* შესვლა OTP-ის გარეშე */}
+                <TouchableOpacity
+                  style={[
+                    styles.loginWithoutOTPButton,
+                    isLoading && styles.loginButtonDisabled,
+                  ]}
+                  onPress={handleLoginWithoutOTP}
+                  disabled={isLoading}
+                >
+                  <Text style={styles.loginWithoutOTPButtonText}>
+                    შესვლა OTP-ის გარეშე
                   </Text>
                 </TouchableOpacity>
 
@@ -663,6 +728,21 @@ const styles = StyleSheet.create({
   loginButtonDisabled: {
     backgroundColor: "#9CA3AF",
     opacity: 0.7,
+  },
+  loginWithoutOTPButton: {
+    backgroundColor: "transparent",
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: "#9CA3AF",
+    height: 48,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  loginWithoutOTPButtonText: {
+    fontSize: 15,
+    fontFamily: "Poppins-Medium",
+    color: "#6B7280",
   },
   dividerContainer: {
     flexDirection: "row",

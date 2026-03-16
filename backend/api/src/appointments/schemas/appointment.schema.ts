@@ -295,6 +295,9 @@ export class Appointment {
   };
 
   @Prop()
+  cancelledAt?: Date; // ზუსტი დრო, როდესაც პაციენტმა (ან სისტემამ) გაუქმება გააკეთა
+
+  @Prop()
   createdAt?: Date;
 
   @Prop()

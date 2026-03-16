@@ -5,14 +5,14 @@ import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Modal,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Modal,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -30,13 +30,18 @@ interface PatientAppointment {
   homeVisitCompletedAt?: string;
 }
 
-const mapAppointmentFromAPI = (appointment: any, apiBaseUrl: string): PatientAppointment => {
+const mapAppointmentFromAPI = (
+  appointment: any,
+  apiBaseUrl: string,
+): PatientAppointment => {
   let doctorImage;
   if (appointment.doctorId?.profileImage) {
     if (appointment.doctorId.profileImage.startsWith("http")) {
       doctorImage = { uri: appointment.doctorId.profileImage };
     } else {
-      doctorImage = { uri: `${apiBaseUrl}/${appointment.doctorId.profileImage}` };
+      doctorImage = {
+        uri: `${apiBaseUrl}/${appointment.doctorId.profileImage}`,
+      };
     }
   } else {
     doctorImage = require("@/assets/images/doctors/doctor1.png");
@@ -70,7 +75,7 @@ const getStatusLabel = (status: string) => {
     case "in-progress":
       return "მიმდინარე";
     case "pending":
-      return "მოლოდინში";
+      return "დანიშნული";
     case "confirmed":
       return "დადასტურებული";
     default:
@@ -89,7 +94,7 @@ const getStatusColor = (status: string) => {
     case "in-progress":
       return "#06B6D4";
     case "pending":
-      return "#F59E0B";
+      return "#8B5CF6";
     case "confirmed":
       return "#10B981";
     default:
@@ -105,10 +110,12 @@ export default function FilteredAppointmentsScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [showConsultationTimeModal, setShowConsultationTimeModal] = useState(false);
+  const [showConsultationTimeModal, setShowConsultationTimeModal] =
+    useState(false);
 
   const filterType = params.filterType === "video" ? "video" : "home-visit";
-  const title = filterType === "video" ? "ვიდეო კონსულტაციები" : "ბინაზე გამოძახებები";
+  const title =
+    filterType === "video" ? "ვიდეო კონსულტაციები" : "ბინაზე გამოძახებები";
 
   const loadAppointments = useCallback(async () => {
     try {
@@ -116,7 +123,9 @@ export default function FilteredAppointmentsScreen() {
       setError(null);
 
       if (apiService.isMockMode()) {
-        throw new Error("Mock API mode is disabled. Please disable USE_MOCK_API.");
+        throw new Error(
+          "Mock API mode is disabled. Please disable USE_MOCK_API.",
+        );
       }
 
       const response = await apiService.getPatientAppointments();
@@ -124,8 +133,15 @@ export default function FilteredAppointmentsScreen() {
       if (response.success && response.data) {
         const apiBaseUrl = apiService.getBaseURL();
         const mappedAppointments = response.data
-          .map((appointment: any) => mapAppointmentFromAPI(appointment, apiBaseUrl))
-          .filter((apt: PatientAppointment) => apt.type === filterType)
+          .map((appointment: any) =>
+            mapAppointmentFromAPI(appointment, apiBaseUrl),
+          )
+          .filter(
+            (apt: PatientAppointment) =>
+              apt.type === filterType &&
+              apt.status !== "completed" &&
+              apt.status !== "cancelled",
+          )
           .sort((a: PatientAppointment, b: PatientAppointment) => {
             // Sort by date and time - nearest first
             const dateA = new Date(`${a.date}T${a.time}`).getTime();
@@ -174,21 +190,26 @@ export default function FilteredAppointmentsScreen() {
 
   const isJoinButtonActive = (appointment: PatientAppointment) => {
     // Only show for scheduled or in-progress appointments
-    if (appointment.status !== "scheduled" && appointment.status !== "in-progress" && appointment.status !== "pending" && appointment.status !== "confirmed") {
+    if (
+      appointment.status !== "scheduled" &&
+      appointment.status !== "in-progress" &&
+      appointment.status !== "pending" &&
+      appointment.status !== "confirmed"
+    ) {
       return false;
     }
 
     // Parse appointment date and time
     const appointmentDateTime = new Date(
-      `${appointment.date}T${appointment.time}`
+      `${appointment.date}T${appointment.time}`,
     );
-    
+
     // Calculate time difference (negative means past)
     const diff = appointmentDateTime.getTime() - currentTime.getTime();
-    
+
     // One hour in milliseconds
     const oneHourInMs = 60 * 60 * 1000;
-    
+
     // Button is active:
     // - Before appointment time (diff > 0) - always show
     // - From appointment time until 1 hour after (diff <= 0 && diff >= -oneHourInMs)
@@ -196,21 +217,44 @@ export default function FilteredAppointmentsScreen() {
     return diff >= -oneHourInMs;
   };
 
+  // კონსულტაციის დრო + 1 საათი გავიდა — ღილაკი ვაჩვენოთ არა, ტექსტი "დრო უკვე გავიდა"
+  const isConsultationTimePassed = (appointment: PatientAppointment) => {
+    if (
+      appointment.status !== "scheduled" &&
+      appointment.status !== "in-progress" &&
+      appointment.status !== "pending" &&
+      appointment.status !== "confirmed"
+    ) {
+      return false;
+    }
+    const appointmentDateTime = new Date(
+      `${appointment.date}T${appointment.time}`,
+    );
+    const diff = appointmentDateTime.getTime() - currentTime.getTime();
+    const oneHourInMs = 60 * 60 * 1000;
+    return diff < -oneHourInMs;
+  };
+
   // Check if consultation time has not yet arrived (more than 30 minutes before)
   const isConsultationTimeNotYet = (appointment: PatientAppointment) => {
-    if (appointment.status !== "scheduled" && appointment.status !== "in-progress" && appointment.status !== "pending" && appointment.status !== "confirmed") {
+    if (
+      appointment.status !== "scheduled" &&
+      appointment.status !== "in-progress" &&
+      appointment.status !== "pending" &&
+      appointment.status !== "confirmed"
+    ) {
       return false;
     }
 
     const appointmentDateTime = new Date(
-      `${appointment.date}T${appointment.time}`
+      `${appointment.date}T${appointment.time}`,
     );
-    
+
     const diff = appointmentDateTime.getTime() - currentTime.getTime();
-    
+
     // 30 minutes in milliseconds
     const thirtyMinutesInMs = 30 * 60 * 1000;
-    
+
     // Consultation time has not yet arrived if diff > 30 minutes
     return diff > thirtyMinutesInMs;
   };
@@ -218,10 +262,10 @@ export default function FilteredAppointmentsScreen() {
   // Get time remaining until appointment (for waiting screen)
   const getTimeRemaining = (appointment: PatientAppointment) => {
     const appointmentDateTime = new Date(
-      `${appointment.date}T${appointment.time}`
+      `${appointment.date}T${appointment.time}`,
     );
     const diff = appointmentDateTime.getTime() - currentTime.getTime();
-    
+
     if (diff < 0) return null; // Past appointment
 
     const hours = Math.floor(diff / (1000 * 60 * 60));
@@ -310,7 +354,13 @@ export default function FilteredAppointmentsScreen() {
         (item.status === "scheduled" ||
           item.status === "in-progress" ||
           item.status === "pending" ||
-          item.status === "confirmed") && (
+          item.status === "confirmed") &&
+        (isConsultationTimePassed(item) ? (
+          <View style={styles.timePassedContainer}>
+            <Ionicons name="time-outline" size={20} color="#9CA3AF" />
+            <Text style={styles.timePassedText}>დრო უკვე გავიდა</Text>
+          </View>
+        ) : (
           <TouchableOpacity
             style={[
               styles.joinCallButton,
@@ -318,14 +368,11 @@ export default function FilteredAppointmentsScreen() {
             ]}
             onPress={async (e) => {
               e.stopPropagation();
-              // Check if consultation time has not yet arrived
               if (isConsultationTimeNotYet(item)) {
                 setShowConsultationTimeModal(true);
                 return;
               }
-
               if (!isJoinButtonActive(item)) {
-                // Navigate to waiting screen
                 router.push({
                   pathname: "/screens/appointment-waiting",
                   params: {
@@ -338,7 +385,6 @@ export default function FilteredAppointmentsScreen() {
                 });
                 return;
               }
-              // Track join time
               try {
                 await apiService.joinCall(item.id);
               } catch (err) {
@@ -369,21 +415,21 @@ export default function FilteredAppointmentsScreen() {
               შესვლა კონსულტაციაზე
             </Text>
             {isJoinButtonActive(item) && (
-              <Ionicons
-                name="arrow-forward"
-                size={16}
-                color="#FFFFFF"
-              />
+              <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
             )}
           </TouchableOpacity>
-        )}
+        ))}
 
       {item.type === "home-visit" &&
-        (item.status === "scheduled" || item.status === "in-progress" || item.status === "pending" || item.status === "confirmed") && (
+        (item.status === "scheduled" ||
+          item.status === "in-progress" ||
+          item.status === "pending" ||
+          item.status === "confirmed") && (
           <TouchableOpacity
             style={[
               styles.completeHomeVisitButton,
-              item.homeVisitCompletedAt && styles.completeHomeVisitButtonDisabled,
+              item.homeVisitCompletedAt &&
+                styles.completeHomeVisitButtonDisabled,
             ]}
             disabled={!!item.homeVisitCompletedAt}
             onPress={async (e) => {
@@ -401,27 +447,30 @@ export default function FilteredAppointmentsScreen() {
                     style: "default",
                     onPress: async () => {
                       try {
-                        const response = await apiService.completeHomeVisit(item.id);
+                        const response = await apiService.completeHomeVisit(
+                          item.id,
+                        );
                         if (response.success) {
                           Alert.alert(
                             "წარმატება",
-                            "ბინაზე კონსულტაცია მონიშნულია როგორც ჩატარებული"
+                            "ბინაზე კონსულტაცია მონიშნულია როგორც ჩატარებული",
                           );
                           await loadAppointments();
                         } else {
                           Alert.alert(
                             "შეცდომა",
-                            response.message || "ოპერაცია ვერ მოხერხდა"
+                            response.message || "ოპერაცია ვერ მოხერხდა",
                           );
                         }
                       } catch (err: any) {
                         console.error("❌ Complete home visit error:", err);
-                        const errorMessage = err.message || "ოპერაცია ვერ მოხერხდა";
+                        const errorMessage =
+                          err.message || "ოპერაცია ვერ მოხერხდა";
                         Alert.alert("შეცდომა", errorMessage);
                       }
                     },
                   },
-                ]
+                ],
               );
             }}
           >
@@ -454,7 +503,10 @@ export default function FilteredAppointmentsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+        >
           <Ionicons name="chevron-back" size={24} color="#1F2937" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{title}</Text>
@@ -470,7 +522,10 @@ export default function FilteredAppointmentsScreen() {
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={loadAppointments}>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={loadAppointments}
+          >
             <Text style={styles.retryButtonText}>ხელახლა ცდა</Text>
           </TouchableOpacity>
         </View>
@@ -486,9 +541,7 @@ export default function FilteredAppointmentsScreen() {
               ? "ვიდეო კონსულტაციები არ მოიძებნა"
               : "ბინაზე გამოძახებები არ მოიძებნა"}
           </Text>
-          <Text style={styles.emptyText}>
-            ამ ტიპის ჯავშნები ჯერ არ გაქვთ
-          </Text>
+          <Text style={styles.emptyText}>ამ ტიპის ჯავშნები ჯერ არ გაქვთ</Text>
         </View>
       ) : (
         <FlatList
@@ -499,37 +552,38 @@ export default function FilteredAppointmentsScreen() {
           showsVerticalScrollIndicator={false}
           refreshing={loading}
           onRefresh={loadAppointments}
-          />
-        )}
+        />
+      )}
 
-        {/* Consultation Time Modal */}
-        <Modal
-          visible={showConsultationTimeModal}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={() => setShowConsultationTimeModal(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Ionicons name="time-outline" size={48} color="#F59E0B" />
-                <Text style={styles.modalTitle}>კონსულტაციის დრო არ მოვიდა</Text>
-                <Text style={styles.modalText}>
-                  ვერ შეხვალ ჯერ კონსულტაციის დრო არაა. გთხოვთ დაელოდოთ კონსულტაციის დროს.
-                </Text>
-                <TouchableOpacity
-                  style={styles.modalButton}
-                  onPress={() => setShowConsultationTimeModal(false)}
-                >
-                  <Text style={styles.modalButtonText}>კარგი</Text>
-                </TouchableOpacity>
-              </View>
+      {/* Consultation Time Modal */}
+      <Modal
+        visible={showConsultationTimeModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowConsultationTimeModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Ionicons name="time-outline" size={48} color="#F59E0B" />
+              <Text style={styles.modalTitle}>კონსულტაციის დრო არ მოვიდა</Text>
+              <Text style={styles.modalText}>
+                ვერ შეხვალ ჯერ კონსულტაციის დრო არაა. გთხოვთ დაელოდოთ
+                კონსულტაციის დროს.
+              </Text>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={() => setShowConsultationTimeModal(false)}
+              >
+                <Text style={styles.modalButtonText}>კარგი</Text>
+              </TouchableOpacity>
             </View>
           </View>
-        </Modal>
-      </SafeAreaView>
-    );
-  }
+        </View>
+      </Modal>
+    </SafeAreaView>
+  );
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -782,6 +836,22 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins-SemiBold",
     color: "#FFFFFF",
     letterSpacing: 0.5,
+  },
+  timePassedContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    backgroundColor: "#F3F4F6",
+  },
+  timePassedText: {
+    fontSize: 16,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
   },
   modalOverlay: {
     flex: 1,

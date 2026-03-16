@@ -695,19 +695,15 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
                 mode,
               });
 
-              // Navigate directly to payment page
+              // ჯავშნის გაკეთება -> make-appointment (პრობლემის აღწერა, ფაილი) -> patient-details -> payment
               router.push({
-                pathname: "/screens/payment/payment-methods",
+                pathname: "/screens/appointment/make-appointment",
                 params: {
-                  doctorId,
+                  doctorId: doctorId || "",
                   selectedDate,
                   selectedTime,
                   appointmentType: mode,
-                  amount: totalAmount.toString(),
-                  consultationFee: consultationFee.toString(),
-                  problemDescription: "", // Empty, will be filled later if needed
-                  visitAddress: "", // Empty, will be filled later if needed
-                  uploadedFile: "", // Empty, will be filled later if needed
+                  paymentMethod: "visa",
                 },
               });
             } catch (doctorError) {

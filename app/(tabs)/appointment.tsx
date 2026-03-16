@@ -14,7 +14,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../contexts/AuthContext";
@@ -37,11 +37,11 @@ interface PatientAppointment {
   instrumentalTests?: any[];
   laboratoryTests?: any[];
   rescheduleRequest?: {
-    requestedBy?: 'doctor' | 'patient';
+    requestedBy?: "doctor" | "patient";
     requestedDate?: string;
     requestedTime?: string;
     reason?: string;
-    status?: 'pending' | 'approved' | 'rejected';
+    status?: "pending" | "approved" | "rejected";
     requestedAt?: string;
     respondedAt?: string;
     respondedBy?: string;
@@ -100,20 +100,23 @@ const getConsultationTypeLabel = (type: string) => {
 };
 
 // Helper function to map backend appointment to app format
-const mapAppointmentFromAPI = (appointment: any, apiBaseUrl: string): PatientAppointment => {
+const mapAppointmentFromAPI = (
+  appointment: any,
+  apiBaseUrl: string,
+): PatientAppointment => {
   // Handle populated doctorId (object) or non-populated doctorId (string/ObjectId)
   let doctor: any = {};
   if (appointment.doctorId) {
-    if (typeof appointment.doctorId === 'object' && appointment.doctorId.name) {
+    if (typeof appointment.doctorId === "object" && appointment.doctorId.name) {
       // Populated doctor object
       doctor = appointment.doctorId;
     } else {
       // Non-populated, just ID - this shouldn't happen if backend populates correctly
-      console.warn('Doctor not populated for appointment:', appointment._id);
+      console.warn("Doctor not populated for appointment:", appointment._id);
       doctor = {};
     }
   }
-  
+
   let doctorImage;
   if (doctor.profileImage) {
     if (doctor.profileImage.startsWith("http")) {
@@ -134,11 +137,11 @@ const mapAppointmentFromAPI = (appointment: any, apiBaseUrl: string): PatientApp
         // Use LOCAL methods to get the date as it appears in user's timezone
         // This ensures the date matches what the user expects to see
         const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
         const formattedDate = `${year}-${month}-${day}`;
-        
-        console.log('📅 [mapAppointmentFromAPI] Date parsing:', {
+
+        console.log("📅 [mapAppointmentFromAPI] Date parsing:", {
           appointmentId: appointment._id || appointment.id,
           original: appointment.appointmentDate,
           dateObject: date.toISOString(),
@@ -147,11 +150,11 @@ const mapAppointmentFromAPI = (appointment: any, apiBaseUrl: string): PatientApp
           localDay: day,
           formatted: formattedDate,
           utcYear: date.getUTCFullYear(),
-          utcMonth: String(date.getUTCMonth() + 1).padStart(2, '0'),
-          utcDay: String(date.getUTCDate()).padStart(2, '0'),
+          utcMonth: String(date.getUTCMonth() + 1).padStart(2, "0"),
+          utcDay: String(date.getUTCDate()).padStart(2, "0"),
           timezoneOffset: date.getTimezoneOffset(),
         });
-        
+
         return formattedDate;
       })()
     : "";
@@ -164,7 +167,8 @@ const mapAppointmentFromAPI = (appointment: any, apiBaseUrl: string): PatientApp
     cancelled: "cancelled",
     "in-progress": "in-progress",
   };
-  const mappedStatus = statusMap[appointment.status] || appointment.status || "scheduled";
+  const mappedStatus =
+    statusMap[appointment.status] || appointment.status || "scheduled";
 
   // Determine consultation type (default to consultation)
   const consultationType = appointment.type || "video";
@@ -177,8 +181,8 @@ const mapAppointmentFromAPI = (appointment: any, apiBaseUrl: string): PatientApp
   if (appointment.rescheduleRequest?.requestedDate) {
     const reqDate = new Date(appointment.rescheduleRequest.requestedDate);
     const year = reqDate.getFullYear();
-    const month = String(reqDate.getMonth() + 1).padStart(2, '0');
-    const day = String(reqDate.getDate()).padStart(2, '0');
+    const month = String(reqDate.getMonth() + 1).padStart(2, "0");
+    const day = String(reqDate.getDate()).padStart(2, "0");
     rescheduleRequestDate = `${year}-${month}-${day}`;
   }
 
@@ -190,23 +194,30 @@ const mapAppointmentFromAPI = (appointment: any, apiBaseUrl: string): PatientApp
     time: appointment.appointmentTime || "",
     status: mappedStatus,
     type: consultationType,
-    fee: typeof fee === 'number' ? fee : parseFloat(String(fee).replace(/[^\d.]/g, '')) || 0,
-    isPaid: appointment.paymentStatus === "paid" || appointment.paymentStatus === "completed",
+    fee:
+      typeof fee === "number"
+        ? fee
+        : parseFloat(String(fee).replace(/[^\d.]/g, "")) || 0,
+    isPaid:
+      appointment.paymentStatus === "paid" ||
+      appointment.paymentStatus === "completed",
     symptoms: appointment.patientDetails?.problem || appointment.notes || "",
     diagnosis: appointment.diagnosis || "",
     visitAddress: appointment.visitAddress,
     homeVisitCompletedAt: appointment.homeVisitCompletedAt,
     doctorImage: doctorImage,
-    rescheduleRequest: appointment.rescheduleRequest ? {
-      requestedBy: appointment.rescheduleRequest.requestedBy,
-      requestedDate: rescheduleRequestDate,
-      requestedTime: appointment.rescheduleRequest.requestedTime,
-      reason: appointment.rescheduleRequest.reason,
-      status: appointment.rescheduleRequest.status,
-      requestedAt: appointment.rescheduleRequest.requestedAt,
-      respondedAt: appointment.rescheduleRequest.respondedAt,
-      respondedBy: appointment.rescheduleRequest.respondedBy,
-    } : undefined,
+    rescheduleRequest: appointment.rescheduleRequest
+      ? {
+          requestedBy: appointment.rescheduleRequest.requestedBy,
+          requestedDate: rescheduleRequestDate,
+          requestedTime: appointment.rescheduleRequest.requestedTime,
+          reason: appointment.rescheduleRequest.reason,
+          status: appointment.rescheduleRequest.status,
+          requestedAt: appointment.rescheduleRequest.requestedAt,
+          respondedAt: appointment.rescheduleRequest.respondedAt,
+          respondedBy: appointment.rescheduleRequest.respondedBy,
+        }
+      : undefined,
   };
 };
 
@@ -226,13 +237,20 @@ const Appointment = () => {
   const [selectedAppointment, setSelectedAppointment] =
     useState<PatientAppointment | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [appointmentDocuments, setAppointmentDocuments] = useState<Record<string, {
-    url: string;
-    name?: string;
-    type?: string;
-    uploadedAt?: string;
-  }[]>>({});
-  const [expandedAppointments, setExpandedAppointments] = useState<Set<string>>(new Set());
+  const [appointmentDocuments, setAppointmentDocuments] = useState<
+    Record<
+      string,
+      {
+        url: string;
+        name?: string;
+        type?: string;
+        uploadedAt?: string;
+      }[]
+    >
+  >({});
+  const [expandedAppointments, setExpandedAppointments] = useState<Set<string>>(
+    new Set(),
+  );
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [filterStartDate, setFilterStartDate] = useState("");
   const [filterEndDate, setFilterEndDate] = useState("");
@@ -240,27 +258,43 @@ const Appointment = () => {
   const [showEndPicker, setShowEndPicker] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [refreshing, setRefreshing] = useState(false);
-  
+
   // Reschedule states
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
   const [rescheduleLoading, setRescheduleLoading] = useState(false);
-  const [availableSlots, setAvailableSlots] = useState<{ date: string; time: string; }[]>([]);
-  const [selectedRescheduleDate, setSelectedRescheduleDate] = useState<string | null>(null);
-  const [selectedRescheduleTime, setSelectedRescheduleTime] = useState<string | null>(null);
+  const [availableSlots, setAvailableSlots] = useState<
+    { date: string; time: string }[]
+  >([]);
+  const [selectedRescheduleDate, setSelectedRescheduleDate] = useState<
+    string | null
+  >(null);
+  const [selectedRescheduleTime, setSelectedRescheduleTime] = useState<
+    string | null
+  >(null);
   const [loadingAvailability, setLoadingAvailability] = useState(false);
-  
+
   // Approve reschedule states (when doctor requested without date/time)
-  const [showApproveRescheduleModal, setShowApproveRescheduleModal] = useState(false);
-  const [approveRescheduleAppointmentId, setApproveRescheduleAppointmentId] = useState<string | null>(null);
-  const [approveRescheduleDate, setApproveRescheduleDate] = useState<string | null>(null);
-  const [approveRescheduleTime, setApproveRescheduleTime] = useState<string | null>(null);
-  const [approveRescheduleLoading, setApproveRescheduleLoading] = useState(false);
-  
+  const [showApproveRescheduleModal, setShowApproveRescheduleModal] =
+    useState(false);
+  const [approveRescheduleAppointmentId, setApproveRescheduleAppointmentId] =
+    useState<string | null>(null);
+  const [approveRescheduleDate, setApproveRescheduleDate] = useState<
+    string | null
+  >(null);
+  const [approveRescheduleTime, setApproveRescheduleTime] = useState<
+    string | null
+  >(null);
+  const [approveRescheduleLoading, setApproveRescheduleLoading] =
+    useState(false);
+
   // Modal for "consultation time not yet" message
-  const [showConsultationTimeModal, setShowConsultationTimeModal] = useState(false);
-  
+  const [showConsultationTimeModal, setShowConsultationTimeModal] =
+    useState(false);
+
   // Cancel states
-  const [cancellingAppointmentId, setCancellingAppointmentId] = useState<string | null>(null);
+  const [cancellingAppointmentId, setCancellingAppointmentId] = useState<
+    string | null
+  >(null);
 
   // Load appointments from API
   useEffect(() => {
@@ -269,12 +303,14 @@ const Appointment = () => {
     } else {
       setLoading(false);
     }
-     
   }, [isAuthenticated, user?.id]);
 
   // Update filterType from params
   useEffect(() => {
-    if (params.filterType && (params.filterType === "video" || params.filterType === "home-visit")) {
+    if (
+      params.filterType &&
+      (params.filterType === "video" || params.filterType === "home-visit")
+    ) {
       setFilterType(params.filterType as "video" | "home-visit");
     }
   }, [params.filterType]);
@@ -302,41 +338,50 @@ const Appointment = () => {
       const response = await apiService.getPatientAppointments();
 
       if (response.success && response.data) {
-        console.log('🔍 response.data:', response.data);
+        console.log("🔍 response.data:", response.data);
         const apiBaseUrl = apiService.getBaseURL();
         const mappedAppointments = response.data.map((appointment: any) =>
-          mapAppointmentFromAPI(appointment, apiBaseUrl)
+          mapAppointmentFromAPI(appointment, apiBaseUrl),
         );
         setAppointments(mappedAppointments);
 
         // Pre-load documents count for all appointments to show indicators
-        const docsPromises = mappedAppointments.map(async (apt: PatientAppointment) => {
-          try {
-            const docsResponse = await apiService.getAppointmentDocuments(apt.id);
-            if (docsResponse.success && docsResponse.data) {
-              setAppointmentDocuments(prev => {
-                const newDocs = { ...prev };
-                newDocs[apt.id] = docsResponse.data;
-                return newDocs;
-              });
-            } else {
-              setAppointmentDocuments(prev => {
+        const docsPromises = mappedAppointments.map(
+          async (apt: PatientAppointment) => {
+            try {
+              const docsResponse = await apiService.getAppointmentDocuments(
+                apt.id,
+              );
+              if (docsResponse.success && docsResponse.data) {
+                setAppointmentDocuments((prev) => {
+                  const newDocs = { ...prev };
+                  newDocs[apt.id] = docsResponse.data;
+                  return newDocs;
+                });
+              } else {
+                setAppointmentDocuments((prev) => {
+                  const newDocs = { ...prev };
+                  newDocs[apt.id] = [];
+                  return newDocs;
+                });
+              }
+            } catch (error) {
+              console.error(
+                `Error loading documents for appointment ${apt.id}:`,
+                error,
+              );
+              setAppointmentDocuments((prev) => {
                 const newDocs = { ...prev };
                 newDocs[apt.id] = [];
                 return newDocs;
               });
             }
-          } catch (error) {
-            console.error(`Error loading documents for appointment ${apt.id}:`, error);
-            setAppointmentDocuments(prev => {
-              const newDocs = { ...prev };
-              newDocs[apt.id] = [];
-              return newDocs;
-            });
-          }
-        });
+          },
+        );
         // Load documents in background, don't wait
-        Promise.all(docsPromises).catch(err => console.error("Error loading documents:", err));
+        Promise.all(docsPromises).catch((err) =>
+          console.error("Error loading documents:", err),
+        );
       } else {
         setAppointments([]);
       }
@@ -352,7 +397,7 @@ const Appointment = () => {
   // Function to calculate time until appointment
   const getTimeUntilAppointment = (appointment: PatientAppointment) => {
     const appointmentDateTime = new Date(
-      `${appointment.date}T${appointment.time}`
+      `${appointment.date}T${appointment.time}`,
     );
     const diff = appointmentDateTime.getTime() - currentTime.getTime();
 
@@ -374,7 +419,7 @@ const Appointment = () => {
   // Check if appointment is starting soon (within 30 minutes)
   const isAppointmentSoon = (appointment: PatientAppointment) => {
     const appointmentDateTime = new Date(
-      `${appointment.date}T${appointment.time}`
+      `${appointment.date}T${appointment.time}`,
     );
     const diff = appointmentDateTime.getTime() - currentTime.getTime();
     return diff > 0 && diff <= 30 * 60 * 1000; // 30 minutes
@@ -384,7 +429,7 @@ const Appointment = () => {
   const isAppointmentTimePassed = (appointment: PatientAppointment) => {
     if (appointment.status !== "scheduled") return false;
     const appointmentDateTime = new Date(
-      `${appointment.date}T${appointment.time}`
+      `${appointment.date}T${appointment.time}`,
     );
     const diff = appointmentDateTime.getTime() - currentTime.getTime();
     return diff < 0; // Past appointment
@@ -394,21 +439,24 @@ const Appointment = () => {
   // Button is active before appointment time and until 1 hour after appointment time
   const isJoinButtonActive = (appointment: PatientAppointment) => {
     // Only show for scheduled or in-progress appointments
-    if (appointment.status !== "scheduled" && appointment.status !== "in-progress") {
+    if (
+      appointment.status !== "scheduled" &&
+      appointment.status !== "in-progress"
+    ) {
       return false;
     }
 
     // Parse appointment date and time
     const appointmentDateTime = new Date(
-      `${appointment.date}T${appointment.time}`
+      `${appointment.date}T${appointment.time}`,
     );
-    
+
     // Calculate time difference (negative means past)
     const diff = appointmentDateTime.getTime() - currentTime.getTime();
-    
+
     // One hour in milliseconds
     const oneHourInMs = 60 * 60 * 1000;
-    
+
     // Button is active:
     // - Before appointment time (diff > 0) - always show
     // - From appointment time until 1 hour after (diff <= 0 && diff >= -oneHourInMs)
@@ -418,19 +466,22 @@ const Appointment = () => {
 
   // Check if consultation time has not yet arrived (more than 30 minutes before)
   const isConsultationTimeNotYet = (appointment: PatientAppointment) => {
-    if (appointment.status !== "scheduled" && appointment.status !== "in-progress") {
+    if (
+      appointment.status !== "scheduled" &&
+      appointment.status !== "in-progress"
+    ) {
       return false;
     }
 
     const appointmentDateTime = new Date(
-      `${appointment.date}T${appointment.time}`
+      `${appointment.date}T${appointment.time}`,
     );
-    
+
     const diff = appointmentDateTime.getTime() - currentTime.getTime();
-    
+
     // 30 minutes in milliseconds
     const thirtyMinutesInMs = 30 * 60 * 1000;
-    
+
     // Consultation time has not yet arrived if diff > 30 minutes
     return diff > thirtyMinutesInMs;
   };
@@ -438,10 +489,10 @@ const Appointment = () => {
   // Get time remaining until appointment (for waiting screen)
   const getTimeRemaining = (appointment: PatientAppointment) => {
     const appointmentDateTime = new Date(
-      `${appointment.date}T${appointment.time}`
+      `${appointment.date}T${appointment.time}`,
     );
     const diff = appointmentDateTime.getTime() - currentTime.getTime();
-    
+
     if (diff < 0) return null; // Past appointment
 
     const hours = Math.floor(diff / (1000 * 60 * 60));
@@ -461,26 +512,38 @@ const Appointment = () => {
 
   const isUpcomingAppointment = (appointment: PatientAppointment) => {
     if (!appointment.date) {
-      console.log('❌ [isUpcomingAppointment] No date:', appointment.id);
+      console.log("❌ [isUpcomingAppointment] No date:", appointment.id);
       return false;
     }
 
     // "in-progress" appointments ALWAYS show in appointments (მიმდინარე)
     // regardless of date - this is the active appointment
     if (appointment.status === "in-progress") {
-      console.log('✅ [isUpcomingAppointment] In-progress -> show in appointments:', appointment.id, appointment.date);
+      console.log(
+        "✅ [isUpcomingAppointment] In-progress -> show in appointments:",
+        appointment.id,
+        appointment.date,
+      );
       return true;
     }
 
     // Exclude cancelled appointments - they go to history
     if (appointment.status === "cancelled") {
-      console.log('❌ [isUpcomingAppointment] Cancelled -> history:', appointment.id, appointment.date);
+      console.log(
+        "❌ [isUpcomingAppointment] Cancelled -> history:",
+        appointment.id,
+        appointment.date,
+      );
       return false;
     }
 
     // Exclude completed appointments - they should go to history
     if (appointment.status === "completed") {
-      console.log('❌ [isUpcomingAppointment] Completed -> history:', appointment.id, appointment.date);
+      console.log(
+        "❌ [isUpcomingAppointment] Completed -> history:",
+        appointment.id,
+        appointment.date,
+      );
       return false;
     }
 
@@ -492,20 +555,33 @@ const Appointment = () => {
     // appointment.date is in YYYY-MM-DD format (from backend UTC converted to local)
     // appointment.time is in HH:MM format
     let appointmentDateTime: Date;
-    
+
     if (appointment.time) {
       // Create date from YYYY-MM-DD and HH:MM in local timezone
-      const [year, month, day] = appointment.date.split('-').map(Number);
-      const [hours, minutes] = appointment.time.split(':').map(Number);
-      appointmentDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
+      const [year, month, day] = appointment.date.split("-").map(Number);
+      const [hours, minutes] = appointment.time.split(":").map(Number);
+      appointmentDateTime = new Date(
+        year,
+        month - 1,
+        day,
+        hours,
+        minutes,
+        0,
+        0,
+      );
     } else {
       // If no time, use date only
-      const [year, month, day] = appointment.date.split('-').map(Number);
+      const [year, month, day] = appointment.date.split("-").map(Number);
       appointmentDateTime = new Date(year, month - 1, day, 0, 0, 0, 0);
     }
 
     if (Number.isNaN(appointmentDateTime.getTime())) {
-      console.log('❌ [isUpcomingAppointment] Invalid date:', appointment.id, appointment.date, appointment.time);
+      console.log(
+        "❌ [isUpcomingAppointment] Invalid date:",
+        appointment.id,
+        appointment.date,
+        appointment.time,
+      );
       return false;
     }
 
@@ -513,10 +589,10 @@ const Appointment = () => {
     // Compare dates only (ignore time for date comparison)
     const appointmentDateOnly = new Date(appointmentDateTime);
     appointmentDateOnly.setHours(0, 0, 0, 0);
-    
+
     const isUpcoming = appointmentDateOnly.getTime() >= today.getTime();
-    
-    console.log('📅 [isUpcomingAppointment] Check:', {
+
+    console.log("📅 [isUpcomingAppointment] Check:", {
       appointmentId: appointment.id,
       date: appointment.date,
       time: appointment.time,
@@ -526,9 +602,11 @@ const Appointment = () => {
       today: today.toISOString(),
       isUpcoming,
       diff: appointmentDateOnly.getTime() - today.getTime(),
-      diffDays: (appointmentDateOnly.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+      diffDays:
+        (appointmentDateOnly.getTime() - today.getTime()) /
+        (1000 * 60 * 60 * 24),
     });
-    
+
     return isUpcoming;
   };
 
@@ -552,9 +630,15 @@ const Appointment = () => {
       // Parse date and time for comparison
       const getDateTime = (appt: PatientAppointment) => {
         if (!appt.date) return Infinity;
-        const [year, month, day] = appt.date.split('-').map(Number);
-        const [hours, minutes] = (appt.time || '00:00').split(':').map(Number);
-        return new Date(year, month - 1, day, hours || 0, minutes || 0).getTime();
+        const [year, month, day] = appt.date.split("-").map(Number);
+        const [hours, minutes] = (appt.time || "00:00").split(":").map(Number);
+        return new Date(
+          year,
+          month - 1,
+          day,
+          hours || 0,
+          minutes || 0,
+        ).getTime();
       };
       return getDateTime(a) - getDateTime(b);
     });
@@ -570,41 +654,52 @@ const Appointment = () => {
       .length,
   };
 
-  const toggleAppointmentExpansion = async (appointment: PatientAppointment) => {
+  const toggleAppointmentExpansion = async (
+    appointment: PatientAppointment,
+  ) => {
     const isExpanded = expandedAppointments.has(appointment.id);
-    
+
     if (!isExpanded) {
       // Fetch full appointment details when expanding
       try {
-        const appointmentResponse = await apiService.getAppointmentById(appointment.id);
+        const appointmentResponse = await apiService.getAppointmentById(
+          appointment.id,
+        );
         if (appointmentResponse.success && appointmentResponse.data) {
           const fullAppointment = appointmentResponse.data as any;
           // Update appointment in the list with full details
-          setAppointments(prev => prev.map(apt => 
-            apt.id === appointment.id 
-              ? { 
-                  ...apt, 
-                  instrumentalTests: fullAppointment.instrumentalTests || [], 
-                  laboratoryTests: fullAppointment.laboratoryTests || [],
-                  symptoms: fullAppointment.patientDetails?.problem || fullAppointment.notes || apt.symptoms,
-                }
-              : apt
-          ));
+          setAppointments((prev) =>
+            prev.map((apt) =>
+              apt.id === appointment.id
+                ? {
+                    ...apt,
+                    instrumentalTests: fullAppointment.instrumentalTests || [],
+                    laboratoryTests: fullAppointment.laboratoryTests || [],
+                    symptoms:
+                      fullAppointment.patientDetails?.problem ||
+                      fullAppointment.notes ||
+                      apt.symptoms,
+                  }
+                : apt,
+            ),
+          );
         }
 
         // Load appointment documents
         try {
-          const docsResponse = await apiService.getAppointmentDocuments(appointment.id);
+          const docsResponse = await apiService.getAppointmentDocuments(
+            appointment.id,
+          );
           if (docsResponse.success && docsResponse.data) {
             // Store documents per appointment
-            setAppointmentDocuments(prev => {
+            setAppointmentDocuments((prev) => {
               const newDocs = { ...prev };
               newDocs[appointment.id] = docsResponse.data;
               return newDocs;
             });
           } else {
             // Ensure empty array if no documents
-            setAppointmentDocuments(prev => {
+            setAppointmentDocuments((prev) => {
               const newDocs = { ...prev };
               newDocs[appointment.id] = [];
               return newDocs;
@@ -612,7 +707,7 @@ const Appointment = () => {
           }
         } catch (error) {
           console.error("Error fetching appointment documents:", error);
-          setAppointmentDocuments(prev => {
+          setAppointmentDocuments((prev) => {
             const newDocs = { ...prev };
             newDocs[appointment.id] = [];
             return newDocs;
@@ -622,8 +717,8 @@ const Appointment = () => {
         console.error("Error fetching appointment details:", error);
       }
     }
-    
-    setExpandedAppointments(prev => {
+
+    setExpandedAppointments((prev) => {
       const newSet = new Set(prev);
       if (isExpanded) {
         newSet.delete(appointment.id);
@@ -680,6 +775,22 @@ const Appointment = () => {
     setRefreshing(false);
   };
 
+  /** ღილაკები გადაჯავშნა/გაუქმება ჩანდეს მხოლოდ სანამ კონსულტაცია მოვა: ვიდეო 2 სთ ადრე, ბინაზე 12 სთ ადრე */
+  const canShowRescheduleAndCancel = (appointment: PatientAppointment) => {
+    const dateStr = appointment.date;
+    const timeStr = appointment.time || "00:00";
+    if (!dateStr) return false;
+    const appointmentDateTime = new Date(`${dateStr}T${timeStr}`);
+    if (Number.isNaN(appointmentDateTime.getTime())) return false;
+    const diffMs = appointmentDateTime.getTime() - currentTime.getTime();
+    const twoHoursMs = 2 * 60 * 60 * 1000;
+    const twelveHoursMs = 12 * 60 * 60 * 1000;
+    if (appointment.type === "home-visit") {
+      return diffMs >= twelveHoursMs;
+    }
+    return diffMs >= twoHoursMs; // video ან სხვა
+  };
+
   // Open reschedule modal and load doctor availability
   const handleOpenReschedule = async (appointment: PatientAppointment) => {
     setShowDetailsModal(false);
@@ -687,38 +798,47 @@ const Appointment = () => {
     setSelectedRescheduleDate(null);
     setSelectedRescheduleTime(null);
     setLoadingAvailability(true);
-    
+
     try {
-      const appointmentResponse = await apiService.getAppointmentById(appointment.id);
+      const appointmentResponse = await apiService.getAppointmentById(
+        appointment.id,
+      );
       if (appointmentResponse.success && appointmentResponse.data) {
         const apt = appointmentResponse.data as any;
         const doctorId = apt.doctorId?._id || apt.doctorId;
         const appointmentType = apt.type || appointment.type; // video or home-visit
-                const availabilityResponse = await apiService.getDoctorAvailability(
-          doctorId, 
-          appointmentType as "video" | "home-visit", 
-          true
+        const availabilityResponse = await apiService.getDoctorAvailability(
+          doctorId,
+          appointmentType as "video" | "home-visit",
+          true,
         );
-        console.log('📅 Availability response for type', appointmentType, ':', JSON.stringify(availabilityResponse.data, null, 2));
-        
+        console.log(
+          "📅 Availability response for type",
+          appointmentType,
+          ":",
+          JSON.stringify(availabilityResponse.data, null, 2),
+        );
+
         if (availabilityResponse.success && availabilityResponse.data) {
           // Flatten availability into slots
           const slots: { date: string; time: string }[] = [];
           const availability = availabilityResponse.data;
           const today = new Date();
           today.setHours(0, 0, 0, 0);
-          
+
           // API returns: { date, dayOfWeek, timeSlots, bookedSlots, isAvailable, type }
           availability.forEach((day: any) => {
             // Check if date is in the future
             const dayDate = new Date(day.date);
             dayDate.setHours(0, 0, 0, 0);
-            
+
             // Only show future dates and matching type
-            if (day.isAvailable && 
-                day.timeSlots && 
-                dayDate >= today && 
-                day.type === appointmentType) {
+            if (
+              day.isAvailable &&
+              day.timeSlots &&
+              dayDate >= today &&
+              day.type === appointmentType
+            ) {
               const bookedSet = new Set(day.bookedSlots || []);
               day.timeSlots.forEach((time: string) => {
                 // Only add if not booked
@@ -728,13 +848,16 @@ const Appointment = () => {
               });
             }
           });
-          
-          console.log('📅 Parsed slots (filtered by type and future dates):', slots);
+
+          console.log(
+            "📅 Parsed slots (filtered by type and future dates):",
+            slots,
+          );
           setAvailableSlots(slots);
         }
       }
     } catch (err) {
-      console.error('Error loading availability:', err);
+      console.error("Error loading availability:", err);
     } finally {
       setLoadingAvailability(false);
     }
@@ -742,16 +865,21 @@ const Appointment = () => {
 
   // Handle reschedule request (patient requests reschedule)
   const handleReschedule = async () => {
-    if (!selectedAppointment || !selectedRescheduleDate || !selectedRescheduleTime) return;
-    
+    if (
+      !selectedAppointment ||
+      !selectedRescheduleDate ||
+      !selectedRescheduleTime
+    )
+      return;
+
     setRescheduleLoading(true);
     try {
       const response = await apiService.requestReschedule(
         selectedAppointment.id,
         selectedRescheduleDate,
-        selectedRescheduleTime
+        selectedRescheduleTime,
       );
-      
+
       if (response.success) {
         setShowRescheduleModal(false);
         setSelectedRescheduleDate(null);
@@ -763,7 +891,7 @@ const Appointment = () => {
         Alert.alert("შეცდომა", response.message || "გადაჯავშნა ვერ მოხერხდა");
       }
     } catch (err: any) {
-      console.error('Reschedule error:', err);
+      console.error("Reschedule error:", err);
       Alert.alert("შეცდომა", err.message || "გადაჯავშნა ვერ მოხერხდა");
     } finally {
       setRescheduleLoading(false);
@@ -771,34 +899,40 @@ const Appointment = () => {
   };
 
   // Handle approve reschedule request
-  const handleApproveReschedule = async (appointmentId: string, appointment?: PatientAppointment) => {
+  const handleApproveReschedule = async (
+    appointmentId: string,
+    appointment?: PatientAppointment,
+  ) => {
     // If doctor requested without date/time, patient must choose date/time
-    if (appointment?.rescheduleRequest && 
-        !appointment.rescheduleRequest.requestedDate && 
-        !appointment.rescheduleRequest.requestedTime) {
+    if (
+      appointment?.rescheduleRequest &&
+      !appointment.rescheduleRequest.requestedDate &&
+      !appointment.rescheduleRequest.requestedTime
+    ) {
       // Open modal to select date and time
       setApproveRescheduleAppointmentId(appointmentId);
       setApproveRescheduleDate(null);
       setApproveRescheduleTime(null);
-      
+
       // Load doctor availability
       try {
         setLoadingAvailability(true);
-        const appointmentResponse = await apiService.getAppointmentById(appointmentId);
+        const appointmentResponse =
+          await apiService.getAppointmentById(appointmentId);
         if (appointmentResponse.success && appointmentResponse.data) {
           const apt = appointmentResponse.data as any;
           const doctorId = apt.doctorId?._id || apt.doctorId;
-          
+
           if (doctorId) {
             const response = await apiService.getDoctorAvailability(
               doctorId.toString(),
               apt.type as "video" | "home-visit",
-              true // forPatient
+              true, // forPatient
             );
             if (response.success && response.data) {
               const slots = (response.data as any[]).flatMap((slot: any) => {
                 const date = new Date(slot.date);
-                const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+                const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
                 return (slot.timeSlots || []).map((time: string) => ({
                   date: dateStr,
                   time,
@@ -814,11 +948,11 @@ const Appointment = () => {
       } finally {
         setLoadingAvailability(false);
       }
-      
+
       setShowApproveRescheduleModal(true);
       return;
     }
-    
+
     // If doctor specified date/time, approve directly
     try {
       const response = await apiService.approveReschedule(appointmentId);
@@ -829,14 +963,18 @@ const Appointment = () => {
         Alert.alert("შეცდომა", response.message || "დამტკიცება ვერ მოხერხდა");
       }
     } catch (err: any) {
-      console.error('Approve reschedule error:', err);
+      console.error("Approve reschedule error:", err);
       Alert.alert("შეცდომა", err.message || "დამტკიცება ვერ მოხერხდა");
     }
   };
 
   // Handle approve reschedule with date/time selection
   const handleApproveRescheduleWithDate = async () => {
-    if (!approveRescheduleAppointmentId || !approveRescheduleDate || !approveRescheduleTime) {
+    if (
+      !approveRescheduleAppointmentId ||
+      !approveRescheduleDate ||
+      !approveRescheduleTime
+    ) {
       Alert.alert("შეცდომა", "გთხოვთ აირჩიოთ თარიღი და დრო");
       return;
     }
@@ -846,7 +984,7 @@ const Appointment = () => {
       const response = await apiService.approveReschedule(
         approveRescheduleAppointmentId,
         approveRescheduleDate,
-        approveRescheduleTime
+        approveRescheduleTime,
       );
       if (response.success) {
         setShowApproveRescheduleModal(false);
@@ -859,7 +997,7 @@ const Appointment = () => {
         Alert.alert("შეცდომა", response.message || "დამტკიცება ვერ მოხერხდა");
       }
     } catch (err: any) {
-      console.error('Approve reschedule error:', err);
+      console.error("Approve reschedule error:", err);
       Alert.alert("შეცდომა", err.message || "დამტკიცება ვერ მოხერხდა");
     } finally {
       setApproveRescheduleLoading(false);
@@ -883,61 +1021,76 @@ const Appointment = () => {
                 await loadAppointments();
                 Alert.alert("წარმატება", "გადაჯავშნის მოთხოვნა უარყოფილია");
               } else {
-                Alert.alert("შეცდომა", response.message || "უარყოფა ვერ მოხერხდა");
+                Alert.alert(
+                  "შეცდომა",
+                  response.message || "უარყოფა ვერ მოხერხდა",
+                );
               }
             } catch (err: any) {
-              console.error('Reject reschedule error:', err);
+              console.error("Reject reschedule error:", err);
               Alert.alert("შეცდომა", err.message || "უარყოფა ვერ მოხერხდა");
             }
           },
         },
-      ]
+      ],
     );
   };
 
   const handleCancelAppointment = async (appointmentId: string) => {
     // Show confirmation alert
     Alert.alert(
-      'ჯავშნის გაუქმება',
-      'დარწმუნებული ხართ რომ გსურთ ჯავშნის გაუქმება?',
+      "ჯავშნის გაუქმება",
+      "დარწმუნებული ხართ რომ გსურთ ჯავშნის გაუქმება?",
       [
         {
-          text: 'არა',
-          style: 'cancel',
+          text: "არა",
+          style: "cancel",
         },
         {
-          text: 'კი, გაუქმება',
-          style: 'destructive',
+          text: "კი, გაუქმება",
+          style: "destructive",
           onPress: async () => {
             try {
               setCancellingAppointmentId(appointmentId);
-              const response = await apiService.cancelAppointment(appointmentId);
-              
+              const response =
+                await apiService.cancelAppointment(appointmentId);
+
               if (response.success) {
                 // Reload appointments to get updated data
                 await loadAppointments();
-                Alert.alert('წარმატება', response.message || 'ჯავშანი წარმატებით გაუქმდა');
+                Alert.alert(
+                  "წარმატება",
+                  response.message || "ჯავშანი წარმატებით გაუქმდა",
+                );
               } else {
-                Alert.alert('შეცდომა', response.message || 'ჯავშნის გაუქმება ვერ მოხერხდა');
+                Alert.alert(
+                  "შეცდომა",
+                  response.message || "ჯავშნის გაუქმება ვერ მოხერხდა",
+                );
               }
             } catch (err: any) {
-              console.error('Cancel appointment error:', err);
-              Alert.alert('შეცდომა', err.message || 'ჯავშნის გაუქმება ვერ მოხერხდა');
+              console.error("Cancel appointment error:", err);
+              Alert.alert(
+                "შეცდომა",
+                err.message || "ჯავშნის გაუქმება ვერ მოხერხდა",
+              );
             } finally {
               setCancellingAppointmentId(null);
             }
           },
         },
-      ]
+      ],
     );
   };
 
   // Get unique dates from available slots
-  const uniqueDates = [...new Set(availableSlots.map(s => s.date))];
-  
+  const uniqueDates = [...new Set(availableSlots.map((s) => s.date))];
+
   // Get times for selected date
-  const timesForSelectedDate = selectedRescheduleDate 
-    ? availableSlots.filter(s => s.date === selectedRescheduleDate).map(s => s.time)
+  const timesForSelectedDate = selectedRescheduleDate
+    ? availableSlots
+        .filter((s) => s.date === selectedRescheduleDate)
+        .map((s) => s.time)
     : [];
 
   return (
@@ -1043,12 +1196,9 @@ const Appointment = () => {
               მიმდინარე
             </Text>
           </TouchableOpacity>
-
-        
         </View>
 
         {/* Filter by consultation type (video / home-visit) */}
-
 
         {/* Appointments List */}
         <View style={styles.listSection}>
@@ -1079,537 +1229,414 @@ const Appointment = () => {
             filteredAppointments.map((appointment) => {
               const isExpanded = expandedAppointments.has(appointment.id);
               const documents = appointmentDocuments[appointment.id] || [];
-              
+
               return (
-              <View key={appointment.id} style={styles.appointmentCard}>
-                <TouchableOpacity
-                  style={{ flex: 1 }}
-                  onPress={() => toggleAppointmentExpansion(appointment)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.appointmentHeader}>
-                    <View style={styles.doctorInfo}>
-                      <View style={styles.avatarContainer}>
-                        {appointment.doctorImage && typeof appointment.doctorImage === 'object' && 'uri' in appointment.doctorImage ? (
-                          <Image source={appointment.doctorImage} style={styles.doctorAvatarImage} />
-                        ) : (
-                          <Ionicons name="medical" size={24} color="#06B6D4" />
-                        )}
-                      </View>
-                      <View style={styles.doctorDetails}>
-                        <View style={styles.doctorNameRow}>
-                          <Text style={styles.doctorName}>
-                            {appointment.doctorName}
-                          </Text>
-                          {appointment.status === "scheduled" &&
-                            isAppointmentSoon(appointment) && (
-                              <View style={styles.soonBadge}>
-                                <Ionicons
-                                  name="alarm"
-                                  size={12}
-                                  color="#EF4444"
-                                />
-                                <Text style={styles.soonText}>მალე</Text>
-                              </View>
-                            )}
-                          {/* File indicator badge */}
-                          {documents.length > 0 && (
-                            <View style={styles.fileIndicatorBadge}>
-                              <Ionicons name="document-attach" size={12} color="#0EA5E9" />
-                            </View>
+                <View key={appointment.id} style={styles.appointmentCard}>
+                  <TouchableOpacity
+                    style={{ flex: 1 }}
+                    onPress={() => toggleAppointmentExpansion(appointment)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.appointmentHeader}>
+                      <View style={styles.doctorInfo}>
+                        <View style={styles.avatarContainer}>
+                          {appointment.doctorImage &&
+                          typeof appointment.doctorImage === "object" &&
+                          "uri" in appointment.doctorImage ? (
+                            <Image
+                              source={appointment.doctorImage}
+                              style={styles.doctorAvatarImage}
+                            />
+                          ) : (
+                            <Ionicons
+                              name="medical"
+                              size={24}
+                              color="#06B6D4"
+                            />
                           )}
                         </View>
-                        <Text style={styles.doctorSpecialty}>
-                          {appointment.doctorSpecialty} •{" "}
-                          {getConsultationTypeLabel(appointment.type)}
-                        </Text>
+                        <View style={styles.doctorDetails}>
+                          <View style={styles.doctorNameRow}>
+                            <Text style={styles.doctorName}>
+                              {appointment.doctorName}
+                            </Text>
+                            {appointment.status === "scheduled" &&
+                              isAppointmentSoon(appointment) && (
+                                <View style={styles.soonBadge}>
+                                  <Ionicons
+                                    name="alarm"
+                                    size={12}
+                                    color="#EF4444"
+                                  />
+                                  <Text style={styles.soonText}>მალე</Text>
+                                </View>
+                              )}
+                            {/* File indicator badge */}
+                            {documents.length > 0 && (
+                              <View style={styles.fileIndicatorBadge}>
+                                <Ionicons
+                                  name="document-attach"
+                                  size={12}
+                                  color="#0EA5E9"
+                                />
+                              </View>
+                            )}
+                          </View>
+                          <Text style={styles.doctorSpecialty}>
+                            {appointment.doctorSpecialty} •{" "}
+                            {getConsultationTypeLabel(appointment.type)}
+                          </Text>
+                        </View>
                       </View>
-                    </View>
-                    <View
-                      style={[
-                        styles.statusBadge,
-                        {
-                          backgroundColor: isAppointmentTimePassed(appointment)
-                            ? "#EF444420"
-                            : `${getStatusColor(appointment.status)}20`,
-                        },
-                      ]}
-                    >
-                      <Text
+                      <View
                         style={[
-                          styles.statusText,
-                          { 
-                            color: isAppointmentTimePassed(appointment)
-                              ? "#EF4444"
-                              : getStatusColor(appointment.status)
+                          styles.statusBadge,
+                          {
+                            backgroundColor: isAppointmentTimePassed(
+                              appointment,
+                            )
+                              ? "#EF444420"
+                              : `${getStatusColor(appointment.status)}20`,
                           },
                         ]}
                       >
-                        {getStatusLabel(appointment.status)}
-                      </Text>
+                        <Text
+                          style={[
+                            styles.statusText,
+                            {
+                              color: isAppointmentTimePassed(appointment)
+                                ? "#EF4444"
+                                : getStatusColor(appointment.status),
+                            },
+                          ]}
+                        >
+                          {getStatusLabel(appointment.status)}
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => toggleAppointmentExpansion(appointment)}
+                        style={styles.expandButton}
+                      >
+                        <Ionicons
+                          name={isExpanded ? "chevron-up" : "chevron-down"}
+                          size={20}
+                          color="#6B7280"
+                        />
+                      </TouchableOpacity>
                     </View>
-                    <TouchableOpacity
-                      onPress={() => toggleAppointmentExpansion(appointment)}
-                      style={styles.expandButton}
-                    >
+                  </TouchableOpacity>
+
+                  <View style={styles.appointmentBody}>
+                    <View style={styles.infoRow}>
                       <Ionicons
-                        name={isExpanded ? "chevron-up" : "chevron-down"}
-                        size={20}
+                        name="calendar-outline"
+                        size={16}
                         color="#6B7280"
                       />
-                    </TouchableOpacity>
-                  </View>
-                </TouchableOpacity>
-
-                <View style={styles.appointmentBody}>
-                  <View style={styles.infoRow}>
-                    <Ionicons
-                      name="calendar-outline"
-                      size={16}
-                      color="#6B7280"
-                    />
-                    <Text style={styles.infoText}>{appointment.date}</Text>
-                  </View>
-                  <View style={styles.infoRow}>
-                    <Ionicons name="time-outline" size={16} color="#6B7280" />
-                    <Text style={styles.infoText}>{appointment.time}</Text>
-                  </View>
-                  {appointment.diagnosis && (
-                    <View style={styles.diagnosisRow}>
-                      <Ionicons
-                        name="checkmark-circle"
-                        size={16}
-                        color="#10B981"
-                      />
-                      <Text style={styles.diagnosisText}>
-                        {appointment.diagnosis}
-                      </Text>
+                      <Text style={styles.infoText}>{appointment.date}</Text>
                     </View>
-                  )}
-                  {appointment.type === "home-visit" && appointment.visitAddress && (
                     <View style={styles.infoRow}>
-                      <Ionicons name="location-outline" size={16} color="#6B7280" />
-                      <Text style={styles.infoText}>{appointment.visitAddress}</Text>
+                      <Ionicons name="time-outline" size={16} color="#6B7280" />
+                      <Text style={styles.infoText}>{appointment.time}</Text>
                     </View>
-                  )}
-                  {/* File indicator */}
-                  {documents.length > 0 && (
-                    <View style={styles.infoRow}>
-                      <Ionicons name="document-attach-outline" size={16} color="#0EA5E9" />
-                      <Text style={[styles.infoText, { color: "#0EA5E9" }]}>
-                        {documents.length} ფაილი ატვირთულია
-                      </Text>
-                    </View>
-                  )}
-                </View>
-
-                {/* Expanded Details */}
-                {isExpanded && (
-                  <View style={styles.expandedSection}>
-                    {/* Prescription/Danijnuloba */}
-                    <View style={styles.detailSection}>
-                      <Text style={styles.detailSectionTitle}>დანიშნულება</Text>
-                     
-                    </View>
-
-                    {/* Instrumental Tests */}
-                    {appointment.instrumentalTests && appointment.instrumentalTests.length > 0 && (
-                      <View style={styles.detailSection}>
-                        <Text style={styles.detailSectionTitle}>
-                          დანიშნული ინსტრუმენტული კვლევები
+                    {appointment.diagnosis && (
+                      <View style={styles.diagnosisRow}>
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={16}
+                          color="#10B981"
+                        />
+                        <Text style={styles.diagnosisText}>
+                          {appointment.diagnosis}
                         </Text>
-                        {appointment.instrumentalTests.map((test: any, index: number) => (
-                          <View key={index} style={styles.testCard}>
-                            <View style={styles.testHeader}>
-                              <Ionicons name="pulse-outline" size={18} color="#8B5CF6" />
-                              <View style={styles.testInfo}>
-                                <Text style={styles.testName}>{test.productName}</Text>
-                                {test.notes && (
-                                  <Text style={styles.testNotes}>შენიშვნა: {test.notes}</Text>
-                                )}
-                              </View>
-                            </View>
-                          </View>
-                        ))}
                       </View>
                     )}
-
-                    {/* Laboratory Tests */}
-                    {appointment.laboratoryTests && appointment.laboratoryTests.length > 0 && (
-                      <View style={styles.detailSection}>
-                        <Text style={styles.detailSectionTitle}>
-                          დანიშნული ლაბორატორიული კვლევები
-                        </Text>
-                        {appointment.laboratoryTests.map((test: any, index: number) => (
-                          <View key={index} style={styles.testCard}>
-                            <View style={styles.testHeader}>
-                              <Ionicons name="flask-outline" size={18} color="#06B6D4" />
-                              <View style={styles.testInfo}>
-                                <Text style={styles.testName}>{test.productName}</Text>
-                                {test.clinicName && (
-                                  <Text style={styles.testNotes}>კლინიკა: {test.clinicName}</Text>
-                                )}
-                              </View>
-                            </View>
-                          </View>
-                        ))}
-                      </View>
-                    )}
-
-                    {/* Patient Uploaded Documents */}
-                    {documents.length > 0 && (
-                      <View style={styles.detailSection}>
-                        <Text style={styles.detailSectionTitle}>ატვირთული ფაილები</Text>
-                        {documents.map((doc, index) => (
-                          <TouchableOpacity
-                            key={index}
-                            style={styles.viewFileButton}
-                            onPress={() => {
-                              const url = doc.url.startsWith("http") 
-                                ? doc.url 
-                                : `${apiService.getBaseURL()}/${doc.url}`;
-                              Linking.openURL(url).catch(() =>
-                                Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა")
-                              );
-                            }}
-                          >
-                            <Ionicons
-                              name={doc.type?.startsWith("image/") ? "image-outline" : "document-text-outline"}
-                              size={18}
-                              color="#0EA5E9"
-                            />
-                            <Text style={styles.viewFileButtonText} numberOfLines={1}>
-                              {doc.name || `ფაილი ${index + 1}`}
-                            </Text>
-                            <Ionicons
-                              name="open-outline"
-                              size={16}
-                              color="#0EA5E9"
-                              style={{ marginLeft: "auto" }}
-                            />
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    )}
-
-                    {/* Patient Uploaded Symptoms */}
-                    {appointment.symptoms && appointment.symptoms.trim().length > 0 && (
-                      <View style={styles.detailSection}>
-                        <Text style={styles.detailSectionTitle}>პაციენტის ატვირთული სიმპტომები</Text>
-                        <View style={styles.symptomsCard}>
-                          <Ionicons name="medical-outline" size={18} color="#6B7280" />
-                          <Text style={styles.symptomsTextExpanded}>
-                            {appointment.symptoms}
+                    {appointment.type === "home-visit" &&
+                      appointment.visitAddress && (
+                        <View style={styles.infoRow}>
+                          <Ionicons
+                            name="location-outline"
+                            size={16}
+                            color="#6B7280"
+                          />
+                          <Text style={styles.infoText}>
+                            {appointment.visitAddress}
                           </Text>
                         </View>
+                      )}
+                    {/* File indicator */}
+                    {documents.length > 0 && (
+                      <View style={styles.infoRow}>
+                        <Ionicons
+                          name="document-attach-outline"
+                          size={16}
+                          color="#0EA5E9"
+                        />
+                        <Text style={[styles.infoText, { color: "#0EA5E9" }]}>
+                          {documents.length} ფაილი ატვირთულია
+                        </Text>
                       </View>
                     )}
+                  </View>
 
-                    {/* Collapse Button */}
+                  {/* Expanded Details */}
+                  {isExpanded && (
+                    <View style={styles.expandedSection}>
+                      {/* Prescription/Danijnuloba */}
+                      <View style={styles.detailSection}>
+                        <Text style={styles.detailSectionTitle}>
+                          დანიშნულება
+                        </Text>
+                      </View>
+
+                      {/* Instrumental Tests */}
+                      {appointment.instrumentalTests &&
+                        appointment.instrumentalTests.length > 0 && (
+                          <View style={styles.detailSection}>
+                            <Text style={styles.detailSectionTitle}>
+                              დანიშნული ინსტრუმენტული კვლევები
+                            </Text>
+                            {appointment.instrumentalTests.map(
+                              (test: any, index: number) => (
+                                <View key={index} style={styles.testCard}>
+                                  <View style={styles.testHeader}>
+                                    <Ionicons
+                                      name="pulse-outline"
+                                      size={18}
+                                      color="#8B5CF6"
+                                    />
+                                    <View style={styles.testInfo}>
+                                      <Text style={styles.testName}>
+                                        {test.productName}
+                                      </Text>
+                                      {test.notes && (
+                                        <Text style={styles.testNotes}>
+                                          შენიშვნა: {test.notes}
+                                        </Text>
+                                      )}
+                                    </View>
+                                  </View>
+                                </View>
+                              ),
+                            )}
+                          </View>
+                        )}
+
+                      {/* Laboratory Tests */}
+                      {appointment.laboratoryTests &&
+                        appointment.laboratoryTests.length > 0 && (
+                          <View style={styles.detailSection}>
+                            <Text style={styles.detailSectionTitle}>
+                              დანიშნული ლაბორატორიული კვლევები
+                            </Text>
+                            {appointment.laboratoryTests.map(
+                              (test: any, index: number) => (
+                                <View key={index} style={styles.testCard}>
+                                  <View style={styles.testHeader}>
+                                    <Ionicons
+                                      name="flask-outline"
+                                      size={18}
+                                      color="#06B6D4"
+                                    />
+                                    <View style={styles.testInfo}>
+                                      <Text style={styles.testName}>
+                                        {test.productName}
+                                      </Text>
+                                      {test.clinicName && (
+                                        <Text style={styles.testNotes}>
+                                          კლინიკა: {test.clinicName}
+                                        </Text>
+                                      )}
+                                    </View>
+                                  </View>
+                                </View>
+                              ),
+                            )}
+                          </View>
+                        )}
+
+                      {/* Patient Uploaded Documents */}
+
+                      {/* Patient Uploaded Symptoms */}
+
+                      {/* Collapse Button */}
+                      <TouchableOpacity
+                        style={styles.viewDetailsButton}
+                        onPress={() => toggleAppointmentExpansion(appointment)}
+                      >
+                        <Text style={styles.viewDetailsButtonText}>
+                          დეტალების დაფარვა
+                        </Text>
+                        <Ionicons name="chevron-up" size={18} color="#0EA5E9" />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {/* View Details Button */}
+                  {!isExpanded && (
                     <TouchableOpacity
                       style={styles.viewDetailsButton}
                       onPress={() => toggleAppointmentExpansion(appointment)}
                     >
                       <Text style={styles.viewDetailsButtonText}>
-                        დეტალების დაფარვა
+                        დეტალების ნახვა
                       </Text>
-                      <Ionicons 
-                        name="chevron-up" 
-                        size={18} 
-                        color="#0EA5E9" 
-                      />
+                      <Ionicons name="chevron-down" size={18} color="#0EA5E9" />
                     </TouchableOpacity>
-                  </View>
-                )}
+                  )}
 
-                {/* View Details Button */}
-                {!isExpanded && (
-                  <TouchableOpacity
-                    style={styles.viewDetailsButton}
-                    onPress={() => toggleAppointmentExpansion(appointment)}
-                  >
-                    <Text style={styles.viewDetailsButtonText}>
-                      დეტალების ნახვა
-                    </Text>
-                    <Ionicons 
-                      name="chevron-down" 
-                      size={18} 
-                      color="#0EA5E9" 
-                    />
-                  </TouchableOpacity>
-                )}
+                  {/* Reminder & Join Call Section - Only for video consultations */}
 
-                {/* Reminder & Join Call Section - Only for video consultations */}
-                {appointment.status === "scheduled" && (
-                  <View style={styles.reminderSection}>
-                    {getTimeUntilAppointment(appointment) ? (
-                      <View
-                        style={[
-                          styles.reminderBadge,
-                          isAppointmentSoon(appointment) &&
-                            styles.reminderBadgeUrgent,
-                        ]}
-                      >
-                        <Ionicons
-                          name={
-                            isAppointmentSoon(appointment)
-                              ? "alarm"
-                              : "time-outline"
-                          }
-                          size={16}
-                          color={
-                            isAppointmentSoon(appointment)
-                              ? "#EF4444"
-                              : "#F59E0B"
-                          }
-                        />
-                        <Text
+                  {/* Reschedule Request Status - if doctor requested reschedule */}
+                  {appointment.rescheduleRequest?.status === "pending" &&
+                    appointment.rescheduleRequest?.requestedBy === "doctor" && (
+                      <View style={styles.rescheduleRequestCard}>
+                        <View style={styles.rescheduleRequestHeader}>
+                          <Ionicons
+                            name="calendar-outline"
+                            size={20}
+                            color="#8B5CF6"
+                          />
+                          <Text style={styles.rescheduleRequestTitle}>
+                            ექიმმა მოითხოვა გადაჯავშნა
+                          </Text>
+                        </View>
+                        {appointment.rescheduleRequest.requestedDate &&
+                        appointment.rescheduleRequest.requestedTime ? (
+                          <Text style={styles.rescheduleRequestText}>
+                            ახალი თარიღი:{" "}
+                            {appointment.rescheduleRequest.requestedDate}{" "}
+                            {appointment.rescheduleRequest.requestedTime}
+                          </Text>
+                        ) : (
+                          <Text style={styles.rescheduleRequestText}>
+                            გთხოვთ აირჩიოთ ახალი თარიღი და დრო
+                          </Text>
+                        )}
+                        {appointment.rescheduleRequest.reason && (
+                          <Text style={styles.rescheduleRequestReason}>
+                            მიზეზი: {appointment.rescheduleRequest.reason}
+                          </Text>
+                        )}
+                        <View style={styles.rescheduleRequestActions}>
+                          <TouchableOpacity
+                            style={[styles.approveButton, styles.actionButton]}
+                            onPress={() =>
+                              handleApproveReschedule(
+                                appointment.id,
+                                appointment,
+                              )
+                            }
+                          >
+                            <Ionicons
+                              name="checkmark-circle"
+                              size={18}
+                              color="#10B981"
+                            />
+                            <Text style={styles.approveButtonText}>
+                              დამტკიცება
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.rejectButton, styles.actionButton]}
+                            onPress={() =>
+                              handleRejectReschedule(appointment.id)
+                            }
+                          >
+                            <Ionicons
+                              name="close-circle"
+                              size={18}
+                              color="#EF4444"
+                            />
+                            <Text style={styles.rejectButtonText}>უარყოფა</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    )}
+
+                  {/* Reschedule Request Status - if patient requested reschedule */}
+                  {appointment.rescheduleRequest?.status === "pending" &&
+                    appointment.rescheduleRequest?.requestedBy ===
+                      "patient" && (
+                      <View style={styles.rescheduleRequestCard}>
+                        <View style={styles.rescheduleRequestHeader}>
+                          <Ionicons
+                            name="calendar-outline"
+                            size={20}
+                            color="#8B5CF6"
+                          />
+                          <Text style={styles.rescheduleRequestTitle}>
+                            გადაჯავშნის მოთხოვნა გაიგზავნა
+                          </Text>
+                        </View>
+                        <Text style={styles.rescheduleRequestText}>
+                          ახალი თარიღი:{" "}
+                          {appointment.rescheduleRequest.requestedDate}{" "}
+                          {appointment.rescheduleRequest.requestedTime}
+                        </Text>
+                        <Text style={styles.rescheduleRequestStatus}>
+                          ექიმის პასუხის მოლოდინში...
+                        </Text>
+                      </View>
+                    )}
+
+                  {/* Reschedule and Cancel - ჩანს მხოლოდ სანამ კონსულტაცია მოვა; განმეორებითზე გადაჯავშნა არ ჩანს */}
+                  {(appointment.status === "scheduled" ||
+                    appointment.status === "pending") &&
+                    !(appointment.rescheduleRequest?.status === "pending") &&
+                    canShowRescheduleAndCancel(appointment) &&
+                    appointment.type !== "followup" && (
+                      <View style={styles.actionButtonsRow}>
+                        <TouchableOpacity
                           style={[
-                            styles.reminderText,
-                            isAppointmentSoon(appointment) &&
-                              styles.reminderTextUrgent,
+                            styles.rescheduleCardButton,
+                            styles.actionButton,
+                            { marginTop: 8 },
                           ]}
+                          onPress={() => {
+                            setSelectedAppointment(appointment);
+                            handleOpenReschedule(appointment);
+                          }}
                         >
-                          {getTimeUntilAppointment(appointment)} დარჩა
-                        </Text>
-                        {isAppointmentSoon(appointment) && (
-                          <View style={styles.urgentDot} />
-                        )}
-                      </View>
-                    ) : isAppointmentTimePassed(appointment) ? (
-                      <View style={styles.reminderBadge}>
-                        <Ionicons name="time-outline" size={16} color="#EF4444" />
-                        <Text style={[styles.reminderText, { color: "#EF4444" }]}>
-                          კონსულტაციის დრო გავიდა
-                        </Text>
-                      </View>
-                    ) : null}
-                    {/* Show "Join Call" button only for video consultations */}
-                    {appointment.type === "video" && (
-                      <TouchableOpacity
-                        style={[
-                          styles.joinCallButton,
-                          isAppointmentSoon(appointment) &&
-                            styles.joinCallButtonPulsing,
-                          !isJoinButtonActive(appointment) && styles.joinCallButtonDisabled,
-                        ]}
-                        onPress={async () => {
-                          // Check if consultation time has not yet arrived
-                          if (isConsultationTimeNotYet(appointment)) {
-                            setShowConsultationTimeModal(true);
-                            return;
-                          }
-                          
-                          if (!isJoinButtonActive(appointment)) {
-                            // Navigate to waiting screen
-                            router.push({
-                              pathname: "/screens/appointment-waiting",
-                              params: {
-                                appointmentId: appointment.id,
-                                doctorName: appointment.doctorName,
-                                date: appointment.date,
-                                time: appointment.time,
-                                timeRemaining: getTimeRemaining(appointment) || "",
-                              },
-                            });
-                            return;
-                          }
-                          // Track join time
-                          try {
-                            await apiService.joinCall(appointment.id);
-                          } catch (err) {
-                            console.error("Failed to track join time:", err);
-                          }
-                          router.push({
-                            pathname: "/screens/video-call",
-                            params: {
-                              appointmentId: appointment.id,
-                              doctorName: appointment.doctorName,
-                              roomName: `medicare-${appointment.id}`,
-                            },
-                          });
-                        }}
-                        disabled={false}
-                      >
-                        <Ionicons 
-                          name="videocam" 
-                          size={20} 
-                          color={isJoinButtonActive(appointment) ? "#FFFFFF" : "#9CA3AF"} 
-                        />
-                        <Text style={[
-                          styles.joinCallText,
-                          !isJoinButtonActive(appointment) && { color: "#9CA3AF" }
-                        ]}>
-                          შესვლა კონსულტაციაზე
-                        </Text>
-                        {isJoinButtonActive(appointment) && (
                           <Ionicons
-                            name="arrow-forward"
-                            size={16}
-                            color="#FFFFFF"
+                            name="calendar-outline"
+                            size={18}
+                            color="#8B5CF6"
                           />
-                        )}
-                      </TouchableOpacity>
+                          <Text style={styles.rescheduleCardButtonText}>
+                            გადაჯავშნა
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[
+                            styles.cancelCardButton,
+                            styles.actionButton,
+                            { marginTop: 8 },
+                          ]}
+                          onPress={() =>
+                            handleCancelAppointment(appointment.id)
+                          }
+                          disabled={cancellingAppointmentId === appointment.id}
+                        >
+                          {cancellingAppointmentId === appointment.id ? (
+                            <ActivityIndicator size="small" color="#EF4444" />
+                          ) : (
+                            <>
+                              <Ionicons
+                                name="close-circle-outline"
+                                size={18}
+                                color="#EF4444"
+                              />
+                              <Text style={styles.cancelCardButtonText}>
+                                გაუქმება
+                              </Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
+                      </View>
                     )}
-                    {appointment.type === "home-visit" && 
-                     (appointment.status === "scheduled" || appointment.status === "in-progress") ? (
-                      <TouchableOpacity
-                        style={[
-                          styles.completeHomeVisitButton,
-                          appointment.homeVisitCompletedAt && styles.completeHomeVisitButtonDisabled
-                        ]}
-                        disabled={!!appointment.homeVisitCompletedAt}
-                        onPress={async () => {
-                          Alert.alert(
-                            "დასრულება",
-                            "დარწმუნებული ხართ, რომ ბინაზე კონსულტაცია დასრულდა?",
-                            [
-                              {
-                                text: "გაუქმება",
-                                style: "cancel",
-                              },
-                              {
-                                text: "დასრულება",
-                                style: "default",
-                                onPress: async () => {
-                                  try {
-                                    const response = await apiService.completeHomeVisit(appointment.id);
-                                    if (response.success) {
-                                      Alert.alert("წარმატება", "ბინაზე კონსულტაცია მონიშნულია როგორც ჩატარებული");
-                                      await loadAppointments();
-                                    } else {
-                                      Alert.alert("შეცდომა", response.message || "ოპერაცია ვერ მოხერხდა");
-                                    }
-                                  } catch (err: any) {
-                                    console.error("❌ Complete home visit error:", err);
-                                    const errorMessage = err.message || "ოპერაცია ვერ მოხერხდა";
-                                    Alert.alert("შეცდომა", errorMessage);
-                                  }
-                                },
-                              },
-                            ]
-                          );
-                        }}
-                      >
-                        <Ionicons 
-                          name={appointment.homeVisitCompletedAt ? "checkmark-done-circle" : "checkmark-circle"} 
-                          size={20} 
-                          color={appointment.homeVisitCompletedAt ? "#10B981" : "#FFFFFF"} 
-                        />
-                        <Text style={[
-                          styles.completeHomeVisitButtonText,
-                          appointment.homeVisitCompletedAt && styles.completeHomeVisitButtonTextDisabled
-                        ]}>
-                          {appointment.homeVisitCompletedAt ? "უკვე დასრულებულია" : "დასრულება"}
-                        </Text>
-                        {!appointment.homeVisitCompletedAt && (
-                          <Ionicons
-                            name="arrow-forward"
-                            size={16}
-                            color="#FFFFFF"
-                          />
-                        )}
-                      </TouchableOpacity>
-                    ) : null}
-                  </View>
-                )}
-
-                {/* Reschedule Request Status - if doctor requested reschedule */}
-                {appointment.rescheduleRequest?.status === 'pending' && 
-                 appointment.rescheduleRequest?.requestedBy === 'doctor' && (
-                  <View style={styles.rescheduleRequestCard}>
-                    <View style={styles.rescheduleRequestHeader}>
-                      <Ionicons name="calendar-outline" size={20} color="#8B5CF6" />
-                      <Text style={styles.rescheduleRequestTitle}>
-                        ექიმმა მოითხოვა გადაჯავშნა
-                      </Text>
-                    </View>
-                    {appointment.rescheduleRequest.requestedDate && appointment.rescheduleRequest.requestedTime ? (
-                      <Text style={styles.rescheduleRequestText}>
-                        ახალი თარიღი: {appointment.rescheduleRequest.requestedDate} {appointment.rescheduleRequest.requestedTime}
-                      </Text>
-                    ) : (
-                      <Text style={styles.rescheduleRequestText}>
-                        გთხოვთ აირჩიოთ ახალი თარიღი და დრო
-                      </Text>
-                    )}
-                    {appointment.rescheduleRequest.reason && (
-                      <Text style={styles.rescheduleRequestReason}>
-                        მიზეზი: {appointment.rescheduleRequest.reason}
-                      </Text>
-                    )}
-                    <View style={styles.rescheduleRequestActions}>
-                      <TouchableOpacity
-                        style={[styles.approveButton, styles.actionButton]}
-                        onPress={() => handleApproveReschedule(appointment.id, appointment)}
-                      >
-                        <Ionicons name="checkmark-circle" size={18} color="#10B981" />
-                        <Text style={styles.approveButtonText}>დამტკიცება</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.rejectButton, styles.actionButton]}
-                        onPress={() => handleRejectReschedule(appointment.id)}
-                      >
-                        <Ionicons name="close-circle" size={18} color="#EF4444" />
-                        <Text style={styles.rejectButtonText}>უარყოფა</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                )}
-
-                {/* Reschedule Request Status - if patient requested reschedule */}
-                {appointment.rescheduleRequest?.status === 'pending' && 
-                 appointment.rescheduleRequest?.requestedBy === 'patient' && (
-                  <View style={styles.rescheduleRequestCard}>
-                    <View style={styles.rescheduleRequestHeader}>
-                      <Ionicons name="calendar-outline" size={20} color="#8B5CF6" />
-                      <Text style={styles.rescheduleRequestTitle}>
-                        გადაჯავშნის მოთხოვნა გაიგზავნა
-                      </Text>
-                    </View>
-                    <Text style={styles.rescheduleRequestText}>
-                      ახალი თარიღი: {appointment.rescheduleRequest.requestedDate} {appointment.rescheduleRequest.requestedTime}
-                    </Text>
-                    <Text style={styles.rescheduleRequestStatus}>
-                      ექიმის პასუხის მოლოდინში...
-                    </Text>
-                  </View>
-                )}
-
-                {/* Reschedule and Cancel buttons - only for scheduled appointments and if no pending request */}
-                {/* Cancel button is hidden for home-visit appointments */}
-                {(appointment.status === "scheduled" || appointment.status === "pending") && 
-                 !(appointment.rescheduleRequest?.status === 'pending') &&
-                 appointment.type !== "home-visit" && (
-                  <View style={styles.actionButtonsRow}>
-                    <TouchableOpacity
-                      style={[styles.rescheduleCardButton, styles.actionButton]}
-                      onPress={() => {
-                        setSelectedAppointment(appointment);
-                        handleOpenReschedule(appointment);
-                      }}
-                    >
-                      <Ionicons name="calendar-outline" size={18} color="#8B5CF6" />
-                      <Text style={styles.rescheduleCardButtonText}>გადაჯავშნა</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.cancelCardButton, styles.actionButton]}
-                      onPress={() => handleCancelAppointment(appointment.id)}
-                      disabled={cancellingAppointmentId === appointment.id}
-                    >
-                      {cancellingAppointmentId === appointment.id ? (
-                        <ActivityIndicator size="small" color="#EF4444" />
-                      ) : (
-                        <>
-                          <Ionicons name="close-circle-outline" size={18} color="#EF4444" />
-                          <Text style={styles.cancelCardButtonText}>გაუქმება</Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-            );
+                </View>
+              );
             })
           )}
         </View>
@@ -1677,7 +1704,7 @@ const Appointment = () => {
                 {/* Prescription/Danijnuloba */}
                 <View style={styles.detailSection}>
                   <Text style={styles.detailLabel}>დანიშნულება</Text>
-                </View> 
+                </View>
 
                 {selectedAppointment.diagnosis && (
                   <View style={styles.detailSection}>
@@ -1716,7 +1743,7 @@ const Appointment = () => {
                               </View>
                             </View>
                           </View>
-                        )
+                        ),
                       )}
                     </View>
                   )}
@@ -1749,51 +1776,64 @@ const Appointment = () => {
                               </View>
                             </View>
                           </View>
-                        )
+                        ),
                       )}
                     </View>
                   )}
 
                 {/* Patient Uploaded Documents */}
-                {appointmentDocuments[selectedAppointment.id] && appointmentDocuments[selectedAppointment.id].length > 0 && (
-                  <View style={styles.detailSection}>
-                    <Text style={styles.detailLabel}>ატვირთული ფაილები</Text>
-                    {appointmentDocuments[selectedAppointment.id].map((doc: any, index: number) => (
-                      <TouchableOpacity
-                        key={index}
-                        style={styles.viewFileButton}
-                        onPress={() => {
-                          const url = doc.url.startsWith("http") 
-                            ? doc.url 
-                            : `${apiService.getBaseURL()}/${doc.url}`;
-                          Linking.openURL(url).catch(() =>
-                            Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა")
-                          );
-                        }}
-                      >
-                        <Ionicons
-                          name={doc.type?.startsWith("image/") ? "image-outline" : "document-text-outline"}
-                          size={18}
-                          color="#0EA5E9"
-                        />
-                        <Text style={styles.viewFileButtonText} numberOfLines={1}>
-                          {doc.name || `ფაილი ${index + 1}`}
-                        </Text>
-                        <Ionicons
-                          name="open-outline"
-                          size={16}
-                          color="#0EA5E9"
-                          style={{ marginLeft: "auto" }}
-                        />
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
+                {appointmentDocuments[selectedAppointment.id] &&
+                  appointmentDocuments[selectedAppointment.id].length > 0 && (
+                    <View style={styles.detailSection}>
+                      <Text style={styles.detailLabel}>ატვირთული ფაილები</Text>
+                      {appointmentDocuments[selectedAppointment.id].map(
+                        (doc: any, index: number) => (
+                          <TouchableOpacity
+                            key={index}
+                            style={styles.viewFileButton}
+                            onPress={() => {
+                              const url = doc.url.startsWith("http")
+                                ? doc.url
+                                : `${apiService.getBaseURL()}/${doc.url}`;
+                              Linking.openURL(url).catch(() =>
+                                Alert.alert(
+                                  "შეცდომა",
+                                  "ფაილის გახსნა ვერ მოხერხდა",
+                                ),
+                              );
+                            }}
+                          >
+                            <Ionicons
+                              name={
+                                doc.type?.startsWith("image/")
+                                  ? "image-outline"
+                                  : "document-text-outline"
+                              }
+                              size={18}
+                              color="#0EA5E9"
+                            />
+                            <Text
+                              style={styles.viewFileButtonText}
+                              numberOfLines={1}
+                            >
+                              {doc.name || `ფაილი ${index + 1}`}
+                            </Text>
+                            <Ionicons
+                              name="open-outline"
+                              size={16}
+                              color="#0EA5E9"
+                              style={{ marginLeft: "auto" }}
+                            />
+                          </TouchableOpacity>
+                        ),
+                      )}
+                    </View>
+                  )}
 
                 <View style={styles.detailSection}>
                   <Text style={styles.detailLabel}>ანაზღაურება</Text>
                   <Text style={styles.detailValue}>
-                    {typeof selectedAppointment.fee === 'number' 
+                    {typeof selectedAppointment.fee === "number"
                       ? `${selectedAppointment.fee} ₾`
                       : selectedAppointment.fee || "0 ₾"}
                   </Text>
@@ -1859,36 +1899,52 @@ const Appointment = () => {
               {loadingAvailability ? (
                 <View style={styles.loadingContainer}>
                   <ActivityIndicator size="large" color="#06B6D4" />
-                  <Text style={styles.loadingText}>თავისუფალი დროების ჩატვირთვა...</Text>
+                  <Text style={styles.loadingText}>
+                    თავისუფალი დროების ჩატვირთვა...
+                  </Text>
                 </View>
               ) : availableSlots.length === 0 ? (
                 <View style={styles.emptyContainer}>
                   <Ionicons name="calendar-outline" size={48} color="#9CA3AF" />
-                  <Text style={styles.emptyText}>თავისუფალი დრო არ მოიძებნა</Text>
+                  <Text style={styles.emptyText}>
+                    თავისუფალი დრო არ მოიძებნა
+                  </Text>
                 </View>
               ) : (
                 <>
                   {/* Date Selection */}
                   <View style={styles.detailSection}>
                     <Text style={styles.detailLabel}>აირჩიეთ თარიღი</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dateScrollView}>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      style={styles.dateScrollView}
+                    >
                       {uniqueDates.map((date) => (
                         <TouchableOpacity
                           key={date}
                           style={[
                             styles.dateChip,
-                            selectedRescheduleDate === date && styles.dateChipSelected
+                            selectedRescheduleDate === date &&
+                              styles.dateChipSelected,
                           ]}
                           onPress={() => {
                             setSelectedRescheduleDate(date);
                             setSelectedRescheduleTime(null);
                           }}
                         >
-                          <Text style={[
-                            styles.dateChipText,
-                            selectedRescheduleDate === date && styles.dateChipTextSelected
-                          ]}>
-                            {new Date(date).toLocaleDateString('ka-GE', { weekday: 'short', day: 'numeric', month: 'short' })}
+                          <Text
+                            style={[
+                              styles.dateChipText,
+                              selectedRescheduleDate === date &&
+                                styles.dateChipTextSelected,
+                            ]}
+                          >
+                            {new Date(date).toLocaleDateString("ka-GE", {
+                              weekday: "short",
+                              day: "numeric",
+                              month: "short",
+                            })}
                           </Text>
                         </TouchableOpacity>
                       ))}
@@ -1905,14 +1961,18 @@ const Appointment = () => {
                             key={time}
                             style={[
                               styles.timeChip,
-                              selectedRescheduleTime === time && styles.timeChipSelected
+                              selectedRescheduleTime === time &&
+                                styles.timeChipSelected,
                             ]}
                             onPress={() => setSelectedRescheduleTime(time)}
                           >
-                            <Text style={[
-                              styles.timeChipText,
-                              selectedRescheduleTime === time && styles.timeChipTextSelected
-                            ]}>
+                            <Text
+                              style={[
+                                styles.timeChipText,
+                                selectedRescheduleTime === time &&
+                                  styles.timeChipTextSelected,
+                              ]}
+                            >
                               {time}
                             </Text>
                           </TouchableOpacity>
@@ -1927,17 +1987,29 @@ const Appointment = () => {
             <View style={styles.modalFooter}>
               <TouchableOpacity
                 style={[
-                  styles.modalButton, 
+                  styles.modalButton,
                   styles.rescheduleConfirmButton,
-                  (!selectedRescheduleDate || !selectedRescheduleTime) && styles.disabledButton
+                  (!selectedRescheduleDate || !selectedRescheduleTime) &&
+                    styles.disabledButton,
                 ]}
                 onPress={handleReschedule}
-                disabled={!selectedRescheduleDate || !selectedRescheduleTime || rescheduleLoading}
+                disabled={
+                  !selectedRescheduleDate ||
+                  !selectedRescheduleTime ||
+                  rescheduleLoading
+                }
               >
                 {rescheduleLoading ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <Text style={[styles.modalButtonText, styles.rescheduleButtonText]}>დადასტურება</Text>
+                  <Text
+                    style={[
+                      styles.modalButtonText,
+                      styles.rescheduleButtonText,
+                    ]}
+                  >
+                    დადასტურება
+                  </Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -1968,20 +2040,29 @@ const Appointment = () => {
               {loadingAvailability ? (
                 <View style={styles.loadingContainer}>
                   <ActivityIndicator size="large" color="#06B6D4" />
-                  <Text style={styles.loadingText}>ხელმისაწვდომი დროების ჩატვირთვა...</Text>
+                  <Text style={styles.loadingText}>
+                    ხელმისაწვდომი დროების ჩატვირთვა...
+                  </Text>
                 </View>
               ) : (
                 <>
                   {/* Date Selection */}
                   <View style={styles.detailSection}>
                     <Text style={styles.detailLabel}>აირჩიეთ თარიღი</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dateScrollView}>
-                      {Array.from(new Set(availableSlots.map(s => s.date))).map((date) => (
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      style={styles.dateScrollView}
+                    >
+                      {Array.from(
+                        new Set(availableSlots.map((s) => s.date)),
+                      ).map((date) => (
                         <TouchableOpacity
                           key={date}
                           style={[
                             styles.dateChip,
-                            approveRescheduleDate === date && styles.dateChipSelected,
+                            approveRescheduleDate === date &&
+                              styles.dateChipSelected,
                           ]}
                           onPress={() => {
                             setApproveRescheduleDate(date);
@@ -1991,7 +2072,8 @@ const Appointment = () => {
                           <Text
                             style={[
                               styles.dateChipText,
-                              approveRescheduleDate === date && styles.dateChipTextSelected,
+                              approveRescheduleDate === date &&
+                                styles.dateChipTextSelected,
                             ]}
                           >
                             {new Date(date).toLocaleDateString("ka-GE", {
@@ -2011,20 +2093,24 @@ const Appointment = () => {
                       <Text style={styles.detailLabel}>აირჩიეთ დრო</Text>
                       <View style={styles.timeGrid}>
                         {availableSlots
-                          .filter(s => s.date === approveRescheduleDate)
+                          .filter((s) => s.date === approveRescheduleDate)
                           .map((slot) => (
                             <TouchableOpacity
                               key={slot.time}
                               style={[
                                 styles.timeChip,
-                                approveRescheduleTime === slot.time && styles.timeChipSelected,
+                                approveRescheduleTime === slot.time &&
+                                  styles.timeChipSelected,
                               ]}
-                              onPress={() => setApproveRescheduleTime(slot.time)}
+                              onPress={() =>
+                                setApproveRescheduleTime(slot.time)
+                              }
                             >
                               <Text
                                 style={[
                                   styles.timeChipText,
-                                  approveRescheduleTime === slot.time && styles.timeChipTextSelected,
+                                  approveRescheduleTime === slot.time &&
+                                    styles.timeChipTextSelected,
                                 ]}
                               >
                                 {slot.time}
@@ -2049,15 +2135,29 @@ const Appointment = () => {
                 style={[
                   styles.modalButton,
                   styles.rescheduleButton,
-                  (!approveRescheduleDate || !approveRescheduleTime || approveRescheduleLoading) && styles.disabledButton,
+                  (!approveRescheduleDate ||
+                    !approveRescheduleTime ||
+                    approveRescheduleLoading) &&
+                    styles.disabledButton,
                 ]}
                 onPress={handleApproveRescheduleWithDate}
-                disabled={!approveRescheduleDate || !approveRescheduleTime || approveRescheduleLoading}
+                disabled={
+                  !approveRescheduleDate ||
+                  !approveRescheduleTime ||
+                  approveRescheduleLoading
+                }
               >
                 {approveRescheduleLoading ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <Text style={[styles.modalButtonText, styles.rescheduleButtonText]}>დამტკიცება</Text>
+                  <Text
+                    style={[
+                      styles.modalButtonText,
+                      styles.rescheduleButtonText,
+                    ]}
+                  >
+                    დამტკიცება
+                  </Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -2074,13 +2174,19 @@ const Appointment = () => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <View style={[styles.modalHeader, { justifyContent: "center", flexDirection: "column", gap: 12 }]}>
+            <View
+              style={[
+                styles.modalHeader,
+                { justifyContent: "center", flexDirection: "column", gap: 12 },
+              ]}
+            >
               <Ionicons name="time-outline" size={48} color="#F59E0B" />
               <Text style={styles.modalTitle}>კონსულტაციის დრო არ მოვიდა</Text>
             </View>
             <View style={styles.modalBody}>
               <Text style={styles.modalMessage}>
-                ვერ შეხვალ ჯერ კონსულტაციის დრო არაა. გთხოვთ დაელოდოთ კონსულტაციის დროს.
+                ვერ შეხვალ ჯერ კონსულტაციის დრო არაა. გთხოვთ დაელოდოთ
+                კონსულტაციის დროს.
               </Text>
             </View>
             <View style={styles.modalFooter}>
@@ -2088,7 +2194,11 @@ const Appointment = () => {
                 style={[styles.modalButton, styles.primaryButton]}
                 onPress={() => setShowConsultationTimeModal(false)}
               >
-                <Text style={[styles.modalButtonText, styles.primaryButtonText]}>გასაგებია</Text>
+                <Text
+                  style={[styles.modalButtonText, styles.primaryButtonText]}
+                >
+                  გასაგებია
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -2113,7 +2223,10 @@ const Appointment = () => {
                 <Ionicons name="close" size={24} color="#6B7280" />
               </TouchableOpacity>
             </View>
-            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+            <ScrollView
+              style={styles.modalBody}
+              showsVerticalScrollIndicator={false}
+            >
               <View style={styles.detailSection}>
                 <Text style={styles.detailLabel}>საწყისი თარიღი</Text>
                 <TouchableOpacity
@@ -2121,10 +2234,12 @@ const Appointment = () => {
                   onPress={() => setShowStartPicker(true)}
                 >
                   <Ionicons name="calendar-outline" size={20} color="#06B6D4" />
-                  <Text style={[
-                    styles.dateInputText,
-                    !filterStartDate && styles.dateInputTextPlaceholder
-                  ]}>
+                  <Text
+                    style={[
+                      styles.dateInputText,
+                      !filterStartDate && styles.dateInputTextPlaceholder,
+                    ]}
+                  >
                     {filterStartDate || "აირჩიე თარიღი"}
                   </Text>
                   {filterStartDate && (
@@ -2143,9 +2258,7 @@ const Appointment = () => {
                   <View style={styles.pickerContainer}>
                     <DateTimePicker
                       value={
-                        filterStartDate
-                          ? new Date(filterStartDate)
-                          : new Date()
+                        filterStartDate ? new Date(filterStartDate) : new Date()
                       }
                       mode="date"
                       display="default"
@@ -2153,7 +2266,9 @@ const Appointment = () => {
                         setShowStartPicker(false);
                         if (event.type === "dismissed") return;
                         if (selectedDate) {
-                          setFilterStartDate(selectedDate.toISOString().split("T")[0]);
+                          setFilterStartDate(
+                            selectedDate.toISOString().split("T")[0],
+                          );
                         }
                       }}
                     />
@@ -2168,10 +2283,12 @@ const Appointment = () => {
                   onPress={() => setShowEndPicker(true)}
                 >
                   <Ionicons name="calendar-outline" size={20} color="#06B6D4" />
-                  <Text style={[
-                    styles.dateInputText,
-                    !filterEndDate && styles.dateInputTextPlaceholder
-                  ]}>
+                  <Text
+                    style={[
+                      styles.dateInputText,
+                      !filterEndDate && styles.dateInputTextPlaceholder,
+                    ]}
+                  >
                     {filterEndDate || "აირჩიე თარიღი"}
                   </Text>
                   {filterEndDate && (
@@ -2190,9 +2307,7 @@ const Appointment = () => {
                   <View style={styles.pickerContainer}>
                     <DateTimePicker
                       value={
-                        filterEndDate
-                          ? new Date(filterEndDate)
-                          : new Date()
+                        filterEndDate ? new Date(filterEndDate) : new Date()
                       }
                       mode="date"
                       display="default"
@@ -2200,7 +2315,9 @@ const Appointment = () => {
                         setShowEndPicker(false);
                         if (event.type === "dismissed") return;
                         if (selectedDate) {
-                          setFilterEndDate(selectedDate.toISOString().split("T")[0]);
+                          setFilterEndDate(
+                            selectedDate.toISOString().split("T")[0],
+                          );
                         }
                       }}
                     />
@@ -2223,7 +2340,12 @@ const Appointment = () => {
                 style={[styles.modalButton, styles.modalButtonPrimary]}
                 onPress={() => setShowFilterModal(false)}
               >
-                <Text style={[styles.modalButtonText, styles.modalButtonTextPrimary]}>
+                <Text
+                  style={[
+                    styles.modalButtonText,
+                    styles.modalButtonTextPrimary,
+                  ]}
+                >
                   ფილტრი
                 </Text>
               </TouchableOpacity>

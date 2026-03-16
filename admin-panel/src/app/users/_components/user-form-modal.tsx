@@ -210,49 +210,38 @@ export default function UserFormModal({
           throw new Error('ტელეფონის ნომერი აუცილებელია');
         }
         submitData.password = formData.password;
-        // Phone verification temporarily disabled
-        // TODO: Re-enable phone verification when SMS service is fully configured
-        // For admin-created users, we allow bypassing verification
-        // Admin can mark user as verified manually
-        // if (isPhoneVerified) {
-        //   submitData.isVerified = true;
-        // }
-      } else if (formData.password) {
-        submitData.password = formData.password;
-      }
-
-      if (mode === 'edit') {
-        submitData.isVerified = formData.isVerified;
-        submitData.isActive = formData.isActive;
-        // approvalStatus მხოლოდ ექიმებისთვის
-        if (formData.role === 'doctor') {
-          submitData.approvalStatus = formData.approvalStatus;
-        }
-      } else if (formData.role === 'patient') {
-        submitData.isActive = formData.isActive;
-      }
-
-      if (formData.role === 'doctor') {
-        submitData.specialization = formData.specializations
-          .map((s) => s.trim())
-          .filter(Boolean)
-          .join(', ') || undefined;
-        submitData.degrees = formData.degrees || undefined;
-        submitData.experience = formData.experience || undefined;
-        submitData.consultationFee = formData.consultationFee
-          ? parseFloat(formData.consultationFee)
-          : undefined;
-        submitData.followUpFee = formData.followUpFee
-          ? parseFloat(formData.followUpFee)
-          : undefined;
-        submitData.about = formData.about || undefined;
-        submitData.location = formData.location || undefined;
       }
 
       if (mode === 'create') {
+        // Create: full payload
+        if (formData.role === 'patient') {
+          submitData.isActive = formData.isActive;
+        }
+        if (formData.role === 'doctor') {
+          submitData.specialization = formData.specializations
+            .map((s) => s.trim())
+            .filter(Boolean)
+            .join(', ') || undefined;
+          submitData.degrees = formData.degrees || undefined;
+          submitData.experience = formData.experience || undefined;
+          submitData.consultationFee = formData.consultationFee
+            ? parseFloat(formData.consultationFee)
+            : undefined;
+          submitData.followUpFee = formData.followUpFee
+            ? parseFloat(formData.followUpFee)
+            : undefined;
+          submitData.about = formData.about || undefined;
+          submitData.location = formData.location || undefined;
+        }
         await apiService.createUser(submitData);
       } else if (user) {
-        await apiService.updateUser(user.id, submitData);
+        // Edit: მხოლოდ პაროლის ცვლილება შესაძლებელია
+        if (!formData.password || !formData.password.trim()) {
+          setError('პაროლის შესაცვლელად შეიყვანეთ ახალი პაროლი');
+          setLoading(false);
+          return;
+        }
+        await apiService.updateUser(user.id, { password: formData.password.trim() });
       }
 
       onSuccess();
@@ -287,6 +276,12 @@ export default function UserFormModal({
           </div>
         )}
 
+        {mode === 'edit' && (
+          <p className="mb-4 rounded-lg bg-gray-100 p-3 text-sm text-dark-6 dark:bg-dark-2 dark:text-dark-5">
+            რედაქტირებისას შეგიძლიათ მხოლოდ პაროლის შეცვლა. დანარჩენი ველები მხოლოდ ნახვის რეჟიმშია.
+          </p>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Role */}
           <div>
@@ -299,7 +294,8 @@ export default function UserFormModal({
                 setFormData({ ...formData, role: e.target.value as 'patient' | 'doctor' })
               }
               required
-              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
+              disabled={mode === 'edit'}
+              className={`w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary ${mode === 'edit' ? 'cursor-not-allowed opacity-70' : ''}`}
             >
               <option value="patient">პაციენტი</option>
               <option value="doctor">ექიმი</option>
@@ -316,7 +312,8 @@ export default function UserFormModal({
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
-              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
+              disabled={mode === 'edit'}
+              className={`w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary ${mode === 'edit' ? 'cursor-not-allowed opacity-70' : ''}`}
             />
           </div>
 
@@ -330,21 +327,23 @@ export default function UserFormModal({
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               required
-              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
+              disabled={mode === 'edit'}
+              className={`w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary ${mode === 'edit' ? 'cursor-not-allowed opacity-70' : ''}`}
             />
           </div>
 
-          {/* Password */}
+          {/* Password - ერთადერთი რედაქტირებადი ველი edit მოდში */}
           <div>
             <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
-              პაროლი {mode === 'create' ? '*' : '(დატოვე ცარიელი შეცვლის გარეშე)'}
+              პაროლი {mode === 'create' ? '*' : '(ახალი პაროლი)'}
             </label>
             <input
               type="password"
               value={formData.password}
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
               required={mode === 'create'}
-              minLength={6}
+              minLength={mode === 'create' ? 6 : undefined}
+              placeholder={mode === 'edit' ? 'შეიყვანეთ ახალი პაროლი' : undefined}
               className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
             />
           </div>
@@ -361,7 +360,8 @@ export default function UserFormModal({
                 setFormData({ ...formData, phone: e.target.value });
               }}
               required={mode === 'create'}
-              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
+              disabled={mode === 'edit'}
+              className={`w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary ${mode === 'edit' ? 'cursor-not-allowed opacity-70' : ''}`}
             />
 
             {/* Phone Verification - Temporarily Disabled */}
@@ -421,7 +421,8 @@ export default function UserFormModal({
               type="date"
               value={formData.dateOfBirth}
               onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
-              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
+              disabled={mode === 'edit'}
+              className={`w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary ${mode === 'edit' ? 'cursor-not-allowed opacity-70' : ''}`}
             />
           </div>
 
@@ -435,7 +436,8 @@ export default function UserFormModal({
               onChange={(e) =>
                 setFormData({ ...formData, gender: e.target.value as 'male' | 'female' | 'other' })
               }
-              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
+              disabled={mode === 'edit'}
+              className={`w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary ${mode === 'edit' ? 'cursor-not-allowed opacity-70' : ''}`}
             >
               <option value="male">კაცი</option>
               <option value="female">ქალი</option>
@@ -443,7 +445,7 @@ export default function UserFormModal({
             </select>
           </div>
 
-          {/* პაციენტის სტატუსი – create mode-ში მხოლოდ აქტიური/არააქტიური */}
+          {/* პაციენტის სტატუსი – მხოლოდ create მოდში */}
           {formData.role === 'patient' && mode === 'create' && (
             <div>
               <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
@@ -476,7 +478,7 @@ export default function UserFormModal({
             </div>
           )}
 
-          {/* Edit mode only fields */}
+          {/* Edit mode-ში ყველაფერი ჩანს, მაგრამ disabled — რედაქტირებადი მხოლოდ პაროლი */}
           {mode === 'edit' && (
             <>
               {/* ექიმის ლიცენზია – ჩანს რედაქტირებაში, გადმოწერადი. ჯერ შეამოწმეთ, შემდეგ „აქტიური". */}
@@ -635,8 +637,9 @@ export default function UserFormModal({
                   <div className="flex gap-2">
                     <button
                       type="button"
+                      disabled={mode === 'edit'}
                       onClick={() => setFormData({ ...formData, isActive: true })}
-                      className={`flex-1 rounded-lg border px-4 py-2 text-sm font-medium transition ${
+                      className={`flex-1 rounded-lg border px-4 py-2 text-sm font-medium transition ${mode === 'edit' ? 'cursor-not-allowed opacity-70' : ''} ${
                         formData.isActive
                           ? 'border-primary bg-primary text-white dark:bg-primary dark:text-white'
                           : 'border-stroke bg-transparent text-dark hover:border-primary dark:border-dark-3 dark:text-white dark:hover:border-primary'
@@ -646,8 +649,9 @@ export default function UserFormModal({
                     </button>
                     <button
                       type="button"
+                      disabled={mode === 'edit'}
                       onClick={() => setFormData({ ...formData, isActive: false })}
-                      className={`flex-1 rounded-lg border px-4 py-2 text-sm font-medium transition ${
+                      className={`flex-1 rounded-lg border px-4 py-2 text-sm font-medium transition ${mode === 'edit' ? 'cursor-not-allowed opacity-70' : ''} ${
                         !formData.isActive
                           ? 'border-primary bg-primary text-white dark:bg-primary dark:text-white'
                           : 'border-stroke bg-transparent text-dark hover:border-primary dark:border-dark-3 dark:text-white dark:hover:border-primary'
@@ -659,28 +663,30 @@ export default function UserFormModal({
                 </div>
               )}
 
-              {/* ექიმისთვის რედაქტირებისას: დადასტურებული, აქტიური, დამტკიცების სტატუსი */}
+              {/* ექიმისთვის რედაქტირებისას: დადასტურებული, აქტიური, დამტკიცების სტატუსი — edit-ში disabled */}
               {formData.role === 'doctor' && (
                 <>
                   <div className="flex items-center gap-4">
-                    <label className="flex items-center gap-2">
+                    <label className={`flex items-center gap-2 ${mode === 'edit' ? 'opacity-70 cursor-not-allowed' : ''}`}>
                       <input
                         type="checkbox"
                         checked={formData.isVerified}
                         onChange={(e) =>
                           setFormData({ ...formData, isVerified: e.target.checked })
                         }
+                        disabled={mode === 'edit'}
                         className="rounded border-stroke text-primary focus:ring-primary dark:border-dark-3"
                       />
                       <span className="text-sm text-dark dark:text-white">დადასტურებული</span>
                     </label>
-                    <label className="flex items-center gap-2">
+                    <label className={`flex items-center gap-2 ${mode === 'edit' ? 'opacity-70 cursor-not-allowed' : ''}`}>
                       <input
                         type="checkbox"
                         checked={formData.isActive}
                         onChange={(e) =>
                           setFormData({ ...formData, isActive: e.target.checked })
                         }
+                        disabled={mode === 'edit'}
                         className="rounded border-stroke text-primary focus:ring-primary dark:border-dark-3"
                       />
                       <span className="text-sm text-dark dark:text-white">აქტიური</span>
@@ -699,7 +705,8 @@ export default function UserFormModal({
                           approvalStatus: e.target.value as 'pending' | 'approved' | 'rejected',
                         })
                       }
-                      className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
+                      disabled={mode === 'edit'}
+                      className={`w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary ${mode === 'edit' ? 'cursor-not-allowed opacity-70' : ''}`}
                     >
                       <option value="pending">მოლოდინში</option>
                       <option value="approved">დამტკიცებული</option>
@@ -761,7 +768,8 @@ export default function UserFormModal({
                   type="text"
                   value={formData.degrees}
                   onChange={(e) => setFormData({ ...formData, degrees: e.target.value })}
-                  className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
+                  disabled={mode === 'edit'}
+                  className={`w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary ${mode === 'edit' ? 'cursor-not-allowed opacity-70' : ''}`}
                 />
               </div>
 
@@ -773,7 +781,8 @@ export default function UserFormModal({
                   type="text"
                   value={formData.experience}
                   onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
-                  className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
+                  disabled={mode === 'edit'}
+                  className={`w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary ${mode === 'edit' ? 'cursor-not-allowed opacity-70' : ''}`}
                 />
               </div>
 
@@ -789,7 +798,8 @@ export default function UserFormModal({
                     onChange={(e) =>
                       setFormData({ ...formData, consultationFee: e.target.value })
                     }
-                    className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
+                    disabled={mode === 'edit'}
+                    className={`w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary ${mode === 'edit' ? 'cursor-not-allowed opacity-70' : ''}`}
                   />
                 </div>
 
@@ -804,7 +814,8 @@ export default function UserFormModal({
                     onChange={(e) =>
                       setFormData({ ...formData, followUpFee: e.target.value })
                     }
-                    className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
+                    disabled={mode === 'edit'}
+                    className={`w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary ${mode === 'edit' ? 'cursor-not-allowed opacity-70' : ''}`}
                   />
                 </div>
               </div>
@@ -817,7 +828,8 @@ export default function UserFormModal({
                   type="text"
                   value={formData.location}
                   onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
+                  disabled={mode === 'edit'}
+                  className={`w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary ${mode === 'edit' ? 'cursor-not-allowed opacity-70' : ''}`}
                 />
               </div>
 
@@ -829,7 +841,8 @@ export default function UserFormModal({
                   value={formData.about}
                   onChange={(e) => setFormData({ ...formData, about: e.target.value })}
                   rows={4}
-                  className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
+                  disabled={mode === 'edit'}
+                  className={`w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary ${mode === 'edit' ? 'cursor-not-allowed opacity-70' : ''}`}
                 />
               </div>
             </>

@@ -54,6 +54,7 @@ interface AppointmentDetails {
   createdAt?: string;
   updatedAt?: string;
   homeVisitCompletedAt?: string; // When patient marked home visit as completed
+  cancelledAt?: string; // ზუსტი დრო, როდესაც პაციენტმა/სისტემამ გაუქმება გააკეთა
 }
 
 interface AppointmentDetailsModalProps {
@@ -261,12 +262,13 @@ export function AppointmentDetailsModal({
 
       if (response.success) {
         setStatusUpdateSuccess(true);
-        // Update local state
+        // Update local state (response.data may include cancelledAt when status is cancelled)
         setAppointment({
           ...appointment,
           status: newStatus as any,
+          cancelledAt: response.data?.cancelledAt ?? appointment.cancelledAt,
         });
-        
+
         if (onReschedule) {
           onReschedule();
         }
@@ -396,6 +398,11 @@ export function AppointmentDetailsModal({
                     {appointment.status === 'completed' && 'დასრულებული'}
                     {appointment.status === 'cancelled' && 'გაუქმებული'}
                   </span>
+                  {appointment.status === 'cancelled' && appointment.cancelledAt && (
+                    <p className="text-xs text-dark-4 dark:text-dark-6 mt-1">
+                      გაუქმება: {new Date(appointment.cancelledAt).toLocaleString('ka-GE', { dateStyle: 'medium', timeStyle: 'short' })}
+                    </p>
+                  )}
                   <span className={`rounded-full px-3 py-1 text-xs font-medium ${getPaymentStatusColor(appointment.paymentStatus)}`}>
                     {appointment.paymentStatus === 'pending' && 'გადახდა მოლოდინში'}
                     {appointment.paymentStatus === 'paid' && 'გადახდილი'}

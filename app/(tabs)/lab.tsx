@@ -5,11 +5,15 @@ import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  BackHandler,
   FlatList,
+  Keyboard,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  TouchableWithoutFeedback,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -34,10 +38,35 @@ const Lab = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"laboratory" | "immunological">("laboratory");
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   useEffect(() => {
     loadOverview();
   }, []);
+
+  // უკან ღილაკზე კლავიატურის დახურვა (Android)
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      () => setKeyboardVisible(true)
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      () => setKeyboardVisible(false)
+    );
+    const backHandler = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (keyboardVisible) {
+        Keyboard.dismiss();
+        return true;
+      }
+      return false;
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+      backHandler.remove();
+    };
+  }, [keyboardVisible]);
 
   const loadOverview = async () => {
     try {
@@ -88,6 +117,8 @@ const Lab = () => {
     );
   }
 
+  const dismissKeyboard = () => Keyboard.dismiss();
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header with Gradient */}
@@ -110,6 +141,8 @@ const Lab = () => {
         </View>
       </LinearGradient>
 
+      <TouchableWithoutFeedback onPress={dismissKeyboard} accessible={false}>
+        <View style={styles.mainContent}>
       {/* Tabs */}
       <View style={styles.tabsContainer}>
         <TouchableOpacity
@@ -258,8 +291,11 @@ const Lab = () => {
           contentContainerStyle={styles.productsList}
           renderItem={({ item }) => <ProductCard product={item} />}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         />
       )}
+        </View>
+      </TouchableWithoutFeedback>
     </SafeAreaView>
   );
 };
@@ -357,6 +393,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F8FAFC",
+  },
+  mainContent: {
+    flex: 1,
   },
   loadingContainer: {
     flex: 1,

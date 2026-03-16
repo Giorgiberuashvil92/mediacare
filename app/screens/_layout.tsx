@@ -53,6 +53,12 @@ export default function ScreensLayout() {
         }}
       />
 
+      {/* Appointment Routes */}
+      <Stack.Screen name="appointment/make-appointment" />
+      <Stack.Screen name="appointment/patient-details" />
+      <Stack.Screen name="appointment/appointment-details" />
+      <Stack.Screen name="appointment/appointment-success" />
+
       {/* Appointment Waiting Route */}
       <Stack.Screen 
         name="appointment-waiting" 

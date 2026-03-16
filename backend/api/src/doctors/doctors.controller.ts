@@ -36,8 +36,20 @@ export class DoctorsController {
   // Specific routes must come before parameterized routes
   @Get('dashboard/stats')
   @UseGuards(JwtAuthGuard, DoctorGuard)
-  async getDashboardStats(@CurrentUser() user: { sub: string }) {
-    return await this.doctorsService.getDashboardStats(user.sub);
+  async getDashboardStats(
+    @CurrentUser() user: { sub: string },
+    @Query('year') year?: string,
+    @Query('month') month?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+  ) {
+    return await this.doctorsService.getDashboardStats(
+      user.sub,
+      year ? parseInt(year, 10) : undefined,
+      month ? parseInt(month, 10) : undefined,
+      dateFrom,
+      dateTo,
+    );
   }
 
   @Get('dashboard/appointments')

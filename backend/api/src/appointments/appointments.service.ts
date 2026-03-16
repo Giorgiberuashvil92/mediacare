@@ -120,6 +120,11 @@ export class AppointmentsService {
       appointment.markModified('documents');
       await appointment.save();
 
+      console.log('📄 addDocument - Saved to DB:', {
+        appointmentId,
+        documentsCount: appointment.documents.length,
+        docName: doc.name,
+      });
       return { success: true, data: doc };
     } catch (error) {
       console.error('❌ addDocument - Cloudinary upload error:', error);
@@ -135,9 +140,14 @@ export class AppointmentsService {
 
     this.ensureDoctorOrPatient(userId, appointment);
 
+    const documents = appointment.documents || [];
+    console.log('📄 getDocuments - Returning:', {
+      appointmentId,
+      count: documents.length,
+    });
     return {
       success: true,
-      data: appointment.documents || [],
+      data: documents,
     };
   }
 
@@ -559,24 +569,48 @@ export class AppointmentsService {
       throw new BadRequestException('Invalid appointment time');
     }
 
-    // Build full appointment DateTime and enforce 2 hour lead time
+    // Build new and original appointment datetime
     const appointmentDateTime = new Date(appointmentDate);
     appointmentDateTime.setHours(hours, minutes, 0, 0);
 
     const now = new Date();
-    const twoHoursInMs = 2 * 60 * 60 * 1000;
+    const origDate = new Date(appointment.appointmentDate);
+    const [origH, origM] = (appointment.appointmentTime || '00:00').split(':').map(Number);
+    origDate.setHours(origH, origM || 0, 0, 0);
+    const originalPast = origDate.getTime() < now.getTime();
+    const twoHoursMs = 2 * 60 * 60 * 1000;
+    const twelveHoursMs = 12 * 60 * 60 * 1000;
 
-    // Check if new appointment time is in the past
+    // New time must be in the future
     if (appointmentDateTime.getTime() < now.getTime()) {
       throw new BadRequestException(
         'ახალი თარიღი და დრო არ შეიძლება იყოს წარსულში',
       );
     }
 
-    if (appointmentDateTime.getTime() - now.getTime() < twoHoursInMs) {
-      throw new BadRequestException(
-        'ჯავშნის გადაჯავშნა შესაძლებელია მინიმუმ 2 საათით ადრე',
-      );
+    // ონლაინი: ჯერ არ მოსულ დროზე როცა უნდა მაშინ; გასულ დროზე მაქს 2 საათის განმავლობაში
+    // ბინა: კონსულტაციის დადგომამდე არაუგვიანეს 12 საათისა (ანუ ახალი დრო მინ. 12 სთ შემდეგ)
+    if (appointment.type === AppointmentType.VIDEO) {
+      if (originalPast) {
+        const allowedUntil = origDate.getTime() + twoHoursMs;
+        if (now.getTime() > allowedUntil) {
+          throw new BadRequestException(
+            'ონლაინის გადაჯავშნა გასული კონსულტაციის შემდეგ შესაძლებელია მაქსიმუმ 2 საათის განმავლობაში.',
+          );
+        }
+      }
+    } else {
+      // home-visit: გადაჯავშნა მხოლოდ კონსულტაციის დადგომამდე არაუგვიანეს 12 საათისა
+      if (originalPast) {
+        throw new BadRequestException(
+          'ბინაზე ვიზიტის გადაჯავშნა შეუძლებელია კონსულტაციის დროის გასვლის შემდეგ.',
+        );
+      }
+      if (appointmentDateTime.getTime() - now.getTime() < twelveHoursMs) {
+        throw new BadRequestException(
+          'ბინაზე ვიზიტის გადაჯავშნა შესაძლებელია კონსულტაციის დადგომამდე არაუგვიანეს 12 საათისა.',
+        );
+      }
     }
 
     // Check doctor's availability for the specific appointment type
@@ -686,8 +720,9 @@ export class AppointmentsService {
       throw new BadRequestException('Appointment is already cancelled');
     }
 
-    // Update appointment status to cancelled
+    // Update appointment status to cancelled and record when
     appointment.status = AppointmentStatus.CANCELLED;
+    appointment.cancelledAt = new Date();
     await appointment.save();
 
     // Note: The time slot will automatically become available again because
@@ -746,6 +781,13 @@ export class AppointmentsService {
       );
     }
 
+    // განმეორებითი ვიზიტის გადაჯავშნა პაციენტს არ უნდა ჰქონდეს
+    if (isPatient && appointment.followUp?.appointmentId) {
+      throw new BadRequestException(
+        'განმეორებითი ვიზიტის გადაჯავშნა შეუძლებელია.',
+      );
+    }
+
     // If patient is requesting, date and time are required
     if (isPatient && (!newDate || !newTime)) {
       throw new BadRequestException(
@@ -794,6 +836,33 @@ export class AppointmentsService {
         throw new BadRequestException(
           'ახალი თარიღი და დრო არ შეიძლება იყოს წარსულში',
         );
+      }
+
+      // ონლაინი: გასულ დროზე მაქს 2 სთ; ბინა: კონსულტაციამდე არაუგვიანეს 12 სთ
+      const origDateReq = new Date(appointment.appointmentDate);
+      const [origHReq, origMReq] = (appointment.appointmentTime || '00:00').split(':').map(Number);
+      origDateReq.setHours(origHReq, origMReq || 0, 0, 0);
+      const originalPastReq = origDateReq.getTime() < now.getTime();
+      const twoHoursMsReq = 2 * 60 * 60 * 1000;
+      const twelveHoursMsReq = 12 * 60 * 60 * 1000;
+
+      if (appointment.type === AppointmentType.VIDEO) {
+        if (originalPastReq && now.getTime() > origDateReq.getTime() + twoHoursMsReq) {
+          throw new BadRequestException(
+            'ონლაინის გადაჯავშნა გასული კონსულტაციის შემდეგ შესაძლებელია მაქსიმუმ 2 საათის განმავლობაში.',
+          );
+        }
+      } else {
+        if (originalPastReq) {
+          throw new BadRequestException(
+            'ბინაზე ვიზიტის გადაჯავშნა შეუძლებელია კონსულტაციის დროის გასვლის შემდეგ.',
+          );
+        }
+        if (appointmentDateTime.getTime() - now.getTime() < twelveHoursMsReq) {
+          throw new BadRequestException(
+            'ბინაზე ვიზიტის გადაჯავშნა შესაძლებელია კონსულტაციის დადგომამდე არაუგვიანეს 12 საათისა.',
+          );
+        }
       }
 
       normalizedTime = newTime;
@@ -1364,23 +1433,59 @@ export class AppointmentsService {
       );
     }
 
-    // Initialize laboratoryTests array if it doesn't exist
-    if (!appointment.laboratoryTests) {
-      appointment.laboratoryTests = [];
-    }
+    const existingList = appointment.laboratoryTests || [];
+    console.log('[assignLaboratoryTests] appointmentId:', appointmentId);
+    console.log('[assignLaboratoryTests] request tests (count):', tests.length);
+    console.log(
+      '[assignLaboratoryTests] request tests:',
+      JSON.stringify(tests, null, 2),
+    );
+    console.log(
+      '[assignLaboratoryTests] existing in DB (count):',
+      existingList.length,
+    );
+    console.log(
+      '[assignLaboratoryTests] existing in DB:',
+      JSON.stringify(existingList, null, 2),
+    );
 
-    // Add new tests
-    const newTests = tests.map((test) => ({
-      productId: test.productId,
-      productName: test.productName,
-      clinicId: test.clinicId,
-      clinicName: test.clinicName,
-      assignedAt: new Date(),
-      booked: false,
-    }));
+    // Replace list (რედაქტირებისას არ უნდა დუბლირდებოდეს: ჩანაცვლება, არა push)
+    const existingMap = new Map(existingList.map((t) => [t.productId, t]));
+    const newTests = tests.map((test) => {
+      const existing = existingMap.get(test.productId);
+      if (existing) {
+        return {
+          ...existing,
+          productName: test.productName,
+        };
+      }
+      return {
+        productId: test.productId,
+        productName: test.productName,
+        clinicId: test.clinicId,
+        clinicName: test.clinicName,
+        assignedAt: new Date(),
+        booked: false,
+      };
+    });
+    console.log(
+      '[assignLaboratoryTests] newTests after merge (count):',
+      newTests.length,
+    );
+    console.log(
+      '[assignLaboratoryTests] newTests after merge:',
+      JSON.stringify(newTests, null, 2),
+    );
 
-    appointment.laboratoryTests.push(...newTests);
+    appointment.laboratoryTests = newTests;
     await appointment.save();
+
+    const savedList = appointment.laboratoryTests || [];
+    console.log('[assignLaboratoryTests] saved (count):', savedList.length);
+    console.log(
+      '[assignLaboratoryTests] saved:',
+      JSON.stringify(savedList, null, 2),
+    );
 
     return {
       success: true,
@@ -1419,19 +1524,66 @@ export class AppointmentsService {
       );
     }
 
-    if (!appointment.instrumentalTests) {
-      appointment.instrumentalTests = [];
-    }
+    const existingInstrumentalList = appointment.instrumentalTests || [];
+    console.log('[assignInstrumentalTests] appointmentId:', appointmentId);
+    console.log(
+      '[assignInstrumentalTests] request tests (count):',
+      tests.length,
+    );
+    console.log(
+      '[assignInstrumentalTests] request tests:',
+      JSON.stringify(tests, null, 2),
+    );
+    console.log(
+      '[assignInstrumentalTests] existing in DB (count):',
+      existingInstrumentalList.length,
+    );
+    console.log(
+      '[assignInstrumentalTests] existing in DB:',
+      JSON.stringify(existingInstrumentalList, null, 2),
+    );
 
-    const newTests = tests.map((test) => ({
-      productId: test.productId,
-      productName: test.productName,
-      notes: test.notes,
-      assignedAt: new Date(),
-    }));
+    // Replace list (რედაქტირებისას არ უნდა დუბლირდებოდეს: ჩანაცვლება, არა push)
+    const existingInstrumentalMap = new Map(
+      existingInstrumentalList.map((t) => [t.productId, t]),
+    );
+    const newInstrumentalTests = tests.map((test) => {
+      const existing = existingInstrumentalMap.get(test.productId);
+      if (existing) {
+        return {
+          ...existing,
+          productName: test.productName,
+          notes: test.notes,
+        };
+      }
+      return {
+        productId: test.productId,
+        productName: test.productName,
+        notes: test.notes,
+        assignedAt: new Date(),
+      };
+    });
+    console.log(
+      '[assignInstrumentalTests] newTests after merge (count):',
+      newInstrumentalTests.length,
+    );
+    console.log(
+      '[assignInstrumentalTests] newTests after merge:',
+      JSON.stringify(newInstrumentalTests, null, 2),
+    );
 
-    appointment.instrumentalTests.push(...newTests);
+    appointment.instrumentalTests = newInstrumentalTests;
     await appointment.save();
+
+    const savedInstrumental = appointment.instrumentalTests || [];
+    console.log(
+      '[assignInstrumentalTests] saved (count):',
+      savedInstrumental.length,
+    );
+    console.log(
+      '[assignInstrumentalTests] saved:',
+      JSON.stringify(savedInstrumental, null, 2),
+    );
 
     return {
       success: true,

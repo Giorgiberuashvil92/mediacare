@@ -157,9 +157,12 @@ export class DoctorsService {
             reason: followUp.reason,
           }
         : { required: false },
-      // მიეცეს ექიმს სრულად დანიშნული/შესრულებული ლაბორატორიული კვლევები, მათ შორის ატვირთული შედეგიც
+      // მიეცეს ექიმს სრულად დანიშნული/შესრულებული ლაბორატორიული და ინსტრუმენტული კვლევები
       laboratoryTests: Array.isArray(apt.laboratoryTests)
         ? apt.laboratoryTests
+        : [],
+      instrumentalTests: Array.isArray(apt.instrumentalTests)
+        ? apt.instrumentalTests
         : [],
       form100: apt.form100
         ? {
@@ -427,32 +430,32 @@ export class DoctorsService {
       const availabilityTypes = Array.from(types);
 
       return {
-      id: (doctor._id as string).toString(),
-      name: doctor.name,
-      email: doctor.email,
-      phone: doctor.phone,
-      idNumber: doctor.idNumber,
-      specialization: (doctor as any).specialization,
-      rating: doctor.rating || 0,
-      reviewCount: doctor.reviewCount || 0,
-      isActive: doctor.isActive,
-      profileImage: doctor.profileImage,
-      degrees: doctor.degrees,
-      location: doctor.location,
-      patients: '100+', // This could be calculated from appointments
-      experience: doctor.experience,
-      consultationFee: doctor.consultationFee,
-      followUpFee: doctor.followUpFee,
-      videoConsultationFee: doctor.videoConsultationFee,
-      homeVisitFee: doctor.homeVisitFee,
-      about: doctor.about,
-      dateOfBirth: doctor.dateOfBirth,
-      gender: doctor.gender,
-      licenseDocument: doctor.licenseDocument,
-      workingHours: '09:00 - 18:00', // This could be from availability
-      approvalStatus: doctor.approvalStatus,
-      doctorStatus: (doctor as any).doctorStatus,
-      isTopRated: doctor.isTopRated || false,
+        id: (doctor._id as string).toString(),
+        name: doctor.name,
+        email: doctor.email,
+        phone: doctor.phone,
+        idNumber: doctor.idNumber,
+        specialization: (doctor as any).specialization,
+        rating: doctor.rating || 0,
+        reviewCount: doctor.reviewCount || 0,
+        isActive: doctor.isActive,
+        profileImage: doctor.profileImage,
+        degrees: doctor.degrees,
+        location: doctor.location,
+        patients: '100+', // This could be calculated from appointments
+        experience: doctor.experience,
+        consultationFee: doctor.consultationFee,
+        followUpFee: doctor.followUpFee,
+        videoConsultationFee: doctor.videoConsultationFee,
+        homeVisitFee: doctor.homeVisitFee,
+        about: doctor.about,
+        dateOfBirth: doctor.dateOfBirth,
+        gender: doctor.gender,
+        licenseDocument: doctor.licenseDocument,
+        workingHours: '09:00 - 18:00', // This could be from availability
+        approvalStatus: doctor.approvalStatus,
+        doctorStatus: (doctor as any).doctorStatus,
+        isTopRated: doctor.isTopRated || false,
         availabilityTypes, // Array of 'video' | 'home-visit' that doctor offers
       };
     });
@@ -1002,14 +1005,19 @@ export class DoctorsService {
     // Track which date+type combinations are being updated
     const updatedDateTypes = new Set<string>();
 
+    // YYYY-MM-DD -> UTC midnight, რათა იგივე კალენდარული დღე ყოველთვის იგივე დოკუმენტს ემთხვეოდეს (timezone-ის მიუხედავად)
+    const parseDateUTC = (dateStr: string): Date => {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      return new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0));
+    };
+
     for (const slot of updateAvailabilityDto.availability) {
       console.log(
         '📥 [DoctorsService] Processing slot:',
         JSON.stringify(slot, null, 2),
       );
-      const date = new Date(slot.date);
-      date.setHours(0, 0, 0, 0);
-      const dateTypeKey = `${date.toISOString()}_${slot.type}`;
+      const date = parseDateUTC(slot.date);
+      const dateTypeKey = `${slot.date}_${slot.type}`;
       updatedDateTypes.add(dateTypeKey);
 
       // Check if the same time slots are already added for the other appointment type
@@ -1084,8 +1092,8 @@ export class DoctorsService {
     let deletedCount = 0;
     for (const existing of allExistingAvailability) {
       const existingDate = new Date(existing.date);
-      existingDate.setHours(0, 0, 0, 0);
-      const dateTypeKey = `${existingDate.toISOString()}_${existing.type}`;
+      const existingDateStr = `${existingDate.getUTCFullYear()}-${String(existingDate.getUTCMonth() + 1).padStart(2, '0')}-${String(existingDate.getUTCDate()).padStart(2, '0')}`;
+      const dateTypeKey = `${existingDateStr}_${existing.type}`;
 
       if (!updatedDateTypes.has(dateTypeKey)) {
         await this.availabilityModel.deleteOne({
@@ -1093,7 +1101,7 @@ export class DoctorsService {
         });
         deletedCount++;
         console.log(
-          `🗑️ [DoctorsService] Deleted availability not in request: ${existingDate.toISOString()}, type: ${existing.type}`,
+          `🗑️ [DoctorsService] Deleted availability not in request: ${existingDateStr}, type: ${existing.type}`,
         );
       }
     }
@@ -1276,14 +1284,35 @@ export class DoctorsService {
     return this.getDoctorById(doctorId, true);
   }
 
-  async getDashboardStats(doctorId: string) {
+  /** Doctor revenue share (platform takes the rest): video 60%, home-visit 50% */
+  private readonly VIDEO_DOCTOR_SHARE = 0.6;
+  private readonly HOME_VISIT_DOCTOR_SHARE = 0.5;
+
+  async getDashboardStats(
+    doctorId: string,
+    year?: number,
+    month?: number,
+    dateFrom?: string,
+    dateTo?: string,
+  ) {
     // Validate ObjectId format
     if (!mongoose.Types.ObjectId.isValid(doctorId)) {
       throw new NotFoundException('Invalid doctor ID format');
     }
 
     console.log('📊 DoctorsService.getDashboardStats - START');
-    console.log('📊 DoctorsService.getDashboardStats - doctorId:', doctorId);
+    console.log(
+      '📊 DoctorsService.getDashboardStats - doctorId:',
+      doctorId,
+      'year:',
+      year,
+      'month:',
+      month,
+      'dateFrom:',
+      dateFrom,
+      'dateTo:',
+      dateTo,
+    );
 
     const doctor = await this.userModel
       .findById(new mongoose.Types.ObjectId(doctorId))
@@ -1496,6 +1525,103 @@ export class DoctorsService {
       (apt: any) => apt.status === 'completed',
     );
 
+    // Period-specific stats: single month (year+month) or date range (dateFrom+dateTo)
+    let periodStats:
+      | {
+          year: number;
+          month: number;
+          dateFrom?: string;
+          dateTo?: string;
+          videoCount: number;
+          homeVisitCount: number;
+          videoEarnings: number;
+          homeVisitEarnings: number;
+          totalEarnings: number;
+        }
+      | undefined;
+
+    let startOfPeriod: Date | undefined;
+    let endOfPeriod: Date | undefined;
+    let useRange = false;
+
+    if (dateFrom && dateTo) {
+      const from = new Date(dateFrom);
+      const to = new Date(dateTo);
+      if (!isNaN(from.getTime()) && !isNaN(to.getTime())) {
+        startOfPeriod = new Date(from);
+        startOfPeriod.setHours(0, 0, 0, 0);
+        endOfPeriod = new Date(to);
+        endOfPeriod.setHours(23, 59, 59, 999);
+        useRange = true;
+      }
+    }
+
+    if (
+      !useRange &&
+      year != null &&
+      month != null &&
+      month >= 1 &&
+      month <= 12
+    ) {
+      startOfPeriod = new Date(year, month - 1, 1);
+      endOfPeriod = new Date(year, month, 0);
+      endOfPeriod.setHours(23, 59, 59, 999);
+    }
+
+    if (startOfPeriod && endOfPeriod) {
+      const periodAppointments = allAppointments.filter((apt: any) => {
+        const aptDate = new Date(apt.appointmentDate);
+        return (
+          aptDate >= startOfPeriod &&
+          aptDate <= endOfPeriod &&
+          apt.status === 'completed'
+        );
+      });
+
+      const periodVideo = periodAppointments.filter(
+        (apt: any) => apt.type === 'video',
+      );
+      const periodHomeVisit = periodAppointments.filter(
+        (apt: any) => apt.type === 'home-visit',
+      );
+
+      const periodVideoPaid = periodVideo.filter(
+        (apt: any) => apt.paymentStatus === 'paid',
+      );
+      const periodHomeVisitPaid = periodHomeVisit.filter(
+        (apt: any) => apt.paymentStatus === 'paid',
+      );
+
+      const videoEarnings = periodVideoPaid.reduce(
+        (sum: number, apt: any) =>
+          sum +
+          (apt.totalAmount || apt.consultationFee || 0) *
+            this.VIDEO_DOCTOR_SHARE,
+        0,
+      );
+      const homeVisitEarnings = periodHomeVisitPaid.reduce(
+        (sum: number, apt: any) =>
+          sum +
+          (apt.totalAmount || apt.consultationFee || 0) *
+            this.HOME_VISIT_DOCTOR_SHARE,
+        0,
+      );
+
+      periodStats = {
+        year: startOfPeriod.getFullYear(),
+        month: startOfPeriod.getMonth() + 1,
+        ...(useRange && {
+          dateFrom: startOfPeriod.toISOString().split('T')[0],
+          dateTo: endOfPeriod.toISOString().split('T')[0],
+        }),
+        videoCount: periodVideo.length,
+        homeVisitCount: periodHomeVisit.length,
+        videoEarnings: Math.round(videoEarnings),
+        homeVisitEarnings: Math.round(homeVisitEarnings),
+        totalEarnings: Math.round(videoEarnings + homeVisitEarnings),
+      };
+    }
+
     // Real statistics based on appointments
     const stats = {
       earnings: {
@@ -1533,6 +1659,7 @@ export class DoctorsService {
         thisMonth: homeVisitThisMonth.length,
         lastMonth: homeVisitLastMonth.length,
       },
+      periodStats,
     };
 
     console.log(
@@ -1804,16 +1931,24 @@ export class DoctorsService {
       throw new BadRequestException('Follow-up date and time are required');
     }
 
-    const normalizedDate = new Date(dto.date);
-    if (Number.isNaN(normalizedDate.getTime())) {
-      throw new BadRequestException('Invalid follow-up date');
-    }
-    normalizedDate.setHours(0, 0, 0, 0);
-
     const followUpDateTime = new Date(`${dto.date}T${dto.time}`);
     if (Number.isNaN(followUpDateTime.getTime())) {
       throw new BadRequestException('Invalid follow-up time');
     }
+
+    const parts = dto.date.split('-').map(Number);
+    if (parts.length !== 3) {
+      throw new BadRequestException('Invalid follow-up date');
+    }
+    const [year, month, day] = parts;
+    const startOfDayUTC = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+    const endOfDayUTC = new Date(
+      Date.UTC(year, month - 1, day, 23, 59, 59, 999),
+    );
+    if (Number.isNaN(startOfDayUTC.getTime())) {
+      throw new BadRequestException('Invalid follow-up date');
+    }
+    const normalizedDate = startOfDayUTC;
 
     // Determine appointment type (default to original appointment type or 'video')
     const appointmentType =
@@ -1829,10 +1964,10 @@ export class DoctorsService {
       );
     }
 
-    // Check doctor's availability for the selected type and time slot
+    // Check doctor's availability (query by date range so it matches regardless of server timezone when availability was saved)
     const availability = await this.availabilityModel.findOne({
       doctorId: appointment.doctorId,
-      date: normalizedDate,
+      date: { $gte: startOfDayUTC, $lte: endOfDayUTC },
       type: appointmentType,
       isAvailable: true,
     });
@@ -1854,10 +1989,10 @@ export class DoctorsService {
       );
     }
 
-    // Check if the time slot is already booked
+    // Check if the time slot is already booked (use date range for timezone-safe match)
     const existingAppointment = await this.appointmentModel.findOne({
       doctorId: appointment.doctorId,
-      appointmentDate: normalizedDate,
+      appointmentDate: { $gte: startOfDayUTC, $lte: endOfDayUTC },
       appointmentTime: dto.time,
       type: appointmentType,
       status: { $in: [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED] },

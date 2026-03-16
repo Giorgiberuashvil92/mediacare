@@ -64,6 +64,10 @@ export default function MedicineShopPage() {
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [editingClinicId, setEditingClinicId] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<'all' | ShopEntityType>('all');
+  const [activeTab, setActiveTab] = useState<'categories' | 'products' | 'clinics'>('categories');
+  const [showCategoryForm, setShowCategoryForm] = useState(false);
+  const [showProductForm, setShowProductForm] = useState(false);
+  const [showClinicForm, setShowClinicForm] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -315,43 +319,110 @@ export default function MedicineShopPage() {
     [categories],
   );
 
+  const inputClass =
+    'w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary';
+  const labelClass = 'mb-2 block text-sm font-medium text-dark dark:text-white';
+
   return (
     <>
       <Breadcrumb pageName="მედიკამენტების მაღაზია" />
 
       <div className="rounded-[10px] bg-white shadow-1 dark:bg-gray-dark dark:shadow-card">
         <div className="border-b border-stroke p-6 dark:border-dark-3">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h2 className="text-2xl font-bold text-dark dark:text-white">
-                მედიცინ შოპის მართვა
-              </h2>
-              <p className="text-dark-4 dark:text-dark-6">
-                კატეგორიებისა და პროდუქტების დინამიური მართვა
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <label className="text-sm text-dark dark:text-white">ფილტრი</label>
-              <select
-                value={typeFilter}
-                onChange={(event) => setTypeFilter(event.target.value as any)}
-                className="rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
+          <h2 className="text-2xl font-bold text-dark dark:text-white">
+            მედიცინ შოპის მართვა
+          </h2>
+          <p className="mt-1 text-dark-4 dark:text-dark-6">
+            კატეგორიები, პროდუქტები (ლაბორატორიული / ინსტრუმენტული გამოკვლევები) და კლინიკები
+          </p>
+
+          {!loading && (
+            <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div
+                onClick={() => setActiveTab('categories')}
+                className={`cursor-pointer rounded-xl border-2 p-4 transition ${
+                  activeTab === 'categories'
+                    ? 'border-primary bg-primary/5 dark:bg-primary/10'
+                    : 'border-stroke hover:border-primary/50 dark:border-dark-3'
+                }`}
               >
-                <option value="all">ყველა</option>
-                <option value="laboratory">ლაბორატორიული კვლევები</option>
-                <option value="equipment">ინსტრუმენტული გამოკვლევები</option>
-              </select>
+                <div className="text-2xl font-bold text-dark dark:text-white">
+                  {categories.length}
+                </div>
+                <div className="text-sm text-dark-4 dark:text-dark-6">კატეგორია</div>
+              </div>
+              <div
+                onClick={() => setActiveTab('products')}
+                className={`cursor-pointer rounded-xl border-2 p-4 transition ${
+                  activeTab === 'products'
+                    ? 'border-primary bg-primary/5 dark:bg-primary/10'
+                    : 'border-stroke hover:border-primary/50 dark:border-dark-3'
+                }`}
+              >
+                <div className="text-2xl font-bold text-dark dark:text-white">
+                  {products.length}
+                </div>
+                <div className="text-sm text-dark-4 dark:text-dark-6">პროდუქტი</div>
+              </div>
+              <div
+                onClick={() => setActiveTab('clinics')}
+                className={`cursor-pointer rounded-xl border-2 p-4 transition ${
+                  activeTab === 'clinics'
+                    ? 'border-primary bg-primary/5 dark:bg-primary/10'
+                    : 'border-stroke hover:border-primary/50 dark:border-dark-3'
+                }`}
+              >
+                <div className="text-2xl font-bold text-dark dark:text-white">
+                  {clinics.length}
+                </div>
+                <div className="text-sm text-dark-4 dark:text-dark-6">კლინიკა</div>
+              </div>
             </div>
+          )}
+
+          <div className="mt-6 flex flex-wrap gap-2 border-b border-stroke dark:border-dark-3">
+            <button
+              type="button"
+              onClick={() => setActiveTab('categories')}
+              className={`rounded-t-lg px-4 py-2.5 text-sm font-medium transition ${
+                activeTab === 'categories'
+                  ? 'bg-primary text-white'
+                  : 'text-dark-4 hover:bg-gray-2 hover:text-dark dark:text-dark-6 dark:hover:bg-dark-3 dark:hover:text-white'
+              }`}
+            >
+              კატეგორიები
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('products')}
+              className={`rounded-t-lg px-4 py-2.5 text-sm font-medium transition ${
+                activeTab === 'products'
+                  ? 'bg-primary text-white'
+                  : 'text-dark-4 hover:bg-gray-2 hover:text-dark dark:text-dark-6 dark:hover:bg-dark-3 dark:hover:text-white'
+              }`}
+            >
+              პროდუქტები
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('clinics')}
+              className={`rounded-t-lg px-4 py-2.5 text-sm font-medium transition ${
+                activeTab === 'clinics'
+                  ? 'bg-primary text-white'
+                  : 'text-dark-4 hover:bg-gray-2 hover:text-dark dark:text-dark-6 dark:hover:bg-dark-3 dark:hover:text-white'
+              }`}
+            >
+              კლინიკები
+            </button>
           </div>
         </div>
 
-        <div className="p-6 space-y-8">
+        <div className="p-6 space-y-6">
           {feedback && (
             <div className="rounded-lg bg-green-50 p-3 text-sm text-green-700 dark:bg-green-900/20 dark:text-green-300">
               {feedback}
             </div>
           )}
-
           {error && (
             <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
               {error}
@@ -364,869 +435,829 @@ export default function MedicineShopPage() {
             </div>
           ) : (
             <>
-              <section>
-                <div className="mb-4 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-xl font-semibold text-dark dark:text-white">
-                      კატეგორიების მართვა
-                    </h3>
-                    <p className="text-sm text-dark-4 dark:text-dark-6">
-                      დაამატე ან შეცვალე კატეგორიები ლაბორატორიული და ინსტრუმენტული გამოკვლევებისთვის
-                    </p>
-                  </div>
-                  {editingCategoryId && (
-                    <button
-                      onClick={() => {
-                        setEditingCategoryId(null);
-                        setCategoryForm({ ...defaultCategoryForm });
-                      }}
-                      className="text-sm font-medium text-primary"
-                    >
-                      გაუქმება
-                    </button>
-                  )}
-                </div>
-
-                <form onSubmit={handleCategorySubmit} className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
-                      კატეგორიის სახელი
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={categoryForm.name}
-                      onChange={(event) =>
-                        setCategoryForm({ ...categoryForm, name: event.target.value })
-                      }
-                      className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
-                      ტიპი
-                    </label>
-                    <select
-                      value={categoryForm.type}
-                      onChange={(event) =>
-                        setCategoryForm({ ...categoryForm, type: event.target.value as ShopEntityType })
-                      }
-                      className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
-                    >
-                      {CATEGORY_TYPES.map((type) => (
-                        <option key={type} value={type}>
-                          {type === 'laboratory' ? 'ლაბორატორიული კვლევები' : 'ინსტრუმენტული გამოკვლევები'}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
-                      მშობელი კატეგორია (არასავალდებულო)
-                    </label>
-                    <select
-                      value={categoryForm.parentCategory}
-                      onChange={(event) =>
-                        setCategoryForm({
-                          ...categoryForm,
-                          parentCategory: event.target.value,
-                        })
-                      }
-                      className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
-                    >
-                      <option value="">-</option>
-                      {categories
-                        .filter((category) => category.id !== editingCategoryId)
-                        .map((category) => (
-                          <option key={category.id} value={category.id}>
-                            {category.name}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
-                      ვიზუალური რიგითობა
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={categoryForm.order}
-                      onChange={(event) =>
-                        setCategoryForm({ ...categoryForm, order: event.target.value })
-                      }
-                      className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
-                      აღწერა
-                    </label>
-                    <textarea
-                      rows={3}
-                      value={categoryForm.description}
-                      onChange={(event) =>
-                        setCategoryForm({ ...categoryForm, description: event.target.value })
-                      }
-                      className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
-                      სურათის URL
-                    </label>
-                    <input
-                      type="text"
-                      value={categoryForm.imageUrl}
-                      onChange={(event) =>
-                        setCategoryForm({ ...categoryForm, imageUrl: event.target.value })
-                      }
-                      className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <input
-                      id="category-active"
-                      type="checkbox"
-                      checked={categoryForm.isActive}
-                      onChange={(event) =>
-                        setCategoryForm({ ...categoryForm, isActive: event.target.checked })
-                      }
-                      className="h-4 w-4"
-                    />
-                    <label
-                      htmlFor="category-active"
-                      className="text-sm font-medium text-dark dark:text-white"
-                    >
-                      აქტიური კატეგორია
-                    </label>
-                  </div>
-
-                  <div className="md:col-span-2 flex justify-end gap-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingCategoryId(null);
-                        setCategoryForm({ ...defaultCategoryForm });
-                      }}
-                      className="rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-dark transition hover:bg-gray-50 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3"
-                    >
-                      გასუფთავება
-                    </button>
-                    <button
-                      type="submit"
-                      className="rounded-lg bg-primary px-6 py-2 text-sm font-medium text-white hover:bg-primary/90"
-                    >
-                      {editingCategoryId ? 'კატეგორიის განახლება' : 'კატეგორიის დამატება'}
-                    </button>
-                  </div>
-                </form>
-              </section>
-
-              <section>
-                <div className="mb-4 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-xl font-semibold text-dark dark:text-white">
-                      პროდუქტების მართვა
-                    </h3>
-                    <p className="text-sm text-dark-4 dark:text-dark-6">
-                      დაამატე ლაბორატორიული და ინსტრუმენტული გამოკვლევები
-                    </p>
-                  </div>
-                  {editingProductId && (
-                    <button
-                      onClick={() => {
-                        setEditingProductId(null);
-                        setProductForm({ ...defaultProductForm });
-                      }}
-                      className="text-sm font-medium text-primary"
-                    >
-                      გაუქმება
-                    </button>
-                  )}
-                </div>
-
-                <form onSubmit={handleProductSubmit} className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
-                      პროდუქტის სახელი
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={productForm.name}
-                      onChange={(event) =>
-                        setProductForm({ ...productForm, name: event.target.value })
-                      }
-                      className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
-                      ICD კოდი (არასავალდებულო)
-                    </label>
-                    <input
-                      type="text"
-                      value={productForm.icdCode}
-                      onChange={(event) =>
-                        setProductForm({ ...productForm, icdCode: event.target.value })
-                      }
-                      placeholder="მაგ: BL.6"
-                      className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
-                      მეორე ICD კოდი (არასავალდებულო)
-                    </label>
-                    <input
-                      type="text"
-                      value={productForm.icdCode2}
-                      onChange={(event) =>
-                        setProductForm({ ...productForm, icdCode2: event.target.value })
-                      }
-                      placeholder="მაგ: BL.7"
-                      className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
-                      NCSP კოდი / უნიკალური კოდი (არასავალდებულო)
-                    </label>
-                    <input
-                      type="text"
-                      value={productForm.uniqueCode}
-                      onChange={(event) =>
-                        setProductForm({ ...productForm, uniqueCode: event.target.value })
-                      }
-                      placeholder="მაგ: LAB-001"
-                      className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
-                      ტიპი
-                    </label>
-                    <select
-                      value={productForm.type}
-                      onChange={(event) =>
-                        setProductForm({
-                          ...productForm,
-                          type: event.target.value as ShopEntityType,
-                          category: '',
-                        })
-                      }
-                      className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
-                    >
-                      {CATEGORY_TYPES.map((type) => (
-                        <option key={type} value={type}>
-                          {type === 'laboratory' ? 'ლაბორატორიული კვლევები' : 'ინსტრუმენტული გამოკვლევები'}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
-                      ფასი / ლარი (₾)
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={productForm.price}
-                      onChange={(event) =>
-                        setProductForm({ ...productForm, price: event.target.value })
-                      }
-                      className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
-                      ფასდაკლება (%)
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={100}
-                      value={productForm.discountPercent}
-                      onChange={(event) =>
-                        setProductForm({
-                          ...productForm,
-                          discountPercent: event.target.value,
-                        })
-                      }
-                      className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
-                      შეთავაზებული ფასი (₾)
-                    </label>
-                    <div className="w-full rounded-lg border border-stroke bg-gray-50 px-4 py-2 text-dark dark:border-dark-3 dark:bg-gray-dark dark:text-white">
-                      {productForm.price && productForm.discountPercent
-                        ? (
-                            Number(productForm.price) *
-                            (1 - Number(productForm.discountPercent) / 100)
-                          ).toFixed(2)
-                        : productForm.price || '0.00'}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
-                      კლინიკა
-                    </label>
-                    <select
-                      value={productForm.clinic}
-                      onChange={(event) =>
-                        setProductForm({ ...productForm, clinic: event.target.value })
-                      }
-                      className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
-                    >
-                      <option value="">-</option>
-                      {clinics
-                        .filter((clinic) => clinic.isActive)
-                        .map((clinic) => (
-                          <option key={clinic.id} value={clinic.name}>
-                            {clinic.name}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
-                      მარაგი
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={productForm.stock}
-                      onChange={(event) =>
-                        setProductForm({ ...productForm, stock: event.target.value })
-                      }
-                      className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
-                      ერთეული
-                    </label>
-                    <input
-                      type="text"
-                      value={productForm.unit}
-                      onChange={(event) =>
-                        setProductForm({ ...productForm, unit: event.target.value })
-                      }
-                      className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
-                      კატეგორია ({productForm.type === 'laboratory' ? 'ლაბორატორიული კვლევები' : 'ინსტრუმენტული გამოკვლევები'})
-                    </label>
-                    <select
-                      value={productForm.category}
-                      onChange={(event) =>
-                        setProductForm({ ...productForm, category: event.target.value })
-                      }
-                      required={productForm.type === 'laboratory'}
-                      className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
-                    >
-                      <option value="">-</option>
-                      {(productForm.type === 'laboratory'
-                        ? laboratoryCategories
-                        : equipmentCategories
-                      ).map((category) => (
-                        <option key={category.id} value={category.id}>
-                          {category.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
-                      აღწერა
-                    </label>
-                    <textarea
-                      rows={3}
-                      value={productForm.description}
-                      onChange={(event) =>
-                        setProductForm({ ...productForm, description: event.target.value })
-                      }
-                      className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
-                      სურათის URL
-                    </label>
-                    <input
-                      type="text"
-                      value={productForm.imageUrl}
-                      onChange={(event) =>
-                        setProductForm({ ...productForm, imageUrl: event.target.value })
-                      }
-                      className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
-                      ვიზუალური რიგითობა
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={productForm.order}
-                      onChange={(event) =>
-                        setProductForm({ ...productForm, order: event.target.value })
-                      }
-                      className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-4">
-                    <label className="flex items-center gap-2 text-sm font-medium text-dark dark:text-white">
-                      <input
-                        type="checkbox"
-                        checked={productForm.isActive}
-                        onChange={(event) =>
-                          setProductForm({ ...productForm, isActive: event.target.checked })
-                        }
-                        className="h-4 w-4"
-                      />
-                      აქტიური
-                    </label>
-                    <label className="flex items-center gap-2 text-sm font-medium text-dark dark:text-white">
-                      <input
-                        type="checkbox"
-                        checked={productForm.isFeatured}
-                        onChange={(event) =>
-                          setProductForm({
-                            ...productForm,
-                            isFeatured: event.target.checked,
-                          })
-                        }
-                        className="h-4 w-4"
-                      />
-                      გამორჩეული
-                    </label>
-                  </div>
-
-                  <div className="md:col-span-2 flex justify-end gap-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingProductId(null);
-                        setProductForm({ ...defaultProductForm });
-                      }}
-                      className="rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-dark transition hover:bg-gray-50 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3"
-                    >
-                      გასუფთავება
-                    </button>
-                    <button
-                      type="submit"
-                      className="rounded-lg bg-primary px-6 py-2 text-sm font-medium text-white hover:bg-primary/90"
-                    >
-                      {editingProductId ? 'პროდუქტის განახლება' : 'პროდუქტის დამატება'}
-                    </button>
-                  </div>
-                </form>
-              </section>
-
-              <section>
-                <div className="mb-4 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-xl font-semibold text-dark dark:text-white">
-                      კლინიკების მართვა
-                    </h3>
-                    <p className="text-sm text-dark-4 dark:text-dark-6">
-                      დაამატე ან შეცვალე კლინიკები ლაბორატორიული კვლევებისთვის
-                    </p>
-                  </div>
-                  {editingClinicId && (
-                    <button
-                      onClick={() => {
-                        setEditingClinicId(null);
-                        setClinicForm({ ...defaultClinicForm });
-                      }}
-                      className="text-sm font-medium text-primary"
-                    >
-                      გაუქმება
-                    </button>
-                  )}
-                </div>
-
-                <form onSubmit={handleClinicSubmit} className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
-                      კლინიკის სახელი
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={clinicForm.name}
-                      onChange={(event) =>
-                        setClinicForm({ ...clinicForm, name: event.target.value })
-                      }
-                      className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
-                      მისამართი
-                    </label>
-                    <input
-                      type="text"
-                      value={clinicForm.address}
-                      onChange={(event) =>
-                        setClinicForm({ ...clinicForm, address: event.target.value })
-                      }
-                      className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
-                      ტელეფონი
-                    </label>
-                    <input
-                      type="text"
-                      value={clinicForm.phone}
-                      onChange={(event) =>
-                        setClinicForm({ ...clinicForm, phone: event.target.value })
-                      }
-                      className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
-                      ელ. ფოსტა
-                    </label>
-                    <input
-                      type="email"
-                      value={clinicForm.email}
-                      onChange={(event) =>
-                        setClinicForm({ ...clinicForm, email: event.target.value })
-                      }
-                      className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <input
-                      id="clinic-active"
-                      type="checkbox"
-                      checked={clinicForm.isActive}
-                      onChange={(event) =>
-                        setClinicForm({ ...clinicForm, isActive: event.target.checked })
-                      }
-                      className="h-4 w-4"
-                    />
-                    <label
-                      htmlFor="clinic-active"
-                      className="text-sm font-medium text-dark dark:text-white"
-                    >
-                      აქტიური კლინიკა
-                    </label>
-                  </div>
-
-                  <div className="md:col-span-2 flex justify-end gap-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingClinicId(null);
-                        setClinicForm({ ...defaultClinicForm });
-                      }}
-                      className="rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-dark transition hover:bg-gray-50 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3"
-                    >
-                      გასუფთავება
-                    </button>
-                    <button
-                      type="submit"
-                      className="rounded-lg bg-primary px-6 py-2 text-sm font-medium text-white hover:bg-primary/90"
-                    >
-                      {editingClinicId ? 'კლინიკის განახლება' : 'კლინიკის დამატება'}
-                    </button>
-                  </div>
-                </form>
-              </section>
-
+              {activeTab === 'categories' && (
               <section className="space-y-6">
-                <div>
-                  <h3 className="mb-3 text-lg font-semibold text-dark dark:text-white">
-                    კატეგორიების სია
-                  </h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-stroke text-left text-xs uppercase text-dark-4 dark:border-dark-3">
-                          <th className="p-3">სახელი</th>
-                          <th className="p-3">ტიპი</th>
-                          <th className="p-3">სტატუსი</th>
-                          <th className="p-3">პროდუქტები</th>
-                          <th className="p-3 text-right">ქმედებები</th>
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-dark dark:text-white">
+                      კატეგორიების სია
+                    </h3>
+                    <p className="text-sm text-dark-4 dark:text-dark-6">
+                      ლაბორატორიული და ინსტრუმენტული გამოკვლევების კატეგორიები
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={typeFilter}
+                      onChange={(e) => setTypeFilter(e.target.value as 'all' | ShopEntityType)}
+                      className={inputClass}
+                    >
+                      <option value="all">ყველა ტიპი</option>
+                      <option value="laboratory">ლაბორატორიული</option>
+                      <option value="equipment">ინსტრუმენტული</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCategoryForm((v) => !v);
+                        if (showCategoryForm) {
+                          setEditingCategoryId(null);
+                          setCategoryForm({ ...defaultCategoryForm });
+                        }
+                      }}
+                      className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90"
+                    >
+                      {showCategoryForm ? 'ფორმის დამალვა' : 'ახალი კატეგორია'}
+                    </button>
+                  </div>
+                </div>
+
+                {(showCategoryForm || editingCategoryId) && (
+                  <div className="rounded-xl border border-stroke bg-gray-2/50 p-6 dark:border-dark-3 dark:bg-dark-3/30">
+                    <h4 className="mb-4 text-sm font-semibold text-dark dark:text-white">
+                      {editingCategoryId ? 'კატეგორიის რედაქტირება' : 'ახალი კატეგორიის დამატება'}
+                    </h4>
+                    <form onSubmit={handleCategorySubmit} className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <label className={labelClass}>კატეგორიის სახელი *</label>
+                        <input
+                          type="text"
+                          required
+                          value={categoryForm.name}
+                          onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>ტიპი</label>
+                        <select
+                          value={categoryForm.type}
+                          onChange={(e) =>
+                            setCategoryForm({ ...categoryForm, type: e.target.value as ShopEntityType })
+                          }
+                          className={inputClass}
+                        >
+                          {CATEGORY_TYPES.map((type) => (
+                            <option key={type} value={type}>
+                              {type === 'laboratory' ? 'ლაბორატორიული' : 'ინსტრუმენტული'}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className={labelClass}>მშობელი კატეგორია</label>
+                        <select
+                          value={categoryForm.parentCategory}
+                          onChange={(e) =>
+                            setCategoryForm({ ...categoryForm, parentCategory: e.target.value })
+                          }
+                          className={inputClass}
+                        >
+                          <option value="">— არა</option>
+                          {categories
+                            .filter((c) => c.id !== editingCategoryId)
+                            .map((c) => (
+                              <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className={labelClass}>რიგითობა</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={categoryForm.order}
+                          onChange={(e) => setCategoryForm({ ...categoryForm, order: e.target.value })}
+                          className={inputClass}
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className={labelClass}>აღწერა</label>
+                        <textarea
+                          rows={2}
+                          value={categoryForm.description}
+                          onChange={(e) =>
+                            setCategoryForm({ ...categoryForm, description: e.target.value })
+                          }
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>სურათის URL</label>
+                        <input
+                          type="text"
+                          value={categoryForm.imageUrl}
+                          onChange={(e) =>
+                            setCategoryForm({ ...categoryForm, imageUrl: e.target.value })
+                          }
+                          className={inputClass}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          id="category-active"
+                          type="checkbox"
+                          checked={categoryForm.isActive}
+                          onChange={(e) =>
+                            setCategoryForm({ ...categoryForm, isActive: e.target.checked })
+                          }
+                          className="h-4 w-4"
+                        />
+                        <label htmlFor="category-active" className="text-sm text-dark dark:text-white">
+                          აქტიური
+                        </label>
+                      </div>
+                      <div className="md:col-span-2 flex justify-end gap-3">
+                        {editingCategoryId && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingCategoryId(null);
+                              setCategoryForm({ ...defaultCategoryForm });
+                              setShowCategoryForm(false);
+                            }}
+                            className="rounded-lg border border-stroke px-4 py-2 text-sm dark:border-dark-3"
+                          >
+                            გაუქმება
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingCategoryId(null);
+                            setCategoryForm({ ...defaultCategoryForm });
+                          }}
+                          className="rounded-lg border border-stroke px-4 py-2 text-sm dark:border-dark-3"
+                        >
+                          გასუფთავება
+                        </button>
+                        <button
+                          type="submit"
+                          className="rounded-lg bg-primary px-6 py-2 text-sm font-medium text-white hover:bg-primary/90"
+                        >
+                          {editingCategoryId ? 'განახლება' : 'დამატება'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+
+                <div className="overflow-x-auto rounded-lg border border-stroke dark:border-dark-3">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-stroke bg-gray-2 text-left text-xs uppercase text-dark-4 dark:border-dark-3 dark:bg-dark-3">
+                        <th className="p-3">სახელი</th>
+                        <th className="p-3">ტიპი</th>
+                        <th className="p-3">სტატუსი</th>
+                        <th className="p-3">პროდუქტები</th>
+                        <th className="p-3 text-right">ქმედებები</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredCategories.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="p-6 text-center text-dark-4">
+                            კატეგორია არ მოიძებნა
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {filteredCategories.length === 0 ? (
-                          <tr>
-                            <td colSpan={5} className="p-4 text-center text-dark-4">
-                              კატეგორია არ მოიძებნა
+                      ) : (
+                        filteredCategories.map((category) => (
+                          <tr
+                            key={category.id}
+                            className="border-b border-stroke text-dark last:border-0 dark:border-dark-3 dark:text-white"
+                          >
+                            <td className="p-3">
+                              <div className="font-medium">{category.name}</div>
+                              {category.description && (
+                                <div className="text-xs text-dark-4">{category.description}</div>
+                              )}
+                            </td>
+                            <td className="p-3">
+                              {category.type === 'laboratory' ? 'ლაბორატორიული' : 'ინსტრუმენტული'}
+                            </td>
+                            <td className="p-3">
+                              <span
+                                className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                                  category.isActive
+                                    ? 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-300'
+                                    : 'bg-red-100 text-red-600 dark:bg-red-900/20 dark:text-red-300'
+                                }`}
+                              >
+                                {category.isActive ? 'აქტიური' : 'გამორთული'}
+                              </span>
+                            </td>
+                            <td className="p-3">{(category.products?.length || 0)}</td>
+                            <td className="p-3 text-right space-x-2">
+                              <button
+                                onClick={() => {
+                                  setShowCategoryForm(true);
+                                  startCategoryEdit(category);
+                                }}
+                                className="text-primary hover:underline"
+                              >
+                                რედაქტირება
+                              </button>
+                              <button
+                                onClick={() => handleDeleteCategory(category.id)}
+                                className="text-red-500 hover:underline"
+                              >
+                                წაშლა
+                              </button>
                             </td>
                           </tr>
-                        ) : (
-                          filteredCategories.map((category) => (
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+              )}
+
+              {activeTab === 'products' && (
+              <section className="space-y-6">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-dark dark:text-white">
+                      პროდუქტების სია
+                    </h3>
+                    <p className="text-sm text-dark-4 dark:text-dark-6">
+                      ლაბორატორიული და ინსტრუმენტული გამოკვლევები
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={typeFilter}
+                      onChange={(e) => setTypeFilter(e.target.value as 'all' | ShopEntityType)}
+                      className={inputClass}
+                    >
+                      <option value="all">ყველა ტიპი</option>
+                      <option value="laboratory">ლაბორატორიული</option>
+                      <option value="equipment">ინსტრუმენტული</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowProductForm((v) => !v);
+                        if (showProductForm) {
+                          setEditingProductId(null);
+                          setProductForm({ ...defaultProductForm });
+                        }
+                      }}
+                      className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90"
+                    >
+                      {showProductForm ? 'ფორმის დამალვა' : 'ახალი პროდუქტი'}
+                    </button>
+                  </div>
+                </div>
+
+                {(showProductForm || editingProductId) && (
+                  <div className="rounded-xl border border-stroke bg-gray-2/50 p-6 dark:border-dark-3 dark:bg-dark-3/30">
+                    <h4 className="mb-4 text-sm font-semibold text-dark dark:text-white">
+                      {editingProductId ? 'პროდუქტის რედაქტირება' : 'ახალი პროდუქტის დამატება'}
+                    </h4>
+                    <form onSubmit={handleProductSubmit} className="space-y-6">
+                      <div className="rounded-lg border border-stroke p-4 dark:border-dark-3">
+                        <div className="mb-3 text-xs font-semibold uppercase text-dark-4 dark:text-dark-6">
+                          ძირითადი ინფორმაცია
+                        </div>
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div>
+                            <label className={labelClass}>პროდუქტის სახელი *</label>
+                            <input
+                              type="text"
+                              required
+                              value={productForm.name}
+                              onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
+                              className={inputClass}
+                            />
+                          </div>
+                          <div>
+                            <label className={labelClass}>ტიპი</label>
+                            <select
+                              value={productForm.type}
+                              onChange={(e) =>
+                                setProductForm({
+                                  ...productForm,
+                                  type: e.target.value as ShopEntityType,
+                                  category: '',
+                                })
+                              }
+                              className={inputClass}
+                            >
+                              {CATEGORY_TYPES.map((type) => (
+                                <option key={type} value={type}>
+                                  {type === 'laboratory' ? 'ლაბორატორიული' : 'ინსტრუმენტული'}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="md:col-span-2">
+                            <label className={labelClass}>კატეგორია</label>
+                            <select
+                              value={productForm.category}
+                              onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
+                              required={productForm.type === 'laboratory'}
+                              className={inputClass}
+                            >
+                              <option value="">— აირჩიეთ</option>
+                              {(productForm.type === 'laboratory'
+                                ? laboratoryCategories
+                                : equipmentCategories
+                              ).map((c) => (
+                                <option key={c.id} value={c.id}>{c.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="md:col-span-2">
+                            <label className={labelClass}>აღწერა</label>
+                            <textarea
+                              rows={2}
+                              value={productForm.description}
+                              onChange={(e) =>
+                                setProductForm({ ...productForm, description: e.target.value })
+                              }
+                              className={inputClass}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="rounded-lg border border-stroke p-4 dark:border-dark-3">
+                        <div className="mb-3 text-xs font-semibold uppercase text-dark-4 dark:text-dark-6">
+                          ფასი
+                        </div>
+                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                          <div>
+                            <label className={labelClass}>ფასი (₾)</label>
+                            <input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              value={productForm.price}
+                              onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
+                              className={inputClass}
+                            />
+                          </div>
+                          <div>
+                            <label className={labelClass}>ფასდაკლება (%)</label>
+                            <input
+                              type="number"
+                              min={0}
+                              max={100}
+                              value={productForm.discountPercent}
+                              onChange={(e) =>
+                                setProductForm({ ...productForm, discountPercent: e.target.value })
+                              }
+                              className={inputClass}
+                            />
+                          </div>
+                          <div>
+                            <label className={labelClass}>შეთავაზებული ფასი (₾)</label>
+                            <div className="flex h-[42px] items-center rounded-lg border border-stroke bg-gray-50 px-4 dark:border-dark-3 dark:bg-gray-dark">
+                              {productForm.price && productForm.discountPercent
+                                ? (
+                                    Number(productForm.price) *
+                                    (1 - Number(productForm.discountPercent) / 100)
+                                  ).toFixed(2)
+                                : productForm.price || '0.00'}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="rounded-lg border border-stroke p-4 dark:border-dark-3">
+                        <div className="mb-3 text-xs font-semibold uppercase text-dark-4 dark:text-dark-6">
+                          კოდები (არასავალდებულო)
+                        </div>
+                        <div className="grid gap-4 md:grid-cols-3">
+                          <div>
+                            <label className={labelClass}>ICD კოდი</label>
+                            <input
+                              type="text"
+                              value={productForm.icdCode}
+                              onChange={(e) => setProductForm({ ...productForm, icdCode: e.target.value })}
+                              placeholder="მაგ: BL.6"
+                              className={inputClass}
+                            />
+                          </div>
+                          <div>
+                            <label className={labelClass}>მეორე ICD</label>
+                            <input
+                              type="text"
+                              value={productForm.icdCode2}
+                              onChange={(e) => setProductForm({ ...productForm, icdCode2: e.target.value })}
+                              placeholder="მაგ: BL.7"
+                              className={inputClass}
+                            />
+                          </div>
+                          <div>
+                            <label className={labelClass}>NCSP / უნიკალური კოდი</label>
+                            <input
+                              type="text"
+                              value={productForm.uniqueCode}
+                              onChange={(e) => setProductForm({ ...productForm, uniqueCode: e.target.value })}
+                              placeholder="მაგ: LAB-001"
+                              className={inputClass}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="rounded-lg border border-stroke p-4 dark:border-dark-3">
+                        <div className="mb-3 text-xs font-semibold uppercase text-dark-4 dark:text-dark-6">
+                          კლინიკა და მარაგი
+                        </div>
+                        <div className="grid gap-4 md:grid-cols-3">
+                          <div>
+                            <label className={labelClass}>კლინიკა</label>
+                            <select
+                              value={productForm.clinic}
+                              onChange={(e) => setProductForm({ ...productForm, clinic: e.target.value })}
+                              className={inputClass}
+                            >
+                              <option value="">—</option>
+                              {clinics.filter((c) => c.isActive).map((c) => (
+                                <option key={c.id} value={c.name}>{c.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className={labelClass}>მარაგი</label>
+                            <input
+                              type="number"
+                              min={0}
+                              value={productForm.stock}
+                              onChange={(e) => setProductForm({ ...productForm, stock: e.target.value })}
+                              className={inputClass}
+                            />
+                          </div>
+                          <div>
+                            <label className={labelClass}>ერთეული</label>
+                            <input
+                              type="text"
+                              value={productForm.unit}
+                              onChange={(e) => setProductForm({ ...productForm, unit: e.target.value })}
+                              className={inputClass}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="rounded-lg border border-stroke p-4 dark:border-dark-3">
+                        <div className="mb-3 text-xs font-semibold uppercase text-dark-4 dark:text-dark-6">
+                          ჩვენება
+                        </div>
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div>
+                            <label className={labelClass}>სურათის URL</label>
+                            <input
+                              type="text"
+                              value={productForm.imageUrl}
+                              onChange={(e) => setProductForm({ ...productForm, imageUrl: e.target.value })}
+                              className={inputClass}
+                            />
+                          </div>
+                          <div>
+                            <label className={labelClass}>რიგითობა</label>
+                            <input
+                              type="number"
+                              min={0}
+                              value={productForm.order}
+                              onChange={(e) => setProductForm({ ...productForm, order: e.target.value })}
+                              className={inputClass}
+                            />
+                          </div>
+                          <div className="flex gap-6">
+                            <label className="flex items-center gap-2 text-sm text-dark dark:text-white">
+                              <input
+                                type="checkbox"
+                                checked={productForm.isActive}
+                                onChange={(e) =>
+                                  setProductForm({ ...productForm, isActive: e.target.checked })
+                                }
+                                className="h-4 w-4"
+                              />
+                              აქტიური
+                            </label>
+                            <label className="flex items-center gap-2 text-sm text-dark dark:text-white">
+                              <input
+                                type="checkbox"
+                                checked={productForm.isFeatured}
+                                onChange={(e) =>
+                                  setProductForm({ ...productForm, isFeatured: e.target.checked })
+                                }
+                                className="h-4 w-4"
+                              />
+                              გამორჩეული
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end gap-3">
+                        {editingProductId && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingProductId(null);
+                              setProductForm({ ...defaultProductForm });
+                              setShowProductForm(false);
+                            }}
+                            className="rounded-lg border border-stroke px-4 py-2 text-sm dark:border-dark-3"
+                          >
+                            გაუქმება
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingProductId(null);
+                            setProductForm({ ...defaultProductForm });
+                          }}
+                          className="rounded-lg border border-stroke px-4 py-2 text-sm dark:border-dark-3"
+                        >
+                          გასუფთავება
+                        </button>
+                        <button
+                          type="submit"
+                          className="rounded-lg bg-primary px-6 py-2 text-sm font-medium text-white hover:bg-primary/90"
+                        >
+                          {editingProductId ? 'განახლება' : 'დამატება'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+
+                <div className="overflow-x-auto rounded-lg border border-stroke dark:border-dark-3">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-stroke bg-gray-2 text-left text-xs uppercase text-dark-4 dark:border-dark-3 dark:bg-dark-3">
+                        <th className="p-3">კვლევა</th>
+                        <th className="p-3">კოდები</th>
+                        <th className="p-3">ფასი</th>
+                        <th className="p-3">შეთავაზებული</th>
+                        <th className="p-3">კლინიკა</th>
+                        <th className="p-3">სტატუსი</th>
+                        <th className="p-3 text-right">ქმედებები</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredProducts.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="p-6 text-center text-dark-4">
+                            პროდუქტი არ მოიძებნა
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredProducts.map((product) => {
+                          const discountedPrice =
+                            product.price && product.discountPercent
+                              ? product.price * (1 - product.discountPercent / 100)
+                              : product.price || 0;
+                          const codes = [product.icdCode, product.icdCode2, product.uniqueCode]
+                            .filter(Boolean)
+                            .join(' / ') || '—';
+                          return (
                             <tr
-                              key={category.id}
-                              className="border-b border-stroke text-sm text-dark dark:border-dark-3 dark:text-white"
+                              key={product.id}
+                              className="border-b border-stroke text-dark last:border-0 dark:border-dark-3 dark:text-white"
                             >
                               <td className="p-3">
-                                <div className="font-medium">{category.name}</div>
-                                {category.description && (
-                                  <div className="text-xs text-dark-4 dark:text-dark-6">
-                                    {category.description}
-                                  </div>
+                                <div className="font-medium">{product.name}</div>
+                                {product.description && (
+                                  <div className="text-xs text-dark-4 line-clamp-1">{product.description}</div>
                                 )}
                               </td>
-                              <td className="p-3 capitalize">
-                                {category.type === 'laboratory' ? 'ლაბორატორიული კვლევები' : 'ინსტრუმენტული გამოკვლევები'}
+                              <td className="p-3 text-xs">{codes}</td>
+                              <td className="p-3">
+                                {product.price != null ? `₾${product.price.toFixed(2)}` : '—'}
                               </td>
+                              <td className="p-3 font-medium text-green-600 dark:text-green-400">
+                                {discountedPrice > 0 ? `₾${discountedPrice.toFixed(2)}` : '—'}
+                              </td>
+                              <td className="p-3">{product.clinic || '—'}</td>
                               <td className="p-3">
                                 <span
-                                  className={`rounded-full px-3 py-1 text-xs font-medium ${
-                                    category.isActive
+                                  className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                                    product.isActive
                                       ? 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-300'
                                       : 'bg-red-100 text-red-600 dark:bg-red-900/20 dark:text-red-300'
                                   }`}
                                 >
-                                  {category.isActive ? 'აქტიური' : 'გამორთული'}
+                                  {product.isActive ? 'აქტიური' : 'გამორთული'}
                                 </span>
-                              </td>
-                              <td className="p-3">
-                                {(category.products?.length || 0).toLocaleString()}
                               </td>
                               <td className="p-3 text-right space-x-2">
                                 <button
-                                  onClick={() => startCategoryEdit(category)}
-                                  className="text-sm font-medium text-primary"
+                                  onClick={() => {
+                                    setShowProductForm(true);
+                                    startProductEdit(product);
+                                  }}
+                                  className="text-primary hover:underline"
                                 >
                                   რედაქტირება
                                 </button>
                                 <button
-                                  onClick={() => handleDeleteCategory(category.id)}
-                                  className="text-sm font-medium text-red-500"
+                                  onClick={() => handleDeleteProduct(product.id)}
+                                  className="text-red-500 hover:underline"
                                 >
                                   წაშლა
                                 </button>
                               </td>
                             </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="mb-3 text-lg font-semibold text-dark dark:text-white">
-                    პროდუქტების სია
-                  </h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-stroke text-left text-xs uppercase text-dark-4 dark:border-dark-3">
-                          <th className="p-3">ICD</th>
-                          <th className="p-3">მეორე ICD</th>
-                          <th className="p-3">უნიკალური კოდი</th>
-                          <th className="p-3">კვლევის დასახელება</th>
-                          <th className="p-3">ფასი / ლარი</th>
-                          <th className="p-3">ფასდაკლება</th>
-                          <th className="p-3">შეთავაზებული ფასი</th>
-                          <th className="p-3">კლინიკა</th>
-                          <th className="p-3">სტატუსი</th>
-                          <th className="p-3 text-right">ქმედებები</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredProducts.length === 0 ? (
-                          <tr>
-                            <td colSpan={10} className="p-4 text-center text-dark-4">
-                              პროდუქტი არ მოიძებნა
-                            </td>
-                          </tr>
-                        ) : (
-                          filteredProducts.map((product) => {
-                            const discountedPrice =
-                              product.price && product.discountPercent
-                                ? product.price * (1 - product.discountPercent / 100)
-                                : product.price || 0;
-                            return (
-                              <tr
-                                key={product.id}
-                                className="border-b border-stroke text-sm text-dark dark:border-dark-3 dark:text-white"
-                              >
-                                <td className="p-3">
-                                  <div className="font-medium">{product.icdCode || '-'}</div>
-                                </td>
-                                <td className="p-3">
-                                  <div className="font-medium">{product.icdCode2 || '-'}</div>
-                                </td>
-                                <td className="p-3">
-                                  <div className="font-mono text-xs">{product.uniqueCode || '-'}</div>
-                                </td>
-                                <td className="p-3">
-                                  <div className="font-medium">{product.name}</div>
-                                  {product.description && (
-                                    <div className="text-xs text-dark-4 dark:text-dark-6">
-                                      {product.description}
-                                    </div>
-                                  )}
-                                </td>
-                                <td className="p-3">
-                                  {product.price ? `₾${product.price.toFixed(2)}` : '-'}
-                                </td>
-                                <td className="p-3">
-                                  {product.discountPercent
-                                    ? `${product.discountPercent}%`
-                                    : '-'}
-                                </td>
-                                <td className="p-3">
-                                  <span className="font-medium text-green-600 dark:text-green-400">
-                                    {discountedPrice > 0 ? `₾${discountedPrice.toFixed(2)}` : '-'}
-                                  </span>
-                                </td>
-                                <td className="p-3">
-                                  {product.clinic || '-'}
-                                </td>
-                                <td className="p-3">
-                                  <span
-                                    className={`rounded-full px-3 py-1 text-xs font-medium ${
-                                      product.isActive
-                                        ? 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-300'
-                                        : 'bg-red-100 text-red-600 dark:bg-red-900/20 dark:text-red-300'
-                                    }`}
-                                  >
-                                    {product.isActive ? 'აქტიური' : 'გამორთული'}
-                                  </span>
-                                </td>
-                                <td className="p-3 text-right space-x-2">
-                                  <button
-                                    onClick={() => startProductEdit(product)}
-                                    className="text-sm font-medium text-primary"
-                                  >
-                                    რედაქტირება
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteProduct(product.id)}
-                                    className="text-sm font-medium text-red-500"
-                                  >
-                                    წაშლა
-                                  </button>
-                                </td>
-                              </tr>
-                            );
-                          })
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="mb-3 text-lg font-semibold text-dark dark:text-white">
-                    კლინიკების სია
-                  </h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-stroke text-left text-xs uppercase text-dark-4 dark:border-dark-3">
-                          <th className="p-3">სახელი</th>
-                          <th className="p-3">მისამართი</th>
-                          <th className="p-3">ტელეფონი</th>
-                          <th className="p-3">ელ. ფოსტა</th>
-                          <th className="p-3">სტატუსი</th>
-                          <th className="p-3 text-right">ქმედებები</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {clinics.length === 0 ? (
-                          <tr>
-                            <td colSpan={6} className="p-4 text-center text-dark-4">
-                              კლინიკა არ მოიძებნა
-                            </td>
-                          </tr>
-                        ) : (
-                          clinics.map((clinic) => (
-                            <tr
-                              key={clinic.id}
-                              className="border-b border-stroke text-sm text-dark dark:border-dark-3 dark:text-white"
-                            >
-                              <td className="p-3">
-                                <div className="font-medium">{clinic.name}</div>
-                              </td>
-                              <td className="p-3">
-                                {clinic.address || '-'}
-                              </td>
-                              <td className="p-3">
-                                {clinic.phone || '-'}
-                              </td>
-                              <td className="p-3">
-                                {clinic.email || '-'}
-                              </td>
-                              <td className="p-3">
-                                <span
-                                  className={`rounded-full px-3 py-1 text-xs font-medium ${
-                                    clinic.isActive
-                                      ? 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-300'
-                                      : 'bg-red-100 text-red-600 dark:bg-red-900/20 dark:text-red-300'
-                                  }`}
-                                >
-                                  {clinic.isActive ? 'აქტიური' : 'გამორთული'}
-                                </span>
-                              </td>
-                              <td className="p-3 text-right space-x-2">
-                                <button
-                                  onClick={() => startClinicEdit(clinic)}
-                                  className="text-sm font-medium text-primary"
-                                >
-                                  რედაქტირება
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteClinic(clinic.id)}
-                                  className="text-sm font-medium text-red-500"
-                                >
-                                  წაშლა
-                                </button>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </section>
+              )}
+
+              {activeTab === 'clinics' && (
+              <section className="space-y-6">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-dark dark:text-white">
+                      კლინიკების სია
+                    </h3>
+                    <p className="text-sm text-dark-4 dark:text-dark-6">
+                      კლინიკები ლაბორატორიული კვლევებისთვის
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowClinicForm((v) => !v);
+                      if (showClinicForm) {
+                        setEditingClinicId(null);
+                        setClinicForm({ ...defaultClinicForm });
+                      }
+                    }}
+                    className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90"
+                  >
+                    {showClinicForm ? 'ფორმის დამალვა' : 'ახალი კლინიკა'}
+                  </button>
+                </div>
+
+                {(showClinicForm || editingClinicId) && (
+                  <div className="rounded-xl border border-stroke bg-gray-2/50 p-6 dark:border-dark-3 dark:bg-dark-3/30">
+                    <h4 className="mb-4 text-sm font-semibold text-dark dark:text-white">
+                      {editingClinicId ? 'კლინიკის რედაქტირება' : 'ახალი კლინიკის დამატება'}
+                    </h4>
+                    <form onSubmit={handleClinicSubmit} className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <label className={labelClass}>კლინიკის სახელი *</label>
+                        <input
+                          type="text"
+                          required
+                          value={clinicForm.name}
+                          onChange={(e) => setClinicForm({ ...clinicForm, name: e.target.value })}
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>მისამართი</label>
+                        <input
+                          type="text"
+                          value={clinicForm.address}
+                          onChange={(e) => setClinicForm({ ...clinicForm, address: e.target.value })}
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>ტელეფონი</label>
+                        <input
+                          type="text"
+                          value={clinicForm.phone}
+                          onChange={(e) => setClinicForm({ ...clinicForm, phone: e.target.value })}
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>ელ. ფოსტა</label>
+                        <input
+                          type="email"
+                          value={clinicForm.email}
+                          onChange={(e) => setClinicForm({ ...clinicForm, email: e.target.value })}
+                          className={inputClass}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          id="clinic-active"
+                          type="checkbox"
+                          checked={clinicForm.isActive}
+                          onChange={(e) =>
+                            setClinicForm({ ...clinicForm, isActive: e.target.checked })
+                          }
+                          className="h-4 w-4"
+                        />
+                        <label htmlFor="clinic-active" className="text-sm text-dark dark:text-white">
+                          აქტიური
+                        </label>
+                      </div>
+                      <div className="md:col-span-2 flex justify-end gap-3">
+                        {editingClinicId && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingClinicId(null);
+                              setClinicForm({ ...defaultClinicForm });
+                              setShowClinicForm(false);
+                            }}
+                            className="rounded-lg border border-stroke px-4 py-2 text-sm dark:border-dark-3"
+                          >
+                            გაუქმება
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingClinicId(null);
+                            setClinicForm({ ...defaultClinicForm });
+                          }}
+                          className="rounded-lg border border-stroke px-4 py-2 text-sm dark:border-dark-3"
+                        >
+                          გასუფთავება
+                        </button>
+                        <button
+                          type="submit"
+                          className="rounded-lg bg-primary px-6 py-2 text-sm font-medium text-white hover:bg-primary/90"
+                        >
+                          {editingClinicId ? 'განახლება' : 'დამატება'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+
+                <div className="overflow-x-auto rounded-lg border border-stroke dark:border-dark-3">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-stroke bg-gray-2 text-left text-xs uppercase text-dark-4 dark:border-dark-3 dark:bg-dark-3">
+                        <th className="p-3">სახელი</th>
+                        <th className="p-3">მისამართი</th>
+                        <th className="p-3">ტელეფონი</th>
+                        <th className="p-3">ელ. ფოსტა</th>
+                        <th className="p-3">სტატუსი</th>
+                        <th className="p-3 text-right">ქმედებები</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {clinics.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="p-6 text-center text-dark-4">
+                            კლინიკა არ მოიძებნა
+                          </td>
+                        </tr>
+                      ) : (
+                        clinics.map((clinic) => (
+                          <tr
+                            key={clinic.id}
+                            className="border-b border-stroke text-dark last:border-0 dark:border-dark-3 dark:text-white"
+                          >
+                            <td className="p-3 font-medium">{clinic.name}</td>
+                            <td className="p-3">{clinic.address || '—'}</td>
+                            <td className="p-3">{clinic.phone || '—'}</td>
+                            <td className="p-3">{clinic.email || '—'}</td>
+                            <td className="p-3">
+                              <span
+                                className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                                  clinic.isActive
+                                    ? 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-300'
+                                    : 'bg-red-100 text-red-600 dark:bg-red-900/20 dark:text-red-300'
+                                }`}
+                              >
+                                {clinic.isActive ? 'აქტიური' : 'გამორთული'}
+                              </span>
+                            </td>
+                            <td className="p-3 text-right space-x-2">
+                              <button
+                                onClick={() => {
+                                  setShowClinicForm(true);
+                                  startClinicEdit(clinic);
+                                }}
+                                className="text-primary hover:underline"
+                              >
+                                რედაქტირება
+                              </button>
+                              <button
+                                onClick={() => handleDeleteClinic(clinic.id)}
+                                className="text-red-500 hover:underline"
+                              >
+                                წაშლა
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+              )}
             </>
           )}
         </div>

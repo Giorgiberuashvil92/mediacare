@@ -62,7 +62,10 @@ const Services = () => {
             key={service.id}
             onPress={() => handlePress(service.id, service.onPress)}
             activeOpacity={0.85}
-            style={styles.serviceCard}
+            style={[
+              styles.serviceCard,
+              service.id === "lab" && styles.serviceCardWide,
+            ]}
           >
             <LinearGradient
               colors={service.gradient as [string, string]}
@@ -147,6 +150,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 10,
     elevation: 5,
+  },
+  serviceCardWide: {
+    width: "100%",
   },
   gradientBackground: {
     borderRadius: 18,

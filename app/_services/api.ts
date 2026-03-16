@@ -1041,7 +1041,12 @@ class ApiService {
   }
 
   // Doctor Dashboard endpoints
-  async getDoctorDashboardStats(): Promise<{
+  async getDoctorDashboardStats(params?: {
+    year?: number;
+    month?: number;
+    dateFrom?: string;
+    dateTo?: string;
+  }): Promise<{
     success: boolean;
     data: {
       earnings: {
@@ -1076,6 +1081,17 @@ class ApiService {
         total: number;
         completed: number;
         thisMonth: number;
+      };
+      periodStats?: {
+        year: number;
+        month: number;
+        dateFrom?: string;
+        dateTo?: string;
+        videoCount: number;
+        homeVisitCount: number;
+        videoEarnings: number;
+        homeVisitEarnings: number;
+        totalEarnings: number;
       };
     };
   }> {
@@ -1120,7 +1136,16 @@ class ApiService {
       });
     }
 
-    return this.apiCall("/doctors/dashboard/stats", {
+    const search = new URLSearchParams();
+    if (params?.dateFrom && params?.dateTo) {
+      search.set("dateFrom", params.dateFrom);
+      search.set("dateTo", params.dateTo);
+    } else if (params?.year != null && params?.month != null) {
+      search.set("year", String(params.year));
+      search.set("month", String(params.month));
+    }
+    const query = search.toString() ? `?${search.toString()}` : "";
+    return this.apiCall(`/doctors/dashboard/stats${query}`, {
       method: "GET",
     });
   }
@@ -1841,6 +1866,11 @@ class ApiService {
     });
   }
 
+  /**
+   * ატვირთავს ჯავშნის დოკუმენტს (იგივე პრინციპი რაც uploadProfileImagePublic).
+   * uri = ლოკალური ფაილის მისამართი (file://...) – React Native FormData-დან
+   * ფაილის კონტენტი იგზავნება, ბეკენდი ატვირთავს Cloudinary-ზე და ინახავს ბაზაში.
+   */
   async uploadAppointmentDocument(
     appointmentId: string,
     file: {
@@ -1875,8 +1905,8 @@ class ApiService {
     const formData = new FormData();
     formData.append("file", {
       uri: file.uri,
-      name: file.name,
-      type: file.type,
+      name: file.name || "document.pdf",
+      type: file.type || "application/pdf",
     } as any);
 
     const token = await AsyncStorage.getItem("accessToken");
@@ -1884,15 +1914,21 @@ class ApiService {
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
     }
+    // Content-Type არ ვაყენებთ – React Native თავად დააყენებს multipart/form-data boundary-ით (როგორც რეგისტრაციაზე)
 
-    const response = await fetch(
-      `${this.baseURL}/appointments/${appointmentId}/documents`,
-      {
-        method: "POST",
-        headers,
-        body: formData,
-      },
-    );
+    const url = `${this.baseURL}/appointments/${appointmentId}/documents`;
+    console.log("📤 [uploadAppointmentDocument] Sending file to backend (backend will upload to Cloudinary):", {
+      appointmentId,
+      name: file.name,
+      type: file.type,
+      endpoint: url,
+    });
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
 
     return this.handleResponse<{
       success: boolean;
@@ -2434,7 +2470,7 @@ class ApiService {
     // ALWAYS use external API for session creation (NOT our backend)
     // HERA Backend API - External AI Assistant Service
     // HERA XXI Organization: https://hera-youth.ge
-    const EXTERNAL_API_URL = "http://16.16.218.17:8008";
+    const EXTERNAL_API_URL = "https://hapttic-hera.click";
     const API_KEY = "hera-api-key";
 
     console.log("🚀 [createAISession] Using EXTERNAL API (NOT backend):", {
@@ -2489,7 +2525,7 @@ class ApiService {
     // DO NOT use this.apiCall - use fetch directly!
     // HERA Backend API - External AI Assistant Service
     // HERA XXI Organization: https://hera-youth.ge
-    const EXTERNAL_API_URL = "http://16.16.218.17:8008";
+    const EXTERNAL_API_URL = "https://hapttic-hera.click";
     const API_KEY = "hera-api-key";
 
     console.log("🚀🚀🚀 [getAISessions] Using EXTERNAL API (NOT backend) - DO NOT USE apiCall:", {
@@ -2574,7 +2610,7 @@ class ApiService {
     // ALWAYS use external API for getting session (NOT our backend)
     // HERA Backend API - External AI Assistant Service
     // HERA XXI Organization: https://hera-youth.ge
-    const EXTERNAL_API_URL = "http://16.16.218.17:8008";
+    const EXTERNAL_API_URL = "https://hapttic-hera.click";
     const API_KEY = "hera-api-key";
 
     console.log("🚀 [getAISession] Using EXTERNAL API (NOT backend):", {
@@ -2668,7 +2704,7 @@ class ApiService {
     // ALWAYS use external API for sending messages (NOT our backend)
     // HERA Backend API - External AI Assistant Service
     // HERA XXI Organization: https://hera-youth.ge
-    const EXTERNAL_API_URL = "http://16.16.218.17:8008";
+    const EXTERNAL_API_URL = "https://hapttic-hera.click";
     const API_KEY = "hera-api-key";
 
     console.log("🚀 [sendAIMessage] Using EXTERNAL API (NOT backend):", {
@@ -2790,7 +2826,7 @@ class ApiService {
     // DO NOT use this.apiCall - use fetch directly!
     // HERA Backend API - External AI Assistant Service
     // HERA XXI Organization: https://hera-youth.ge
-    const EXTERNAL_API_URL = "http://16.16.218.17:8008";
+    const EXTERNAL_API_URL = "https://hapttic-hera.click";
     const API_KEY = "hera-api-key";
 
     console.log("🚀🚀🚀 [getAIMessages] Using EXTERNAL API (NOT backend) - DO NOT USE apiCall:", {
