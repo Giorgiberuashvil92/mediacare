@@ -36,7 +36,8 @@ interface Appointment {
   patientId: string;
   date: string;
   time: string;
-  type: "video" | "home-visit" | "followup";
+  type: "video" | "home-visit";
+  isFollowUp?: boolean;
   status: string;
 }
 
@@ -704,7 +705,7 @@ export default function LaboratoryScreen() {
             onPress={() => {
               // Disable if came from dashboard (has params)
               if (!params.appointmentId && !params.patientId && !params.patientName) {
-                console.log('🧪 [Laboratory] ჯავშნის მოდალი — იხსნება, ჯავშნების ტიპები (ვიდეო / სახლი):', appointments.map((apt) => ({ id: apt.id, patientName: apt.patientName, type: apt.type, typeLabel: apt.type === "video" ? "ვიდეო" : apt.type === "followup" ? "განმეორებითი" : apt.type === "home-visit" ? "სახლში ვიზიტი" : apt.type ?? "უცნობი" })));
+                console.log('🧪 [Laboratory] ჯავშნის მოდალი — იხსნება, ჯავშნების ტიპები:', appointments.map((apt) => ({ id: apt.id, patientName: apt.patientName, type: apt.type, isFollowUp: apt.isFollowUp, typeLabel: apt.isFollowUp ? "განმეორებითი" : apt.type === "video" ? "ვიდეო" : apt.type === "home-visit" ? "სახლში ვიზიტი" : apt.type ?? "უცნობი" })));
                 setShowAppointmentModal(true);
               }
             }}
@@ -856,7 +857,7 @@ export default function LaboratoryScreen() {
                     selectedAppointment?.id === item.id && styles.patientItemSelected,
                   ]}
                   onPress={() => {
-                    const aptType = item.type === "video" ? "ვიდეო" : item.type === "followup" ? "განმეორებითი" : item.type === "home-visit" ? "სახლში ვიზიტი" : (item.type ?? "უცნობი");
+                    const aptType = item.isFollowUp ? "განმეორებითი" : item.type === "video" ? "ვიდეო" : item.type === "home-visit" ? "სახლში ვიზიტი" : (item.type ?? "უცნობი");
                     console.log('🧪 [Laboratory] ჯავშნის მოდალი — არჩეული ჯავშანი:', {
                       id: item.id,
                       patientName: item.patientName,
@@ -869,13 +870,13 @@ export default function LaboratoryScreen() {
                     setShowAppointmentModal(false);
                   }}
                 >
-                  <View style={[styles.patientAvatar, { backgroundColor: (item.type === "video" || item.type === "followup") ? "#0EA5E9" : "#10B981" }]}>
-                    <Ionicons name={item.type === "followup" ? "repeat" : (item.type === "video" ? "videocam" : "home")} size={18} color="#FFFFFF" />
+                  <View style={[styles.patientAvatar, { backgroundColor: (item.type === "video" || item.isFollowUp) ? "#0EA5E9" : "#10B981" }]}>
+                    <Ionicons name={item.isFollowUp ? "repeat" : (item.type === "video" ? "videocam" : "home")} size={18} color="#FFFFFF" />
                   </View>
                   <View style={styles.patientInfo}>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                       <Text style={styles.patientName}>{item.patientName}</Text>
-                      {item.type === "followup" && (
+                      {item.isFollowUp && (
                         <View style={{ backgroundColor: "#0EA5E9", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
                           <Text style={{ fontSize: 11, color: "#FFFFFF", fontWeight: "600" }}>განმეორებითი</Text>
                         </View>

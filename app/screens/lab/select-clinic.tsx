@@ -12,7 +12,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useCart } from "../../contexts/CartContext";
@@ -117,10 +117,13 @@ const SelectClinic = () => {
         style={styles.header}
       >
         <View style={styles.headerRow}>
-          <TouchableOpacity style={styles.iconButton} onPress={() => router.back()}>
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => router.back()}
+          >
             <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>კლინიკის არჩევა</Text>
+          <Text style={styles.headerTitle}>ეს მომსახურება დაემატება მალე </Text>
           <View style={styles.iconButtonPlaceholder} />
         </View>
       </LinearGradient>
@@ -129,12 +132,13 @@ const SelectClinic = () => {
         <View style={styles.infoCard}>
           <Text style={styles.infoTitle}>სახლში გამოძახება</Text>
           <Text style={styles.infoSubtitle}>
-            შეიყვანეთ მისამართი და აირჩიეთ თარიღი &quot;{params.productName}&quot;-ისთვის
+            შეიყვანეთ მისამართი და აირჩიეთ თარიღი &quot;{params.productName}
+            &quot;-ისთვის
           </Text>
         </View>
 
         {/* Home Collection Form */}
-        {(
+        {
           <View style={styles.homeCollectionForm}>
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>მისამართი *</Text>
@@ -146,6 +150,7 @@ const SelectClinic = () => {
                 placeholderTextColor="#94A3B8"
                 multiline
                 numberOfLines={3}
+                editable={false}
               />
             </View>
 
@@ -155,6 +160,7 @@ const SelectClinic = () => {
                 <TouchableOpacity
                   style={styles.dateTimeButton}
                   onPress={() => setShowDatePicker(true)}
+                  disabled
                 >
                   <Ionicons name="calendar-outline" size={20} color="#06B6D4" />
                   <Text style={styles.dateTimeText}>
@@ -168,6 +174,7 @@ const SelectClinic = () => {
                 <TouchableOpacity
                   style={styles.dateTimeButton}
                   onPress={() => setShowTimePicker(true)}
+                  disabled
                 >
                   <Ionicons name="time-outline" size={20} color="#06B6D4" />
                   <Text style={styles.dateTimeText}>
@@ -177,8 +184,7 @@ const SelectClinic = () => {
               </View>
             </View>
           </View>
-        )}
-
+        }
       </ScrollView>
 
       <View style={styles.bottomBar}>
@@ -186,6 +192,7 @@ const SelectClinic = () => {
           style={styles.addButton}
           onPress={handleAddToCart}
           activeOpacity={0.8}
+          disabled
         >
           <Ionicons name="card-outline" size={20} color="#FFFFFF" />
           <Text style={styles.addButtonText}>გადახდა</Text>
@@ -644,4 +651,3 @@ const styles = StyleSheet.create({
 });
 
 export default SelectClinic;
-

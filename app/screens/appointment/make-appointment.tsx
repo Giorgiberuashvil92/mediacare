@@ -294,8 +294,7 @@ const MakeAppointment = () => {
     typeof doctor.consultationFee === "number"
       ? doctor.consultationFee
       : parseFloat(String(doctor.consultationFee).replace(/[^\d.]/g, "")) || 0;
-  const vat = Math.round(consultationFee * 0.05);
-  const netAmount = consultationFee + vat;
+  const netAmount = consultationFee;
 
   // Format the date and time for display
   const formatDate = (dateString: string) => {
@@ -688,11 +687,6 @@ const MakeAppointment = () => {
         {/* Payment Details */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>გადახდის დეტალები</Text>
-
-          <View style={styles.paymentRow}>
-            <Text style={styles.paymentLabel}>კონსულტაციის საფასური</Text>
-            <Text style={styles.paymentAmount}>{consultationFee} ₾</Text>
-          </View>
 
           <View style={styles.paymentRow}>
             <Text style={styles.netAmountLabel}>საერთო თანხა</Text>

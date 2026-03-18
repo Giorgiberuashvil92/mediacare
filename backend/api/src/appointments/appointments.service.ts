@@ -47,12 +47,12 @@ export class AppointmentsService {
       apt.patientId.toString() === userId.toString() ||
       apt.doctorId.toString() === userId.toString();
     if (!isOwner) {
-      throw new Error('Not allowed for this appointment');
+      throw new UnauthorizedException('Not allowed for this appointment');
     }
   }
 
   async addDocument(
-    patientId: string,
+    userId: string,
     appointmentId: string,
     file: Express.Multer.File,
   ) {
@@ -94,7 +94,7 @@ export class AppointmentsService {
       throw new NotFoundException('Appointment not found');
     }
 
-    this.ensurePatientOwner(patientId, appointment);
+    this.ensureDoctorOrPatient(userId, appointment);
 
     try {
       const upload = await this.cloudinaryService.uploadBuffer(
@@ -452,17 +452,11 @@ export class AppointmentsService {
       .sort({ appointmentDate: -1 })
       .lean();
 
-    // ექიმის/პაციენტის მიერ შექმნილი განმეორებითი (isFollowUp) — პაციენტის აპში type: 'followup'
-    const data = (appointments as any[]).map((apt) => {
-      if (apt.isFollowUp === true) {
-        return {
-          ...apt,
-          type: 'followup',
-          originalType: apt.type === 'home-visit' ? 'home-visit' : 'video',
-        };
-      }
-      return apt;
-    });
+    // type უცვლელი (video | home-visit); განმეორებითობა ცალკე ველით isFollowUp
+    const data = (appointments as any[]).map((apt) => ({
+      ...apt,
+      ...(apt.isFollowUp === true ? { isFollowUp: true } : {}),
+    }));
 
     return {
       success: true,
@@ -588,8 +582,9 @@ export class AppointmentsService {
     const now = new Date();
     const origDate = new Date(appointment.appointmentDate);
     const [origH, origM] = (appointment.appointmentTime || '00:00')
-            .split(':')
-      .map(Number);
+
+      .split(':')
+      .map(Number) as [number, number];
     origDate.setHours(origH, origM || 0, 0, 0);
     const originalPast = origDate.getTime() < now.getTime();
     const twoHoursMs = 2 * 60 * 60 * 1000;

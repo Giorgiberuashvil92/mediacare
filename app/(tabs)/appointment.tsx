@@ -1,6 +1,7 @@
 import { apiService } from "@/app/_services/api";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import * as DocumentPicker from "expo-document-picker";
 import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -26,7 +27,8 @@ interface PatientAppointment {
   date: string;
   time: string;
   status: string;
-  type: string;
+  type: string; // "video" | "home-visit" — ტიპი არ იცვლება განმეორებითზე
+  isFollowUp?: boolean; // true = განმეორებითი ვიზიტი
   fee: string | number;
   isPaid: boolean;
   symptoms?: string;
@@ -82,7 +84,8 @@ const getStatusColor = (status: string) => {
   }
 };
 
-const getConsultationTypeLabel = (type: string) => {
+const getConsultationTypeLabel = (type: string, isFollowUp?: boolean) => {
+  if (isFollowUp === true) return "განმეორებითი";
   switch (type) {
     case "video":
       return "ვიდეო კონსულტაცია";
@@ -90,8 +93,6 @@ const getConsultationTypeLabel = (type: string) => {
       return "ბინაზე ვიზიტი";
     case "consultation":
       return "კონსულტაცია";
-    case "followup":
-      return "განმეორებითი";
     case "emergency":
       return "სასწრაფო";
     default:
@@ -170,8 +171,9 @@ const mapAppointmentFromAPI = (
   const mappedStatus =
     statusMap[appointment.status] || appointment.status || "scheduled";
 
-  // Determine consultation type (default to consultation)
+  // Determine consultation type (default to video); type ყოველთვის video | home-visit, განმეორებითი = isFollowUp
   const consultationType = appointment.type || "video";
+  const isFollowUp = appointment.isFollowUp === true;
 
   // Format fee
   const fee = appointment.totalAmount || appointment.consultationFee || 0;
@@ -194,6 +196,7 @@ const mapAppointmentFromAPI = (
     time: appointment.appointmentTime || "",
     status: mappedStatus,
     type: consultationType,
+    isFollowUp,
     fee:
       typeof fee === "number"
         ? fee
@@ -251,6 +254,7 @@ const Appointment = () => {
   const [expandedAppointments, setExpandedAppointments] = useState<Set<string>>(
     new Set(),
   );
+  const [uploadingDocForId, setUploadingDocForId] = useState<string | null>(null);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [filterStartDate, setFilterStartDate] = useState("");
   const [filterEndDate, setFilterEndDate] = useState("");
@@ -338,10 +342,41 @@ const Appointment = () => {
       const response = await apiService.getPatientAppointments();
 
       if (response.success && response.data) {
-        console.log("🔍 response.data:", response.data);
+        const raw = response.data;
+        console.log("📋 [getPatientAppointments] სულ ჯავშანი:", raw.length);
+        console.log(
+          "📋 [getPatientAppointments] თითოეულის type/status (raw API):",
+          raw.map((a: any) => ({
+            id: String(a._id || a.id || ""),
+            type: a.type,
+            status: a.status,
+            appointmentDate: a.appointmentDate,
+            appointmentTime: a.appointmentTime,
+            followUpAppointmentId: a.followUpAppointmentId,
+            parentAppointmentId: a.parentAppointmentId,
+          })),
+        );
+        if (raw[0]) {
+          console.log(
+            "📋 [getPatientAppointments] პირველი ჯავშნის სრული raw (keys):",
+            Object.keys(raw[0]),
+          );
+          console.log(
+            "📋 [getPatientAppointments] პირველი ჯავშნის raw:",
+            JSON.stringify(raw[0], null, 2),
+          );
+        }
         const apiBaseUrl = apiService.getBaseURL();
         const mappedAppointments = response.data.map((appointment: any) =>
           mapAppointmentFromAPI(appointment, apiBaseUrl),
+        );
+        console.log(
+          "📋 [getPatientAppointments] map-ის შემდეგ (type ველი):",
+          mappedAppointments.map((m) => ({
+            id: m.id,
+            type: m.type,
+            isFollowup: m.isFollowUp,
+          })),
         );
         setAppointments(mappedAppointments);
 
@@ -729,6 +764,52 @@ const Appointment = () => {
     });
   };
 
+  const handleUploadDocumentForAppointment = async (appointmentId: string) => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: [
+          "application/pdf",
+          "image/jpeg",
+          "image/jpg",
+          "image/png",
+          "image/webp",
+        ],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled) return;
+      const file = result.assets?.[0];
+      if (!file) return;
+      if (file.size && file.size > 5 * 1024 * 1024) {
+        Alert.alert("შეცდომა", "ფაილი უნდა იყოს 5MB-მდე");
+        return;
+      }
+      setUploadingDocForId(appointmentId);
+      const uploadResp = await apiService.uploadAppointmentDocument(
+        appointmentId,
+        {
+          uri: file.uri,
+          name: file.name || "document",
+          type: file.mimeType || "application/pdf",
+        },
+      );
+      if (uploadResp.success && uploadResp.data) {
+        setAppointmentDocuments((prev) => {
+          const next = { ...prev };
+          next[appointmentId] = [uploadResp.data!, ...(prev[appointmentId] || [])];
+          return next;
+        });
+        Alert.alert("წარმატება", "ფაილი აიტვირთა");
+      } else {
+        Alert.alert("შეცდომა", "ატვირთვა ვერ მოხერხდა");
+      }
+    } catch (err: any) {
+      console.error("Document upload error:", err);
+      Alert.alert("შეცდომა", err?.message || "ფაილის ატვირთვა ვერ მოხერხდა");
+    } finally {
+      setUploadingDocForId(null);
+    }
+  };
+
   if (!isAuthenticated) {
     return (
       <SafeAreaView style={styles.container}>
@@ -775,7 +856,6 @@ const Appointment = () => {
     setRefreshing(false);
   };
 
-  /** ღილაკები გადაჯავშნა/გაუქმება ჩანდეს მხოლოდ სანამ კონსულტაცია მოვა: ვიდეო 2 სთ ადრე, ბინაზე 12 სთ ადრე */
   const canShowRescheduleAndCancel = (appointment: PatientAppointment) => {
     const dateStr = appointment.date;
     const timeStr = appointment.time || "00:00";
@@ -1284,7 +1364,7 @@ const Appointment = () => {
                           </View>
                           <Text style={styles.doctorSpecialty}>
                             {appointment.doctorSpecialty} •{" "}
-                            {getConsultationTypeLabel(appointment.type)}
+                            {getConsultationTypeLabel(appointment.type, appointment.isFollowUp)}
                           </Text>
                         </View>
                       </View>
@@ -1382,11 +1462,72 @@ const Appointment = () => {
                   {/* Expanded Details */}
                   {isExpanded && (
                     <View style={styles.expandedSection}>
-                      {/* Prescription/Danijnuloba */}
+                      {/* დანიშნულება — ფაილის ატვირთვა */}
                       <View style={styles.detailSection}>
                         <Text style={styles.detailSectionTitle}>
                           დანიშნულება
                         </Text>
+                        <TouchableOpacity
+                          style={[
+                            styles.uploadDocButton,
+                            uploadingDocForId === appointment.id &&
+                              styles.uploadDocButtonDisabled,
+                          ]}
+                          onPress={() =>
+                            handleUploadDocumentForAppointment(appointment.id)
+                          }
+                          disabled={uploadingDocForId === appointment.id}
+                        >
+                          {uploadingDocForId === appointment.id ? (
+                            <ActivityIndicator size="small" color="#0EA5E9" />
+                          ) : (
+                            <Ionicons
+                              name="cloud-upload-outline"
+                              size={20}
+                              color="#0EA5E9"
+                            />
+                          )}
+                          <Text style={styles.uploadDocButtonText}>
+                            {uploadingDocForId === appointment.id
+                              ? "იტვირთება..."
+                              : "ფაილის ატვირთვა"}
+                          </Text>
+                        </TouchableOpacity>
+                        <Text style={[styles.uploadDocHint, { marginTop: 0 }]}>
+                          PDF ან სურათი, მაქს. 5MB
+                        </Text>
+                        {documents.length > 0 && (
+                          <View style={styles.uploadedDocList}>
+                            {documents.map((doc: any, idx: number) => (
+                              <TouchableOpacity
+                                key={doc.url || idx}
+                                style={styles.uploadedDocItem}
+                                onPress={() => {
+                                  if (doc.url) Linking.openURL(doc.url);
+                                }}
+                              >
+                                <Ionicons
+                                  name="document-text"
+                                  size={18}
+                                  color="#0EA5E9"
+                                />
+                                <Text
+                                  style={styles.uploadedDocName}
+                                  numberOfLines={1}
+                                >
+                                  {doc.name || "დოკუმენტი"}
+                                </Text>
+                                {doc.url && (
+                                  <Ionicons
+                                    name="open-outline"
+                                    size={16}
+                                    color="#6B7280"
+                                  />
+                                )}
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        )}
                       </View>
 
                       {/* Instrumental Tests */}
@@ -1454,10 +1595,6 @@ const Appointment = () => {
                             )}
                           </View>
                         )}
-
-                      {/* Patient Uploaded Documents */}
-
-                      {/* Patient Uploaded Symptoms */}
 
                       {/* Collapse Button */}
                       <TouchableOpacity
@@ -1585,7 +1722,7 @@ const Appointment = () => {
                     appointment.status === "pending") &&
                     !(appointment.rescheduleRequest?.status === "pending") &&
                     canShowRescheduleAndCancel(appointment) &&
-                    appointment.type !== "followup" && (
+                    !appointment.isFollowUp && (
                       <View style={styles.actionButtonsRow}>
                         <TouchableOpacity
                           style={[
@@ -1687,7 +1824,7 @@ const Appointment = () => {
                 <View style={styles.detailSection}>
                   <Text style={styles.detailLabel}>ტიპი</Text>
                   <Text style={styles.detailValue}>
-                    {getConsultationTypeLabel(selectedAppointment.type)}
+                    {getConsultationTypeLabel(selectedAppointment.type, selectedAppointment.isFollowUp)}
                   </Text>
                 </View>
 
@@ -1701,10 +1838,46 @@ const Appointment = () => {
                     </View>
                   )}
 
-                {/* Prescription/Danijnuloba */}
-                <View style={styles.detailSection}>
-                  <Text style={styles.detailLabel}>დანიშნულება</Text>
-                </View>
+                {/* დოკუმენტები — თქვენი და ექიმის ფაილები */}
+                {appointmentDocuments[selectedAppointment.id] &&
+                  appointmentDocuments[selectedAppointment.id].length > 0 && (
+                    <View style={styles.detailSection}>
+                      <Text style={styles.detailLabel}>დოკუმენტები</Text>
+                      <Text style={styles.uploadDocHint}>
+                        თქვენი და ექიმის ფაილები
+                      </Text>
+                      {appointmentDocuments[selectedAppointment.id].map(
+                        (doc: any, idx: number) => (
+                          <TouchableOpacity
+                            key={doc.url || idx}
+                            style={styles.uploadedDocItem}
+                            onPress={() => {
+                              if (doc.url) Linking.openURL(doc.url);
+                            }}
+                          >
+                            <Ionicons
+                              name="document-text"
+                              size={18}
+                              color="#0EA5E9"
+                            />
+                            <Text
+                              style={styles.uploadedDocName}
+                              numberOfLines={1}
+                            >
+                              {doc.name || "დოკუმენტი"}
+                            </Text>
+                            {doc.url && (
+                              <Ionicons
+                                name="open-outline"
+                                size={16}
+                                color="#6B7280"
+                              />
+                            )}
+                          </TouchableOpacity>
+                        ),
+                      )}
+                    </View>
+                  )}
 
                 {selectedAppointment.diagnosis && (
                   <View style={styles.detailSection}>
@@ -1776,55 +1949,6 @@ const Appointment = () => {
                               </View>
                             </View>
                           </View>
-                        ),
-                      )}
-                    </View>
-                  )}
-
-                {/* Patient Uploaded Documents */}
-                {appointmentDocuments[selectedAppointment.id] &&
-                  appointmentDocuments[selectedAppointment.id].length > 0 && (
-                    <View style={styles.detailSection}>
-                      <Text style={styles.detailLabel}>ატვირთული ფაილები</Text>
-                      {appointmentDocuments[selectedAppointment.id].map(
-                        (doc: any, index: number) => (
-                          <TouchableOpacity
-                            key={index}
-                            style={styles.viewFileButton}
-                            onPress={() => {
-                              const url = doc.url.startsWith("http")
-                                ? doc.url
-                                : `${apiService.getBaseURL()}/${doc.url}`;
-                              Linking.openURL(url).catch(() =>
-                                Alert.alert(
-                                  "შეცდომა",
-                                  "ფაილის გახსნა ვერ მოხერხდა",
-                                ),
-                              );
-                            }}
-                          >
-                            <Ionicons
-                              name={
-                                doc.type?.startsWith("image/")
-                                  ? "image-outline"
-                                  : "document-text-outline"
-                              }
-                              size={18}
-                              color="#0EA5E9"
-                            />
-                            <Text
-                              style={styles.viewFileButtonText}
-                              numberOfLines={1}
-                            >
-                              {doc.name || `ფაილი ${index + 1}`}
-                            </Text>
-                            <Ionicons
-                              name="open-outline"
-                              size={16}
-                              color="#0EA5E9"
-                              style={{ marginLeft: "auto" }}
-                            />
-                          </TouchableOpacity>
                         ),
                       )}
                     </View>
@@ -3204,6 +3328,53 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins-SemiBold",
     color: "#1F2937",
     marginBottom: 12,
+  },
+  uploadDocButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: "#F0F9FF",
+    borderWidth: 1,
+    borderColor: "#BAE6FD",
+    marginBottom: 4,
+  },
+  uploadDocButtonDisabled: {
+    opacity: 0.7,
+  },
+  uploadDocButtonText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#0EA5E9",
+  },
+  uploadDocHint: {
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+    marginBottom: 12,
+  },
+  uploadedDocList: {
+    gap: 8,
+  },
+  uploadedDocItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  uploadedDocName: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: "Poppins-Regular",
+    color: "#374151",
   },
   symptomsCard: {
     flexDirection: "row",

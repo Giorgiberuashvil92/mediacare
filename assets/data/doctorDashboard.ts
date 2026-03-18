@@ -87,13 +87,14 @@ export interface Consultation {
   patientAge: number;
   date: string;
   time: string;
-  // ტიპი ახლა მოიცავს როგორც ძველ მნიშვნელობებს, ისე რეალურ ვიზიტის ტიპებს
+  // ტიპი: video | home-visit (განმეორებითზეც იგივე ტიპი რჩება)
   type:
     | "consultation"
-    | "followup"
     | "emergency"
     | "video"
     | "home-visit";
+  /** true = განმეორებითი ვიზიტი (ტიპი იგივე video/home-visit) */
+  isFollowUp?: boolean;
   status: "completed" | "scheduled" | "cancelled" | "in-progress"; // შესრულებული | დანიშნული | გაუქმებული | მიმდინარე
   fee: number; // ანაზღაურება
   isPaid: boolean; // გადახდილია
@@ -241,7 +242,8 @@ export const recentConsultations: Consultation[] = [
     patientAge: 32,
     date: "2024-10-26",
     time: "10:00",
-    type: "followup",
+    type: "video",
+    isFollowUp: true,
     status: "completed",
     fee: 50.0,
     isPaid: true,
@@ -303,7 +305,8 @@ export const recentConsultations: Consultation[] = [
     patientAge: 52,
     date: "2024-10-25",
     time: "09:30",
-    type: "followup",
+    type: "video",
+    isFollowUp: true,
     status: "completed",
     fee: 50.0,
     isPaid: true,
@@ -497,8 +500,10 @@ export const patientVisitHistory: PatientVisitHistory[] = [
 
 // Helper function to get consultation type label in Georgian
 export const getConsultationTypeLabel = (
-  type: Consultation["type"]
+  type: Consultation["type"],
+  isFollowUp?: boolean
 ): string => {
+  if (isFollowUp === true) return "განმეორებითი";
   switch (type) {
     case "video":
       return "ვიდეო კონსულტაცია";
@@ -506,8 +511,6 @@ export const getConsultationTypeLabel = (
       return "ბინაზე ვიზიტი";
     case "consultation":
       return "კონსულტაცია";
-    case "followup":
-      return "განმეორებითი";
     case "emergency":
       return "სასწრაფო";
     default:

@@ -1772,12 +1772,9 @@ export class DoctorsService {
       const isFollowUp = followUpAppointmentIds.has(aptId);
       if (isFollowUp) {
         console.log(
-          `✅ Marking appointment ${aptId} as followup (original type: ${apt.type})`,
+          `✅ Marking appointment ${aptId} as follow-up (type unchanged: ${apt.type})`,
         );
-        // Store original type before changing to 'followup'
-        formatted.originalType =
-          apt.type === 'home-visit' ? 'home-visit' : 'video';
-        formatted.type = 'followup';
+        formatted.isFollowUp = true;
       }
       // Log formatted rescheduleRequest
       if (formatted.rescheduleRequest) {
@@ -2048,11 +2045,7 @@ export class DoctorsService {
     const formattedFollowUp = this.formatDashboardAppointment(
       followUpAppointment,
     ) as any;
-    // Mark as followup since this is a follow-up appointment
-    // Store original type before changing to 'followup'
-    formattedFollowUp.originalType =
-      appointmentType === AppointmentType.HOME_VISIT ? 'home-visit' : 'video';
-    formattedFollowUp.type = 'followup';
+    formattedFollowUp.isFollowUp = true;
 
     return {
       success: true,

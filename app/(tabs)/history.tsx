@@ -57,6 +57,8 @@ const History = () => {
     string | null
   >(null);
   const [loadingAvailability, setLoadingAvailability] = useState(false);
+  const [visitDocuments, setVisitDocuments] = useState<any[]>([]);
+  const [loadingVisitDocuments, setLoadingVisitDocuments] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated && user?.id) {
@@ -65,6 +67,31 @@ const History = () => {
       setLoading(false);
     }
   }, [isAuthenticated, user?.id]);
+
+  useEffect(() => {
+    if (!selectedVisit?.id) {
+      setVisitDocuments([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setLoadingVisitDocuments(true);
+      setVisitDocuments([]);
+      try {
+        const res = await apiService.getAppointmentDocuments(selectedVisit.id);
+        if (!cancelled && res.success && Array.isArray(res.data)) {
+          setVisitDocuments(res.data);
+        }
+      } catch {
+        if (!cancelled) setVisitDocuments([]);
+      } finally {
+        if (!cancelled) setLoadingVisitDocuments(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedVisit?.id]);
 
   const loadPastAppointments = async () => {
     try {
@@ -448,7 +475,7 @@ const History = () => {
                             color="#6B7280"
                           />
                           <Text style={styles.infoText}>
-                            {getConsultationTypeLabel(visit.consultationType)}
+                            {getConsultationTypeLabel(visit.consultationType, (visit as any).isFollowUp)}
                           </Text>
                         </View>
                       )}
@@ -976,11 +1003,7 @@ const History = () => {
                   <View style={styles.detailSection}>
                     <Text style={styles.detailLabel}>კონსულტაციის ტიპი</Text>
                     <Text style={styles.detailValue}>
-                      {selectedVisit.consultationType === "home-visit"
-                        ? "ბინაზე ვიზიტი"
-                        : selectedVisit.consultationType === "video"
-                          ? "ონლაინ კონსულტაცია"
-                          : selectedVisit.consultationType}
+                      {getConsultationTypeLabel(selectedVisit.consultationType, (selectedVisit as any).isFollowUp)}
                     </Text>
                   </View>
                 )}
@@ -1656,7 +1679,14 @@ const History = () => {
                           </Text>
                         </View>
                       </View>
-                      <TouchableOpacity style={styles.form100DownloadButton}>
+                      <TouchableOpacity
+                        style={styles.form100DownloadButton}
+                        onPress={() => {
+                          if (selectedVisit.form100?.pdfUrl) {
+                            Linking.openURL(selectedVisit.form100.pdfUrl);
+                          }
+                        }}
+                      >
                         <Ionicons
                           name="download-outline"
                           size={20}
@@ -1669,6 +1699,65 @@ const History = () => {
                     </View>
                   </View>
                 )}
+
+                {/* ჯავშანზე ატვირთული დოკუმენტები (როგორც ფორმა 100) */}
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailLabel}>დოკუმენტები</Text>
+                  {loadingVisitDocuments ? (
+                    <View style={styles.visitDocsLoading}>
+                      <ActivityIndicator size="small" color="#0EA5E9" />
+                      <Text style={styles.visitDocsLoadingText}>
+                        იტვირთება...
+                      </Text>
+                    </View>
+                  ) : visitDocuments.length > 0 ? (
+                    visitDocuments.map((doc: any, index: number) => {
+                      const url = doc.url?.startsWith("http")
+                        ? doc.url
+                        : doc.url
+                          ? `${apiService.getBaseURL()}/${doc.url}`
+                          : null;
+                      return (
+                        <TouchableOpacity
+                          key={doc.url || index}
+                          style={styles.visitDocCard}
+                          onPress={() => url && Linking.openURL(url)}
+                          disabled={!url}
+                        >
+                          <View style={styles.form100Header}>
+                            <Ionicons
+                              name={
+                                (doc.mimeType || doc.type)?.startsWith(
+                                  "image/",
+                                )
+                                  ? "image-outline"
+                                  : "document-text"
+                              }
+                              size={24}
+                              color="#0EA5E9"
+                            />
+                            <View style={styles.form100Info}>
+                              <Text style={styles.visitDocTitle}>
+                                {doc.name || "დოკუმენტი"}
+                              </Text>
+                            </View>
+                            {url && (
+                              <Ionicons
+                                name="open-outline"
+                                size={20}
+                                color="#0EA5E9"
+                              />
+                            )}
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })
+                  ) : (
+                    <Text style={styles.visitDocsEmpty}>
+                      ამ ვიზიტზე დოკუმენტები არ არის
+                    </Text>
+                  )}
+                </View>
               </ScrollView>
             )}
 
@@ -1818,7 +1907,8 @@ const STATUS_LABELS: Record<string, string> = {
   pending: "მოლოდინში",
 };
 
-const getConsultationTypeLabel = (type: string) => {
+const getConsultationTypeLabel = (type: string, isFollowUp?: boolean) => {
+  if (isFollowUp === true) return "განმეორებითი";
   switch (type) {
     case "video":
       return "ვიდეო კონსულტაცია";
@@ -1826,8 +1916,6 @@ const getConsultationTypeLabel = (type: string) => {
       return "ბინაზე ვიზიტი";
     case "consultation":
       return "კონსულტაცია";
-    case "followup":
-      return "განმეორებითი";
     case "emergency":
       return "სასწრაფო";
     default:
@@ -1931,6 +2019,7 @@ const mapAppointmentToVisit = (appointment: any) => {
     appointmentDate,
     appointmentTime: appointment.appointmentTime || appointment.time || "",
     consultationType: appointment.type || "video",
+    isFollowUp: appointment.isFollowUp === true,
     diagnosis:
       summary.diagnosis ||
       appointment.diagnosis ||
@@ -2707,6 +2796,37 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Poppins-SemiBold",
     color: "#FFFFFF",
+  },
+  visitDocCard: {
+    backgroundColor: "#F0F9FF",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#BAE6FD",
+  },
+  visitDocTitle: {
+    fontSize: 15,
+    fontFamily: "Poppins-SemiBold",
+    color: "#0C4A6E",
+    flex: 1,
+  },
+  visitDocsLoading: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 12,
+  },
+  visitDocsLoadingText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+  },
+  visitDocsEmpty: {
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#9CA3AF",
+    fontStyle: "italic",
   },
   modalFooter: {
     flexDirection: "row",

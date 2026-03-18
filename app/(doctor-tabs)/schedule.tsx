@@ -106,8 +106,7 @@ export default function DoctorSchedule() {
           const appointments = appointmentsResponse.data as any[];
 
           appointments.forEach((appointment: any) => {
-            // გამოვტოვოთ followup appointments
-            if (appointment.type === "followup") return;
+            if (appointment.isFollowUp === true) return;
 
             // Format date to YYYY-MM-DD
             let appointmentDate = appointment.date;

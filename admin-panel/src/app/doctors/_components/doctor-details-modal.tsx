@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { apiService, User } from '@/lib/api';
-import { useEffect, useState } from 'react';
+import { apiService, User } from "@/lib/api";
+import { useEffect, useState } from "react";
 
 interface DoctorDetailsModalProps {
   doctorId: string;
@@ -37,7 +37,7 @@ export function DoctorDetailsModal({
         setDoctor(response.data);
       }
     } catch (err: any) {
-      setError(err.message || 'ექიმის დეტალების ჩატვირთვა ვერ მოხერხდა');
+      setError(err.message || "ექიმის დეტალების ჩატვირთვა ვერ მოხერხდა");
     } finally {
       setLoading(false);
     }
@@ -123,7 +123,11 @@ export function DoctorDetailsModal({
                         სქესი
                       </label>
                       <p className="text-dark dark:text-white capitalize">
-                        {doctor.gender === 'male' ? 'კაცი' : doctor.gender === 'female' ? 'ქალი' : 'სხვა'}
+                        {doctor.gender === "male"
+                          ? "კაცი"
+                          : doctor.gender === "female"
+                            ? "ქალი"
+                            : "სხვა"}
                       </p>
                     </div>
                   )}
@@ -133,11 +137,14 @@ export function DoctorDetailsModal({
                         დაბადების თარიღი
                       </label>
                       <p className="text-dark dark:text-white">
-                        {new Date(doctor.dateOfBirth).toLocaleDateString('ka-GE', {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric',
-                        })}
+                        {new Date(doctor.dateOfBirth).toLocaleDateString(
+                          "ka-GE",
+                          {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                          },
+                        )}
                       </p>
                     </div>
                   )}
@@ -210,26 +217,6 @@ export function DoctorDetailsModal({
                       </p>
                     </div>
                   )}
-                  {doctor.consultationFee !== undefined && (
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-dark-4 dark:text-dark-6">
-                        კონსულტაციის საფასური
-                      </label>
-                      <p className="text-dark dark:text-white">
-                        ₾{doctor.consultationFee}
-                      </p>
-                    </div>
-                  )}
-                  {doctor.followUpFee !== undefined && (
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-dark-4 dark:text-dark-6">
-                        განმეორებითი კონსულტაციის საფასური
-                      </label>
-                      <p className="text-dark dark:text-white">
-                        ₾{doctor.followUpFee}
-                      </p>
-                    </div>
-                  )}
                 </div>
               </div>
 
@@ -239,9 +226,7 @@ export function DoctorDetailsModal({
                   <h3 className="mb-4 text-lg font-semibold text-dark dark:text-white">
                     შესახებ
                   </h3>
-                  <p className="text-dark-4 dark:text-dark-6">
-                    {doctor.about}
-                  </p>
+                  <p className="text-dark-4 dark:text-dark-6">{doctor.about}</p>
                 </div>
               )}
 
@@ -255,11 +240,15 @@ export function DoctorDetailsModal({
                     {(() => {
                       // Helper function to check if URL is absolute (starts with http:// or https://)
                       const isAbsoluteUrl = (url: string) => {
-                        return url && (url.startsWith('http://') || url.startsWith('https://'));
+                        return (
+                          url &&
+                          (url.startsWith("http://") ||
+                            url.startsWith("https://"))
+                        );
                       };
                       const licenseUrl = isAbsoluteUrl(doctor.licenseDocument)
                         ? doctor.licenseDocument
-                        : `${process.env.NEXT_PUBLIC_API_URL || 'https://mediacare-production.up.railway.app'}/${doctor.licenseDocument}`;
+                        : `${process.env.NEXT_PUBLIC_API_URL || "https://mediacare-production.up.railway.app"}/${doctor.licenseDocument}`;
                       return (
                         <a
                           href={licenseUrl}
@@ -300,18 +289,18 @@ export function DoctorDetailsModal({
                     </label>
                     <span
                       className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
-                        doctor.approvalStatus === 'approved'
-                          ? 'bg-success/10 text-success'
-                          : doctor.approvalStatus === 'rejected'
-                          ? 'bg-danger/10 text-danger'
-                          : 'bg-warning/10 text-warning'
+                        doctor.approvalStatus === "approved"
+                          ? "bg-success/10 text-success"
+                          : doctor.approvalStatus === "rejected"
+                            ? "bg-danger/10 text-danger"
+                            : "bg-warning/10 text-warning"
                       }`}
                     >
-                      {doctor.approvalStatus === 'pending'
-                        ? 'განხილვის მოლოდინში'
-                        : doctor.approvalStatus === 'approved'
-                        ? 'დამტკიცებული'
-                        : 'უარყოფილი'}
+                      {doctor.approvalStatus === "pending"
+                        ? "განხილვის მოლოდინში"
+                        : doctor.approvalStatus === "approved"
+                          ? "დამტკიცებული"
+                          : "უარყოფილი"}
                     </span>
                   </div>
                   <div>
@@ -321,11 +310,11 @@ export function DoctorDetailsModal({
                     <span
                       className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
                         doctor.isActive
-                          ? 'bg-success/10 text-success'
-                          : 'bg-danger/10 text-danger'
+                          ? "bg-success/10 text-success"
+                          : "bg-danger/10 text-danger"
                       }`}
                     >
-                      {doctor.isActive ? 'აქტიური' : 'არააქტიური'}
+                      {doctor.isActive ? "აქტიური" : "არააქტიური"}
                     </span>
                   </div>
                 </div>
@@ -342,7 +331,7 @@ export function DoctorDetailsModal({
                       რეიტინგი
                     </label>
                     <p className="text-dark dark:text-white">
-                      {doctor.rating?.toFixed(1) || 'არ არის'}
+                      {doctor.rating?.toFixed(1) || "არ არის"}
                     </p>
                   </div>
                   <div>
@@ -357,7 +346,9 @@ export function DoctorDetailsModal({
               </div>
 
               {/* Identomat Verification Images */}
-              {(doctor.identomatFaceImage || doctor.identomatDocumentFrontImage || doctor.identomatDocumentBackImage) && (
+              {(doctor.identomatFaceImage ||
+                doctor.identomatDocumentFrontImage ||
+                doctor.identomatDocumentBackImage) && (
                 <div>
                   <h3 className="mb-4 text-lg font-semibold text-dark dark:text-white">
                     IDENTOMAT-ით იდენტიფიკაცია
@@ -430,4 +421,3 @@ export function DoctorDetailsModal({
     </div>
   );
 }
-

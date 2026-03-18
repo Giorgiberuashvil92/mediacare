@@ -68,7 +68,7 @@ export class AppointmentsController {
   }
 
   @Post(':id/documents')
-  @UseGuards(JwtAuthGuard, PatientGuard)
+  @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('file'))
   async uploadAppointmentDocument(
     @CurrentUser() user: { sub: string },

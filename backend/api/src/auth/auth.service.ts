@@ -9,6 +9,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
 import * as bcrypt from 'bcrypt';
+import { randomUUID } from 'crypto';
 import * as mongoose from 'mongoose';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
@@ -637,11 +638,19 @@ export class AuthService {
 
   private async generateTokens(userId: string) {
     const payload = { sub: userId };
+    const refreshPayload = { sub: userId, jti: randomUUID() };
 
     const accessToken = this.jwtService.sign(payload, { expiresIn: '24h' });
-    const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
+    const refreshToken = this.jwtService.sign(refreshPayload, {
+      expiresIn: '7d',
+    });
 
-    // Save refresh token to database
+    // Revoke any existing refresh tokens for this user to avoid duplicate key and keep one per user
+    await this.refreshTokenModel.updateMany(
+      { userId, revokedAt: null },
+      { revokedAt: new Date() },
+    );
+
     const refreshTokenDoc = new this.refreshTokenModel({
       token: refreshToken,
       userId,
@@ -659,12 +668,20 @@ export class AuthService {
   // DEV ONLY: Generate tokens with longer expiration for dev/admin use
   private async generateDevTokens(userId: string) {
     const payload = { sub: userId };
+    const refreshPayload = { sub: userId, jti: randomUUID() };
 
     // Dev tokens last 7 days instead of 24 hours
     const accessToken = this.jwtService.sign(payload, { expiresIn: '7d' });
-    const refreshToken = this.jwtService.sign(payload, { expiresIn: '30d' });
+    const refreshToken = this.jwtService.sign(refreshPayload, {
+      expiresIn: '30d',
+    });
 
-    // Save refresh token to database
+    // Revoke any existing refresh tokens for this user
+    await this.refreshTokenModel.updateMany(
+      { userId, revokedAt: null },
+      { revokedAt: new Date() },
+    );
+
     const refreshTokenDoc = new this.refreshTokenModel({
       token: refreshToken,
       userId,

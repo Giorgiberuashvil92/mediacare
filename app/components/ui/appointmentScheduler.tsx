@@ -61,8 +61,9 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
   const [selectedTime, setSelectedTime] = useState<string>("");
 
   const generateFullDaySlots = () => {
-    return Array.from({ length: 24 }, (_, hour) =>
-      `${hour.toString().padStart(2, "0")}:00`,
+    return Array.from(
+      { length: 24 },
+      (_, hour) => `${hour.toString().padStart(2, "0")}:00`,
     );
   };
 
@@ -114,7 +115,9 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
       const dayDate = new Date(day.date);
       dayDate.setHours(0, 0, 0, 0);
       if (dayDate < today) {
-        console.log(`🚫 [AppointmentScheduler] Filtering out past date: ${day.date}`);
+        console.log(
+          `🚫 [AppointmentScheduler] Filtering out past date: ${day.date}`,
+        );
         return false;
       }
 
@@ -127,20 +130,24 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
         }
         return typeMatches;
       }
-      
+
       // Legacy support: თუ type არ არის, გამოვიყენოთ ძველი ლოგიკა
       if (isTwentyFourSeven) {
         return day.isAvailable !== false;
       }
       if (mode === "video") {
-        return (day.videoSlots && day.videoSlots.length > 0) || day.timeSlots.length > 0;
+        return (
+          (day.videoSlots && day.videoSlots.length > 0) ||
+          day.timeSlots.length > 0
+        );
       }
       // home-visit
       return day.homeVisitSlots && day.homeVisitSlots.length > 0;
     })
     // დავრწმუნდეთ, რომ თარიღები unique-ები არიან (თუ რამე პრობლემაა)
-    .filter((day, index, self) => 
-      index === self.findIndex((d) => d.date === day.date)
+    .filter(
+      (day, index, self) =>
+        index === self.findIndex((d) => d.date === day.date),
     );
 
   // Ensure selected date always belongs to current filtered list
@@ -149,7 +156,7 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
     !filteredAvailability.find((d) => d.date === selectedDate)
   ) {
     // Default to first available date for this mode
-     
+
     setSelectedDate(filteredAvailability[0].date);
   }
 
@@ -164,11 +171,11 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
       const [hours, minutes] = time.split(":").map(Number);
       const slotDateTime = new Date(dateStr);
       slotDateTime.setHours(hours, minutes || 0, 0, 0);
-      
+
       const now = new Date();
       const diffMs = slotDateTime.getTime() - now.getTime();
       const diffHours = diffMs / (1000 * 60 * 60);
-      
+
       // ონლაინის შემთხვევაში: 2 საათით ადრე
       // ბინაზე ვიზიტისას: 12 საათით ადრე
       const requiredHours = mode === "video" ? 2 : 12;
@@ -181,31 +188,31 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
 
   const handleTimeSelect = (time: string) => {
     if (!selectedDate) return;
-    
+
     // Check if booking is allowed (at least 2 hours for video, 12 hours for home-visit)
     if (!canBookTimeSlot(selectedDate, time)) {
       const requiredHours = mode === "video" ? 2 : 12;
       Alert.alert(
         "დრო არ არის ხელმისაწვდომი",
-        `ჯავშნის გაკეთება შესაძლებელია მინიმუმ ${requiredHours} საათით ადრე. გთხოვთ აირჩიოთ სხვა დრო.`
+        `ჯავშნის გაკეთება შესაძლებელია მინიმუმ ${requiredHours} საათით ადრე. გთხოვთ აირჩიოთ სხვა დრო.`,
       );
       return;
     }
-    
+
     setSelectedTime(time);
   };
 
   const selectedDayAvailability = filteredAvailability.find(
-    (day) => day.date === selectedDate
+    (day) => day.date === selectedDate,
   );
 
   const getVisibleTimeSlots = () => {
     if (!selectedDayAvailability) {
-      console.log('📅 AppointmentScheduler - No selectedDayAvailability');
+      console.log("📅 AppointmentScheduler - No selectedDayAvailability");
       return [];
     }
 
-    console.log('📅 AppointmentScheduler - selectedDayAvailability:', {
+    console.log("📅 AppointmentScheduler - selectedDayAvailability:", {
       date: selectedDayAvailability.date,
       timeSlots: selectedDayAvailability.timeSlots,
       bookedSlots: selectedDayAvailability.bookedSlots,
@@ -216,8 +223,8 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
 
     // Get current time
     const now = new Date();
-    const currentDate = now.toISOString().split('T')[0]; // YYYY-MM-DD
-    const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const currentDate = now.toISOString().split("T")[0]; // YYYY-MM-DD
+    const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 
     // Helper function to check if a time slot has passed
     const isTimeSlotPassed = (dateStr: string, timeStr: string): boolean => {
@@ -225,12 +232,12 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
       if (dateStr < currentDate) {
         return true;
       }
-      
+
       // If date is today, check if time has passed
       if (dateStr === currentDate) {
         return timeStr <= currentTime;
       }
-      
+
       // If date is in the future, time slot hasn't passed
       return false;
     };
@@ -243,8 +250,8 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
         if (!selectedDate) return false;
         return !isTimeSlotPassed(selectedDate, time);
       });
-      
-      console.log('📅 AppointmentScheduler - 24/7 mode (filtered):', {
+
+      console.log("📅 AppointmentScheduler - 24/7 mode (filtered):", {
         fullDaySlots,
         availableSlots,
         bookedSlots: selectedDayAvailability.bookedSlots || [],
@@ -252,7 +259,7 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
         currentDate,
         currentTime,
       });
-      
+
       return availableSlots;
     }
 
@@ -279,7 +286,7 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
 
     // Return filtered slots (excluding passed times)
     // The booked slots will be filtered out visually using isBooked check in render
-    console.log('📅 AppointmentScheduler - Available slots (filtered):', {
+    console.log("📅 AppointmentScheduler - Available slots (filtered):", {
       slotsByMode,
       availableSlots,
       bookedSlots,
@@ -291,25 +298,33 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
         return isTimeSlotPassed(selectedDate, time);
       }),
     });
-    
+
     return availableSlots;
   };
 
   // Log availability data when component mounts or availability changes
   useEffect(() => {
-    console.log('📅 AppointmentScheduler - Full availability array:', JSON.stringify(availability, null, 2));
-    console.log('📅 AppointmentScheduler - Availability data:', {
+    console.log(
+      "📅 AppointmentScheduler - Full availability array:",
+      JSON.stringify(availability, null, 2),
+    );
+    console.log("📅 AppointmentScheduler - Availability data:", {
       availability,
       isFollowUp,
       followUpAppointmentId,
       mode,
       selectedDate,
     });
-    
+
     if (selectedDate) {
-      const selectedDay = availability.find((day: any) => day.date === selectedDate);
-      console.log('📅 AppointmentScheduler - Selected day data (full):', JSON.stringify(selectedDay, null, 2));
-      console.log('📅 AppointmentScheduler - Selected day data:', {
+      const selectedDay = availability.find(
+        (day: any) => day.date === selectedDate,
+      );
+      console.log(
+        "📅 AppointmentScheduler - Selected day data (full):",
+        JSON.stringify(selectedDay, null, 2),
+      );
+      console.log("📅 AppointmentScheduler - Selected day data:", {
         date: selectedDate,
         selectedDay,
         timeSlots: selectedDay?.timeSlots,
@@ -322,10 +337,6 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
   return (
     <View style={styles.container}>
       {/* Working Time Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>სამუშაო საათები</Text>
-        <Text style={styles.workingHours}>{workingHours}</Text>
-      </View>
 
       {/* Schedule Section */}
       <View style={styles.section}>
@@ -435,9 +446,11 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
             {getVisibleTimeSlots().map((time) => {
               const isBooked =
                 selectedDayAvailability?.bookedSlots?.includes(time) || false;
-              const canBook = selectedDate ? canBookTimeSlot(selectedDate, time) : true;
+              const canBook = selectedDate
+                ? canBookTimeSlot(selectedDate, time)
+                : true;
               const isTooSoon = !canBook && !isBooked;
-              
+
               return (
                 <TouchableOpacity
                   key={time}
@@ -447,7 +460,9 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
                     isBooked && styles.bookedTimeSlot,
                     isTooSoon && styles.disabledTimeSlot,
                   ]}
-                  onPress={() => !isBooked && !isTooSoon && handleTimeSelect(time)}
+                  onPress={() =>
+                    !isBooked && !isTooSoon && handleTimeSelect(time)
+                  }
                   disabled={isBooked || isTooSoon}
                 >
                   <Text
@@ -514,7 +529,7 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
             const requiredHours = mode === "video" ? 2 : 12;
             Alert.alert(
               "დრო არ არის ხელმისაწვდომი",
-              `ჯავშნის გაკეთება შესაძლებელია მინიმუმ ${requiredHours} საათით ადრე. გთხოვთ აირჩიოთ სხვა დრო.`
+              `ჯავშნის გაკეთება შესაძლებელია მინიმუმ ${requiredHours} საათით ადრე. გთხოვთ აირჩიოთ სხვა დრო.`,
             );
             return;
           }
@@ -522,7 +537,11 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
           try {
             // გადამოწმება: ისევ თავისუფალია ეს დრო ამ ტიპისთვის?
             // პაციენტისთვის: forPatient=true, რომ დაჯავშნილი სლოტები ჩანდეს
-            const response = await apiService.getDoctorAvailability(doctorId, undefined, true);
+            const response = await apiService.getDoctorAvailability(
+              doctorId,
+              undefined,
+              true,
+            );
 
             if (!response.success || !response.data) {
               Alert.alert(
@@ -533,7 +552,8 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
             }
 
             const daysForType = (response.data as any[]).filter(
-              (d) => d.date === selectedDate && d.type === mode && d.isAvailable,
+              (d) =>
+                d.date === selectedDate && d.type === mode && d.isAvailable,
             );
 
             let availableSlots: string[] = daysForType.flatMap(
@@ -541,10 +561,7 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
             );
 
             // If backend has no slots but working hours are 24/7, allow full-day selection
-            if (
-              availableSlots.length === 0 &&
-              workingHours?.includes("24")
-            ) {
+            if (availableSlots.length === 0 && workingHours?.includes("24")) {
               availableSlots = generateFullDaySlots();
             }
 
@@ -569,15 +586,16 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
             // If this is a follow-up appointment, schedule it directly
             if (isFollowUp && followUpAppointmentId) {
               try {
-                const followUpResponse = await apiService.scheduleFollowUpAppointment(
-                  followUpAppointmentId,
-                  {
-                    date: selectedDate,
-                    time: selectedTime,
-                    type: mode,
-                  },
-                  false // isDoctor = false for patient side
-                );
+                const followUpResponse =
+                  await apiService.scheduleFollowUpAppointment(
+                    followUpAppointmentId,
+                    {
+                      date: selectedDate,
+                      time: selectedTime,
+                      type: mode,
+                    },
+                    false, // isDoctor = false for patient side
+                  );
 
                 if (followUpResponse.success) {
                   Alert.alert(
@@ -590,19 +608,23 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
                           router.back();
                         },
                       },
-                    ]
+                    ],
                   );
                 } else {
                   Alert.alert(
                     "შეცდომა",
-                    followUpResponse.message || "განმეორებითი ვიზიტის დაჯავშნა ვერ მოხერხდა"
+                    followUpResponse.message ||
+                      "განმეორებითი ვიზიტის დაჯავშნა ვერ მოხერხდა",
                   );
                 }
               } catch (error: any) {
-                console.error("Failed to schedule follow-up appointment:", error);
+                console.error(
+                  "Failed to schedule follow-up appointment:",
+                  error,
+                );
                 Alert.alert(
                   "შეცდომა",
-                  error.message || "განმეორებითი ვიზიტის დაჯავშნა ვერ მოხერხდა"
+                  error.message || "განმეორებითი ვიზიტის დაჯავშნა ვერ მოხერხდა",
                 );
               }
               return;
@@ -611,7 +633,7 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
             // Get doctor info to calculate payment amount
             try {
               const doctorResponse = await apiService.getDoctorById(doctorId);
-              
+
               if (!doctorResponse.success || !doctorResponse.data) {
                 Alert.alert(
                   "შეცდომა",
@@ -621,9 +643,12 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
               }
 
               const doctor = doctorResponse.data;
-              
+
               // Log full doctor object to see what we're getting
-              console.log("💰 [AppointmentScheduler] Full doctor object:", JSON.stringify(doctor, null, 2));
+              console.log(
+                "💰 [AppointmentScheduler] Full doctor object:",
+                JSON.stringify(doctor, null, 2),
+              );
               console.log("💰 [AppointmentScheduler] Doctor fee data:", {
                 mode,
                 consultationFee: doctor.consultationFee,
@@ -635,56 +660,118 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
                 homeVisitFeeType: typeof doctor.homeVisitFee,
                 allDoctorKeys: Object.keys(doctor),
               });
-              
+
               // Determine consultation fee based on appointment type
               let consultationFee = 0;
-              
+
               if (mode === "video") {
                 // Prefer videoConsultationFee, fallback to consultationFee
-                if (typeof doctor.videoConsultationFee === 'number' && doctor.videoConsultationFee > 0) {
+                if (
+                  typeof doctor.videoConsultationFee === "number" &&
+                  doctor.videoConsultationFee > 0
+                ) {
                   consultationFee = doctor.videoConsultationFee;
-                  console.log("✅ [AppointmentScheduler] Using videoConsultationFee:", consultationFee);
-                } else if (typeof doctor.consultationFee === 'number' && doctor.consultationFee > 0) {
+                  console.log(
+                    "✅ [AppointmentScheduler] Using videoConsultationFee:",
+                    consultationFee,
+                  );
+                } else if (
+                  typeof doctor.consultationFee === "number" &&
+                  doctor.consultationFee > 0
+                ) {
                   consultationFee = doctor.consultationFee;
-                  console.log("✅ [AppointmentScheduler] Using consultationFee (fallback):", consultationFee);
+                  console.log(
+                    "✅ [AppointmentScheduler] Using consultationFee (fallback):",
+                    consultationFee,
+                  );
                 } else {
-                  const parsed = parseFloat(String(doctor.videoConsultationFee || doctor.consultationFee || '0').replace(/[^\d.]/g, '')) || 0;
+                  const parsed =
+                    parseFloat(
+                      String(
+                        doctor.videoConsultationFee ||
+                          doctor.consultationFee ||
+                          "0",
+                      ).replace(/[^\d.]/g, ""),
+                    ) || 0;
                   consultationFee = parsed;
-                  console.log("✅ [AppointmentScheduler] Using parsed fee:", consultationFee);
+                  console.log(
+                    "✅ [AppointmentScheduler] Using parsed fee:",
+                    consultationFee,
+                  );
                 }
               } else if (mode === "home-visit") {
                 // Prefer homeVisitFee, fallback to consultationFee
-                if (typeof doctor.homeVisitFee === 'number' && doctor.homeVisitFee > 0) {
+                if (
+                  typeof doctor.homeVisitFee === "number" &&
+                  doctor.homeVisitFee > 0
+                ) {
                   consultationFee = doctor.homeVisitFee;
-                  console.log("✅ [AppointmentScheduler] Using homeVisitFee:", consultationFee);
-                } else if (typeof doctor.consultationFee === 'number' && doctor.consultationFee > 0) {
+                  console.log(
+                    "✅ [AppointmentScheduler] Using homeVisitFee:",
+                    consultationFee,
+                  );
+                } else if (
+                  typeof doctor.consultationFee === "number" &&
+                  doctor.consultationFee > 0
+                ) {
                   consultationFee = doctor.consultationFee;
-                  console.log("✅ [AppointmentScheduler] Using consultationFee (fallback):", consultationFee);
+                  console.log(
+                    "✅ [AppointmentScheduler] Using consultationFee (fallback):",
+                    consultationFee,
+                  );
                 } else {
-                  const parsed = parseFloat(String(doctor.homeVisitFee || doctor.consultationFee || '0').replace(/[^\d.]/g, '')) || 0;
+                  const parsed =
+                    parseFloat(
+                      String(
+                        doctor.homeVisitFee || doctor.consultationFee || "0",
+                      ).replace(/[^\d.]/g, ""),
+                    ) || 0;
                   consultationFee = parsed;
-                  console.log("✅ [AppointmentScheduler] Using parsed fee:", consultationFee);
+                  console.log(
+                    "✅ [AppointmentScheduler] Using parsed fee:",
+                    consultationFee,
+                  );
                 }
               } else {
                 // Default to consultationFee
-                if (typeof doctor.consultationFee === 'number' && doctor.consultationFee > 0) {
+                if (
+                  typeof doctor.consultationFee === "number" &&
+                  doctor.consultationFee > 0
+                ) {
                   consultationFee = doctor.consultationFee;
-                  console.log("✅ [AppointmentScheduler] Using consultationFee:", consultationFee);
+                  console.log(
+                    "✅ [AppointmentScheduler] Using consultationFee:",
+                    consultationFee,
+                  );
                 } else {
-                  const parsed = parseFloat(String(doctor.consultationFee || '0').replace(/[^\d.]/g, '')) || 0;
+                  const parsed =
+                    parseFloat(
+                      String(doctor.consultationFee || "0").replace(
+                        /[^\d.]/g,
+                        "",
+                      ),
+                    ) || 0;
                   consultationFee = parsed;
-                  console.log("✅ [AppointmentScheduler] Using parsed fee:", consultationFee);
+                  console.log(
+                    "✅ [AppointmentScheduler] Using parsed fee:",
+                    consultationFee,
+                  );
                 }
               }
-              
-              console.log("💰 [AppointmentScheduler] Final consultation fee:", consultationFee);
-              
+
+              console.log(
+                "💰 [AppointmentScheduler] Final consultation fee:",
+                consultationFee,
+              );
+
               // If still 0, use default fee
               if (consultationFee === 0 || isNaN(consultationFee)) {
-                console.warn("⚠️ [AppointmentScheduler] Consultation fee is 0 or undefined, using default fee");
+                console.warn(
+                  "⚠️ [AppointmentScheduler] Consultation fee is 0 or undefined, using default fee",
+                );
                 consultationFee = 10; // Default consultation fee in GEL
               }
-              
+
               const vat = Math.round(consultationFee * 0.05);
               const totalAmount = consultationFee + vat;
 
@@ -714,7 +801,10 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
               );
             }
           } catch (error) {
-            console.error("Failed to validate availability before booking", error);
+            console.error(
+              "Failed to validate availability before booking",
+              error,
+            );
             Alert.alert(
               "შეცდომა",
               "ვერ მოხერხდა დროის გადამოწმება. გთხოვთ სცადოთ თავიდან.",

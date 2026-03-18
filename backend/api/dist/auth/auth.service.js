@@ -50,6 +50,7 @@ const common_1 = require("@nestjs/common");
 const jwt_1 = require("@nestjs/jwt");
 const mongoose_1 = require("@nestjs/mongoose");
 const bcrypt = __importStar(require("bcrypt"));
+const crypto_1 = require("crypto");
 const mongoose = __importStar(require("mongoose"));
 const notifications_service_1 = require("../notifications/notifications.service");
 const notification_schema_1 = require("../schemas/notification.schema");
@@ -509,8 +510,12 @@ let AuthService = class AuthService {
     }
     async generateTokens(userId) {
         const payload = { sub: userId };
+        const refreshPayload = { sub: userId, jti: (0, crypto_1.randomUUID)() };
         const accessToken = this.jwtService.sign(payload, { expiresIn: '24h' });
-        const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
+        const refreshToken = this.jwtService.sign(refreshPayload, {
+            expiresIn: '7d',
+        });
+        await this.refreshTokenModel.updateMany({ userId, revokedAt: null }, { revokedAt: new Date() });
         const refreshTokenDoc = new this.refreshTokenModel({
             token: refreshToken,
             userId,
@@ -524,8 +529,12 @@ let AuthService = class AuthService {
     }
     async generateDevTokens(userId) {
         const payload = { sub: userId };
+        const refreshPayload = { sub: userId, jti: (0, crypto_1.randomUUID)() };
         const accessToken = this.jwtService.sign(payload, { expiresIn: '7d' });
-        const refreshToken = this.jwtService.sign(payload, { expiresIn: '30d' });
+        const refreshToken = this.jwtService.sign(refreshPayload, {
+            expiresIn: '30d',
+        });
+        await this.refreshTokenModel.updateMany({ userId, revokedAt: null }, { revokedAt: new Date() });
         const refreshTokenDoc = new this.refreshTokenModel({
             token: refreshToken,
             userId,

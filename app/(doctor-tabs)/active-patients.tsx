@@ -36,7 +36,8 @@ interface ActivePatient {
   appointmentDate: string;
   appointmentTime: string;
   status: "confirmed" | "in-progress" | "completed";
-  type: "video" | "home-visit" | "followup";
+  type: "video" | "home-visit";
+  isFollowUp?: boolean;
   problem?: string;
   visitAddress?: string;
   // Form 100 status
@@ -76,12 +77,7 @@ export default function ActivePatientsScreen() {
         const relevantStatuses = ["scheduled", "confirmed", "in-progress"];
         const filtered = response.data
           .filter((apt: any) => {
-            // For followup appointments, check originalType instead of type
-            // For regular appointments, check type directly
-            const matchesType =
-              apt.type === "followup"
-                ? apt.originalType === type
-                : apt.type === type;
+            const matchesType = apt.type === type;
             const isRelevant = relevantStatuses.includes(apt.status);
             return matchesType && isRelevant;
           })
@@ -137,7 +133,8 @@ export default function ActivePatientsScreen() {
                 apt.status === "scheduled"
                   ? "confirmed"
                   : apt.status || "confirmed",
-              type: apt.type || "video",
+              type: apt.type === "home-visit" ? "home-visit" : "video",
+              isFollowUp: !!apt.isFollowUp,
               problem: apt.symptoms || undefined,
               visitAddress: apt.visitAddress,
               // Form 100 status
@@ -249,10 +246,8 @@ export default function ActivePatientsScreen() {
       <TouchableOpacity
         style={styles.patientCard}
         onPress={() => {
-          // If it's a followup consultation, navigate to patients (recurring) tab
-          // Otherwise, navigate to appointments (current) tab
           const targetPath =
-            item.type === "followup"
+            item.isFollowUp === true
               ? "/(doctor-tabs)/patients"
               : "/(doctor-tabs)/appointments";
           router.push({
@@ -277,12 +272,12 @@ export default function ActivePatientsScreen() {
                   styles.avatarPlaceholder,
                   {
                     backgroundColor:
-                      item.type === "followup" ? "#0EA5E9" : accentColor,
+                      item.isFollowUp === true ? "#0EA5E9" : accentColor,
                   },
                 ]}
               >
                 <Ionicons
-                  name={item.type === "followup" ? "repeat" : "person"}
+                  name={item.isFollowUp ? "repeat" : "person"}
                   size={24}
                   color="#FFFFFF"
                 />
@@ -299,7 +294,7 @@ export default function ActivePatientsScreen() {
               }}
             >
               <Text style={styles.patientName}>{item.patientName}</Text>
-              {item.type === "followup" && (
+              {item.isFollowUp && (
                 <View
                   style={{
                     backgroundColor: "#0EA5E9",
