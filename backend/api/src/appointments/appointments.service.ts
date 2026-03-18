@@ -588,9 +588,7 @@ export class AppointmentsService {
     const now = new Date();
     const origDate = new Date(appointment.appointmentDate);
     const [origH, origM] = (appointment.appointmentTime || '00:00')
-      
-      
-      .split(':')
+            .split(':')
       .map(Number);
     origDate.setHours(origH, origM || 0, 0, 0);
     const originalPast = origDate.getTime() < now.getTime();
@@ -854,19 +852,13 @@ export class AppointmentsService {
         );
       }
 
-      // ონლაინი: გასულ დროზე მაქს 2 სთ; ბინა: კონსულტაციამდე არაუგვიანეს 1
-        2 სთ
-        
       const origDateReq = new Date(appointment.appointmentDate);
       const [origHReq, origMReq] = (appointment.appointmentTime || '00:00')
         .split(':')
         .map(Number);
       origDateReq.setHours(origHReq, origMReq || 0, 0, 0);
       const originalPastReq = origDateReq.getTime() < now.getTime();
-      const 
-          twoHoursMsReq = 2 
-         * 60 * 60 * 1000;
-        
+      const twoHoursMsReq = 2 * 60 * 60 * 1000;
       const twelveHoursMsReq = 12 * 60 * 60 * 1000;
 
       if (appointment.type === AppointmentType.VIDEO) {
