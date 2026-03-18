@@ -2011,6 +2011,7 @@ export class DoctorsService {
       appointmentDate: normalizedDate,
       appointmentTime: dto.time,
       type: appointmentType,
+      isFollowUp: true,
       meetingLink:
         appointmentType === AppointmentType.VIDEO ? undefined : undefined, // Can be set later
       visitAddress:

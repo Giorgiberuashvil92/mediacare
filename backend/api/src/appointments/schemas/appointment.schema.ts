@@ -49,6 +49,10 @@ export class Appointment {
   @Prop({ enum: AppointmentType, required: true })
   type: AppointmentType;
 
+  /** true თუ ჯავშანი განმეორებითი ვიზიტია (ექიმის ან პაციენტის მიერ შექმნილი) — ვიდეო/ბინა არ მნიშვნელობს */
+  @Prop({ default: false })
+  isFollowUp?: boolean;
+
   @Prop({ enum: AppointmentStatus, default: AppointmentStatus.PENDING })
   status: AppointmentStatus;
 

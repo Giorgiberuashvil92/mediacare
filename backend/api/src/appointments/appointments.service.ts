@@ -452,9 +452,21 @@ export class AppointmentsService {
       .sort({ appointmentDate: -1 })
       .lean();
 
+    // ექიმის/პაციენტის მიერ შექმნილი განმეორებითი (isFollowUp) — პაციენტის აპში type: 'followup'
+    const data = (appointments as any[]).map((apt) => {
+      if (apt.isFollowUp === true) {
+        return {
+          ...apt,
+          type: 'followup',
+          originalType: apt.type === 'home-visit' ? 'home-visit' : 'video',
+        };
+      }
+      return apt;
+    });
+
     return {
       success: true,
-      data: appointments,
+      data,
     };
   }
 
@@ -575,7 +587,11 @@ export class AppointmentsService {
 
     const now = new Date();
     const origDate = new Date(appointment.appointmentDate);
-    const [origH, origM] = (appointment.appointmentTime || '00:00').split(':').map(Number);
+    const [origH, origM] = (appointment.appointmentTime || '00:00')
+      
+      
+      .split(':')
+      .map(Number);
     origDate.setHours(origH, origM || 0, 0, 0);
     const originalPast = origDate.getTime() < now.getTime();
     const twoHoursMs = 2 * 60 * 60 * 1000;
@@ -838,16 +854,26 @@ export class AppointmentsService {
         );
       }
 
-      // ონლაინი: გასულ დროზე მაქს 2 სთ; ბინა: კონსულტაციამდე არაუგვიანეს 12 სთ
+      // ონლაინი: გასულ დროზე მაქს 2 სთ; ბინა: კონსულტაციამდე არაუგვიანეს 1
+        2 სთ
+        
       const origDateReq = new Date(appointment.appointmentDate);
-      const [origHReq, origMReq] = (appointment.appointmentTime || '00:00').split(':').map(Number);
+      const [origHReq, origMReq] = (appointment.appointmentTime || '00:00')
+        .split(':')
+        .map(Number);
       origDateReq.setHours(origHReq, origMReq || 0, 0, 0);
       const originalPastReq = origDateReq.getTime() < now.getTime();
-      const twoHoursMsReq = 2 * 60 * 60 * 1000;
+      const 
+          twoHoursMsReq = 2 
+         * 60 * 60 * 1000;
+        
       const twelveHoursMsReq = 12 * 60 * 60 * 1000;
 
       if (appointment.type === AppointmentType.VIDEO) {
-        if (originalPastReq && now.getTime() > origDateReq.getTime() + twoHoursMsReq) {
+        if (
+          originalPastReq &&
+          now.getTime() > origDateReq.getTime() + twoHoursMsReq
+        ) {
           throw new BadRequestException(
             'ონლაინის გადაჯავშნა გასული კონსულტაციის შემდეგ შესაძლებელია მაქსიმუმ 2 საათის განმავლობაში.',
           );
@@ -1358,6 +1384,7 @@ export class AppointmentsService {
       appointmentDate: normalizedDate,
       appointmentTime: dto.time,
       type: appointmentType,
+      isFollowUp: true,
       visitAddress:
         appointmentType === AppointmentType.HOME_VISIT
           ? dto.visitAddress?.trim()
