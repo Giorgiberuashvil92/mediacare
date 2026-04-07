@@ -36,6 +36,39 @@ type MisPatientUpsertResult = {
   personId?: string | null;
 };
 
+/** MIS პასუხიდან ID სტრიქონის ამოღება — ტიპიზაცია არა, მხოლოდ ხშირი ველები */
+function tryPickPersonIdFromMisBody(parsed: unknown): string | null {
+  const keys = [
+    'PersonID',
+    'personId',
+    'EMRPersonID',
+    'emrPersonId',
+    'ID',
+    'id',
+  ];
+  const fromObject = (o: Record<string, unknown>): string | null => {
+    for (const k of keys) {
+      const v = o[k];
+      if (typeof v === 'string' && v.trim()) return v.trim();
+    }
+    return null;
+  };
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return null;
+  }
+  const root = parsed as Record<string, unknown>;
+  const direct = fromObject(root);
+  if (direct) {
+    return direct;
+  }
+  const inner =
+    root.data ?? root.Data ?? root.value ?? root.Value ?? root.Result;
+  if (inner && typeof inner === 'object' && !Array.isArray(inner)) {
+    return fromObject(inner as Record<string, unknown>);
+  }
+  return null;
+}
+
 @Injectable()
 export class MisAuthService implements OnModuleInit {
   private readonly logger = new Logger(MisAuthService.name);
@@ -141,27 +174,38 @@ export class MisAuthService implements OnModuleInit {
         body: JSON.stringify(payload),
       });
 
+      const responseText = await response.text();
+
+      this.logger.log(
+        `MIS AddOrUpdatePatient ← HTTP ${response.status} ${response.statusText} | RAW BODY:\n${responseText}`,
+      );
+
       if (!response.ok) {
-        const body = await response.text();
-        this.logger.error(
-          `MIS patient upsert failed: ${response.status} ${response.statusText} | ${body}`,
-        );
         return { success: false, personId: null };
       }
 
-      const responseData = (await response.json().catch(() => ({}))) as Record<
-        string,
-        unknown
-      >;
-      const personId =
-        (typeof responseData.PersonID === 'string' && responseData.PersonID) ||
-        (typeof responseData.personId === 'string' && responseData.personId) ||
-        (typeof responseData.ID === 'string' && responseData.ID) ||
-        (typeof responseData.id === 'string' && responseData.id) ||
-        null;
+      let parsed: unknown;
+      const trimmed = responseText.trim();
+      if (trimmed) {
+        try {
+          parsed = JSON.parse(trimmed) as unknown;
+          this.logger.log(
+            `MIS AddOrUpdatePatient ← PARSED (რასაც API დააბრუნებს):\n${JSON.stringify(parsed, null, 2)}`,
+          );
+        } catch {
+          this.logger.warn(
+            `MIS AddOrUpdatePatient: ტექსტი JSON არ არის (პირველი 800 სიმბოლო): ${trimmed.slice(0, 800)}`,
+          );
+          parsed = undefined;
+        }
+      } else {
+        parsed = undefined;
+      }
+
+      const personId = tryPickPersonIdFromMisBody(parsed);
 
       this.logger.log(
-        `MIS patient upsert success for PersonalID=${payload.PersonalID}, PersonID=${personId ?? 'not returned'}`,
+        `MIS AddOrUpdatePatient ← ამოღებული personId ველიდან (თუ იყო): ${personId ?? '(არ ვიპოვე — ზემოთ RAW/PARSED ნახე)'} | ჩვენი PersonalID=${payload.PersonalID}`,
       );
       return { success: true, personId };
     } catch (error) {
