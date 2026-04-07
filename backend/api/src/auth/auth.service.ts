@@ -87,8 +87,31 @@ export class AuthService {
       dateOfBirth,
       minWorkingDaysRequired,
       phone,
+      appointmentDoctorId,
+      appointmentServiceDate,
       ...userData
     } = registerDto;
+
+    const hasAppointmentDoctor = Boolean(appointmentDoctorId?.trim());
+    const hasAppointmentDate = Boolean(appointmentServiceDate?.trim());
+    if (hasAppointmentDoctor !== hasAppointmentDate) {
+      throw new BadRequestException(
+        'appointmentDoctorId და appointmentServiceDate ერთად უნდა მიეთითოს.',
+      );
+    }
+    if (hasAppointmentDoctor && role !== UserRole.PATIENT) {
+      throw new BadRequestException(
+        'ვიზიტის მიბმა რეგისტრაციაზე მხოლოდ პაციენტის როლისთვისაა.',
+      );
+    }
+    if (hasAppointmentDate) {
+      const appt = new Date(appointmentServiceDate.trim());
+      if (Number.isNaN(appt.getTime())) {
+        throw new BadRequestException(
+          'appointmentServiceDate არავალიდური თარიღია.',
+        );
+      }
+    }
 
     // Phone is required for all users (doctors and patients)
     if (!phone || !phone.trim()) {
@@ -327,6 +350,7 @@ export class AuthService {
     }
 
     let misPersonId: string | null = null;
+    let misGeneratedServiceId: string | null = null;
 
     if (savedUser.role === UserRole.PATIENT) {
       const nameParts = (savedUser.name || '').trim().split(/\s+/);
@@ -376,6 +400,59 @@ export class AuthService {
         });
         misPersonId = misSyncResult.personId;
       }
+
+      if (hasAppointmentDoctor && hasAppointmentDate) {
+        if (!misPersonId) {
+          await this.userModel.findByIdAndDelete(savedUser._id);
+          throw new BadRequestException(
+            'MIS PersonID არ მოვიდა — ვიზიტის სერვისის გენერაცია შეუძლებელია. რეგისტრაცია გაუქმებულია.',
+          );
+        }
+
+        const doctor = await this.userModel.findOne({
+          _id: new mongoose.Types.ObjectId(appointmentDoctorId.trim()),
+          role: UserRole.DOCTOR,
+        });
+        const doctorPersonalId = doctor?.idNumber?.trim();
+        if (!doctor || !doctorPersonalId) {
+          await this.userModel.findByIdAndDelete(savedUser._id);
+          throw new BadRequestException(
+            'ექიმი ვერ მოიძებნა ან პირადი ნომერი აკლია (MIS DoctorPersonalID). რეგისტრაცია გაუქმებულია.',
+          );
+        }
+
+        const misServiceCatalogId =
+          process.env.MIS_GENERATE_SERVICE_SERVICE_ID ||
+          'FDDD3E01-C2E0-4D5B-AFCB-1B5BFE6847AE';
+        const misContractId =
+          process.env.MIS_GENERATE_SERVICE_CONTRACT_ID ||
+          '5DCA35BF-AB36-11F0-A26C-00259082206B';
+
+        const serviceDateIso = new Date(
+          appointmentServiceDate.trim(),
+        ).toISOString();
+
+        const genResult = await this.misAuthService.generateService({
+          ServiceID: misServiceCatalogId,
+          PersonID: misPersonId,
+          ContractID: misContractId,
+          MakeAutoPayment: true,
+          DoctorPersonalID: doctorPersonalId,
+          ServiceDate: serviceDateIso,
+        });
+
+        if (!genResult.success || !genResult.serviceId) {
+          await this.userModel.findByIdAndDelete(savedUser._id);
+          throw new BadRequestException(
+            'MIS GenerateService ვერ განხორციელდა. რეგისტრაცია გაუქმებულია.',
+          );
+        }
+
+        misGeneratedServiceId = genResult.serviceId;
+        await this.userModel.findByIdAndUpdate(savedUser._id, {
+          misGeneratedServiceId: genResult.serviceId,
+        });
+      }
     }
 
     // Generate tokens
@@ -394,6 +471,7 @@ export class AuthService {
           email: savedUser.email,
           phone: savedUser.phone,
           misPersonId,
+          misGeneratedServiceId,
           isVerified: savedUser.isVerified,
           approvalStatus: savedUser.approvalStatus,
         },

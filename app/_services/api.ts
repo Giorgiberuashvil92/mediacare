@@ -132,6 +132,10 @@ export interface User {
   isActive?: boolean;
   isVerified?: boolean;
   approvalStatus?: "pending" | "approved" | "rejected";
+  /** MIS პაციენტის ID (ბექი რეგისტრაციის შემდეგ) */
+  misPersonId?: string | null;
+  /** MIS GenerateService-ის პასუხი (ვიზიტით რეგისტრაციისას) */
+  misGeneratedServiceId?: string | null;
 }
 
 export interface LoginRequest {
@@ -150,6 +154,10 @@ export interface RegisterRequest {
   specialization?: string;
   licenseDocument?: string;
   profileImage?: string;
+  /** ექიმის Mongo _id — პაციენტის რეგისტრაცია ვიზიტით → MIS GenerateService */
+  appointmentDoctorId?: string;
+  /** ISO თარიღი/დრო ვიზიტისთვის */
+  appointmentServiceDate?: string;
 }
 
 export interface AuthResponse {

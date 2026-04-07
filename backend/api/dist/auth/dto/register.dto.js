@@ -70,6 +70,21 @@ __decorate([
     __metadata("design:type", String)
 ], RegisterDto.prototype, "address", void 0);
 __decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.ValidateIf)((o) => o.appointmentServiceDate != null &&
+        String(o.appointmentServiceDate).trim() !== ''),
+    (0, class_validator_1.IsMongoId)(),
+    __metadata("design:type", String)
+], RegisterDto.prototype, "appointmentDoctorId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.ValidateIf)((o) => o.appointmentDoctorId != null &&
+        String(o.appointmentDoctorId).trim() !== ''),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    __metadata("design:type", String)
+], RegisterDto.prototype, "appointmentServiceDate", void 0);
+__decorate([
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)

@@ -11,6 +11,8 @@ export declare class RegisterDto {
     gender?: Gender;
     profileImage?: string;
     address?: string;
+    appointmentDoctorId?: string;
+    appointmentServiceDate?: string;
     identificationDocument?: string;
     specialization?: string;
     licenseDocument?: string;

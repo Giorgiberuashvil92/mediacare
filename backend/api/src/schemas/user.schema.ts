@@ -49,6 +49,10 @@ export class User {
   @Prop()
   misPersonId?: string; // PersonID returned from MIS Ambulatory API
 
+  /** GenerateService-ის პასუხის ID (ფორმების გენერაციისთვის შემდეგ ეტაპზე) */
+  @Prop()
+  misGeneratedServiceId?: string;
+
   @Prop()
   dateOfBirth?: Date;
 

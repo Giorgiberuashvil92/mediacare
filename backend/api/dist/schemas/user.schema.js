@@ -67,6 +67,10 @@ __decorate([
 ], User.prototype, "misPersonId", void 0);
 __decorate([
     (0, mongoose_1.Prop)(),
+    __metadata("design:type", String)
+], User.prototype, "misGeneratedServiceId", void 0);
+__decorate([
+    (0, mongoose_1.Prop)(),
     __metadata("design:type", Date)
 ], User.prototype, "dateOfBirth", void 0);
 __decorate([

@@ -23,6 +23,7 @@ export declare class AuthController {
                 email: string;
                 phone: string;
                 misPersonId: string;
+                misGeneratedServiceId: string;
                 isVerified: boolean;
                 approvalStatus: import("../schemas/user.schema").ApprovalStatus;
             };

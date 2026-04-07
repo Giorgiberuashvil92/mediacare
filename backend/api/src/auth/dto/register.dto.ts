@@ -1,10 +1,12 @@
 import {
   IsEmail,
   IsEnum,
+  IsMongoId,
   IsNotEmpty,
   IsOptional,
   IsString,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 import { Gender, UserRole } from '../../schemas/user.schema';
 
@@ -52,6 +54,26 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   address?: string;
+
+  /** ექიმთან ვიზიტით რეგისტრაცია → MIS GenerateService; ორივე ერთად სავალდებულოა */
+  @IsOptional()
+  @ValidateIf(
+    (o: RegisterDto) =>
+      o.appointmentServiceDate != null &&
+      String(o.appointmentServiceDate).trim() !== '',
+  )
+  @IsMongoId()
+  appointmentDoctorId?: string;
+
+  @IsOptional()
+  @ValidateIf(
+    (o: RegisterDto) =>
+      o.appointmentDoctorId != null &&
+      String(o.appointmentDoctorId).trim() !== '',
+  )
+  @IsString()
+  @IsNotEmpty()
+  appointmentServiceDate?: string;
 
   // Identification document (for patients and doctors)
   @IsString()

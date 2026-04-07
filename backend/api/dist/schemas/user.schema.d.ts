@@ -27,6 +27,7 @@ export declare class User {
     phone?: string;
     idNumber?: string;
     misPersonId?: string;
+    misGeneratedServiceId?: string;
     dateOfBirth?: Date;
     gender?: Gender;
     profileImage?: string;
