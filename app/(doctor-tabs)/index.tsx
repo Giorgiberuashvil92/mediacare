@@ -874,7 +874,9 @@ export default function DoctorDashboard() {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>ბოლო აქტივობა</Text>
             <TouchableOpacity
-              onPress={() => router.push("/(doctor-tabs)/appointments")}
+              onPress={() =>
+                router.push("/(doctor-tabs)/appointments?status=completed")
+              }
             >
               <Text style={styles.viewAll}>ისტორია</Text>
             </TouchableOpacity>

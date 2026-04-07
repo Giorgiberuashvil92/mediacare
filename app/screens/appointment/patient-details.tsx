@@ -328,21 +328,6 @@ const PatientDetails = () => {
       return;
     }
 
-    // Validate: booking must be at least 2 hours in advance for video, 12 hours for home-visit
-    if (appointmentDate && selectedTime) {
-      const candidate = new Date(`${appointmentDate}T${selectedTime}:00`);
-      const now = new Date();
-      const requiredHours = appointmentType === "home-visit" ? 12 : 2;
-      const requiredMs = requiredHours * 60 * 60 * 1000;
-      if (candidate.getTime() - now.getTime() < requiredMs) {
-        Alert.alert(
-          "დრო არ არის ხელმისაწვდომი",
-          `ჯავშნის გაკეთება შესაძლებელია მინიმუმ ${requiredHours} საათით ადრე. გთხოვთ აირჩიოთ სხვა დრო.`
-        );
-        return;
-      }
-    }
-
     try {
       setLoading(true);
 

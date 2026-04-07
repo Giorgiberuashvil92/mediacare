@@ -5,6 +5,8 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   Alert,
+  Modal,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -19,6 +21,7 @@ import { showToast } from "../utils/toast";
 export default function SettingsScreen() {
   const { user, logout, isAuthenticated } = useAuth();
   const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [comingSoonVisible, setComingSoonVisible] = useState(false);
 
   // Fetch profile image when screen is focused
   useFocusEffect(
@@ -33,11 +36,11 @@ export default function SettingsScreen() {
           console.log("Failed to load profile image:", error);
         }
       };
-      
+
       if (isAuthenticated) {
         loadProfileImage();
       }
-    }, [isAuthenticated])
+    }, [isAuthenticated]),
   );
 
   const handleResetOnboarding = async () => {
@@ -79,12 +82,15 @@ export default function SettingsScreen() {
           <View style={styles.profileImageContainer}>
             <Image
               source={{
-                uri: profileImage || user?.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&size=200&background=06B6D4&color=fff`,
+                uri:
+                  profileImage ||
+                  user?.profileImage ||
+                  `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || "User")}&size=200&background=06B6D4&color=fff`,
               }}
               style={styles.profileImage}
               contentFit="cover"
             />
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.addPhotoButton}
               onPress={() => router.push("/screens/profile/edit-profile")}
             >
@@ -96,7 +102,6 @@ export default function SettingsScreen() {
             <Text style={styles.userName}>
               {user ? user.name : "მომხმარებელი"}
             </Text>
-            
           </View>
 
           <Text style={styles.userEmail}>
@@ -131,14 +136,14 @@ export default function SettingsScreen() {
 
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => router.push("/screens/profile/medical-cabinet")}
+            onPress={() => setComingSoonVisible(true)}
           >
             <View
               style={[styles.menuIconContainer, { backgroundColor: "#EFF6FF" }]}
             >
               <Ionicons name="document-text" size={20} color="#06B6D4" />
             </View>
-            <Text style={styles.menuText}>პირადი კაბინეტი</Text>
+            <Text style={styles.menuText}>პირადი კაბინეტი - (მალე იქნება)</Text>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity>
 
@@ -152,7 +157,7 @@ export default function SettingsScreen() {
             <Text style={styles.menuText}>ფავორიტები</Text>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity>
-{/* 
+          {/* 
           <TouchableOpacity style={styles.menuItem}>
             <View style={styles.menuIconContainer}>
               <Ionicons name="book" size={20} color="#06B6D4" />
@@ -160,7 +165,7 @@ export default function SettingsScreen() {
             <Text style={styles.menuText}>მისამართების წიგნი</Text>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity> */}
-{/* 
+          {/* 
           <TouchableOpacity
             onPress={() => router.push("/screens/profile/payment")}
             style={styles.menuItem}
@@ -171,8 +176,6 @@ export default function SettingsScreen() {
             <Text style={styles.menuText}>გადახდები</Text>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity> */}
-
-         
 
           <TouchableOpacity
             style={styles.menuItem}
@@ -185,7 +188,6 @@ export default function SettingsScreen() {
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity>
 
-          
           {/* <TouchableOpacity style={styles.menuItem}>
             <View style={styles.menuIconContainer}>
               <Ionicons name="people" size={20} color="#06B6D4" />
@@ -208,7 +210,11 @@ export default function SettingsScreen() {
             onPress={() => router.push("/screens/profile/terms/service")}
           >
             <View style={styles.menuIconContainer}>
-              <Ionicons name="document-text-outline" size={20} color="#06B6D4" />
+              <Ionicons
+                name="document-text-outline"
+                size={20}
+                color="#06B6D4"
+              />
             </View>
             <Text style={styles.menuText}>სერვისის პირობები</Text>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
@@ -310,12 +316,44 @@ export default function SettingsScreen() {
               <View style={styles.menuIconContainer}>
                 <Ionicons name="swap-horizontal" size={20} color="#06B6D4" />
               </View>
-                <Text style={styles.menuText}>ექიმის რეჟიმზე გადასვლა</Text>
+              <Text style={styles.menuText}>ექიმის რეჟიმზე გადასვლა</Text>
               <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
             </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
+
+      <Modal
+        visible={comingSoonVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setComingSoonVisible(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setComingSoonVisible(false)}
+        >
+          <Pressable
+            style={styles.modalCard}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.modalIconWrap}>
+              <Ionicons name="time-outline" size={40} color="#06B6D4" />
+            </View>
+            <Text style={styles.modalTitle}>Coming soon</Text>
+            <Text style={styles.modalSubtitle}>
+              პირადი კაბინეტი მალე ხელმისაწვდომი იქნება.
+            </Text>
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={() => setComingSoonVisible(false)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.modalButtonText}>გასაგებია</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -455,5 +493,61 @@ const styles = StyleSheet.create({
     color: "#6B7280",
     marginBottom: 12,
   },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  modalCard: {
+    width: "100%",
+    maxWidth: 340,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 24,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  modalIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: "#ECFEFF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontFamily: "Poppins-Bold",
+    color: "#1F2937",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  modalSubtitle: {
+    fontSize: 15,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  modalButton: {
+    backgroundColor: "#06B6D4",
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 14,
+    width: "100%",
+    alignItems: "center",
+  },
+  modalButtonText: {
+    fontSize: 16,
+    fontFamily: "Poppins-SemiBold",
+    color: "#FFFFFF",
+  },
 });
-

@@ -1259,6 +1259,12 @@ export class DoctorsService {
     if (updateDoctorDto.adminNotes !== undefined) {
       doctor.adminNotes = updateDoctorDto.adminNotes;
     }
+    if (updateDoctorDto.rating !== undefined) {
+      doctor.rating = updateDoctorDto.rating;
+    }
+    if (updateDoctorDto.reviewCount !== undefined) {
+      doctor.reviewCount = updateDoctorDto.reviewCount;
+    }
 
     console.log(
       '💰 [updateDoctor] Doctor fees AFTER assignment (before save):',
@@ -1959,6 +1965,17 @@ export class DoctorsService {
       throw new BadRequestException(
         'Visit address is required for home-visit appointments',
       );
+    }
+
+    if (appointmentType === AppointmentType.HOME_VISIT) {
+      const [th, tmi] = dto.time.split(':').map(Number);
+      const startLocal = new Date(year, month - 1, day, th, tmi || 0, 0, 0);
+      const HOME_VISIT_MIN_LEAD_MS = 2 * 60 * 60 * 1000;
+      if (startLocal.getTime() - Date.now() < HOME_VISIT_MIN_LEAD_MS) {
+        throw new BadRequestException(
+          'ბინაზე ვიზიტის ჯავშანი შესაძლებელია მინიმუმ 2 საათით ადრე.',
+        );
+      }
     }
 
     // Check doctor's availability (query by date range so it matches regardless of server timezone when availability was saved)

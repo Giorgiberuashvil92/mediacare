@@ -873,12 +873,12 @@ export default function DoctorSchedule() {
     }
   };
 
-  // ბინაზე ვიზიტი: ექიმს მხოლოდ 3 საათით ადრე უნდა დაამატოს გრაფიკი (მოწყობილობის ლოკალური დრო)
+  // ბინაზე ვიზიტი: ექიმს მხოლოდ 2 საათით ადრე უნდა დაამატოს გრაფიკი (მოწყობილობის ლოკალური დრო)
   const canAddSlotHomeVisit = (dateStr: string, time: string): boolean => {
     try {
       const slotDateTime = slotToLocalDate(dateStr, time);
       const diffHours = (slotDateTime.getTime() - Date.now()) / (1000 * 60 * 60);
-      const canAdd = diffHours >= 3;
+      const canAdd = diffHours >= 2;
       if (!canAdd) {
         logSlotCheck("HomeVisit", dateStr, time, slotDateTime, {
           diffHours,
@@ -1035,11 +1035,11 @@ export default function DoctorSchedule() {
         return;
       }
 
-      // შემოწმება: დარჩენილია თუ არა მინიმუმ 3 საათი (ბინაზე ვიზიტი მხოლოდ 3 საათით ადრე)
+      // შემოწმება: დარჩენილია თუ არა მინიმუმ 2 საათი (ბინაზე ვიზიტი მხოლოდ 2 საათით ადრე)
       if (!canAddSlotHomeVisit(currentEditDate, time)) {
         Alert.alert(
           "საათის დამატება შეუძლებელია",
-          "ბინაზე ვიზიტის საათის დამატება შესაძლებელია მინიმუმ 3 საათით ადრე. ამ საათამდე 3 საათზე ნაკლები დარჩენილია.",
+          "ბინაზე ვიზიტის საათის დამატება შესაძლებელია მინიმუმ 2 საათით ადრე. ამ საათამდე 2 საათზე ნაკლები დარჩენილია.",
         );
         return;
       }

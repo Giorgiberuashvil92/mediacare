@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { AIAssistant } from '@/components/AIAssistant';
-import { Header } from '@/components/Layouts/header';
-import { Sidebar } from '@/components/Layouts/sidebar';
-import { useAuth } from '@/contexts/AuthContext';
-import { usePathname } from 'next/navigation';
+import { AIAssistant } from "@/components/AIAssistant";
+import { Header } from "@/components/Layouts/header";
+import { Sidebar } from "@/components/Layouts/sidebar";
+import { useAuth } from "@/contexts/AuthContext";
+import { usePathname } from "next/navigation";
 
 export function DashboardLayoutWrapper({
   children,
@@ -15,7 +15,7 @@ export function DashboardLayoutWrapper({
   const pathname = usePathname();
 
   // Check if current path is auth page
-  const isAuthPage = pathname?.startsWith('/auth');
+  const isAuthPage = pathname?.startsWith("/auth");
 
   // Show loading state
   if (isLoading) {
@@ -31,12 +31,10 @@ export function DashboardLayoutWrapper({
     return <>{children}</>;
   }
 
-  // If not authenticated, don't show sidebar and header (middleware will redirect)
   if (!isAuthenticated) {
     return <>{children}</>;
   }
 
-  // Show dashboard layout with sidebar and header
   return (
     <div className="flex min-h-screen">
       <Sidebar />
@@ -50,4 +48,3 @@ export function DashboardLayoutWrapper({
     </div>
   );
 }
-

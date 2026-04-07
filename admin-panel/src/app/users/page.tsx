@@ -1,18 +1,22 @@
-'use client';
+"use client";
 
-import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
-import { apiService, User } from '@/lib/api';
-import { useEffect, useState } from 'react';
-import DeleteUserModal from './_components/delete-user-modal';
-import UserFormModal from './_components/user-form-modal';
+import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
+import { apiService, User } from "@/lib/api";
+import { useEffect, useState } from "react";
+import DeleteUserModal from "./_components/delete-user-modal";
+import UserFormModal from "./_components/user-form-modal";
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [roleFilter, setRoleFilter] = useState<'patient' | 'doctor' | 'all'>('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [roleFilter, setRoleFilter] = useState<"patient" | "doctor" | "all">(
+    "all",
+  );
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "active" | "inactive"
+  >("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
@@ -36,7 +40,7 @@ export default function UsersPage() {
         limit,
       };
 
-      if (roleFilter !== 'all') {
+      if (roleFilter !== "all") {
         params.role = roleFilter;
       }
 
@@ -49,9 +53,9 @@ export default function UsersPage() {
         let filteredUsers = response.data.users;
 
         // Filter by status on frontend (since backend doesn't have status filter)
-        if (statusFilter !== 'all') {
+        if (statusFilter !== "all") {
           filteredUsers = filteredUsers.filter((user) =>
-            statusFilter === 'active' ? user.isActive : !user.isActive
+            statusFilter === "active" ? user.isActive : !user.isActive,
           );
         }
 
@@ -60,7 +64,7 @@ export default function UsersPage() {
         setTotal(response.data.pagination?.total || 0);
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to load users');
+      setError(err.message || "Failed to load users");
     } finally {
       setLoading(false);
     }
@@ -71,12 +75,12 @@ export default function UsersPage() {
     setCurrentPage(1); // Reset to first page on search
   };
 
-  const handleRoleFilter = (role: 'patient' | 'doctor' | 'all') => {
+  const handleRoleFilter = (role: "patient" | "doctor" | "all") => {
     setRoleFilter(role);
     setCurrentPage(1);
   };
 
-  const handleStatusFilter = (status: 'all' | 'active' | 'inactive') => {
+  const handleStatusFilter = (status: "all" | "active" | "inactive") => {
     setStatusFilter(status);
     setCurrentPage(1);
   };
@@ -101,7 +105,7 @@ export default function UsersPage() {
       await loadUsers();
       setError(null);
     } catch (err: any) {
-      setError(err.message || 'შეცდომა მოხდა წაშლისას');
+      setError(err.message || "შეცდომა მოხდა წაშლისას");
     } finally {
       setDeletingUserId(null);
     }
@@ -129,12 +133,6 @@ export default function UsersPage() {
             <h2 className="text-2xl font-bold text-dark dark:text-white">
               მომხმარებლების მართვა
             </h2>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="rounded-lg bg-primary px-4 py-2 text-white transition hover:bg-primary/90"
-            >
-              + ახალი მომხმარებელი
-            </button>
           </div>
 
           {error && (
@@ -165,7 +163,11 @@ export default function UsersPage() {
                 </label>
                 <select
                   value={roleFilter}
-                  onChange={(e) => handleRoleFilter(e.target.value as 'patient' | 'doctor' | 'all')}
+                  onChange={(e) =>
+                    handleRoleFilter(
+                      e.target.value as "patient" | "doctor" | "all",
+                    )
+                  }
                   className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
                 >
                   <option value="all">ყველა</option>
@@ -181,7 +183,11 @@ export default function UsersPage() {
                 </label>
                 <select
                   value={statusFilter}
-                  onChange={(e) => handleStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
+                  onChange={(e) =>
+                    handleStatusFilter(
+                      e.target.value as "all" | "active" | "inactive",
+                    )
+                  }
                   className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
                 >
                   <option value="all">ყველა</option>
@@ -261,12 +267,18 @@ export default function UsersPage() {
                   </tr>
                 ) : (
                   users.map((user) => {
-                    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'https://mediacare-production.up.railway.app';
+                    const apiBase =
+                      process.env.NEXT_PUBLIC_API_URL ||
+                      "https://mediacare-production.up.railway.app";
                     // Helper function to check if URL is absolute (starts with http:// or https://)
                     const isAbsoluteUrl = (url: string) => {
-                      return url && (url.startsWith('http://') || url.startsWith('https://'));
+                      return (
+                        url &&
+                        (url.startsWith("http://") ||
+                          url.startsWith("https://"))
+                      );
                     };
-                    
+
                     const photoSrc = user.profileImage
                       ? isAbsoluteUrl(user.profileImage)
                         ? user.profileImage
@@ -299,7 +311,7 @@ export default function UsersPage() {
                               className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/20 text-sm font-medium text-primary"
                               title={user.name}
                             >
-                              {(user.name || '?').charAt(0).toUpperCase()}
+                              {(user.name || "?").charAt(0).toUpperCase()}
                             </div>
                           )}
                         </td>
@@ -310,27 +322,29 @@ export default function UsersPage() {
                           {user.email}
                         </td>
                         <td className="p-4 text-dark-4 dark:text-dark-6">
-                          {user.phone || '-'}
+                          {user.phone || "-"}
                         </td>
                         <td className="p-4 text-dark-4 dark:text-dark-6">
-                          {user.idNumber || '-'}
+                          {user.idNumber || "-"}
                         </td>
                         <td className="p-4 text-dark-4 dark:text-dark-6">
                           {user.dateOfBirth
-                            ? new Date(user.dateOfBirth).toLocaleDateString('ka-GE')
-                            : '-'}
+                            ? new Date(user.dateOfBirth).toLocaleDateString(
+                                "ka-GE",
+                              )
+                            : "-"}
                         </td>
                         <td className="p-4 text-dark-4 dark:text-dark-6">
-                          {user.gender === 'male'
-                            ? 'კაცი'
-                            : user.gender === 'female'
-                            ? 'ქალი'
-                            : user.gender === 'other'
-                            ? 'სხვა'
-                            : '-'}
+                          {user.gender === "male"
+                            ? "კაცი"
+                            : user.gender === "female"
+                              ? "ქალი"
+                              : user.gender === "other"
+                                ? "სხვა"
+                                : "-"}
                         </td>
                         <td className="p-4 text-dark-4 dark:text-dark-6">
-                          {user.address || '-'}
+                          {user.address || "-"}
                         </td>
                         <td className="p-4">
                           {idDocUrl ? (
@@ -356,11 +370,13 @@ export default function UsersPage() {
                               გახსნა
                             </a>
                           ) : (
-                            <span className="text-dark-4 dark:text-dark-6">-</span>
+                            <span className="text-dark-4 dark:text-dark-6">
+                              -
+                            </span>
                           )}
                         </td>
                         <td className="p-4">
-                          {user.role === 'doctor' && licenseDocUrl ? (
+                          {user.role === "doctor" && licenseDocUrl ? (
                             <a
                               href={licenseDocUrl}
                               target="_blank"
@@ -383,51 +399,59 @@ export default function UsersPage() {
                               ლიცენზია
                             </a>
                           ) : (
-                            <span className="text-dark-4 dark:text-dark-6">-</span>
+                            <span className="text-dark-4 dark:text-dark-6">
+                              -
+                            </span>
                           )}
                         </td>
                         <td className="p-4">
                           <span
                             className={`rounded-full px-3 py-1 text-xs font-medium ${
-                              user.role === 'doctor'
-                                ? 'bg-primary/10 text-primary'
-                                : 'bg-success/10 text-success'
+                              user.role === "doctor"
+                                ? "bg-primary/10 text-primary"
+                                : "bg-success/10 text-success"
                             }`}
                           >
-                            {user.role === 'doctor' ? 'ექიმი' : 'პაციენტი'}
+                            {user.role === "doctor" ? "ექიმი" : "პაციენტი"}
                           </span>
                         </td>
                         <td className="p-4 text-dark-4 dark:text-dark-6">
-                          {user.role === 'doctor' && user.specialization ? (
+                          {user.role === "doctor" && user.specialization ? (
                             <div className="flex flex-wrap gap-1">
-                              {user.specialization.split(',').map((spec, idx) => (
-                                <span
-                                  key={idx}
-                                  className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
-                                >
-                                  {spec.trim()}
-                                </span>
-                              ))}
+                              {user.specialization
+                                .split(",")
+                                .map((spec, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+                                  >
+                                    {spec.trim()}
+                                  </span>
+                                ))}
                             </div>
                           ) : (
-                            <span className="text-dark-4 dark:text-dark-6">-</span>
+                            <span className="text-dark-4 dark:text-dark-6">
+                              -
+                            </span>
                           )}
                         </td>
                         <td className="p-4">
                           <span
                             className={`rounded-full px-3 py-1 text-xs font-medium ${
                               user.isActive
-                                ? 'bg-success/10 text-success'
-                                : 'bg-danger/10 text-danger'
+                                ? "bg-success/10 text-success"
+                                : "bg-danger/10 text-danger"
                             }`}
                           >
-                            {user.isActive ? 'აქტიური' : 'არააქტიური'}
+                            {user.isActive ? "აქტიური" : "არააქტიური"}
                           </span>
                         </td>
                         <td className="p-4 text-dark-4 dark:text-dark-6">
                           {user.createdAt
-                            ? new Date(user.createdAt).toLocaleDateString('ka-GE')
-                            : '-'}
+                            ? new Date(user.createdAt).toLocaleDateString(
+                                "ka-GE",
+                              )
+                            : "-"}
                         </td>
                         <td className="p-4">
                           <div className="flex gap-2">
@@ -435,7 +459,9 @@ export default function UsersPage() {
                               onClick={async () => {
                                 try {
                                   setLoading(true);
-                                  const response = await apiService.getUserById(user.id);
+                                  const response = await apiService.getUserById(
+                                    user.id,
+                                  );
                                   if (response.success && response.data) {
                                     // getUserById returns { success: true, data: User }
                                     setSelectedUser(response.data);
@@ -446,7 +472,7 @@ export default function UsersPage() {
                                     setShowEditModal(true);
                                   }
                                 } catch (err: any) {
-                                  console.error('Error loading user:', err);
+                                  console.error("Error loading user:", err);
                                   // Fallback to using user from list
                                   setSelectedUser(user);
                                   setShowEditModal(true);
@@ -463,7 +489,9 @@ export default function UsersPage() {
                               disabled={deletingUserId === user.id}
                               className="rounded-lg bg-danger/10 px-3 py-1 text-xs font-medium text-danger transition hover:bg-danger/20 disabled:opacity-50"
                             >
-                              {deletingUserId === user.id ? 'წაშლა...' : 'წაშლა'}
+                              {deletingUserId === user.id
+                                ? "წაშლა..."
+                                : "წაშლა"}
                             </button>
                           </div>
                         </td>
@@ -479,11 +507,14 @@ export default function UsersPage() {
           {totalPages > 1 && (
             <div className="mt-6 flex items-center justify-between">
               <div className="text-sm text-dark-4 dark:text-dark-6">
-                ნაჩვენებია {((currentPage - 1) * limit) + 1}-{Math.min(currentPage * limit, total)} {total}-დან
+                ნაჩვენებია {(currentPage - 1) * limit + 1}-
+                {Math.min(currentPage * limit, total)} {total}-დან
               </div>
               <div className="flex gap-2">
                 <button
-                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.max(1, prev - 1))
+                  }
                   disabled={currentPage === 1 || loading}
                   className="rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-dark transition hover:bg-gray-50 disabled:opacity-50 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3"
                 >
@@ -508,8 +539,8 @@ export default function UsersPage() {
                         disabled={loading}
                         className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
                           currentPage === pageNum
-                            ? 'bg-primary text-white'
-                            : 'border border-stroke text-dark hover:bg-gray-50 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3'
+                            ? "bg-primary text-white"
+                            : "border border-stroke text-dark hover:bg-gray-50 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3"
                         } disabled:opacity-50`}
                       >
                         {pageNum}
@@ -518,7 +549,9 @@ export default function UsersPage() {
                   })}
                 </div>
                 <button
-                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+                  }
                   disabled={currentPage === totalPages || loading}
                   className="rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-dark transition hover:bg-gray-50 disabled:opacity-50 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3"
                 >
@@ -558,11 +591,10 @@ export default function UsersPage() {
           setUserToDelete(null);
         }}
         onConfirm={handleDeleteConfirm}
-        userName={userToDelete?.name || ''}
-        userEmail={userToDelete?.email || ''}
+        userName={userToDelete?.name || ""}
+        userEmail={userToDelete?.email || ""}
         isDeleting={deletingUserId === userToDelete?.id}
       />
     </>
   );
 }
-

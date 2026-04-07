@@ -14,18 +14,18 @@ import SeeAll from "../shared/seeAll";
 // Icon mapping for specializations
 const getIconForSpecialization = (name: string) => {
   const iconMap: Record<string, any> = {
-    "ნევროლოგია": require("../../../assets/images/icons/brain1.png"),
-    "კარდიოლოგია": require("../../../assets/images/icons/cardiology.png"),
-    "გინეკოლოგია": require("../../../assets/images/icons/pregnant.png"),
-    "პედიატრია": require("../../../assets/images/icons/baby.png"),
-    "ალერგოლოგია": require("../../../assets/images/icons/allergy.png"),
-    "სტომატოლოგია": require("../../../assets/images/icons/dendist.png"),
-    "უროლოგია": require("../../../assets/images/icons/urology.png"),
-    "გასტროენტეროლოგია": require("../../../assets/images/icons/gastrology.png"),
-    "დერმატოლოგია": require("../../../assets/images/icons/cardiology.png"), // Fallback
-    "ორთოპედია": require("../../../assets/images/icons/brain1.png"), // Fallback
-    "ოფთალმოლოგია": require("../../../assets/images/icons/allergy.png"), // Fallback
-    "ფსიქოლოგია": require("../../../assets/images/icons/phycatry.png"),
+    ნევროლოგი: require("../../../assets/images/icons/brain1.png"),
+    კარდიოლოგი: require("../../../assets/images/icons/cardiology.png"),
+    გინეკოლოგი: require("../../../assets/images/icons/pregnant.png"),
+    პედიატრი: require("../../../assets/images/icons/baby.png"),
+    ალერგოლოგი: require("../../../assets/images/icons/allergy.png"),
+    სტომატოლოგი: require("../../../assets/images/icons/dendist.png"),
+    უროლოგი: require("../../../assets/images/icons/urology.png"),
+    გასტროენტეროლოგი: require("../../../assets/images/icons/gastrology.png"),
+    დერმატოლოგი: require("../../../assets/images/icons/cardiology.png"), // Fallback
+    ორთოპედი: require("../../../assets/images/icons/brain1.png"), // Fallback
+    ოფთალმოლოგი: require("../../../assets/images/icons/allergy.png"), // Fallback
+    ფსიქოლოგი: require("../../../assets/images/icons/phycatry.png"),
   };
   return iconMap[name] || require("../../../assets/images/icons/brain1.png");
 };
@@ -33,18 +33,18 @@ const getIconForSpecialization = (name: string) => {
 // Background color mapping
 const getBgColorForSpecialization = (name: string) => {
   const colorMap: Record<string, string> = {
-    "ნევროლოგია": "#E3F2FD",
-    "კარდიოლოგია": "#FFEBEE",
-    "გინეკოლოგია": "#F3E5F5",
-    "პედიატრია": "#E8F5E8",
-    "ალერგოლოგია": "#FFF3E0",
-    "სტომატოლოგია": "#E0F2F1",
-    "უროლოგია": "#E1F5FE",
-    "გასტროენტეროლოგია": "#FCE4EC",
-    "დერმატოლოგია": "#FFF8E1",
-    "ორთოპედია": "#E8EAF6",
-    "ოფთალმოლოგია": "#F1F8E9",
-    "ფსიქოლოგია": "#FCE4EC",
+    ნევროლოგი: "#E3F2FD",
+    კარდიოლოგი: "#FFEBEE",
+    გინეკოლოგი: "#F3E5F5",
+    პედიატრი: "#E8F5E8",
+    ალერგოლოგი: "#FFF3E0",
+    სტომატოლოგი: "#E0F2F1",
+    უროლოგი: "#E1F5FE",
+    გასტროენტეროლოგი: "#FCE4EC",
+    დერმატოლოგი: "#FFF8E1",
+    ორთოპედი: "#E8EAF6",
+    ოფთალმოლოგი: "#F1F8E9",
+    ფსიქოლოგი: "#FCE4EC",
   };
   return colorMap[name] || "#E3F2FD";
 };
@@ -84,7 +84,10 @@ const Departments = () => {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <SeeAll title="სპეციალიზაციები" route="/screens/doctors/departments" />
+          <SeeAll
+            title="სპეციალიზაციები"
+            route="/screens/doctors/departments"
+          />
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="small" color="#06B6D4" />
@@ -127,7 +130,6 @@ const Departments = () => {
           ))
         )}
       </View>
-
     </View>
   );
 };

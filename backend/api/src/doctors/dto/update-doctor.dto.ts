@@ -2,8 +2,11 @@ import {
   IsBoolean,
   IsEmail,
   IsEnum,
+  IsInt,
   IsNumber,
   IsOptional,
+  Max,
+  Min,
   IsString,
 } from 'class-validator';
 import { ApprovalStatus, Gender } from '../../schemas/user.schema';
@@ -90,4 +93,17 @@ export class UpdateDoctorDto {
   @IsString()
   @IsOptional()
   adminNotes?: string;
+
+  /** საჯარო რეიტინგი (აპში ვარსკვლავებით) — ადმინის მიერ */
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(5)
+  rating?: number;
+
+  /** შეფასებების რაოდენობა (აპში ტექსტური მითითებისთვის) */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  reviewCount?: number;
 }

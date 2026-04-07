@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { EmailIcon, PasswordIcon, UserIcon } from '@/assets/icons';
-import InputGroup from '@/components/FormElements/InputGroup';
-import { apiService, Specialization } from '@/lib/api';
-import { useEffect, useMemo, useState } from 'react';
+import { EmailIcon, PasswordIcon, UserIcon } from "@/assets/icons";
+import InputGroup from "@/components/FormElements/InputGroup";
+import { apiService, Specialization } from "@/lib/api";
+import { useEffect, useMemo, useState } from "react";
 
 interface AddDoctorFormProps {
   onSuccess?: () => void;
@@ -15,22 +15,23 @@ export function AddDoctorForm({ onSuccess, onCancel }: AddDoctorFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    phone: '',
+    name: "",
+    email: "",
+    password: "",
+    phone: "",
     specializations: [] as string[],
-    degrees: '',
-    experience: '',
-    about: '',
-    location: '',
-    dateOfBirth: '',
-    gender: 'male' as 'male' | 'female' | 'other',
+    degrees: "",
+    experience: "",
+    about: "",
+    location: "",
+    dateOfBirth: "",
+    gender: "male" as "male" | "female" | "other",
   });
   const [licenseFile, setLicenseFile] = useState<File | null>(null);
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
   const [specializations, setSpecializations] = useState<Specialization[]>([]);
-  const [isLoadingSpecializations, setIsLoadingSpecializations] = useState(false);
+  const [isLoadingSpecializations, setIsLoadingSpecializations] =
+    useState(false);
   const [showLicenseInfoModal, setShowLicenseInfoModal] = useState(false);
 
   useEffect(() => {
@@ -42,7 +43,7 @@ export function AddDoctorForm({ onSuccess, onCancel }: AddDoctorFormProps) {
           setSpecializations(response.data);
         }
       } catch (err) {
-        console.error('Failed to load specializations', err);
+        console.error("Failed to load specializations", err);
         setSpecializations([]);
       } finally {
         setIsLoadingSpecializations(false);
@@ -96,12 +97,12 @@ export function AddDoctorForm({ onSuccess, onCancel }: AddDoctorFormProps) {
     setSuccess(null);
 
     if (formData.specializations.length === 0) {
-      setError('აირჩიე მინიმუმ ერთი სპეციალიზაცია.');
+      setError("აირჩიე მინიმუმ ერთი სპეციალიზაცია.");
       return;
     }
 
     if (!licenseFile) {
-      setError('გთხოვთ ატვირთოთ ექიმის სამედიცინო ლიცენზია (PDF).');
+      setError("გთხოვთ ატვირთოთ ექიმის სამედიცინო ლიცენზია (PDF).");
       return;
     }
 
@@ -111,27 +112,29 @@ export function AddDoctorForm({ onSuccess, onCancel }: AddDoctorFormProps) {
       let licenseDocumentPath: string | undefined;
       let profileImageUrl: string | undefined;
 
-      const uploadResponse = await apiService.uploadLicenseDocument(licenseFile);
+      const uploadResponse =
+        await apiService.uploadLicenseDocument(licenseFile);
       if (uploadResponse.success) {
         licenseDocumentPath = uploadResponse.data.filePath;
       }
 
       if (profileImageFile) {
-        const imageResponse = await apiService.uploadProfileImage(profileImageFile);
+        const imageResponse =
+          await apiService.uploadProfileImage(profileImageFile);
         if (imageResponse.success) {
           profileImageUrl = imageResponse.data.url;
         }
       }
 
       const registerData = {
-        role: 'doctor' as const,
+        role: "doctor" as const,
         name: formData.name,
         email: formData.email,
         password: formData.password,
         phone: formData.phone || undefined,
         dateOfBirth: formData.dateOfBirth || undefined,
         gender: formData.gender,
-        specialization: formData.specializations.join(', ') || undefined,
+        specialization: formData.specializations.join(", ") || undefined,
         degrees: formData.degrees || undefined,
         experience: formData.experience || undefined,
         about: formData.about || undefined,
@@ -140,38 +143,38 @@ export function AddDoctorForm({ onSuccess, onCancel }: AddDoctorFormProps) {
         profileImage: profileImageUrl,
       };
 
-      const response = await apiService.apiCall('/auth/register', {
-        method: 'POST',
+      const response = await apiService.apiCall("/auth/register", {
+        method: "POST",
         body: JSON.stringify(registerData),
       });
 
       if (response.success) {
-        const successMessage = response.message || 'ექიმი წარმატებით დაემატა';
+        const successMessage = response.message || "ექიმი წარმატებით დაემატა";
         setSuccess(successMessage);
-        
+
         setFormData({
-          name: '',
-          email: '',
-          password: '',
-          phone: '',
+          name: "",
+          email: "",
+          password: "",
+          phone: "",
           specializations: [],
-          degrees: '',
-          experience: '',
-          about: '',
-          location: '',
-          dateOfBirth: '',
-          gender: 'male',
+          degrees: "",
+          experience: "",
+          about: "",
+          location: "",
+          dateOfBirth: "",
+          gender: "male",
         });
         setLicenseFile(null);
         setProfileImageFile(null);
-        
+
         // Call onSuccess after a short delay to show success message
         setTimeout(() => {
           onSuccess?.();
         }, 1500);
       }
     } catch (err: any) {
-      setError(err.message || 'ექიმის დამატება ვერ მოხერხდა');
+      setError(err.message || "ექიმის დამატება ვერ მოხერხდა");
     } finally {
       setLoading(false);
     }
@@ -266,7 +269,9 @@ export function AddDoctorForm({ onSuccess, onCancel }: AddDoctorFormProps) {
               ) : activeSpecializations.length > 0 ? (
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {activeSpecializations.map((spec) => {
-                    const checked = formData.specializations.includes(spec.name);
+                    const checked = formData.specializations.includes(
+                      spec.name,
+                    );
                     return (
                       <label
                         key={spec._id}
@@ -411,7 +416,6 @@ export function AddDoctorForm({ onSuccess, onCancel }: AddDoctorFormProps) {
             >
               <option value="male">კაცი</option>
               <option value="female">ქალი</option>
-              <option value="other">სხვა</option>
             </select>
           </div>
 
@@ -446,7 +450,7 @@ export function AddDoctorForm({ onSuccess, onCancel }: AddDoctorFormProps) {
               type="submit"
               disabled={loading || activeSpecializations.length === 0}
             >
-              {loading ? 'დამატება...' : 'ექიმის დამატება'}
+              {loading ? "დამატება..." : "ექიმის დამატება"}
             </button>
           </div>
         </form>
@@ -500,7 +504,10 @@ export function AddDoctorForm({ onSuccess, onCancel }: AddDoctorFormProps) {
                       მნიშვნელოვანი ინფორმაცია
                     </p>
                     <p className="mt-2 text-sm text-yellow-700 dark:text-yellow-300">
-                      ლიცენზია იტვირთება მხოლოდ ერთხელ. გთხოვთ, ყურადღებით შეამოწმოთ არჩეული ფაილი სანამ ატვირთვას დააწყებთ. შეცდომის შემთხვევაში ლიცენზიის შეცვლა შესაძლებელი იქნება მხოლოდ ადმინისტრატორის მხარდაჭერით.
+                      ლიცენზია იტვირთება მხოლოდ ერთხელ. გთხოვთ, ყურადღებით
+                      შეამოწმოთ არჩეული ფაილი სანამ ატვირთვას დააწყებთ. შეცდომის
+                      შემთხვევაში ლიცენზიის შეცვლა შესაძლებელი იქნება მხოლოდ
+                      ადმინისტრატორის მხარდაჭერით.
                     </p>
                   </div>
                 </div>
@@ -520,4 +527,3 @@ export function AddDoctorForm({ onSuccess, onCancel }: AddDoctorFormProps) {
     </div>
   );
 }
-

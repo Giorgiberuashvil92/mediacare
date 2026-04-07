@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
-import { apiService } from '@/lib/api';
-import { useEffect, useState } from 'react';
-import { AppointmentDetailsModal } from './_components/appointment-details-modal';
-import { EmptySlots } from './_components/empty-slots';
+import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
+import { apiService } from "@/lib/api";
+import { useEffect, useState } from "react";
+import { AppointmentDetailsModal } from "./_components/appointment-details-modal";
+import { EmptySlots } from "./_components/empty-slots";
 
 interface LaboratoryTest {
   productId: string;
@@ -27,10 +27,16 @@ interface Appointment {
   doctorName: string;
   appointmentDate: string;
   appointmentTime: string;
-  type?: 'video' | 'home-visit';
-  status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
+  type?: "video" | "home-visit";
+  status:
+    | "pending"
+    | "confirmed"
+    | "in-progress"
+    | "completed"
+    | "cancelled"
+    | "blocked";
   consultationFee: number;
-  paymentStatus: 'pending' | 'paid' | 'failed';
+  paymentStatus: "pending" | "paid" | "failed";
   symptoms?: string;
   laboratoryTests?: LaboratoryTest[];
   documentsCount?: number;
@@ -38,13 +44,21 @@ interface Appointment {
 }
 
 export default function AppointmentsPage() {
-  const [activeTab, setActiveTab] = useState<'appointments' | 'empty-slots'>('appointments');
+  const [activeTab, setActiveTab] = useState<"appointments" | "empty-slots">(
+    "appointments",
+  );
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'confirmed' | 'completed' | 'cancelled'>('all');
-  const [paymentFilter, setPaymentFilter] = useState<'all' | 'pending' | 'paid' | 'failed'>('all');
-  const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "confirmed" | "completed" | "cancelled"
+  >("all");
+  const [paymentFilter, setPaymentFilter] = useState<
+    "all" | "pending" | "paid" | "failed"
+  >("all");
+  const [selectedAppointmentId, setSelectedAppointmentId] = useState<
+    string | null
+  >(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
@@ -54,70 +68,70 @@ export default function AppointmentsPage() {
   const loadAppointments = async () => {
     try {
       setLoading(true);
-      
+
       // Real API call to Medicare backend
       const params: any = {
         page: 1,
         limit: 50,
       };
 
-      if (statusFilter !== 'all') {
+      if (statusFilter !== "all") {
         params.status = statusFilter;
       }
 
-      if (paymentFilter !== 'all') {
+      if (paymentFilter !== "all") {
         params.paymentStatus = paymentFilter;
       }
 
       const response = await apiService.getAdminAppointments(params);
-      
+
       if (response.success && response.data) {
         setAppointments(response.data.appointments);
       } else {
         // Fallback to mock data if API fails
         const mockAppointments: Appointment[] = [
           {
-            id: '1',
-            patientName: 'გიორგი გელაშვილი',
-            doctorName: 'დ. ნინო ჯავახიშვილი',
-            appointmentDate: '2024-01-15',
-            appointmentTime: '10:00',
-            status: 'confirmed',
+            id: "1",
+            patientName: "გიორგი გელაშვილი",
+            doctorName: "დ. ნინო ჯავახიშვილი",
+            appointmentDate: "2024-01-15",
+            appointmentTime: "10:00",
+            status: "confirmed",
             consultationFee: 50,
-            paymentStatus: 'paid',
-            symptoms: 'თავის ტკივილი'
+            paymentStatus: "paid",
+            symptoms: "თავის ტკივილი",
           },
           {
-            id: '2',
-            patientName: 'მარიამ კვარაცხელია',
-            doctorName: 'დ. დავით მამაცაშვილი',
-            appointmentDate: '2024-01-15',
-            appointmentTime: '14:30',
-            status: 'pending',
+            id: "2",
+            patientName: "მარიამ კვარაცხელია",
+            doctorName: "დ. დავით მამაცაშვილი",
+            appointmentDate: "2024-01-15",
+            appointmentTime: "14:30",
+            status: "pending",
             consultationFee: 60,
-            paymentStatus: 'pending',
-            symptoms: 'ყელის ტკივილი'
-          }
+            paymentStatus: "pending",
+            symptoms: "ყელის ტკივილი",
+          },
         ];
-        
+
         setAppointments(mockAppointments);
       }
     } catch (err: any) {
-      setError(err.message || 'ჯავშნების ჩატვირთვა ვერ მოხერხდა');
-      
+      setError(err.message || "ჯავშნების ჩატვირთვა ვერ მოხერხდა");
+
       // Show mock data on error
       const mockAppointments: Appointment[] = [
         {
-          id: '1',
-          patientName: 'გიორგი გელაშვილი (Mock)',
-          doctorName: 'დ. ნინო ჯავახიშვილი',
-          appointmentDate: '2024-01-15',
-          appointmentTime: '10:00',
-          status: 'confirmed',
+          id: "1",
+          patientName: "გიორგი გელაშვილი (Mock)",
+          doctorName: "დ. ნინო ჯავახიშვილი",
+          appointmentDate: "2024-01-15",
+          appointmentTime: "10:00",
+          status: "confirmed",
           consultationFee: 50,
-          paymentStatus: 'paid',
-          symptoms: 'თავის ტკივილი'
-        }
+          paymentStatus: "paid",
+          symptoms: "თავის ტკივილი",
+        },
       ];
       setAppointments(mockAppointments);
     } finally {
@@ -127,18 +141,51 @@ export default function AppointmentsPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'confirmed': return 'bg-blue-500 text-white';
-      case 'completed': return 'bg-green-500 text-white';
-      case 'cancelled': return 'bg-red-500 text-white';
-      default: return 'bg-yellow-500 text-white';
+      case "confirmed":
+        return "bg-blue-500 text-white";
+      case "pending":
+        return "bg-amber-500 text-white";
+      case "in-progress":
+        return "bg-orange-500 text-white";
+      case "completed":
+        return "bg-green-500 text-white";
+      case "cancelled":
+        return "bg-red-500 text-white";
+      case "blocked":
+        return "bg-slate-500 text-white";
+      default:
+        return "bg-gray-500 text-white";
+    }
+  };
+
+  /** ფილტრთან და მობაილ აპთან შეჯერებული ქართული სტატუსები */
+  const getAppointmentStatusLabel = (status: string) => {
+    switch (status) {
+      case "pending":
+        return "მოლოდინში";
+      case "confirmed":
+        return "დანიშნული";
+      case "in-progress":
+        return "მიმდინარე";
+      case "completed":
+        return "დასრულებული";
+      case "cancelled":
+        return "გაუქმებული";
+      case "blocked":
+        return "დაბლოკილი";
+      default:
+        return status;
     }
   };
 
   const getPaymentStatusColor = (status: string) => {
     switch (status) {
-      case 'paid': return 'bg-green-500 text-white';
-      case 'failed': return 'bg-red-500 text-white';
-      default: return 'bg-yellow-500 text-white';
+      case "paid":
+        return "bg-green-500 text-white";
+      case "failed":
+        return "bg-red-500 text-white";
+      default:
+        return "bg-yellow-500 text-white";
     }
   };
 
@@ -165,236 +212,318 @@ export default function AppointmentsPage() {
           {/* Tabs */}
           <div className="mb-6 flex gap-2 border-b border-stroke dark:border-dark-3">
             <button
-              onClick={() => setActiveTab('appointments')}
+              onClick={() => setActiveTab("appointments")}
               className={`px-4 py-2 font-medium transition-colors ${
-                activeTab === 'appointments'
-                  ? 'border-b-2 border-primary text-primary'
-                  : 'text-dark-4 hover:text-dark dark:text-dark-6 dark:hover:text-white'
+                activeTab === "appointments"
+                  ? "border-b-2 border-primary text-primary"
+                  : "text-dark-4 hover:text-dark dark:text-dark-6 dark:hover:text-white"
               }`}
             >
               ჯავშნები
             </button>
             <button
-              onClick={() => setActiveTab('empty-slots')}
+              onClick={() => setActiveTab("empty-slots")}
               className={`px-4 py-2 font-medium transition-colors ${
-                activeTab === 'empty-slots'
-                  ? 'border-b-2 border-primary text-primary'
-                  : 'text-dark-4 hover:text-dark dark:text-dark-6 dark:hover:text-white'
+                activeTab === "empty-slots"
+                  ? "border-b-2 border-primary text-primary"
+                  : "text-dark-4 hover:text-dark dark:text-dark-6 dark:hover:text-white"
               }`}
             >
               ცარიელი ჯავშნები
             </button>
           </div>
 
-          {activeTab === 'empty-slots' ? (
+          {activeTab === "empty-slots" ? (
             <EmptySlots />
           ) : (
             <>
-          {error && (
-            <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
-              {error}
-            </div>
-          )}
+              {error && (
+                <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
+                  {error}
+                </div>
+              )}
 
-          {/* Filters */}
-          <div className="mb-6 flex flex-wrap gap-4">
-            <div className="flex-1 min-w-[200px]">
-              <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
-                სტატუსი
-              </label>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as any)}
-                className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
-              >
-                <option value="all">ყველა</option>
-                <option value="pending">მოლოდინში</option>
-                <option value="confirmed">დადასტურებული</option>
-                <option value="completed">დასრულებული</option>
-                <option value="cancelled">გაუქმებული</option>
-              </select>
-            </div>
-
-            <div className="flex-1 min-w-[200px]">
-              <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
-                გადახდის სტატუსი
-              </label>
-              <select
-                value={paymentFilter}
-                onChange={(e) => setPaymentFilter(e.target.value as any)}
-                className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
-              >
-                <option value="all">ყველა</option>
-                <option value="pending">მოლოდინში</option>
-                <option value="paid">გადახდილი</option>
-                <option value="failed">ვერ გადაიხადა</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Appointments Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-stroke dark:border-dark-3">
-                  <th className="p-4 text-left font-medium text-dark dark:text-white">
-                    ნომერი
-                  </th>
-                  <th className="p-4 text-left font-medium text-dark dark:text-white">
-                    პაციენტი
-                  </th>
-                  <th className="p-4 text-left font-medium text-dark dark:text-white">
-                    ექიმი
-                  </th>
-                  <th className="p-4 text-left font-medium text-dark dark:text-white">
-                    თარიღი/დრო
-                  </th>
-                  <th className="p-4 text-left font-medium text-dark dark:text-white">
-                    ტიპი
-                  </th>
-                  <th className="p-4 text-left font-medium text-dark dark:text-white">
+              {/* Filters */}
+              <div className="mb-6 flex flex-wrap gap-4">
+                <div className="flex-1 min-w-[200px]">
+                  <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
                     სტატუსი
-                  </th>
-                  <th className="p-4 text-left font-medium text-dark dark:text-white">
-                    გადახდა
-                  </th>
-                  <th className="p-4 text-left font-medium text-dark dark:text-white">
-                    ლაბ. კვლევები
-                  </th>
-                  <th className="p-4 text-left font-medium text-dark dark:text-white">
-                    დოკუმენტები
-                  </th>
-                  <th className="p-4 text-left font-medium text-dark dark:text-white">
-                    ღირებულება
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {appointments.length === 0 ? (
-                  <tr>
-                    <td colSpan={10} className="p-4 text-center text-dark-4">
-                      ჯავშნები არ მოიძებნა
-                    </td>
-                  </tr>
-                ) : (
-                  appointments.map((appointment) => (
-                    <tr
-                      key={appointment.id}
-                      onClick={() => {
-                        setSelectedAppointmentId(appointment.id);
-                        setIsModalOpen(true);
-                      }}
-                      className="cursor-pointer border-b border-stroke dark:border-dark-3 hover:bg-gray-50 dark:hover:bg-dark-3 transition-colors"
-                    >
-                      <td className="p-4">
-                        <div className="text-sm font-mono text-dark-4 dark:text-dark-6">
-                          {appointment.appointmentNumber || `#${appointment.id.slice(-6)}`}
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div>
-                          <div className="flex items-center gap-2 font-medium text-dark dark:text-white">
-                            {appointment.patientName}
-                            {appointment.documentsCount && appointment.documentsCount > 0 && (
-                              <span className="flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" title={`${appointment.documentsCount} დოკუმენტი ატვირთულია`}>
-                                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
-                                {appointment.documentsCount}
-                              </span>
-                            )}
-                          </div>
-                          {appointment.symptoms && (
-                            <div className="text-sm text-dark-4 dark:text-dark-6">
-                              {appointment.symptoms}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="p-4 text-dark dark:text-white">
-                        {appointment.doctorName}
-                      </td>
-                      <td className="p-4">
-                        <div className="text-dark dark:text-white">
-                          {new Date(appointment.appointmentDate).toLocaleDateString('ka-GE')}
-                        </div>
-                        <div className="text-sm text-dark-4 dark:text-dark-6">
-                          {appointment.appointmentTime}
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex flex-col gap-1">
-                        <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
-                          {appointment.type === 'home-visit' ? 'ბინაზე' : 'ვიდეო'}
-                        </span>
-                          {appointment.type === 'home-visit' && appointment.homeVisitCompletedAt && (
-                            <span className="flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-300" title={`პაციენტმა მონიშნა: ${new Date(appointment.homeVisitCompletedAt).toLocaleString('ka-GE')}`}>
-                              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                              პაციენტმა მონიშნა
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusColor(appointment.status)}`}>
-                          {appointment.status === 'pending' && 'მოლოდინში'}
-                          {appointment.status === 'confirmed' && 'დადასტურებული'}
-                          {appointment.status === 'completed' && 'დასრულებული'}
-                          {appointment.status === 'cancelled' && 'გაუქმებული'}
-                        </span>
-                      </td>
-                      <td className="p-4">
-                        <span className={`rounded-full px-3 py-1 text-xs font-medium ${getPaymentStatusColor(appointment.paymentStatus)}`}>
-                          {appointment.paymentStatus === 'pending' && 'მოლოდინში'}
-                          {appointment.paymentStatus === 'paid' && 'გადახდილი'}
-                          {appointment.paymentStatus === 'failed' && 'ვერ გადაიხადა'}
-                        </span>
-                      </td>
-                      <td className="p-4">
-                        {appointment.laboratoryTests && appointment.laboratoryTests.length > 0 ? (
-                          <div className="flex flex-col gap-1">
-                            <span className="flex items-center gap-1.5 rounded-full bg-purple-100 px-3 py-1 text-xs font-medium text-purple-800 dark:bg-purple-900/30 dark:text-purple-300">
-                              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                              </svg>
-                              {appointment.laboratoryTests.length} კვლევა
-                            </span>
-                            {appointment.laboratoryTests.some(t => t.resultFile) && (
-                              <span className="flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-300">
-                                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                {appointment.laboratoryTests.filter(t => t.resultFile).length} პასუხი
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-dark-4 dark:text-dark-6">—</span>
-                        )}
-                      </td>
-                      <td className="p-4">
-                        {appointment.documentsCount && appointment.documentsCount > 0 ? (
-                          <span className="flex items-center gap-1.5 rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
-                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            {appointment.documentsCount} ფაილი
-                          </span>
-                        ) : (
-                          <span className="text-dark-4 dark:text-dark-6">—</span>
-                        )}
-                      </td>
-                      <td className="p-4 text-dark dark:text-white font-medium">
-                        ₾{appointment.consultationFee}
-                      </td>
+                  </label>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value as any)}
+                    className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
+                  >
+                    <option value="all">ყველა</option>
+                    <option value="confirmed">დანიშნული</option>
+                    <option value="completed">დასრულებული</option>
+                    <option value="cancelled">გაუქმებული</option>
+                  </select>
+                </div>
+
+                <div className="flex-1 min-w-[200px]">
+                  <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
+                    გადახდის სტატუსი
+                  </label>
+                  <select
+                    value={paymentFilter}
+                    onChange={(e) => setPaymentFilter(e.target.value as any)}
+                    className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
+                  >
+                    <option value="all">ყველა</option>
+                    <option value="pending">მოლოდინში</option>
+                    <option value="paid">გადახდილი</option>
+                    <option value="failed">ვერ გადაიხადა</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Appointments Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-stroke dark:border-dark-3">
+                      <th className="p-4 text-left font-medium text-dark dark:text-white">
+                        ნომერი
+                      </th>
+                      <th className="p-4 text-left font-medium text-dark dark:text-white">
+                        პაციენტი
+                      </th>
+                      <th className="p-4 text-left font-medium text-dark dark:text-white">
+                        ექიმი
+                      </th>
+                      <th className="p-4 text-left font-medium text-dark dark:text-white">
+                        თარიღი/დრო
+                      </th>
+                      <th className="p-4 text-left font-medium text-dark dark:text-white">
+                        ტიპი
+                      </th>
+                      <th className="p-4 text-left font-medium text-dark dark:text-white">
+                        სტატუსი
+                      </th>
+                      <th className="p-4 text-left font-medium text-dark dark:text-white">
+                        გადახდა
+                      </th>
+                      <th className="p-4 text-left font-medium text-dark dark:text-white">
+                        ლაბ. კვლევები
+                      </th>
+                      <th className="p-4 text-left font-medium text-dark dark:text-white">
+                        დოკუმენტები
+                      </th>
+                      <th className="p-4 text-left font-medium text-dark dark:text-white">
+                        ღირებულება
+                      </th>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody>
+                    {appointments.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={10}
+                          className="p-4 text-center text-dark-4"
+                        >
+                          ჯავშნები არ მოიძებნა
+                        </td>
+                      </tr>
+                    ) : (
+                      appointments.map((appointment) => (
+                        <tr
+                          key={appointment.id}
+                          onClick={() => {
+                            setSelectedAppointmentId(appointment.id);
+                            setIsModalOpen(true);
+                          }}
+                          className="cursor-pointer border-b border-stroke dark:border-dark-3 hover:bg-gray-50 dark:hover:bg-dark-3 transition-colors"
+                        >
+                          <td className="p-4">
+                            <div className="text-sm font-mono text-dark-4 dark:text-dark-6">
+                              {appointment.appointmentNumber ||
+                                `#${appointment.id.slice(-6)}`}
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <div>
+                              <div className="flex items-center gap-2 font-medium text-dark dark:text-white">
+                                {appointment.patientName}
+                                {appointment.documentsCount &&
+                                  appointment.documentsCount > 0 && (
+                                    <span
+                                      className="flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+                                      title={`${appointment.documentsCount} დოკუმენტი ატვირთულია`}
+                                    >
+                                      <svg
+                                        className="h-3 w-3"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={2}
+                                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                        />
+                                      </svg>
+                                      {appointment.documentsCount}
+                                    </span>
+                                  )}
+                              </div>
+                              {appointment.symptoms && (
+                                <div className="text-sm text-dark-4 dark:text-dark-6">
+                                  {appointment.symptoms}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-4 text-dark dark:text-white">
+                            {appointment.doctorName}
+                          </td>
+                          <td className="p-4">
+                            <div className="text-dark dark:text-white">
+                              {new Date(
+                                appointment.appointmentDate,
+                              ).toLocaleDateString("ka-GE")}
+                            </div>
+                            <div className="text-sm text-dark-4 dark:text-dark-6">
+                              {appointment.appointmentTime}
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex flex-col gap-1">
+                              <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                                {appointment.type === "home-visit"
+                                  ? "ბინაზე"
+                                  : "ვიდეო"}
+                              </span>
+                              {appointment.type === "home-visit" &&
+                                appointment.homeVisitCompletedAt && (
+                                  <span
+                                    className="flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                                    title={`პაციენტმა მონიშნა: ${new Date(appointment.homeVisitCompletedAt).toLocaleString("ka-GE")}`}
+                                  >
+                                    <svg
+                                      className="h-3 w-3"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                                      />
+                                    </svg>
+                                    პაციენტმა მონიშნა
+                                  </span>
+                                )}
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <span
+                              className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusColor(appointment.status)}`}
+                            >
+                              {getAppointmentStatusLabel(appointment.status)}
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            <span
+                              className={`rounded-full px-3 py-1 text-xs font-medium ${getPaymentStatusColor(appointment.paymentStatus)}`}
+                            >
+                              {appointment.paymentStatus === "pending" &&
+                                "მოლოდინში"}
+                              {appointment.paymentStatus === "paid" &&
+                                "გადახდილი"}
+                              {appointment.paymentStatus === "failed" &&
+                                "ვერ გადაიხადა"}
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            {appointment.laboratoryTests &&
+                            appointment.laboratoryTests.length > 0 ? (
+                              <div className="flex flex-col gap-1">
+                                <span className="flex items-center gap-1.5 rounded-full bg-purple-100 px-3 py-1 text-xs font-medium text-purple-800 dark:bg-purple-900/30 dark:text-purple-300">
+                                  <svg
+                                    className="h-3.5 w-3.5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"
+                                    />
+                                  </svg>
+                                  {appointment.laboratoryTests.length} კვლევა
+                                </span>
+                                {appointment.laboratoryTests.some(
+                                  (t) => t.resultFile,
+                                ) && (
+                                  <span className="flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                                    <svg
+                                      className="h-3.5 w-3.5"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                                      />
+                                    </svg>
+                                    {
+                                      appointment.laboratoryTests.filter(
+                                        (t) => t.resultFile,
+                                      ).length
+                                    }{" "}
+                                    პასუხი
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-dark-4 dark:text-dark-6">
+                                —
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-4">
+                            {appointment.documentsCount &&
+                            appointment.documentsCount > 0 ? (
+                              <span className="flex items-center gap-1.5 rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                                <svg
+                                  className="h-3.5 w-3.5"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                  />
+                                </svg>
+                                {appointment.documentsCount} ფაილი
+                              </span>
+                            ) : (
+                              <span className="text-dark-4 dark:text-dark-6">
+                                —
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-4 text-dark dark:text-white font-medium">
+                            ₾{appointment.consultationFee}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </>
           )}
         </div>

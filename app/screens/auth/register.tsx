@@ -18,7 +18,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView, WebViewNavigation } from "react-native-webview";
@@ -35,16 +35,18 @@ export default function RegisterScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const selectedRole: "doctor" | "patient" = (userRole || "patient");
+  const selectedRole: "doctor" | "patient" = userRole || "patient";
 
-  // Common fields 
+  // Common fields
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
   // Doctor specific fields
-  const [selectedSpecializations, setSelectedSpecializations] = useState<string[]>([]);
+  const [selectedSpecializations, setSelectedSpecializations] = useState<
+    string[]
+  >([]);
   const [licenseDocument, setLicenseDocument] = useState<{
     uri: string;
     name: string;
@@ -63,7 +65,7 @@ export default function RegisterScreen() {
   const [loadingSpecializations, setLoadingSpecializations] = useState(false);
   const [specializationModalVisible, setSpecializationModalVisible] =
     useState(false);
-  
+
   // Additional doctor fields (matching admin panel)
   const [phone, setPhone] = useState("");
   const [idNumber, setIdNumber] = useState("");
@@ -92,10 +94,13 @@ export default function RegisterScreen() {
     type: string;
     filePath?: string;
   } | null>(null);
-  const [uploadingIdentificationDocument, setUploadingIdentificationDocument] = useState(false);
-  
+  const [uploadingIdentificationDocument, setUploadingIdentificationDocument] =
+    useState(false);
+
   // Nationality selection (only for patients)
-  const [nationality, setNationality] = useState<"georgian" | "non-georgian" | null>(null);
+  const [nationality, setNationality] = useState<
+    "georgian" | "non-georgian" | null
+  >(null);
   const [showPassportInfoModal, setShowPassportInfoModal] = useState(false);
 
   // IDENTOMAT states
@@ -103,7 +108,8 @@ export default function RegisterScreen() {
   const [identomatUrl, setIdentomatUrl] = useState<string>("");
   const [isIdentomatVerified, setIsIdentomatVerified] = useState(false);
   const [identomatData, setIdentomatData] = useState<any>(null);
-  const [identomatSessionToken, setIdentomatSessionToken] = useState<string>("");
+  const [identomatSessionToken, setIdentomatSessionToken] =
+    useState<string>("");
   const [identomatLoading, setIdentomatLoading] = useState(false);
 
   const nameInputRef = useRef<TextInput>(null);
@@ -238,7 +244,7 @@ export default function RegisterScreen() {
             headers: {
               "Content-Type": "multipart/form-data",
             },
-          }
+          },
         );
 
         const data = await response.json();
@@ -259,7 +265,7 @@ export default function RegisterScreen() {
       console.error("File pick error:", error);
       showToast.error(
         error instanceof Error ? error.message : "ფაილის ატვირთვა ვერ მოხერხდა",
-        "შეცდომა"
+        "შეცდომა",
       );
     } finally {
       setUploadingFile(false);
@@ -271,10 +277,16 @@ export default function RegisterScreen() {
     console.log("📸 [ProfileImage] ===== BUTTON PRESSED =====");
     console.log("📸 [ProfileImage] Timestamp:", new Date().toISOString());
     console.log("📸 [ProfileImage] Platform:", Platform.OS);
-    console.log("📸 [ProfileImage] Current state - uploadingProfileImage:", uploadingProfileImage);
-    console.log("📸 [ProfileImage] Current profileImage:", profileImage ? "exists" : "null");
+    console.log(
+      "📸 [ProfileImage] Current state - uploadingProfileImage:",
+      uploadingProfileImage,
+    );
+    console.log(
+      "📸 [ProfileImage] Current profileImage:",
+      profileImage ? "exists" : "null",
+    );
     console.log("========================================");
-    
+
     // Prevent multiple simultaneous calls
     if (uploadingProfileImage) {
       console.log("⚠️ [ProfileImage] Already uploading, skipping...");
@@ -287,13 +299,18 @@ export default function RegisterScreen() {
 
       // Request permissions - Android specific handling
       if (Platform.OS === "android") {
-        console.log("🤖 [ProfileImage] Android platform detected, checking permissions...");
+        console.log(
+          "🤖 [ProfileImage] Android platform detected, checking permissions...",
+        );
         try {
           // Check if permission is already granted
           const readPermission = await PermissionsAndroid.check(
-            PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES
+            PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES,
           );
-          console.log("🤖 [ProfileImage] Android permission check result:", readPermission);
+          console.log(
+            "🤖 [ProfileImage] Android permission check result:",
+            readPermission,
+          );
 
           if (!readPermission) {
             console.log("🤖 [ProfileImage] Requesting Android permission...");
@@ -302,20 +319,24 @@ export default function RegisterScreen() {
               PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES,
               {
                 title: "ფოტოებზე წვდომა",
-                message: "აპლიკაციას სჭირდება ფოტოებზე წვდომა პროფილის სურათის ასარჩევად",
+                message:
+                  "აპლიკაციას სჭირდება ფოტოებზე წვდომა პროფილის სურათის ასარჩევად",
                 buttonNeutral: "მოგვიანებით",
                 buttonNegative: "არა",
                 buttonPositive: "დიახ",
-              }
+              },
             );
-            console.log("🤖 [ProfileImage] Android permission request result:", granted);
+            console.log(
+              "🤖 [ProfileImage] Android permission request result:",
+              granted,
+            );
 
             if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
               console.log("❌ [ProfileImage] Android permission denied");
               Alert.alert(
                 "წვდომა აკრძალულია",
                 "ფოტოებზე წვდომა საჭიროა. გთხოვთ ჩართოთ პარამეტრებში.",
-                [{ text: "კარგი" }]
+                [{ text: "კარგი" }],
               );
               return;
             }
@@ -324,8 +345,14 @@ export default function RegisterScreen() {
             console.log("✅ [ProfileImage] Android permission already granted");
           }
         } catch (androidPermError) {
-          console.error("❌ [ProfileImage] Android permission error:", androidPermError);
-          console.error("❌ [ProfileImage] Error details:", JSON.stringify(androidPermError, null, 2));
+          console.error(
+            "❌ [ProfileImage] Android permission error:",
+            androidPermError,
+          );
+          console.error(
+            "❌ [ProfileImage] Error details:",
+            JSON.stringify(androidPermError, null, 2),
+          );
           // Fallback to ImagePicker permission request
         }
       } else {
@@ -336,63 +363,117 @@ export default function RegisterScreen() {
       // Android: We already handled permissions above
       // For iOS, we can skip explicit permission request and let launchImageLibraryAsync handle it
       if (Platform.OS === "ios") {
-        console.log("🍎 [ProfileImage] iOS detected - skipping explicit permission request");
-        console.log("🍎 [ProfileImage] launchImageLibraryAsync will handle permissions automatically");
+        console.log(
+          "🍎 [ProfileImage] iOS detected - skipping explicit permission request",
+        );
+        console.log(
+          "🍎 [ProfileImage] launchImageLibraryAsync will handle permissions automatically",
+        );
       } else {
         // Request permissions for Android (if not already granted)
-        console.log("📸 [ProfileImage] Requesting ImagePicker permissions for Android...");
-        console.log("📸 [ProfileImage] ImagePicker available:", typeof ImagePicker !== "undefined");
-        console.log("📸 [ProfileImage] requestMediaLibraryPermissionsAsync available:", typeof ImagePicker.requestMediaLibraryPermissionsAsync === "function");
-        
+        console.log(
+          "📸 [ProfileImage] Requesting ImagePicker permissions for Android...",
+        );
+        console.log(
+          "📸 [ProfileImage] ImagePicker available:",
+          typeof ImagePicker !== "undefined",
+        );
+        console.log(
+          "📸 [ProfileImage] requestMediaLibraryPermissionsAsync available:",
+          typeof ImagePicker.requestMediaLibraryPermissionsAsync === "function",
+        );
+
         let permission;
         try {
-          console.log("📸 [ProfileImage] Calling requestMediaLibraryPermissionsAsync...");
-          
+          console.log(
+            "📸 [ProfileImage] Calling requestMediaLibraryPermissionsAsync...",
+          );
+
           // Add timeout for permission request (10 seconds)
-          const permissionPromise = ImagePicker.requestMediaLibraryPermissionsAsync();
+          const permissionPromise =
+            ImagePicker.requestMediaLibraryPermissionsAsync();
           const permissionTimeoutPromise = new Promise((_, reject) => {
             setTimeout(() => {
-              console.error("⏱️ [ProfileImage] Permission request timeout (10s)");
+              console.error(
+                "⏱️ [ProfileImage] Permission request timeout (10s)",
+              );
               reject(new Error("Permission request timeout"));
             }, 10000);
           });
 
-          permission = await Promise.race([permissionPromise, permissionTimeoutPromise]) as ImagePicker.MediaLibraryPermissionResponse;
+          permission = (await Promise.race([
+            permissionPromise,
+            permissionTimeoutPromise,
+          ])) as ImagePicker.MediaLibraryPermissionResponse;
           console.log("✅ [ProfileImage] Permission request completed");
-          console.log("📸 [ProfileImage] ImagePicker permission result:", JSON.stringify(permission, null, 2));
-          console.log("📸 [ProfileImage] Permission status:", permission?.status);
-          
+          console.log(
+            "📸 [ProfileImage] ImagePicker permission result:",
+            JSON.stringify(permission, null, 2),
+          );
+          console.log(
+            "📸 [ProfileImage] Permission status:",
+            permission?.status,
+          );
+
           if (!permission || permission.status !== "granted") {
-            console.log("❌ [ProfileImage] Permission not granted, status:", permission?.status);
+            console.log(
+              "❌ [ProfileImage] Permission not granted, status:",
+              permission?.status,
+            );
             Alert.alert(
               "წვდომა აკრძალულია",
               "ფოტოებზე წვდომა საჭიროა. გთხოვთ ჩართოთ პარამეტრებში.",
-              [{ text: "კარგი" }]
+              [{ text: "კარგი" }],
             );
             return;
           }
         } catch (permError) {
-          console.error("❌ [ProfileImage] Permission request error:", permError);
+          console.error(
+            "❌ [ProfileImage] Permission request error:",
+            permError,
+          );
           console.error("❌ [ProfileImage] Error type:", typeof permError);
-          console.error("❌ [ProfileImage] Error name:", permError instanceof Error ? permError.name : "unknown");
-          console.error("❌ [ProfileImage] Error message:", permError instanceof Error ? permError.message : "unknown");
-          console.error("❌ [ProfileImage] Error stack:", permError instanceof Error ? permError.stack : "no stack");
+          console.error(
+            "❌ [ProfileImage] Error name:",
+            permError instanceof Error ? permError.name : "unknown",
+          );
+          console.error(
+            "❌ [ProfileImage] Error message:",
+            permError instanceof Error ? permError.message : "unknown",
+          );
+          console.error(
+            "❌ [ProfileImage] Error stack:",
+            permError instanceof Error ? permError.stack : "no stack",
+          );
           try {
-            console.error("❌ [ProfileImage] Error details (JSON):", JSON.stringify(permError, Object.getOwnPropertyNames(permError), 2));
+            console.error(
+              "❌ [ProfileImage] Error details (JSON):",
+              JSON.stringify(
+                permError,
+                Object.getOwnPropertyNames(permError),
+                2,
+              ),
+            );
           } catch (jsonError) {
-            console.error("❌ [ProfileImage] Could not stringify error:", jsonError);
+            console.error(
+              "❌ [ProfileImage] Could not stringify error:",
+              jsonError,
+            );
           }
           Alert.alert(
             "შეცდომა",
             "ფოტოებზე წვდომის მოთხოვნა ვერ მოხერხდა. გთხოვთ სცადოთ ხელახლა.",
-            [{ text: "კარგი" }]
+            [{ text: "კარგი" }],
           );
           return;
         }
       }
 
       console.log("✅ [ProfileImage] Ready to launch image picker...");
-      console.log("📸 [ProfileImage] launchImageLibraryAsync available:", typeof ImagePicker.launchImageLibraryAsync === "function");
+      console.log(
+        "📸 [ProfileImage] launchImageLibraryAsync available:",
+        typeof ImagePicker.launchImageLibraryAsync === "function",
+      );
 
       // Launch image picker with timeout protection
       console.log("📸 [ProfileImage] Launching image picker...");
@@ -407,7 +488,7 @@ export default function RegisterScreen() {
           selectionLimit: 1,
           aspect: [1, 1],
         });
-        
+
         const pickerPromise = ImagePicker.launchImageLibraryAsync({
           mediaTypes: ImagePicker.MediaTypeOptions.Images,
           allowsEditing: true,
@@ -416,8 +497,14 @@ export default function RegisterScreen() {
           aspect: [1, 1], // Square aspect ratio for profile images
         });
         console.log("✅ [ProfileImage] Picker promise created");
-        console.log("📸 [ProfileImage] Picker promise type:", typeof pickerPromise);
-        console.log("📸 [ProfileImage] Picker promise is Promise:", pickerPromise instanceof Promise);
+        console.log(
+          "📸 [ProfileImage] Picker promise type:",
+          typeof pickerPromise,
+        );
+        console.log(
+          "📸 [ProfileImage] Picker promise is Promise:",
+          pickerPromise instanceof Promise,
+        );
 
         // Add timeout (30 seconds)
         console.log("📸 [ProfileImage] Creating timeout promise (30s)...");
@@ -432,34 +519,51 @@ export default function RegisterScreen() {
         console.log("📸 [ProfileImage] Starting Promise.race...");
         console.log("📸 [ProfileImage] Picker promise state:", pickerPromise);
         console.log("📸 [ProfileImage] Timeout promise state:", timeoutPromise);
-        
+
         try {
-          result = await Promise.race([pickerPromise, timeoutPromise]) as ImagePicker.ImagePickerResult;
+          result = (await Promise.race([
+            pickerPromise,
+            timeoutPromise,
+          ])) as ImagePicker.ImagePickerResult;
           console.log("✅ [ProfileImage] Promise.race completed");
-          console.log("📸 [ProfileImage] Picker result received:", JSON.stringify({
-            canceled: result?.canceled,
-            assetsCount: result?.assets?.length,
-            hasAssets: !!result?.assets,
-            resultType: typeof result,
-          }, null, 2));
+          console.log(
+            "📸 [ProfileImage] Picker result received:",
+            JSON.stringify(
+              {
+                canceled: result?.canceled,
+                assetsCount: result?.assets?.length,
+                hasAssets: !!result?.assets,
+                resultType: typeof result,
+              },
+              null,
+              2,
+            ),
+          );
         } catch (raceError) {
           console.error("❌ [ProfileImage] Promise.race error:", raceError);
           throw raceError;
         }
       } catch (pickerError) {
-        console.error("❌ [ProfileImage] Image picker launch error:", pickerError);
-        console.error("❌ [ProfileImage] Error type:", typeof pickerError);
-        console.error("❌ [ProfileImage] Error details:", JSON.stringify(pickerError, Object.getOwnPropertyNames(pickerError), 2));
-        const errorMsg = pickerError instanceof Error 
-          ? pickerError.message 
-          : "სურათის არჩევის ფანჯარა ვერ გაიხსნა";
-        
-        console.error("❌ [ProfileImage] Showing error alert:", errorMsg);
-        Alert.alert(
-          "შეცდომა",
-          errorMsg,
-          [{ text: "კარგი" }]
+        console.error(
+          "❌ [ProfileImage] Image picker launch error:",
+          pickerError,
         );
+        console.error("❌ [ProfileImage] Error type:", typeof pickerError);
+        console.error(
+          "❌ [ProfileImage] Error details:",
+          JSON.stringify(
+            pickerError,
+            Object.getOwnPropertyNames(pickerError),
+            2,
+          ),
+        );
+        const errorMsg =
+          pickerError instanceof Error
+            ? pickerError.message
+            : "სურათის არჩევის ფანჯარა ვერ გაიხსნა";
+
+        console.error("❌ [ProfileImage] Showing error alert:", errorMsg);
+        Alert.alert("შეცდომა", errorMsg, [{ text: "კარგი" }]);
         return;
       }
 
@@ -468,7 +572,7 @@ export default function RegisterScreen() {
         Alert.alert(
           "შეცდომა",
           "სურათის არჩევა ვერ მოხერხდა. გთხოვთ სცადოთ ხელახლა.",
-          [{ text: "კარგი" }]
+          [{ text: "კარგი" }],
         );
         return;
       }
@@ -480,25 +584,38 @@ export default function RegisterScreen() {
 
       if (!result.assets || result.assets.length === 0) {
         console.error("❌ [ProfileImage] No assets in result");
-        console.error("❌ [ProfileImage] Result structure:", JSON.stringify(result, null, 2));
+        console.error(
+          "❌ [ProfileImage] Result structure:",
+          JSON.stringify(result, null, 2),
+        );
         showToast.error("სურათი არ აირჩევა", "შეცდომა");
         return;
       }
 
       console.log("✅ [ProfileImage] Asset found, processing...");
       const asset = result.assets[0];
-      console.log("📸 [ProfileImage] Asset details:", JSON.stringify({
-        uri: asset?.uri?.substring(0, 50) + "...",
-        fileName: asset?.fileName,
-        fileSize: asset?.fileSize,
-        mimeType: asset?.mimeType,
-        width: asset?.width,
-        height: asset?.height,
-      }, null, 2));
-      
+      console.log(
+        "📸 [ProfileImage] Asset details:",
+        JSON.stringify(
+          {
+            uri: asset?.uri?.substring(0, 50) + "...",
+            fileName: asset?.fileName,
+            fileSize: asset?.fileSize,
+            mimeType: asset?.mimeType,
+            width: asset?.width,
+            height: asset?.height,
+          },
+          null,
+          2,
+        ),
+      );
+
       if (!asset || !asset.uri) {
         console.error("❌ [ProfileImage] Asset or URI is missing");
-        console.error("❌ [ProfileImage] Asset:", JSON.stringify(asset, null, 2));
+        console.error(
+          "❌ [ProfileImage] Asset:",
+          JSON.stringify(asset, null, 2),
+        );
         showToast.error("სურათის URI არ მოიძებნა", "შეცდომა");
         return;
       }
@@ -515,10 +632,18 @@ export default function RegisterScreen() {
       });
 
       // Validate file type
-      const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+      const allowedTypes = [
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+        "image/webp",
+      ];
       if (!allowedTypes.includes(fileType.toLowerCase())) {
         console.error("❌ [ProfileImage] Invalid file type:", fileType);
-        showToast.error("მხოლოდ JPG, PNG ან WEBP ფორმატის სურათებია დაშვებული", "შეცდომა");
+        showToast.error(
+          "მხოლოდ JPG, PNG ან WEBP ფორმატის სურათებია დაშვებული",
+          "შეცდომა",
+        );
         return;
       }
 
@@ -530,7 +655,12 @@ export default function RegisterScreen() {
       }
 
       // Validate URI format
-      if (!asset.uri || (!asset.uri.startsWith("file://") && !asset.uri.startsWith("content://") && !asset.uri.startsWith("http"))) {
+      if (
+        !asset.uri ||
+        (!asset.uri.startsWith("file://") &&
+          !asset.uri.startsWith("content://") &&
+          !asset.uri.startsWith("http"))
+      ) {
         console.error("❌ [ProfileImage] Invalid URI format:", asset.uri);
         showToast.error("არასწორი სურათის ფორმატი", "შეცდომა");
         return;
@@ -558,7 +688,7 @@ export default function RegisterScreen() {
         name: fileName,
         type: fileType,
       });
-      
+
       try {
         const response = await apiService.uploadProfileImagePublic({
           uri: asset.uri,
@@ -566,15 +696,25 @@ export default function RegisterScreen() {
           type: fileType,
         });
 
-        console.log("📤 [ProfileImage] Upload response received:", JSON.stringify({
-          success: response?.success,
-          hasUrl: !!response?.url,
-          url: response?.url?.substring(0, 50) + "...",
-          hasPublicId: !!response?.publicId,
-        }, null, 2));
+        console.log(
+          "📤 [ProfileImage] Upload response received:",
+          JSON.stringify(
+            {
+              success: response?.success,
+              hasUrl: !!response?.url,
+              url: response?.url?.substring(0, 50) + "...",
+              hasPublicId: !!response?.publicId,
+            },
+            null,
+            2,
+          ),
+        );
 
         if (!response || !response.url) {
-          console.error("❌ [ProfileImage] Invalid response:", JSON.stringify(response, null, 2));
+          console.error(
+            "❌ [ProfileImage] Invalid response:",
+            JSON.stringify(response, null, 2),
+          );
           throw new Error("Invalid response from server");
         }
 
@@ -590,23 +730,39 @@ export default function RegisterScreen() {
         console.log("✅ [ProfileImage] Upload completed successfully");
       } catch (uploadError) {
         console.error("❌ [ProfileImage] Upload error:", uploadError);
-        console.error("❌ [ProfileImage] Upload error type:", typeof uploadError);
-        console.error("❌ [ProfileImage] Upload error details:", JSON.stringify(uploadError, Object.getOwnPropertyNames(uploadError), 2));
-        const uploadErrorMessage = uploadError instanceof Error 
-          ? uploadError.message 
-          : "სურათის ატვირთვა ვერ მოხერხდა";
-        console.error("❌ [ProfileImage] Showing upload error:", uploadErrorMessage);
+        console.error(
+          "❌ [ProfileImage] Upload error type:",
+          typeof uploadError,
+        );
+        console.error(
+          "❌ [ProfileImage] Upload error details:",
+          JSON.stringify(
+            uploadError,
+            Object.getOwnPropertyNames(uploadError),
+            2,
+          ),
+        );
+        const uploadErrorMessage =
+          uploadError instanceof Error
+            ? uploadError.message
+            : "სურათის ატვირთვა ვერ მოხერხდა";
+        console.error(
+          "❌ [ProfileImage] Showing upload error:",
+          uploadErrorMessage,
+        );
         showToast.error(uploadErrorMessage, "შეცდომა");
         // Don't reset profile image on upload error - keep the selected image
       }
     } catch (error) {
       console.error("❌ [ProfileImage] Profile image pick error:", error);
       console.error("❌ [ProfileImage] Error type:", typeof error);
-      console.error("❌ [ProfileImage] Error details:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : "სურათის არჩევა ვერ მოხერხდა";
-      
+      console.error(
+        "❌ [ProfileImage] Error details:",
+        JSON.stringify(error, Object.getOwnPropertyNames(error), 2),
+      );
+      const errorMessage =
+        error instanceof Error ? error.message : "სურათის არჩევა ვერ მოხერხდა";
+
       console.error("❌ [ProfileImage] Showing error:", errorMessage);
       showToast.error(errorMessage, "შეცდომა");
     } finally {
@@ -661,7 +817,7 @@ export default function RegisterScreen() {
             headers: {
               "Content-Type": "multipart/form-data",
             },
-          }
+          },
         );
 
         const data = await response.json();
@@ -669,11 +825,14 @@ export default function RegisterScreen() {
         if (data.success) {
           // Use Cloudinary URL (data.data.url or data.data.filePath)
           const cloudinaryUrl = data.data.url || data.data.filePath;
-          console.log('✅ [Register] Identification document uploaded to Cloudinary:', {
-            url: cloudinaryUrl,
-            publicId: data.data.publicId,
-            fileName: file.name,
-          });
+          console.log(
+            "✅ [Register] Identification document uploaded to Cloudinary:",
+            {
+              url: cloudinaryUrl,
+              publicId: data.data.publicId,
+              fileName: file.name,
+            },
+          );
           setIdentificationDocument({
             uri: file.uri,
             name: file.name,
@@ -689,24 +848,27 @@ export default function RegisterScreen() {
       console.error("Identification document pick error:", error);
       showToast.error(
         error instanceof Error ? error.message : "ფაილის ატვირთვა ვერ მოხერხდა",
-        "შეცდომა"
+        "შეცდომა",
       );
     } finally {
       setUploadingIdentificationDocument(false);
     }
   };
 
-  const handleOTPVerified = async (code: string, verificationResponse?: any) => {
+  const handleOTPVerified = async (
+    code: string,
+    verificationResponse?: any,
+  ) => {
     console.log("✅ [Register] OTP verified:", {
       code: code,
       hasVerificationResponse: !!verificationResponse,
       verified: verificationResponse?.verified,
     });
-    
+
     setVerificationCode(code);
     setIsPhoneVerified(true);
     setShowOTPModal(false);
-    
+
     // If verification was successful, we can proceed with registration
     // The actual registration will happen when user clicks "Sign Up" button
     // This just marks the phone as verified
@@ -739,7 +901,13 @@ export default function RegisterScreen() {
       setIdNumber(finalIdNumber); // Update state for consistency
     }
 
-    if (!name.trim() || !email.trim() || !password.trim() || !confirmPassword.trim() || !finalIdNumber) {
+    if (
+      !name.trim() ||
+      !email.trim() ||
+      !password.trim() ||
+      !confirmPassword.trim() ||
+      !finalIdNumber
+    ) {
       console.log("❌ [Register] Basic fields validation failed:", {
         name: !!name.trim(),
         email: !!email.trim(),
@@ -839,14 +1007,19 @@ export default function RegisterScreen() {
         return;
       }
       if (!about.trim()) {
-        console.log("❌ [Register] Working language validation failed for doctor");
+        console.log(
+          "❌ [Register] Working language validation failed for doctor",
+        );
         showToast.error("გთხოვთ შეიყვანოთ სამუშაო ენა", "შეცდომა");
         return;
       }
     }
 
     if (password.length < 6) {
-      console.log("❌ [Register] Password length validation failed:", password.length);
+      console.log(
+        "❌ [Register] Password length validation failed:",
+        password.length,
+      );
       showToast.error(
         t("auth.register.validation.passwordLength"),
         t("auth.register.error.default"),
@@ -862,17 +1035,16 @@ export default function RegisterScreen() {
     }
 
     // IDENTOMAT verification is required for Georgian patients and all doctors
-    if ((!isDoctor && nationality === "georgian" && !isIdentomatVerified) || 
-        (isDoctor && !isIdentomatVerified)) {
+    if (
+      (!isDoctor && nationality === "georgian" && !isIdentomatVerified) ||
+      (isDoctor && !isIdentomatVerified)
+    ) {
       console.log("❌ [Register] IDENTOMAT validation failed:", {
         isDoctor,
         nationality,
         isIdentomatVerified,
       });
-      showToast.error(
-        "გთხოვთ გაიაროთ IDENTOMAT-ით იდენტიფიკაცია",
-        "შეცდომა"
-      );
+      showToast.error("გთხოვთ გაიაროთ IDENTOMAT-ით იდენტიფიკაცია", "შეცდომა");
       return;
     }
 
@@ -882,7 +1054,11 @@ export default function RegisterScreen() {
       setIsLoading(true);
 
       // Use finalIdNumber (from state or identomatData)
-      const finalIdNumberForRegistration = idNumber.trim() || (isIdentomatVerified && identomatData?.idNumber ? identomatData.idNumber : "");
+      const finalIdNumberForRegistration =
+        idNumber.trim() ||
+        (isIdentomatVerified && identomatData?.idNumber
+          ? identomatData.idNumber
+          : "");
 
       const registerData: any = {
         name: name.trim(),
@@ -893,8 +1069,6 @@ export default function RegisterScreen() {
         phone: phone.trim(), // Phone is required for all users
         verificationCode: verificationCode.trim(), // OTP code for phone verification
       };
-
-   
 
       if (dateOfBirth && dateOfBirth.trim()) {
         registerData.dateOfBirth = dateOfBirth.trim();
@@ -921,10 +1095,12 @@ export default function RegisterScreen() {
             registerData.identomatFaceImage = identomatData.faceImage;
           }
           if (identomatData.documentFrontImage) {
-            registerData.identomatDocumentFrontImage = identomatData.documentFrontImage;
+            registerData.identomatDocumentFrontImage =
+              identomatData.documentFrontImage;
           }
           if (identomatData.documentBackImage) {
-            registerData.identomatDocumentBackImage = identomatData.documentBackImage;
+            registerData.identomatDocumentBackImage =
+              identomatData.documentBackImage;
           }
           // Send full Identomat data for admin panel
           if (identomatData.fullData) {
@@ -959,7 +1135,7 @@ export default function RegisterScreen() {
         }
       }
 
-      console.log('📤 [Register] Final registration data (before API call):', {
+      console.log("📤 [Register] Final registration data (before API call):", {
         name: registerData.name,
         email: registerData.email,
         role: registerData.role,
@@ -968,11 +1144,15 @@ export default function RegisterScreen() {
         idNumber: registerData.idNumber,
         dateOfBirth: registerData.dateOfBirth,
         gender: registerData.gender,
-        profileImage: registerData.profileImage ? 'provided' : 'not provided',
+        profileImage: registerData.profileImage ? "provided" : "not provided",
         address: registerData.address,
-        identificationDocument: registerData.identificationDocument ? 'provided' : 'not provided',
+        identificationDocument: registerData.identificationDocument
+          ? "provided"
+          : "not provided",
         specialization: registerData.specialization,
-        licenseDocument: registerData.licenseDocument ? 'provided' : 'not provided',
+        licenseDocument: registerData.licenseDocument
+          ? "provided"
+          : "not provided",
         degrees: registerData.degrees,
         experience: registerData.experience,
         about: registerData.about,
@@ -1019,27 +1199,34 @@ export default function RegisterScreen() {
 
     try {
       setIdentomatLoading(true);
-      
-      const COMPANY_KEY = "699c6dc7915fc8ed730c5034_0c1c01bb7b27253e3abe4d2ab9c573ff0ca5931f";
-      
+
+      const COMPANY_KEY =
+        "699c6dc7915fc8ed730c5034_0c1c01bb7b27253e3abe4d2ab9c573ff0ca5931f";
+
       // Step 3: Get IDENTOMAT result (basic data)
-      const resultResponse = await fetch("https://widget.identomat.com/external-api/result/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const resultResponse = await fetch(
+        "https://widget.identomat.com/external-api/result/",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            company_key: COMPANY_KEY,
+            session_token: identomatSessionToken,
+          }),
         },
-        body: JSON.stringify({
-          company_key: COMPANY_KEY,
-          session_token: identomatSessionToken,
-        }),
-      });
+      );
 
       if (!resultResponse.ok) {
         throw new Error("IDENTOMAT შედეგის მიღება ვერ მოხერხდა");
       }
 
       const resultData = await resultResponse.json();
-      console.log("✅ [IDENTOMAT] Result data:", JSON.stringify(resultData, null, 2));
+      console.log(
+        "✅ [IDENTOMAT] Result data:",
+        JSON.stringify(resultData, null, 2),
+      );
 
       // Step 4: Get IDENTOMAT images using /result/card-front/ and /result/card-back/ endpoints
       // These endpoints return images directly (not JSON), so we need to upload them to Cloudinary
@@ -1048,28 +1235,32 @@ export default function RegisterScreen() {
       let documentBackImage: string | null = null;
 
       // Helper function to upload image blob to Cloudinary
-      const uploadImageToCloudinary = async (imageBlob: Blob, imageName: string): Promise<string | null> => {
+      const uploadImageToCloudinary = async (
+        imageBlob: Blob,
+        imageName: string,
+      ): Promise<string | null> => {
         try {
           // Convert blob to base64 for React Native
           const arrayBuffer = await imageBlob.arrayBuffer();
           const bytes = new Uint8Array(arrayBuffer);
-          
+
           // Convert bytes to base64 string manually (works in both web and React Native)
-          let binary = '';
+          let binary = "";
           const chunkSize = 8192; // Process in chunks to avoid stack overflow
           for (let i = 0; i < bytes.byteLength; i += chunkSize) {
             const chunk = bytes.slice(i, i + chunkSize);
             binary += String.fromCharCode.apply(null, Array.from(chunk));
           }
-          
+
           // Use btoa if available (web), otherwise use manual base64 encoding
           let base64String: string;
-          if (typeof btoa !== 'undefined') {
+          if (typeof btoa !== "undefined") {
             base64String = btoa(binary);
           } else {
             // Manual base64 encoding for React Native
-            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-            let result = '';
+            const chars =
+              "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+            let result = "";
             let i = 0;
             while (i < binary.length) {
               const a = binary.charCodeAt(i++);
@@ -1078,65 +1269,96 @@ export default function RegisterScreen() {
               const bitmap = (a << 16) | (b << 8) | c;
               result += chars.charAt((bitmap >> 18) & 63);
               result += chars.charAt((bitmap >> 12) & 63);
-              result += i - 2 < binary.length ? chars.charAt((bitmap >> 6) & 63) : '=';
-              result += i - 1 < binary.length ? chars.charAt(bitmap & 63) : '=';
+              result +=
+                i - 2 < binary.length ? chars.charAt((bitmap >> 6) & 63) : "=";
+              result += i - 1 < binary.length ? chars.charAt(bitmap & 63) : "=";
             }
             base64String = result;
           }
-          
+
           // Create FormData for Cloudinary upload
           const formData = new FormData();
           const dataUri = `data:image/jpeg;base64,${base64String}`;
-          
-          formData.append('file', {
+
+          formData.append("file", {
             uri: dataUri,
             name: imageName,
-            type: 'image/jpeg',
+            type: "image/jpeg",
           } as any);
 
-          const uploadResponse = await fetch(`${apiService.getBaseURL()}/uploads/image/public`, {
-            method: 'POST',
-            body: formData,
-          });
+          const uploadResponse = await fetch(
+            `${apiService.getBaseURL()}/uploads/image/public`,
+            {
+              method: "POST",
+              body: formData,
+            },
+          );
 
           if (uploadResponse.ok) {
             const uploadData = await uploadResponse.json();
-            console.log(`✅ [IDENTOMAT] ${imageName} uploaded to Cloudinary:`, uploadData.url);
+            console.log(
+              `✅ [IDENTOMAT] ${imageName} uploaded to Cloudinary:`,
+              uploadData.url,
+            );
             return uploadData.url || null;
           } else {
             const errorText = await uploadResponse.text();
-            console.warn(`⚠️ [IDENTOMAT] Failed to upload ${imageName} to Cloudinary:`, uploadResponse.status, errorText);
+            console.warn(
+              `⚠️ [IDENTOMAT] Failed to upload ${imageName} to Cloudinary:`,
+              uploadResponse.status,
+              errorText,
+            );
             return null;
           }
         } catch (error) {
-          console.warn(`⚠️ [IDENTOMAT] Error uploading ${imageName} to Cloudinary:`, error);
+          console.warn(
+            `⚠️ [IDENTOMAT] Error uploading ${imageName} to Cloudinary:`,
+            error,
+          );
           return null;
         }
       };
 
       try {
-        console.log("📸 [IDENTOMAT] Requesting face, card-front and card-back images...");
+        console.log(
+          "📸 [IDENTOMAT] Requesting face, card-front and card-back images...",
+        );
         const formData = new FormData();
-        formData.append('company_key', COMPANY_KEY);
-        formData.append('session_token', identomatSessionToken);
+        formData.append("company_key", COMPANY_KEY);
+        formData.append("session_token", identomatSessionToken);
 
         // Step 1: Get face image first (ჯერ სახე)
         try {
-          const faceResponse = await fetch("https://widget.identomat.com/external-api/result/face/", {
-            method: "POST",
-            body: formData,
-          });
+          const faceResponse = await fetch(
+            "https://widget.identomat.com/external-api/result/face/",
+            {
+              method: "POST",
+              body: formData,
+            },
+          );
 
           if (faceResponse.ok) {
-            const contentType = faceResponse.headers.get('content-type');
-            if (contentType && contentType.startsWith('image/')) {
+            const contentType = faceResponse.headers.get("content-type");
+            if (contentType && contentType.startsWith("image/")) {
               const imageBlob = await faceResponse.blob();
-              console.log("✅ [IDENTOMAT] Face image received, uploading to Cloudinary...");
-              faceImage = await uploadImageToCloudinary(imageBlob, `identomat-face-${identomatSessionToken.substring(0, 10)}.jpg`);
-              console.log("📸 [IDENTOMAT] Face image uploaded:", faceImage ? "success" : "failed");
+              console.log(
+                "✅ [IDENTOMAT] Face image received, uploading to Cloudinary...",
+              );
+              faceImage = await uploadImageToCloudinary(
+                imageBlob,
+                `identomat-face-${identomatSessionToken.substring(0, 10)}.jpg`,
+              );
+              console.log(
+                "📸 [IDENTOMAT] Face image uploaded:",
+                faceImage ? "success" : "failed",
+              );
             }
           } else {
-            console.warn("⚠️ [IDENTOMAT] Face endpoint returned error:", faceResponse.status, faceResponse.statusText);
+            console.warn(
+              "⚠️ [IDENTOMAT] Face endpoint returned error:",
+              faceResponse.status,
+              faceResponse.statusText,
+            );
           }
         } catch (faceError) {
           console.warn("⚠️ [IDENTOMAT] Failed to get face image:", faceError);
@@ -1144,95 +1366,166 @@ export default function RegisterScreen() {
 
         // Step 2: Get card front image (მერე წინა)
         try {
-          const cardFrontResponse = await fetch("https://widget.identomat.com/external-api/result/card-front/", {
-            method: "POST",
-            body: formData,
-          });
+          const cardFrontResponse = await fetch(
+            "https://widget.identomat.com/external-api/result/card-front/",
+            {
+              method: "POST",
+              body: formData,
+            },
+          );
 
           if (cardFrontResponse.ok) {
-            const contentType = cardFrontResponse.headers.get('content-type');
-            if (contentType && contentType.startsWith('image/')) {
+            const contentType = cardFrontResponse.headers.get("content-type");
+            if (contentType && contentType.startsWith("image/")) {
               // Response is an image, convert to blob and upload to Cloudinary
               const imageBlob = await cardFrontResponse.blob();
-              console.log("✅ [IDENTOMAT] Card front image received, uploading to Cloudinary...");
-              documentFrontImage = await uploadImageToCloudinary(imageBlob, `identomat-card-front-${identomatSessionToken.substring(0, 10)}.jpg`);
-              console.log("📸 [IDENTOMAT] Card front image uploaded:", documentFrontImage ? "success" : "failed");
+              console.log(
+                "✅ [IDENTOMAT] Card front image received, uploading to Cloudinary...",
+              );
+              documentFrontImage = await uploadImageToCloudinary(
+                imageBlob,
+                `identomat-card-front-${identomatSessionToken.substring(0, 10)}.jpg`,
+              );
+              console.log(
+                "📸 [IDENTOMAT] Card front image uploaded:",
+                documentFrontImage ? "success" : "failed",
+              );
             } else {
               // Response might be JSON with error
-              const errorData = await cardFrontResponse.json().catch(() => null);
+              const errorData = await cardFrontResponse
+                .json()
+                .catch(() => null);
               if (errorData?.argumentError) {
-                console.warn("⚠️ [IDENTOMAT] Card front error:", errorData.argumentError);
+                console.warn(
+                  "⚠️ [IDENTOMAT] Card front error:",
+                  errorData.argumentError,
+                );
               }
             }
           } else {
-            console.warn("⚠️ [IDENTOMAT] Card front endpoint returned error:", cardFrontResponse.status, cardFrontResponse.statusText);
+            console.warn(
+              "⚠️ [IDENTOMAT] Card front endpoint returned error:",
+              cardFrontResponse.status,
+              cardFrontResponse.statusText,
+            );
           }
         } catch (cardFrontError) {
-          console.warn("⚠️ [IDENTOMAT] Failed to get card front image:", cardFrontError);
+          console.warn(
+            "⚠️ [IDENTOMAT] Failed to get card front image:",
+            cardFrontError,
+          );
         }
 
         // Step 3: Get card back image (მერე უკანა)
         try {
-          const cardBackResponse = await fetch("https://widget.identomat.com/external-api/result/card-back/", {
-            method: "POST",
-            body: formData,
-          });
+          const cardBackResponse = await fetch(
+            "https://widget.identomat.com/external-api/result/card-back/",
+            {
+              method: "POST",
+              body: formData,
+            },
+          );
 
           if (cardBackResponse.ok) {
-            const contentType = cardBackResponse.headers.get('content-type');
-            if (contentType && contentType.startsWith('image/')) {
+            const contentType = cardBackResponse.headers.get("content-type");
+            if (contentType && contentType.startsWith("image/")) {
               // Response is an image, convert to blob and upload to Cloudinary
               const imageBlob = await cardBackResponse.blob();
-              console.log("✅ [IDENTOMAT] Card back image received, uploading to Cloudinary...");
-              documentBackImage = await uploadImageToCloudinary(imageBlob, `identomat-card-back-${identomatSessionToken.substring(0, 10)}.jpg`);
-              console.log("📸 [IDENTOMAT] Card back image uploaded:", documentBackImage ? "success" : "failed");
+              console.log(
+                "✅ [IDENTOMAT] Card back image received, uploading to Cloudinary...",
+              );
+              documentBackImage = await uploadImageToCloudinary(
+                imageBlob,
+                `identomat-card-back-${identomatSessionToken.substring(0, 10)}.jpg`,
+              );
+              console.log(
+                "📸 [IDENTOMAT] Card back image uploaded:",
+                documentBackImage ? "success" : "failed",
+              );
             } else {
               // Response might be JSON with error
               const errorData = await cardBackResponse.json().catch(() => null);
               if (errorData?.argumentError) {
-                console.warn("⚠️ [IDENTOMAT] Card back error:", errorData.argumentError);
+                console.warn(
+                  "⚠️ [IDENTOMAT] Card back error:",
+                  errorData.argumentError,
+                );
               }
             }
           } else {
-            console.warn("⚠️ [IDENTOMAT] Card back endpoint returned error:", cardBackResponse.status, cardBackResponse.statusText);
+            console.warn(
+              "⚠️ [IDENTOMAT] Card back endpoint returned error:",
+              cardBackResponse.status,
+              cardBackResponse.statusText,
+            );
           }
         } catch (cardBackError) {
-          console.warn("⚠️ [IDENTOMAT] Failed to get card back image:", cardBackError);
+          console.warn(
+            "⚠️ [IDENTOMAT] Failed to get card back image:",
+            cardBackError,
+          );
         }
       } catch (imageError) {
-        console.warn("⚠️ [IDENTOMAT] Failed to get images from Identomat endpoints, falling back to result data:", imageError);
+        console.warn(
+          "⚠️ [IDENTOMAT] Failed to get images from Identomat endpoints, falling back to result data:",
+          imageError,
+        );
       }
 
       // Extract data from IDENTOMAT response
       // According to Identomat API docs: https://docs.identomat.com/developer-tools/api-reference
       // The response contains a 'person' object with the extracted data
       const person = resultData.person || resultData;
-      
+
       // Try to get personal_number from person object first, then fallback to root level
-      const idNumber = person.personal_number || person.id_number || person.person_number || 
-                       resultData.personal_number || resultData.id_number || resultData.person_number || resultData.idNumber;
-      
+      const idNumber =
+        person.personal_number ||
+        person.id_number ||
+        person.person_number ||
+        resultData.personal_number ||
+        resultData.id_number ||
+        resultData.person_number ||
+        resultData.idNumber;
+
       // Try to get name from person object first, then fallback to root level
-      const firstName = person.first_name || person.firstName || person.name?.first ||
-                        resultData.first_name || resultData.firstName || resultData.name?.first;
-      const lastName = person.last_name || person.lastName || person.name?.last ||
-                       resultData.last_name || resultData.lastName || resultData.name?.last;
-      
+      const firstName =
+        person.first_name ||
+        person.firstName ||
+        person.name?.first ||
+        resultData.first_name ||
+        resultData.firstName ||
+        resultData.name?.first;
+      const lastName =
+        person.last_name ||
+        person.lastName ||
+        person.name?.last ||
+        resultData.last_name ||
+        resultData.lastName ||
+        resultData.name?.last;
+
       // Try to get date of birth from person object first, then fallback to root level
       // Identomat returns birthday in format like "5/15/1985" or ISO format
-      const dateOfBirth = person.birthday || person.birthday_time || person.date_of_birth || person.dateOfBirth || person.dob ||
-                          resultData.date_of_birth || resultData.dateOfBirth || resultData.dob || resultData.birthday;
+      const dateOfBirth =
+        person.birthday ||
+        person.birthday_time ||
+        person.date_of_birth ||
+        person.dateOfBirth ||
+        person.dob ||
+        resultData.date_of_birth ||
+        resultData.dateOfBirth ||
+        resultData.dob ||
+        resultData.birthday;
 
       if (idNumber) {
         // Populate form fields with IDENTOMAT data
         setIdNumber(idNumber);
-        
+
         if (firstName && lastName) {
           setName(`${firstName} ${lastName}`);
         } else if (firstName) {
           setName(firstName);
         }
-        
+
         if (dateOfBirth) {
           setDateOfBirth(dateOfBirth);
           try {
@@ -1241,7 +1534,10 @@ export default function RegisterScreen() {
               setSelectedDate(dob);
             }
           } catch (e) {
-            console.warn("⚠️ [IDENTOMAT] Could not parse date of birth:", dateOfBirth);
+            console.warn(
+              "⚠️ [IDENTOMAT] Could not parse date of birth:",
+              dateOfBirth,
+            );
           }
         }
 
@@ -1250,20 +1546,33 @@ export default function RegisterScreen() {
         if (idNumber) {
           setIdNumber(idNumber);
         }
-        
+
         // If images were not found from face-document endpoint, try to extract from result data
         if (!faceImage) {
-          faceImage = person.face_image || person.face_image_url || resultData.face_image || resultData.face_image_url || null;
+          faceImage =
+            person.face_image ||
+            person.face_image_url ||
+            resultData.face_image ||
+            resultData.face_image_url ||
+            null;
         }
         if (!documentFrontImage) {
-          documentFrontImage = person.document_front_image || person.document_front_image_url || 
-                               resultData.document_front_image || resultData.document_front_image_url || null;
+          documentFrontImage =
+            person.document_front_image ||
+            person.document_front_image_url ||
+            resultData.document_front_image ||
+            resultData.document_front_image_url ||
+            null;
         }
         if (!documentBackImage) {
-          documentBackImage = person.document_back_image || person.document_back_image_url || 
-                              resultData.document_back_image || resultData.document_back_image_url || null;
+          documentBackImage =
+            person.document_back_image ||
+            person.document_back_image_url ||
+            resultData.document_back_image ||
+            resultData.document_back_image_url ||
+            null;
         }
-        
+
         console.log("📸 [IDENTOMAT] Final extracted images:", {
           hasFaceImage: !!faceImage,
           hasDocumentFrontImage: !!documentFrontImage,
@@ -1281,7 +1590,10 @@ export default function RegisterScreen() {
           fullData: resultData,
         });
 
-        showToast.success("IDENTOMAT-ით იდენტიფიკაცია წარმატებით დასრულდა", "წარმატება");
+        showToast.success(
+          "IDENTOMAT-ით იდენტიფიკაცია წარმატებით დასრულდა",
+          "წარმატება",
+        );
 
         // Close modal after short delay
         setTimeout(() => {
@@ -1296,7 +1608,9 @@ export default function RegisterScreen() {
       console.error("❌ [IDENTOMAT] Error getting result:", error);
       Alert.alert(
         "შეცდომა",
-        error instanceof Error ? error.message : "IDENTOMAT-ის შედეგის მიღება ვერ მოხერხდა"
+        error instanceof Error
+          ? error.message
+          : "IDENTOMAT-ის შედეგის მიღება ვერ მოხერხდა",
       );
     } finally {
       setIdentomatLoading(false);
@@ -1321,16 +1635,16 @@ export default function RegisterScreen() {
             keyboardShouldPersistTaps="handled"
           >
             <View style={styles.content}>
-            {/* Logo */}
-            <View style={styles.logoContainer}>
-              <View style={styles.logo}>
-                <Image
-                  source={require("../../../assets/images/logo/logo.png")}
-                  style={styles.logoImage}
-                  contentFit="contain"
-                />
+              {/* Logo */}
+              <View style={styles.logoContainer}>
+                <View style={styles.logo}>
+                  <Image
+                    source={require("../../../assets/images/logo/logo.png")}
+                    style={styles.logoImage}
+                    contentFit="contain"
+                  />
+                </View>
               </View>
-            </View>
             </View>
 
             {/* Title */}
@@ -1346,7 +1660,6 @@ export default function RegisterScreen() {
             </Text>
 
             {/* Role Switcher */}
-            
 
             {/* Nationality Selection - Only for patients */}
             {!isDoctor && nationality === null && (
@@ -1359,19 +1672,23 @@ export default function RegisterScreen() {
                     <TouchableOpacity
                       style={[
                         styles.nationalityOption,
-                        nationality === "georgian" && styles.nationalityOptionSelected,
+                        nationality === "georgian" &&
+                          styles.nationalityOptionSelected,
                       ]}
                       onPress={() => setNationality("georgian")}
                     >
                       <Ionicons
                         name="flag-outline"
                         size={24}
-                        color={nationality === "georgian" ? "#06B6D4" : "#6B7280"}
+                        color={
+                          nationality === "georgian" ? "#06B6D4" : "#6B7280"
+                        }
                       />
                       <Text
                         style={[
                           styles.nationalityText,
-                          nationality === "georgian" && styles.nationalityTextSelected,
+                          nationality === "georgian" &&
+                            styles.nationalityTextSelected,
                         ]}
                       >
                         {t("auth.register.nationality.georgian")}
@@ -1380,19 +1697,23 @@ export default function RegisterScreen() {
                     <TouchableOpacity
                       style={[
                         styles.nationalityOption,
-                        nationality === "non-georgian" && styles.nationalityOptionSelected,
+                        nationality === "non-georgian" &&
+                          styles.nationalityOptionSelected,
                       ]}
                       onPress={() => setNationality("non-georgian")}
                     >
                       <Ionicons
                         name="globe-outline"
                         size={24}
-                        color={nationality === "non-georgian" ? "#06B6D4" : "#6B7280"}
+                        color={
+                          nationality === "non-georgian" ? "#06B6D4" : "#6B7280"
+                        }
                       />
                       <Text
                         style={[
                           styles.nationalityText,
-                          nationality === "non-georgian" && styles.nationalityTextSelected,
+                          nationality === "non-georgian" &&
+                            styles.nationalityTextSelected,
                         ]}
                       >
                         {t("auth.register.nationality.nonGeorgian")}
@@ -1404,1200 +1725,1246 @@ export default function RegisterScreen() {
             )}
 
             {/* Form */}
-            {(!isDoctor && nationality !== null || isDoctor) && (
-            <View style={styles.form}>
-              {/* Name Input */}
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>
-                  {t("auth.register.name.label")} *
-                </Text>
-                <TouchableOpacity
-                  activeOpacity={1}
-                  style={styles.inputWrapper}
-                  onPress={() => nameInputRef.current?.focus()}
-                >
-                  <Ionicons
-                    name="person-outline"
-                    size={20}
-                    color="#9CA3AF"
-                    style={styles.inputIcon}
-                  />
-                  <TextInput
-                    ref={nameInputRef}
-                    style={styles.input}
-                    placeholder={t("auth.register.name.placeholder")}
-                    placeholderTextColor="#9CA3AF"
-                    value={name}
-                    onChangeText={setName}
-                    textContentType="none"
-                    autoComplete="off"
-                    autoCorrect={false}
-                    keyboardType="default"
-                  />
-                </TouchableOpacity>
-              </View>
-
-              {/* Email Input */}
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>
-                  {t("auth.register.email.label")} *
-                </Text>
-                <TouchableOpacity
-                  activeOpacity={1}
-                  style={styles.inputWrapper}
-                  onPress={() => emailInputRef.current?.focus()}
-                >
-                  <Ionicons
-                    name="mail-outline"
-                    size={20}
-                    color="#9CA3AF"
-                    style={styles.inputIcon}
-                  />
-                  <TextInput
-                    ref={emailInputRef}
-                    style={styles.input}
-                    placeholder={t("auth.register.email.placeholder")}
-                    placeholderTextColor="#9CA3AF"
-                    value={email}
-                    onChangeText={setEmail}
-                    textContentType="none"
-                    autoComplete="off"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    keyboardType="email-address"
-                  />
-                </TouchableOpacity>
-              </View>
-
-              {/* ID Number Input */}
-              <View style={styles.inputContainer}>
-                <View style={styles.labelRow}>
+            {((!isDoctor && nationality !== null) || isDoctor) && (
+              <View style={styles.form}>
+                {/* Name Input */}
+                <View style={styles.inputContainer}>
                   <Text style={styles.label}>
-                    {!isDoctor && nationality === "non-georgian"
-                      ? t("auth.register.idNumber.label.passport")
-                      : t("auth.register.idNumber.label")} *
+                    {t("auth.register.name.label")} *
                   </Text>
-                  {!isDoctor && nationality === "non-georgian" && (
-                    <TouchableOpacity
-                      onPress={() => setShowPassportInfoModal(true)}
-                      style={styles.infoButton}
-                    >
-                      <Ionicons
-                        name="information-circle"
-                        size={20}
-                        color="#06B6D4"
-                      />
-                    </TouchableOpacity>
-                  )}
-                </View>
-                <View style={styles.idNumberRow}>
                   <TouchableOpacity
                     activeOpacity={1}
-                    style={[styles.inputWrapper, styles.idNumberInputWrapper]}
-                    onPress={() => idNumberInputRef.current?.focus()}
+                    style={styles.inputWrapper}
+                    onPress={() => nameInputRef.current?.focus()}
                   >
                     <Ionicons
-                      name="card-outline"
+                      name="person-outline"
                       size={20}
                       color="#9CA3AF"
                       style={styles.inputIcon}
                     />
                     <TextInput
-                      ref={idNumberInputRef}
+                      ref={nameInputRef}
                       style={styles.input}
-                      placeholder={
-                        !isDoctor && nationality === "non-georgian"
-                          ? t("auth.register.idNumber.placeholder.passport")
-                          : t("auth.register.idNumber.placeholder")
-                      }
+                      placeholder={t("auth.register.name.placeholder")}
                       placeholderTextColor="#9CA3AF"
-                      value={idNumber}
-                      onChangeText={setIdNumber}
+                      value={name}
+                      onChangeText={setName}
                       textContentType="none"
                       autoComplete="off"
                       autoCorrect={false}
                       keyboardType="default"
-                      editable={!isIdentomatVerified}
                     />
                   </TouchableOpacity>
-                  {((!isDoctor && nationality === "georgian") || isDoctor) && (
-                    <TouchableOpacity
-                      style={[styles.identomatButton, identomatLoading && styles.identomatButtonDisabled]}
-                      onPress={async () => {
-                        if (identomatLoading) return;
-                        
-                        try {
-                          setIdentomatLoading(true);
-                          
-                          const COMPANY_KEY = "699c6dc7915fc8ed730c5034_0c1c01bb7b27253e3abe4d2ab9c573ff0ca5931f";
-                          const beginResponse = await fetch("https://widget.identomat.com/external-api/begin/", {
-                            method: "POST",
-                            headers: {
-                              "Content-Type": "application/json",
-                            },
-                            body: JSON.stringify({
-                              company_key: COMPANY_KEY,
-                              flags: {
-                                skip_agreement: true,
-                                skip_document: false,
-                                skip_face: false,
-                              },
-                              steps: [
-                                {
-                                  type: "face",
-                                  key: "face",
-                                },
-                                {
-                                  type: "document",
-                                  key: "document",
-                                },
-                              ],
-                            }),
-                          });
-                          
-                          console.log("📨 [IDENTOMAT] Begin response status:", beginResponse.status, beginResponse.statusText);
-                          
-                          if (!beginResponse.ok) {
-                            const errorText = await beginResponse.text();
-                            console.error("❌ [IDENTOMAT] Begin error response:", errorText);
-                            throw new Error(`IDENTOMAT session-ის დაწყება ვერ მოხერხდა: ${beginResponse.status} ${beginResponse.statusText}`);
-                          }
-                          
-                          const beginData = await beginResponse.json();
-                          console.log("✅ [IDENTOMAT] Begin response data:", beginData);
-                          console.log("✅ [IDENTOMAT] Response type:", typeof beginData);
-                          
-                          // API returns session token directly as a string, not as an object
-                          let sessionToken: string;
-                          
-                          if (typeof beginData === "string") {
-                            // Response is a string (session token directly)
-                            sessionToken = beginData;
-                          } else if (typeof beginData === "object" && beginData !== null) {
-                            // Response is an object, try different possible field names
-                            sessionToken = beginData.session_token || beginData.sessionToken || beginData.token || beginData.data?.session_token || beginData.data?.token || "";
-                          } else {
-                            throw new Error(`Unexpected response type: ${typeof beginData}`);
-                          }
-                          
-                          if (!sessionToken || sessionToken.trim() === "") {
-                            console.error("❌ [IDENTOMAT] No session token in response. Response:", beginData);
-                            throw new Error(`Session token-ის მიღება ვერ მოხერხდა. Response: ${JSON.stringify(beginData)}`);
-                          }
-                          
-                          console.log("✅ [IDENTOMAT] Session token received:", sessionToken.substring(0, 20) + "...");
-                          
-                          setIdentomatSessionToken(sessionToken);
-                          
-                          // Step 2: Open WebView with session token
-                          const widgetUrl = `https://widget.identomat.com/?session_token=${sessionToken}`;
-                          setIdentomatUrl(widgetUrl);
-                          setShowIdentomatModal(true);
-                        } catch (error) {
-                          console.error("❌ [IDENTOMAT] Error starting session:", error);
-                          Alert.alert(
-                            "შეცდომა",
-                            error instanceof Error ? error.message : "IDENTOMAT-ის იდენტიფიკაცია ვერ მოხერხდა"
-                          );
-                        } finally {
-                          setIdentomatLoading(false);
-                        }
-                      }}
-                      disabled={identomatLoading}
-                    >
-                      {identomatLoading ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
-                      ) : (
-                        <>
-                          <Ionicons
-                            name="finger-print-outline"
-                            size={20}
-                            color="#FFFFFF"
-                          />
-                          <Text style={styles.identomatButtonText}>IDENTOMAT</Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
-                  )}
                 </View>
-                {isIdentomatVerified && (
-                  <View style={styles.identomatSuccessContainer}>
-                    <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-                    <Text style={styles.identomatSuccessText}>
-                      IDENTOMAT-ით დადასტურებული
-                    </Text>
-                  </View>
-                )}
-                
-                {/* Skip IDENTOMAT Button (Temporary for development) */}
-                {!isIdentomatVerified && !isDoctor && nationality === "georgian" && (
+
+                {/* Email Input */}
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>
+                    {t("auth.register.email.label")} *
+                  </Text>
                   <TouchableOpacity
-                    style={styles.skipIdentomatButton}
-                    onPress={() => {
-                      // Skip IDENTOMAT verification (temporary)
-                      const placeholderIdNumber = idNumber.trim() || "00000000000";
-                      setIsIdentomatVerified(true);
-                      // Set idNumber in state so validation passes
-                      setIdNumber(placeholderIdNumber);
-                      setIdentomatData({
-                        idNumber: placeholderIdNumber,
-                        firstName: name?.split(" ")[0] || "Skipped",
-                        lastName: name?.split(" ").slice(1).join(" ") || "User",
-                        dateOfBirth: dateOfBirth || "2000-01-01",
-                        fullData: { message: "Identomat skipped for development" },
-                      });
-                      showToast.info("IDENTOMAT-ის იდენტიფიკაცია გამოტოვებულია (დროებით)", "ინფორმაცია");
-                    }}
+                    activeOpacity={1}
+                    style={styles.inputWrapper}
+                    onPress={() => emailInputRef.current?.focus()}
                   >
-                    <Text style={styles.skipIdentomatButtonText}>
-                      გამოტოვება (დროებით)
-                    </Text>
+                    <Ionicons
+                      name="mail-outline"
+                      size={20}
+                      color="#9CA3AF"
+                      style={styles.inputIcon}
+                    />
+                    <TextInput
+                      ref={emailInputRef}
+                      style={styles.input}
+                      placeholder={t("auth.register.email.placeholder")}
+                      placeholderTextColor="#9CA3AF"
+                      value={email}
+                      onChangeText={setEmail}
+                      textContentType="none"
+                      autoComplete="off"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      keyboardType="email-address"
+                    />
                   </TouchableOpacity>
-                )}
-              </View>
+                </View>
 
-              {/* Phone Input */}
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>
-                  {t("auth.register.phone.label")} *
-                </Text>
-                <TouchableOpacity
-                  activeOpacity={1}
-                  style={styles.inputWrapper}
-                  onPress={() => phoneInputRef.current?.focus()}
-                >
-                  <Ionicons
-                    name="call-outline"
-                    size={20}
-                    color="#9CA3AF"
-                    style={styles.inputIcon}
-                  />
-                  <TextInput
-                    ref={phoneInputRef}
-                    style={styles.input}
-                    placeholder={t("auth.register.phone.placeholder")}
-                    placeholderTextColor="#9CA3AF"
-                    value={phone}
-                    onChangeText={setPhone}
-                    textContentType="none"
-                    autoComplete="off"
-                    autoCorrect={false}
-                    keyboardType="phone-pad"
-                  />
-                </TouchableOpacity>
-
-                {/* Phone Verification Button */}
-                {!isPhoneVerified && phone.trim() && (
-                  <TouchableOpacity
-                    style={styles.verifyPhoneButton}
-                    onPress={() => setShowOTPModal(true)}
-                  >
-                    <Ionicons name="shield-checkmark-outline" size={20} color="#06B6D4" />
-                    <Text style={styles.verifyPhoneButtonText}>
-                      ტელეფონის ვერიფიკაცია
-                    </Text>
-                  </TouchableOpacity>
-                )}
-
-                {/* Verified Status */}
-                {isPhoneVerified && (
-                  <View style={styles.verifiedContainer}>
-                    <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-                    <Text style={styles.verifiedText}>
-                      ტელეფონი დადასტურებულია
-                    </Text>
-                  </View>
-                )}
-              </View>
-
-              {/* Patient specific fields */}
-              {!isDoctor && (
-                <>
-                  {/* Gender Selection */}
-                  <View style={styles.inputContainer}>
+                {/* ID Number Input */}
+                <View style={styles.inputContainer}>
+                  <View style={styles.labelRow}>
                     <Text style={styles.label}>
-                      სქესი *
+                      {!isDoctor && nationality === "non-georgian"
+                        ? t("auth.register.idNumber.label.passport")
+                        : t("auth.register.idNumber.label")}{" "}
+                      *
                     </Text>
-                    <View style={styles.genderContainer}>
+                    {!isDoctor && nationality === "non-georgian" && (
                       <TouchableOpacity
-                        style={[
-                          styles.genderOption,
-                          gender === "male" && styles.genderOptionSelected,
-                        ]}
-                        onPress={() => setGender("male")}
+                        onPress={() => setShowPassportInfoModal(true)}
+                        style={styles.infoButton}
                       >
                         <Ionicons
-                          name="male"
-                          size={20}
-                          color={gender === "male" ? "#06B6D4" : "#6B7280"}
-                        />
-                        <Text
-                          style={[
-                            styles.genderText,
-                            gender === "male" && styles.genderTextSelected,
-                          ]}
-                        >
-                          კაცი
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[
-                          styles.genderOption,
-                          gender === "female" && styles.genderOptionSelected,
-                        ]}
-                        onPress={() => setGender("female")}
-                      >
-                        <Ionicons
-                          name="female"
-                          size={20}
-                          color={gender === "female" ? "#06B6D4" : "#6B7280"}
-                        />
-                        <Text
-                          style={[
-                            styles.genderText,
-                            gender === "female" && styles.genderTextSelected,
-                          ]}
-                        >
-                          ქალი
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[
-                          styles.genderOption,
-                          gender === "other" && styles.genderOptionSelected,
-                        ]}
-                        onPress={() => setGender("other")}
-                      >
-                        <Ionicons
-                          name="person-outline"
-                          size={20}
-                          color={gender === "other" ? "#06B6D4" : "#6B7280"}
-                        />
-                        <Text
-                          style={[
-                            styles.genderText,
-                            gender === "other" && styles.genderTextSelected,
-                          ]}
-                        >
-                          სხვა
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-
-                  {/* Address Input */}
-                  <View style={styles.inputContainer}>
-                    <Text style={styles.label}>
-                      მისამართი *
-                    </Text>
-                    <TouchableOpacity
-                      activeOpacity={1}
-                      style={styles.inputWrapper}
-                      onPress={() => addressInputRef.current?.focus()}
-                    >
-                      <Ionicons
-                        name="location-outline"
-                        size={20}
-                        color="#9CA3AF"
-                        style={styles.inputIcon}
-                      />
-                      <TextInput
-                        ref={addressInputRef}
-                        style={styles.input}
-                        placeholder="შეიყვანეთ მისამართი"
-                        placeholderTextColor="#9CA3AF"
-                        value={address}
-                        onChangeText={setAddress}
-                        textContentType="none"
-                        autoComplete="off"
-                        autoCorrect={false}
-                        keyboardType="default"
-                      />
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Date of Birth */}
-                  <View style={styles.inputContainer}>
-                    <Text style={styles.label}>
-                      დაბადების თარიღი *
-                    </Text>
-                    <TouchableOpacity
-                      style={styles.inputWrapper}
-                      onPress={openDatePicker}
-                    >
-                      <Ionicons
-                        name="calendar-outline"
-                        size={20}
-                        color="#9CA3AF"
-                        style={styles.inputIcon}
-                      />
-                      <Text
-                        style={[
-                          styles.input,
-                          !dateOfBirth && styles.inputPlaceholder,
-                        ]}
-                      >
-                        {dateOfBirth || "აირჩიეთ თარიღი"}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Profile Image */}
-                  <View style={styles.inputContainer}>
-                    <Text style={styles.label}>
-                      პროფილის სურათი
-                    </Text>
-                    <View style={styles.profileCard}>
-                      <View style={styles.profilePreview}>
-                        {profileImage?.uri ? (
-                          <Image
-                            source={{ uri: profileImage.uri }}
-                            style={styles.profilePreviewImage}
-                            contentFit="cover"
-                          />
-                        ) : (
-                          <View style={styles.profilePlaceholder}>
-                            <Ionicons name="person-circle-outline" size={36} color="#9CA3AF" />
-                            <Text style={styles.profilePlaceholderText}>პროფილის ფოტო</Text>
-                          </View>
-                        )}
-                      </View>
-
-                      <View style={styles.profileActions}>
-                        <TouchableOpacity
-                          style={[
-                            styles.filePickerButton,
-                            profileImage && styles.filePickerButtonActive,
-                          ]}
-                          onPress={handleProfileImagePick}
-                          disabled={uploadingProfileImage}
-                        >
-                          <Ionicons
-                            name={
-                              profileImage
-                                ? "checkmark-circle"
-                                : "cloud-upload-outline"
-                            }
-                            size={20}
-                            color={profileImage ? "#10B981" : "#9CA3AF"}
-                            style={styles.inputIcon}
-                          />
-                          {uploadingProfileImage ? (
-                            <View style={styles.uploadingContainer}>
-                              <ActivityIndicator size="small" color="#06B6D4" />
-                              <Text style={styles.uploadingText}>
-                                სურათი იტვირთება...
-                              </Text>
-                            </View>
-                          ) : (
-                            <Text
-                              style={[
-                                styles.filePickerText,
-                                profileImage && styles.filePickerTextActive,
-                              ]}
-                            >
-                              {profileImage
-                                ? profileImage.name
-                                : "აირჩიე პროფილის სურათი"}
-                            </Text>
-                          )}
-                          <Ionicons
-                            name="image-outline"
-                            size={20}
-                            color="#9CA3AF"
-                          />
-                        </TouchableOpacity>
-                        <Text style={styles.profileHint}>
-                          დაშვებულია JPG/PNG/WebP • მაქს 5MB
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  {/* Identification Document */}
-                  <View style={styles.inputContainer}>
-                    <Text style={styles.label}>
-                      იდენტიფიკაციის დოკუმენტი
-                    </Text>
-                    <TouchableOpacity
-                      style={[
-                        styles.filePickerButton,
-                        identificationDocument && styles.filePickerButtonActive,
-                      ]}
-                      onPress={handleIdentificationDocumentPick}
-                      disabled={uploadingIdentificationDocument}
-                    >
-                      <Ionicons
-                        name={
-                          identificationDocument
-                            ? "checkmark-circle"
-                            : "cloud-upload-outline"
-                        }
-                        size={20}
-                        color={identificationDocument ? "#10B981" : "#9CA3AF"}
-                        style={styles.inputIcon}
-                      />
-                      {uploadingIdentificationDocument ? (
-                        <View style={styles.uploadingContainer}>
-                          <ActivityIndicator size="small" color="#06B6D4" />
-                          <Text style={styles.uploadingText}>
-                            {t("doctor.license.uploading")}
-                          </Text>
-                        </View>
-                      ) : (
-                        <Text
-                          style={[
-                            styles.filePickerText,
-                            identificationDocument && styles.filePickerTextActive,
-                          ]}
-                        >
-                          {identificationDocument
-                            ? identificationDocument.name
-                            : "აირჩიე იდენტიფიკაციის დოკუმენტი"}
-                        </Text>
-                      )}
-                      <Ionicons
-                        name="document-attach-outline"
-                        size={20}
-                        color="#9CA3AF"
-                      />
-                    </TouchableOpacity>
-                    {identificationDocument && (
-                      <Text style={styles.fileHelper}>
-                        დოკუმენტი წარმატებით აიტვირთა
-                      </Text>
-                    )}
-                  </View>
-                </>
-              )}
-
-              {/* Doctor specific fields */}
-              {isDoctor && (
-                <>
-                  <View style={styles.inputContainer}>
-                    <Text style={styles.label}>
-                      {t("doctor.specialization.label")} *
-                    </Text>
-                    {loadingSpecializations ? (
-                      <View style={styles.specializationsLoading}>
-                        <ActivityIndicator size="small" color="#06B6D4" />
-                        <Text style={styles.specializationsLoadingText}>
-                          {t("doctor.specialization.loading")}
-                        </Text>
-                      </View>
-                    ) : specializations.length > 0 ? (
-                      <>
-                        <TouchableOpacity
-                          style={styles.multiSelectButton}
-                          onPress={() => setSpecializationModalVisible(true)}
-                        >
-                          <Ionicons
-                            name="medical-outline"
-                            size={20}
-                            color="#06B6D4"
-                            style={styles.multiSelectIcon}
-                          />
-                          <View style={styles.multiSelectTextContainer}>
-                            <Text style={styles.multiSelectLabel}>
-                              {t("doctor.specialization.selectPlaceholder")}
-                            </Text>
-                            <Text
-                              style={[
-                                styles.multiSelectValue,
-                                selectedSpecializations.length === 0 &&
-                                  styles.multiSelectPlaceholder,
-                              ]}
-                              numberOfLines={1}
-                            >
-                              {selectedSpecializations.length > 0
-                                ? selectedSpecializations.join(", ")
-                                : t("doctor.specialization.valuePlaceholder")}
-                            </Text>
-                          </View>
-                          <Ionicons
-                            name="chevron-down"
-                            size={18}
-                            color="#9CA3AF"
-                          />
-                        </TouchableOpacity>
-                        <Text style={styles.multiSelectHelper}>
-                          {t("doctor.specialization.helper")}
-                        </Text>
-                      </>
-                    ) : (
-                      <Text style={styles.specializationsEmpty}>
-                        {t("doctor.specialization.empty")}
-                      </Text>
-                    )}
-                  </View>
-
-                  {/* Degrees Input */}
-                  <View style={styles.inputContainer}>
-                    <Text style={styles.label}>
-                      {t("doctor.degrees.label")} *
-                    </Text>
-                    <TouchableOpacity
-                      activeOpacity={1}
-                      style={styles.inputWrapper}
-                      onPress={() => degreesInputRef.current?.focus()}
-                    >
-                      <Ionicons
-                        name="school-outline"
-                        size={20}
-                        color="#9CA3AF"
-                        style={styles.inputIcon}
-                      />
-                      <TextInput
-                        ref={degreesInputRef}
-                        style={styles.input}
-                        placeholder={t("doctor.degrees.placeholder")}
-                        placeholderTextColor="#9CA3AF"
-                        value={degrees}
-                        onChangeText={setDegrees}
-                        textContentType="none"
-                        autoComplete="off"
-                        autoCorrect={false}
-                        keyboardType="default"
-                      />
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Experience Input */}
-                  <View style={styles.inputContainer}>
-                    <Text style={styles.label}>
-                      {t("doctor.experience.label")} *
-                    </Text>
-                    <TouchableOpacity
-                      activeOpacity={1}
-                      style={styles.inputWrapper}
-                      onPress={() => experienceInputRef.current?.focus()}
-                    >
-                      <Ionicons
-                        name="briefcase-outline"
-                        size={20}
-                        color="#9CA3AF"
-                        style={styles.inputIcon}
-                      />
-                      <TextInput
-                        ref={experienceInputRef}
-                        style={styles.input}
-                        placeholder={t("doctor.experience.placeholder")}
-                        placeholderTextColor="#9CA3AF"
-                        value={experience}
-                        onChangeText={setExperience}
-                        textContentType="none"
-                        autoComplete="off"
-                        autoCorrect={false}
-                        keyboardType="default"
-                      />
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Location Input */}
-                  <View style={styles.inputContainer}>
-                    <Text style={styles.label}>
-                      {t("doctor.location.label")} *
-                    </Text>
-                    <TouchableOpacity
-                      activeOpacity={1}
-                      style={styles.inputWrapper}
-                      onPress={() => locationInputRef.current?.focus()}
-                    >
-                      <Ionicons
-                        name="location-outline"
-                        size={20}
-                        color="#9CA3AF"
-                        style={styles.inputIcon}
-                      />
-                      <TextInput
-                        ref={locationInputRef}
-                        style={styles.input}
-                        placeholder={t("doctor.location.placeholder")}
-                        placeholderTextColor="#9CA3AF"
-                        value={location}
-                        onChangeText={setLocation}
-                        textContentType="none"
-                        autoComplete="off"
-                        autoCorrect={false}
-                        keyboardType="default"
-                      />
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Date of Birth */}
-                  <View style={styles.inputContainer}>
-                    <Text style={styles.label}>
-                      {t("doctor.dob.label")} *
-                    </Text>
-                    <TouchableOpacity
-                      style={styles.inputWrapper}
-                      onPress={openDatePicker}
-                    >
-                      <Ionicons
-                        name="calendar-outline"
-                        size={20}
-                        color="#9CA3AF"
-                        style={styles.inputIcon}
-                      />
-                      <Text
-                        style={[
-                          styles.input,
-                          !dateOfBirth && styles.inputPlaceholder,
-                        ]}
-                      >
-                        {dateOfBirth || t("doctor.dob.placeholder")}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Gender Selection */}
-                  <View style={styles.inputContainer}>
-                    <Text style={styles.label}>
-                      {t("doctor.gender.label")} *
-                    </Text>
-                    <View style={styles.genderContainer}>
-                      <TouchableOpacity
-                        style={[
-                          styles.genderOption,
-                          gender === "male" && styles.genderOptionSelected,
-                        ]}
-                        onPress={() => setGender("male")}
-                      >
-                        <Ionicons
-                          name="male"
-                          size={20}
-                          color={gender === "male" ? "#06B6D4" : "#6B7280"}
-                        />
-                        <Text
-                          style={[
-                            styles.genderText,
-                            gender === "male" && styles.genderTextSelected,
-                          ]}
-                        >
-                          {t("doctor.gender.male")}
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[
-                          styles.genderOption,
-                          gender === "female" && styles.genderOptionSelected,
-                        ]}
-                        onPress={() => setGender("female")}
-                      >
-                        <Ionicons
-                          name="female"
-                          size={20}
-                          color={gender === "female" ? "#06B6D4" : "#6B7280"}
-                        />
-                        <Text
-                          style={[
-                            styles.genderText,
-                            gender === "female" && styles.genderTextSelected,
-                          ]}
-                        >
-                          {t("doctor.gender.female")}
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[
-                          styles.genderOption,
-                          gender === "other" && styles.genderOptionSelected,
-                        ]}
-                        onPress={() => setGender("other")}
-                      >
-                        <Ionicons
-                          name="person-outline"
-                          size={20}
-                          color={gender === "other" ? "#06B6D4" : "#6B7280"}
-                        />
-                        <Text
-                          style={[
-                            styles.genderText,
-                            gender === "other" && styles.genderTextSelected,
-                          ]}
-                        >
-                          {t("doctor.gender.other")}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-
-                  {/* Working Language Input */}
-                  <View style={styles.inputContainer}>
-                    <Text style={styles.label}>
-                      {t("doctor.workingLanguage.label")} *
-                    </Text>
-                    <TouchableOpacity
-                      activeOpacity={1}
-                      style={styles.inputWrapper}
-                      onPress={() => aboutInputRef.current?.focus()}
-                    >
-                      <Ionicons
-                        name="language-outline"
-                        size={20}
-                        color="#9CA3AF"
-                        style={styles.inputIcon}
-                      />
-                      <TextInput
-                        ref={aboutInputRef}
-                        style={styles.input}
-                        placeholder={t("doctor.workingLanguage.placeholder")}
-                        placeholderTextColor="#9CA3AF"
-                        value={about}
-                        onChangeText={setAbout}
-                        textContentType="none"
-                        autoComplete="off"
-                        autoCorrect={false}
-                        keyboardType="default"
-                      />
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* License Document */}
-                  <View style={styles.inputContainer}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                      <Text style={styles.label}>
-                        {t("doctor.license.label")}
-                      </Text>
-                      <TouchableOpacity
-                        onPress={() => setShowLicenseInfoModal(true)}
-                        style={{ padding: 4 }}
-                      >
-                        <Ionicons
-                          name="information-circle-outline"
+                          name="information-circle"
                           size={20}
                           color="#06B6D4"
                         />
                       </TouchableOpacity>
-                    </View>
-                    <TouchableOpacity
-                      style={[
-                        styles.filePickerButton,
-                        licenseDocument && styles.filePickerButtonActive,
-                      ]}
-                      onPress={handleFilePick}
-                      disabled={uploadingFile}
-                    >
-                      <Ionicons
-                        name={
-                          licenseDocument
-                            ? "checkmark-circle"
-                            : "cloud-upload-outline"
-                        }
-                        size={20}
-                        color={licenseDocument ? "#10B981" : "#9CA3AF"}
-                        style={styles.inputIcon}
-                      />
-                      {uploadingFile ? (
-                        <View style={styles.uploadingContainer}>
-                          <ActivityIndicator size="small" color="#06B6D4" />
-                          <Text style={styles.uploadingText}>
-                            {t("doctor.license.uploading")}
-                          </Text>
-                        </View>
-                      ) : (
-                        <Text
-                          style={[
-                            styles.filePickerText,
-                            licenseDocument && styles.filePickerTextActive,
-                          ]}
-                        >
-                          {licenseDocument
-                            ? licenseDocument.name
-                            : t("doctor.license.placeholder")}
-                        </Text>
-                      )}
-                      <Ionicons
-                        name="document-attach-outline"
-                        size={20}
-                        color="#9CA3AF"
-                      />
-                    </TouchableOpacity>
-                    {licenseDocument && (
-                      <Text style={styles.fileHelper}>
-                        {t("doctor.license.success")}
-                      </Text>
                     )}
                   </View>
-
-                  {/* Identification Document */}
-                  <View style={styles.inputContainer}>
-                    <Text style={styles.label}>
-                      იდენტიფიკაციის დოკუმენტი
-                    </Text>
+                  <View style={styles.idNumberRow}>
                     <TouchableOpacity
-                      style={[
-                        styles.filePickerButton,
-                        identificationDocument && styles.filePickerButtonActive,
-                      ]}
-                      onPress={handleIdentificationDocumentPick}
-                      disabled={uploadingIdentificationDocument}
+                      activeOpacity={1}
+                      style={[styles.inputWrapper, styles.idNumberInputWrapper]}
+                      onPress={() => idNumberInputRef.current?.focus()}
                     >
                       <Ionicons
-                        name={
-                          identificationDocument
-                            ? "checkmark-circle"
-                            : "cloud-upload-outline"
-                        }
-                        size={20}
-                        color={identificationDocument ? "#10B981" : "#9CA3AF"}
-                        style={styles.inputIcon}
-                      />
-                      {uploadingIdentificationDocument ? (
-                        <View style={styles.uploadingContainer}>
-                          <ActivityIndicator size="small" color="#06B6D4" />
-                          <Text style={styles.uploadingText}>
-                            {t("doctor.license.uploading")}
-                          </Text>
-                        </View>
-                      ) : (
-                        <Text
-                          style={[
-                            styles.filePickerText,
-                            identificationDocument && styles.filePickerTextActive,
-                          ]}
-                        >
-                          {identificationDocument
-                            ? identificationDocument.name
-                            : "აირჩიე იდენტიფიკაციის დოკუმენტი"}
-                        </Text>
-                      )}
-                      <Ionicons
-                        name="document-attach-outline"
+                        name="card-outline"
                         size={20}
                         color="#9CA3AF"
+                        style={styles.inputIcon}
+                      />
+                      <TextInput
+                        ref={idNumberInputRef}
+                        style={styles.input}
+                        placeholder={
+                          !isDoctor && nationality === "non-georgian"
+                            ? t("auth.register.idNumber.placeholder.passport")
+                            : t("auth.register.idNumber.placeholder")
+                        }
+                        placeholderTextColor="#9CA3AF"
+                        value={idNumber}
+                        onChangeText={setIdNumber}
+                        textContentType="none"
+                        autoComplete="off"
+                        autoCorrect={false}
+                        keyboardType="default"
+                        editable={!isIdentomatVerified}
                       />
                     </TouchableOpacity>
-                    {identificationDocument && (
-                      <Text style={styles.fileHelper}>
-                        დოკუმენტი წარმატებით აიტვირთა
-                      </Text>
-                    )}
-                  </View>
+                    {((!isDoctor && nationality === "georgian") ||
+                      isDoctor) && (
+                      <TouchableOpacity
+                        style={[
+                          styles.identomatButton,
+                          identomatLoading && styles.identomatButtonDisabled,
+                        ]}
+                        onPress={async () => {
+                          if (identomatLoading) return;
 
-                  {/* Profile Image (optional for doctors) */}
-                  <View style={styles.inputContainer}>
-                    <Text style={styles.label}>
-                      პროფილის სურათი
-                    </Text>
-                    <View style={styles.profileCard}>
-                      <View style={styles.profilePreview}>
-                        {profileImage?.uri ? (
-                          <Image
-                            source={{ uri: profileImage.uri }}
-                            style={styles.profilePreviewImage}
-                            contentFit="cover"
-                          />
+                          try {
+                            setIdentomatLoading(true);
+
+                            const COMPANY_KEY =
+                              "699c6dc7915fc8ed730c5034_0c1c01bb7b27253e3abe4d2ab9c573ff0ca5931f";
+                            const beginResponse = await fetch(
+                              "https://widget.identomat.com/external-api/begin/",
+                              {
+                                method: "POST",
+                                headers: {
+                                  "Content-Type": "application/json",
+                                },
+                                body: JSON.stringify({
+                                  company_key: COMPANY_KEY,
+                                  flags: {
+                                    skip_agreement: true,
+                                    skip_document: false,
+                                    skip_face: false,
+                                  },
+                                  steps: [
+                                    {
+                                      type: "face",
+                                      key: "face",
+                                    },
+                                    {
+                                      type: "document",
+                                      key: "document",
+                                    },
+                                  ],
+                                }),
+                              },
+                            );
+
+                            console.log(
+                              "📨 [IDENTOMAT] Begin response status:",
+                              beginResponse.status,
+                              beginResponse.statusText,
+                            );
+
+                            if (!beginResponse.ok) {
+                              const errorText = await beginResponse.text();
+                              console.error(
+                                "❌ [IDENTOMAT] Begin error response:",
+                                errorText,
+                              );
+                              throw new Error(
+                                `IDENTOMAT session-ის დაწყება ვერ მოხერხდა: ${beginResponse.status} ${beginResponse.statusText}`,
+                              );
+                            }
+
+                            const beginData = await beginResponse.json();
+                            console.log(
+                              "✅ [IDENTOMAT] Begin response data:",
+                              beginData,
+                            );
+                            console.log(
+                              "✅ [IDENTOMAT] Response type:",
+                              typeof beginData,
+                            );
+
+                            // API returns session token directly as a string, not as an object
+                            let sessionToken: string;
+
+                            if (typeof beginData === "string") {
+                              // Response is a string (session token directly)
+                              sessionToken = beginData;
+                            } else if (
+                              typeof beginData === "object" &&
+                              beginData !== null
+                            ) {
+                              // Response is an object, try different possible field names
+                              sessionToken =
+                                beginData.session_token ||
+                                beginData.sessionToken ||
+                                beginData.token ||
+                                beginData.data?.session_token ||
+                                beginData.data?.token ||
+                                "";
+                            } else {
+                              throw new Error(
+                                `Unexpected response type: ${typeof beginData}`,
+                              );
+                            }
+
+                            if (!sessionToken || sessionToken.trim() === "") {
+                              console.error(
+                                "❌ [IDENTOMAT] No session token in response. Response:",
+                                beginData,
+                              );
+                              throw new Error(
+                                `Session token-ის მიღება ვერ მოხერხდა. Response: ${JSON.stringify(beginData)}`,
+                              );
+                            }
+
+                            console.log(
+                              "✅ [IDENTOMAT] Session token received:",
+                              sessionToken.substring(0, 20) + "...",
+                            );
+
+                            setIdentomatSessionToken(sessionToken);
+
+                            // Step 2: Open WebView with session token
+                            const widgetUrl = `https://widget.identomat.com/?session_token=${sessionToken}`;
+                            setIdentomatUrl(widgetUrl);
+                            setShowIdentomatModal(true);
+                          } catch (error) {
+                            console.error(
+                              "❌ [IDENTOMAT] Error starting session:",
+                              error,
+                            );
+                            Alert.alert(
+                              "შეცდომა",
+                              error instanceof Error
+                                ? error.message
+                                : "IDENTOMAT-ის იდენტიფიკაცია ვერ მოხერხდა",
+                            );
+                          } finally {
+                            setIdentomatLoading(false);
+                          }
+                        }}
+                        disabled={identomatLoading}
+                      >
+                        {identomatLoading ? (
+                          <ActivityIndicator size="small" color="#FFFFFF" />
                         ) : (
-                          <View style={styles.profilePlaceholder}>
-                            <Ionicons name="person-circle-outline" size={36} color="#9CA3AF" />
-                            <Text style={styles.profilePlaceholderText}>პროფილის ფოტო</Text>
-                          </View>
+                          <>
+                            <Ionicons
+                              name="finger-print-outline"
+                              size={20}
+                              color="#FFFFFF"
+                            />
+                            <Text style={styles.identomatButtonText}>
+                              IDENTOMAT
+                            </Text>
+                          </>
                         )}
-                      </View>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  {isIdentomatVerified && (
+                    <View style={styles.identomatSuccessContainer}>
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={16}
+                        color="#10B981"
+                      />
+                      <Text style={styles.identomatSuccessText}>
+                        IDENTOMAT-ით დადასტურებული
+                      </Text>
+                    </View>
+                  )}
 
-                      <View style={styles.profileActions}>
+                  {/* Skip IDENTOMAT Button (Temporary for development) */}
+                  {!isIdentomatVerified &&
+                    !isDoctor &&
+                    nationality === "georgian" && (
+                      <TouchableOpacity
+                        style={styles.skipIdentomatButton}
+                        onPress={() => {
+                          // Skip IDENTOMAT verification (temporary)
+                          const placeholderIdNumber =
+                            idNumber.trim() || "00000000000";
+                          setIsIdentomatVerified(true);
+                          // Set idNumber in state so validation passes
+                          setIdNumber(placeholderIdNumber);
+                          setIdentomatData({
+                            idNumber: placeholderIdNumber,
+                            firstName: name?.split(" ")[0] || "Skipped",
+                            lastName:
+                              name?.split(" ").slice(1).join(" ") || "User",
+                            dateOfBirth: dateOfBirth || "2000-01-01",
+                            fullData: {
+                              message: "Identomat skipped for development",
+                            },
+                          });
+                          showToast.info(
+                            "IDENTOMAT-ის იდენტიფიკაცია გამოტოვებულია (დროებით)",
+                            "ინფორმაცია",
+                          );
+                        }}
+                      >
+                        <Text style={styles.skipIdentomatButtonText}>
+                          გამოტოვება (დროებით)
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                </View>
+
+                {/* Phone Input */}
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>
+                    {t("auth.register.phone.label")} *
+                  </Text>
+                  <TouchableOpacity
+                    activeOpacity={1}
+                    style={styles.inputWrapper}
+                    onPress={() => phoneInputRef.current?.focus()}
+                  >
+                    <Ionicons
+                      name="call-outline"
+                      size={20}
+                      color="#9CA3AF"
+                      style={styles.inputIcon}
+                    />
+                    <TextInput
+                      ref={phoneInputRef}
+                      style={styles.input}
+                      placeholder={t("auth.register.phone.placeholder")}
+                      placeholderTextColor="#9CA3AF"
+                      value={phone}
+                      onChangeText={setPhone}
+                      textContentType="none"
+                      autoComplete="off"
+                      autoCorrect={false}
+                      keyboardType="phone-pad"
+                    />
+                  </TouchableOpacity>
+
+                  {/* Phone Verification Button */}
+                  {!isPhoneVerified && phone.trim() && (
+                    <TouchableOpacity
+                      style={styles.verifyPhoneButton}
+                      onPress={() => setShowOTPModal(true)}
+                    >
+                      <Ionicons
+                        name="shield-checkmark-outline"
+                        size={20}
+                        color="#06B6D4"
+                      />
+                      <Text style={styles.verifyPhoneButtonText}>
+                        ტელეფონის ვერიფიკაცია
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+
+                  {/* Verified Status */}
+                  {isPhoneVerified && (
+                    <View style={styles.verifiedContainer}>
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={20}
+                        color="#10B981"
+                      />
+                      <Text style={styles.verifiedText}>
+                        ტელეფონი დადასტურებულია
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* Patient specific fields */}
+                {!isDoctor && (
+                  <>
+                    {/* Gender Selection */}
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.label}>სქესი *</Text>
+                      <View style={styles.genderContainer}>
                         <TouchableOpacity
                           style={[
-                            styles.filePickerButton,
-                            profileImage && styles.filePickerButtonActive,
+                            styles.genderOption,
+                            gender === "male" && styles.genderOptionSelected,
                           ]}
-                          onPress={handleProfileImagePick}
-                          disabled={uploadingProfileImage}
+                          onPress={() => setGender("male")}
                         >
                           <Ionicons
-                            name={
-                              profileImage
-                                ? "checkmark-circle"
-                                : "cloud-upload-outline"
-                            }
+                            name="male"
                             size={20}
-                            color={profileImage ? "#10B981" : "#9CA3AF"}
-                            style={styles.inputIcon}
+                            color={gender === "male" ? "#06B6D4" : "#6B7280"}
                           />
-                          {uploadingProfileImage ? (
-                            <View style={styles.uploadingContainer}>
-                              <ActivityIndicator size="small" color="#06B6D4" />
-                              <Text style={styles.uploadingText}>
-                                სურათი იტვირთება...
-                              </Text>
-                            </View>
-                          ) : (
-                            <Text
-                              style={[
-                                styles.filePickerText,
-                                profileImage && styles.filePickerTextActive,
-                              ]}
-                            >
-                              {profileImage
-                                ? profileImage.name
-                                : "აირჩიე პროფილის სურათი"}
-                            </Text>
-                          )}
-                          <Ionicons
-                            name="image-outline"
-                            size={20}
-                            color="#9CA3AF"
-                          />
+                          <Text
+                            style={[
+                              styles.genderText,
+                              gender === "male" && styles.genderTextSelected,
+                            ]}
+                          >
+                            კაცი
+                          </Text>
                         </TouchableOpacity>
-                        <Text style={styles.profileHint}>
-                          დაშვებულია JPG/PNG/WebP • მაქს 5MB
-                        </Text>
+                        <TouchableOpacity
+                          style={[
+                            styles.genderOption,
+                            gender === "female" && styles.genderOptionSelected,
+                          ]}
+                          onPress={() => setGender("female")}
+                        >
+                          <Ionicons
+                            name="female"
+                            size={20}
+                            color={gender === "female" ? "#06B6D4" : "#6B7280"}
+                          />
+                          <Text
+                            style={[
+                              styles.genderText,
+                              gender === "female" && styles.genderTextSelected,
+                            ]}
+                          >
+                            ქალი
+                          </Text>
+                        </TouchableOpacity>
                       </View>
                     </View>
-                  </View>
-                </>
-              )}
 
-              {/* Password Input */}
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>
-                  {t("auth.register.password.label")} *
-                </Text>
-                <TouchableOpacity
-                  activeOpacity={1}
-                  style={styles.inputWrapper}
-                  onPress={() => passwordInputRef.current?.focus()}
-                >
-                  <Ionicons
-                    name="lock-closed-outline"
-                    size={20}
-                    color="#9CA3AF"
-                    style={styles.inputIcon}
-                  />
-                  <TextInput
-                    ref={passwordInputRef}
-                    style={styles.input}
-                    secureTextEntry={!showPassword}
-                    placeholder={t("auth.register.password.placeholder")}
-                    placeholderTextColor="#9CA3AF"
-                    value={password}
-                    onChangeText={setPassword}
-                    textContentType="none"
-                    autoComplete="off"
-                    autoCorrect={false}
-                    keyboardType="default"
-                  />
+                    {/* Address Input */}
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.label}>მისამართი *</Text>
+                      <TouchableOpacity
+                        activeOpacity={1}
+                        style={styles.inputWrapper}
+                        onPress={() => addressInputRef.current?.focus()}
+                      >
+                        <Ionicons
+                          name="location-outline"
+                          size={20}
+                          color="#9CA3AF"
+                          style={styles.inputIcon}
+                        />
+                        <TextInput
+                          ref={addressInputRef}
+                          style={styles.input}
+                          placeholder="შეიყვანეთ მისამართი"
+                          placeholderTextColor="#9CA3AF"
+                          value={address}
+                          onChangeText={setAddress}
+                          textContentType="none"
+                          autoComplete="off"
+                          autoCorrect={false}
+                          keyboardType="default"
+                        />
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Date of Birth */}
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.label}>დაბადების თარიღი *</Text>
+                      <TouchableOpacity
+                        style={styles.inputWrapper}
+                        onPress={openDatePicker}
+                      >
+                        <Ionicons
+                          name="calendar-outline"
+                          size={20}
+                          color="#9CA3AF"
+                          style={styles.inputIcon}
+                        />
+                        <Text
+                          style={[
+                            styles.input,
+                            !dateOfBirth && styles.inputPlaceholder,
+                          ]}
+                        >
+                          {dateOfBirth || "აირჩიეთ თარიღი"}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Profile Image */}
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.label}>პროფილის სურათი</Text>
+                      <View style={styles.profileCard}>
+                        <View style={styles.profilePreview}>
+                          {profileImage?.uri ? (
+                            <Image
+                              source={{ uri: profileImage.uri }}
+                              style={styles.profilePreviewImage}
+                              contentFit="cover"
+                            />
+                          ) : (
+                            <View style={styles.profilePlaceholder}>
+                              <Ionicons
+                                name="person-circle-outline"
+                                size={36}
+                                color="#9CA3AF"
+                              />
+                              <Text style={styles.profilePlaceholderText}>
+                                პროფილის ფოტო
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+
+                        <View style={styles.profileActions}>
+                          <TouchableOpacity
+                            style={[
+                              styles.filePickerButton,
+                              profileImage && styles.filePickerButtonActive,
+                            ]}
+                            onPress={handleProfileImagePick}
+                            disabled={uploadingProfileImage}
+                          >
+                            <Ionicons
+                              name={
+                                profileImage
+                                  ? "checkmark-circle"
+                                  : "cloud-upload-outline"
+                              }
+                              size={20}
+                              color={profileImage ? "#10B981" : "#9CA3AF"}
+                              style={styles.inputIcon}
+                            />
+                            {uploadingProfileImage ? (
+                              <View style={styles.uploadingContainer}>
+                                <ActivityIndicator
+                                  size="small"
+                                  color="#06B6D4"
+                                />
+                                <Text style={styles.uploadingText}>
+                                  სურათი იტვირთება...
+                                </Text>
+                              </View>
+                            ) : (
+                              <Text
+                                style={[
+                                  styles.filePickerText,
+                                  profileImage && styles.filePickerTextActive,
+                                ]}
+                              >
+                                {profileImage
+                                  ? profileImage.name
+                                  : "აირჩიე პროფილის სურათი"}
+                              </Text>
+                            )}
+                            <Ionicons
+                              name="image-outline"
+                              size={20}
+                              color="#9CA3AF"
+                            />
+                          </TouchableOpacity>
+                          <Text style={styles.profileHint}>
+                            დაშვებულია JPG/PNG/WebP • მაქს 5MB
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* Identification Document */}
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.label}>იდენტიფიკაციის დოკუმენტი</Text>
+                      <TouchableOpacity
+                        style={[
+                          styles.filePickerButton,
+                          identificationDocument &&
+                            styles.filePickerButtonActive,
+                        ]}
+                        onPress={handleIdentificationDocumentPick}
+                        disabled={uploadingIdentificationDocument}
+                      >
+                        <Ionicons
+                          name={
+                            identificationDocument
+                              ? "checkmark-circle"
+                              : "cloud-upload-outline"
+                          }
+                          size={20}
+                          color={identificationDocument ? "#10B981" : "#9CA3AF"}
+                          style={styles.inputIcon}
+                        />
+                        {uploadingIdentificationDocument ? (
+                          <View style={styles.uploadingContainer}>
+                            <ActivityIndicator size="small" color="#06B6D4" />
+                            <Text style={styles.uploadingText}>
+                              {t("doctor.license.uploading")}
+                            </Text>
+                          </View>
+                        ) : (
+                          <Text
+                            style={[
+                              styles.filePickerText,
+                              identificationDocument &&
+                                styles.filePickerTextActive,
+                            ]}
+                          >
+                            {identificationDocument
+                              ? identificationDocument.name
+                              : "აირჩიე იდენტიფიკაციის დოკუმენტი"}
+                          </Text>
+                        )}
+                        <Ionicons
+                          name="document-attach-outline"
+                          size={20}
+                          color="#9CA3AF"
+                        />
+                      </TouchableOpacity>
+                      {identificationDocument && (
+                        <Text style={styles.fileHelper}>
+                          დოკუმენტი წარმატებით აიტვირთა
+                        </Text>
+                      )}
+                    </View>
+                  </>
+                )}
+
+                {/* Doctor specific fields */}
+                {isDoctor && (
+                  <>
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.label}>
+                        {t("doctor.specialization.label")} *
+                      </Text>
+                      {loadingSpecializations ? (
+                        <View style={styles.specializationsLoading}>
+                          <ActivityIndicator size="small" color="#06B6D4" />
+                          <Text style={styles.specializationsLoadingText}>
+                            {t("doctor.specialization.loading")}
+                          </Text>
+                        </View>
+                      ) : specializations.length > 0 ? (
+                        <>
+                          <TouchableOpacity
+                            style={styles.multiSelectButton}
+                            onPress={() => setSpecializationModalVisible(true)}
+                          >
+                            <Ionicons
+                              name="medical-outline"
+                              size={20}
+                              color="#06B6D4"
+                              style={styles.multiSelectIcon}
+                            />
+                            <View style={styles.multiSelectTextContainer}>
+                              <Text style={styles.multiSelectLabel}>
+                                {t("doctor.specialization.selectPlaceholder")}
+                              </Text>
+                              <Text
+                                style={[
+                                  styles.multiSelectValue,
+                                  selectedSpecializations.length === 0 &&
+                                    styles.multiSelectPlaceholder,
+                                ]}
+                                numberOfLines={1}
+                              >
+                                {selectedSpecializations.length > 0
+                                  ? selectedSpecializations.join(", ")
+                                  : t("doctor.specialization.valuePlaceholder")}
+                              </Text>
+                            </View>
+                            <Ionicons
+                              name="chevron-down"
+                              size={18}
+                              color="#9CA3AF"
+                            />
+                          </TouchableOpacity>
+                          <Text style={styles.multiSelectHelper}>
+                            {t("doctor.specialization.helper")}
+                          </Text>
+                        </>
+                      ) : (
+                        <Text style={styles.specializationsEmpty}>
+                          {t("doctor.specialization.empty")}
+                        </Text>
+                      )}
+                    </View>
+
+                    {/* Degrees Input */}
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.label}>
+                        {t("doctor.degrees.label")} *
+                      </Text>
+                      <TouchableOpacity
+                        activeOpacity={1}
+                        style={styles.inputWrapper}
+                        onPress={() => degreesInputRef.current?.focus()}
+                      >
+                        <Ionicons
+                          name="school-outline"
+                          size={20}
+                          color="#9CA3AF"
+                          style={styles.inputIcon}
+                        />
+                        <TextInput
+                          ref={degreesInputRef}
+                          style={styles.input}
+                          placeholder={t("doctor.degrees.placeholder")}
+                          placeholderTextColor="#9CA3AF"
+                          value={degrees}
+                          onChangeText={setDegrees}
+                          textContentType="none"
+                          autoComplete="off"
+                          autoCorrect={false}
+                          keyboardType="default"
+                        />
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Experience Input */}
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.label}>
+                        {t("doctor.experience.label")} *
+                      </Text>
+                      <TouchableOpacity
+                        activeOpacity={1}
+                        style={styles.inputWrapper}
+                        onPress={() => experienceInputRef.current?.focus()}
+                      >
+                        <Ionicons
+                          name="briefcase-outline"
+                          size={20}
+                          color="#9CA3AF"
+                          style={styles.inputIcon}
+                        />
+                        <TextInput
+                          ref={experienceInputRef}
+                          style={styles.input}
+                          placeholder={t("doctor.experience.placeholder")}
+                          placeholderTextColor="#9CA3AF"
+                          value={experience}
+                          onChangeText={setExperience}
+                          textContentType="none"
+                          autoComplete="off"
+                          autoCorrect={false}
+                          keyboardType="default"
+                        />
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Location Input */}
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.label}>
+                        {t("doctor.location.label")} *
+                      </Text>
+                      <TouchableOpacity
+                        activeOpacity={1}
+                        style={styles.inputWrapper}
+                        onPress={() => locationInputRef.current?.focus()}
+                      >
+                        <Ionicons
+                          name="location-outline"
+                          size={20}
+                          color="#9CA3AF"
+                          style={styles.inputIcon}
+                        />
+                        <TextInput
+                          ref={locationInputRef}
+                          style={styles.input}
+                          placeholder={t("doctor.location.placeholder")}
+                          placeholderTextColor="#9CA3AF"
+                          value={location}
+                          onChangeText={setLocation}
+                          textContentType="none"
+                          autoComplete="off"
+                          autoCorrect={false}
+                          keyboardType="default"
+                        />
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Date of Birth */}
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.label}>
+                        {t("doctor.dob.label")} *
+                      </Text>
+                      <TouchableOpacity
+                        style={styles.inputWrapper}
+                        onPress={openDatePicker}
+                      >
+                        <Ionicons
+                          name="calendar-outline"
+                          size={20}
+                          color="#9CA3AF"
+                          style={styles.inputIcon}
+                        />
+                        <Text
+                          style={[
+                            styles.input,
+                            !dateOfBirth && styles.inputPlaceholder,
+                          ]}
+                        >
+                          {dateOfBirth || t("doctor.dob.placeholder")}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Gender Selection */}
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.label}>
+                        {t("doctor.gender.label")} *
+                      </Text>
+                      <View style={styles.genderContainer}>
+                        <TouchableOpacity
+                          style={[
+                            styles.genderOption,
+                            gender === "male" && styles.genderOptionSelected,
+                          ]}
+                          onPress={() => setGender("male")}
+                        >
+                          <Ionicons
+                            name="male"
+                            size={20}
+                            color={gender === "male" ? "#06B6D4" : "#6B7280"}
+                          />
+                          <Text
+                            style={[
+                              styles.genderText,
+                              gender === "male" && styles.genderTextSelected,
+                            ]}
+                          >
+                            {t("doctor.gender.male")}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[
+                            styles.genderOption,
+                            gender === "female" && styles.genderOptionSelected,
+                          ]}
+                          onPress={() => setGender("female")}
+                        >
+                          <Ionicons
+                            name="female"
+                            size={20}
+                            color={gender === "female" ? "#06B6D4" : "#6B7280"}
+                          />
+                          <Text
+                            style={[
+                              styles.genderText,
+                              gender === "female" && styles.genderTextSelected,
+                            ]}
+                          >
+                            {t("doctor.gender.female")}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    {/* Working Language Input */}
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.label}>
+                        {t("doctor.workingLanguage.label")} *
+                      </Text>
+                      <TouchableOpacity
+                        activeOpacity={1}
+                        style={styles.inputWrapper}
+                        onPress={() => aboutInputRef.current?.focus()}
+                      >
+                        <Ionicons
+                          name="language-outline"
+                          size={20}
+                          color="#9CA3AF"
+                          style={styles.inputIcon}
+                        />
+                        <TextInput
+                          ref={aboutInputRef}
+                          style={styles.input}
+                          placeholder={t("doctor.workingLanguage.placeholder")}
+                          placeholderTextColor="#9CA3AF"
+                          value={about}
+                          onChangeText={setAbout}
+                          textContentType="none"
+                          autoComplete="off"
+                          autoCorrect={false}
+                          keyboardType="default"
+                        />
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* License Document */}
+                    <View style={styles.inputContainer}>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 8,
+                          marginBottom: 8,
+                        }}
+                      >
+                        <Text style={styles.label}>
+                          {t("doctor.license.label")}
+                        </Text>
+                        <TouchableOpacity
+                          onPress={() => setShowLicenseInfoModal(true)}
+                          style={{ padding: 4 }}
+                        >
+                          <Ionicons
+                            name="information-circle-outline"
+                            size={20}
+                            color="#06B6D4"
+                          />
+                        </TouchableOpacity>
+                      </View>
+                      <TouchableOpacity
+                        style={[
+                          styles.filePickerButton,
+                          licenseDocument && styles.filePickerButtonActive,
+                        ]}
+                        onPress={handleFilePick}
+                        disabled={uploadingFile}
+                      >
+                        <Ionicons
+                          name={
+                            licenseDocument
+                              ? "checkmark-circle"
+                              : "cloud-upload-outline"
+                          }
+                          size={20}
+                          color={licenseDocument ? "#10B981" : "#9CA3AF"}
+                          style={styles.inputIcon}
+                        />
+                        {uploadingFile ? (
+                          <View style={styles.uploadingContainer}>
+                            <ActivityIndicator size="small" color="#06B6D4" />
+                            <Text style={styles.uploadingText}>
+                              {t("doctor.license.uploading")}
+                            </Text>
+                          </View>
+                        ) : (
+                          <Text
+                            style={[
+                              styles.filePickerText,
+                              licenseDocument && styles.filePickerTextActive,
+                            ]}
+                          >
+                            {licenseDocument
+                              ? licenseDocument.name
+                              : t("doctor.license.placeholder")}
+                          </Text>
+                        )}
+                        <Ionicons
+                          name="document-attach-outline"
+                          size={20}
+                          color="#9CA3AF"
+                        />
+                      </TouchableOpacity>
+                      {licenseDocument && (
+                        <Text style={styles.fileHelper}>
+                          {t("doctor.license.success")}
+                        </Text>
+                      )}
+                    </View>
+
+                    {/* Identification Document */}
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.label}>იდენტიფიკაციის დოკუმენტი</Text>
+                      <TouchableOpacity
+                        style={[
+                          styles.filePickerButton,
+                          identificationDocument &&
+                            styles.filePickerButtonActive,
+                        ]}
+                        onPress={handleIdentificationDocumentPick}
+                        disabled={uploadingIdentificationDocument}
+                      >
+                        <Ionicons
+                          name={
+                            identificationDocument
+                              ? "checkmark-circle"
+                              : "cloud-upload-outline"
+                          }
+                          size={20}
+                          color={identificationDocument ? "#10B981" : "#9CA3AF"}
+                          style={styles.inputIcon}
+                        />
+                        {uploadingIdentificationDocument ? (
+                          <View style={styles.uploadingContainer}>
+                            <ActivityIndicator size="small" color="#06B6D4" />
+                            <Text style={styles.uploadingText}>
+                              {t("doctor.license.uploading")}
+                            </Text>
+                          </View>
+                        ) : (
+                          <Text
+                            style={[
+                              styles.filePickerText,
+                              identificationDocument &&
+                                styles.filePickerTextActive,
+                            ]}
+                          >
+                            {identificationDocument
+                              ? identificationDocument.name
+                              : "აირჩიე იდენტიფიკაციის დოკუმენტი"}
+                          </Text>
+                        )}
+                        <Ionicons
+                          name="document-attach-outline"
+                          size={20}
+                          color="#9CA3AF"
+                        />
+                      </TouchableOpacity>
+                      {identificationDocument && (
+                        <Text style={styles.fileHelper}>
+                          დოკუმენტი წარმატებით აიტვირთა
+                        </Text>
+                      )}
+                    </View>
+
+                    {/* Profile Image (optional for doctors) */}
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.label}>პროფილის სურათი</Text>
+                      <View style={styles.profileCard}>
+                        <View style={styles.profilePreview}>
+                          {profileImage?.uri ? (
+                            <Image
+                              source={{ uri: profileImage.uri }}
+                              style={styles.profilePreviewImage}
+                              contentFit="cover"
+                            />
+                          ) : (
+                            <View style={styles.profilePlaceholder}>
+                              <Ionicons
+                                name="person-circle-outline"
+                                size={36}
+                                color="#9CA3AF"
+                              />
+                              <Text style={styles.profilePlaceholderText}>
+                                პროფილის ფოტო
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+
+                        <View style={styles.profileActions}>
+                          <TouchableOpacity
+                            style={[
+                              styles.filePickerButton,
+                              profileImage && styles.filePickerButtonActive,
+                            ]}
+                            onPress={handleProfileImagePick}
+                            disabled={uploadingProfileImage}
+                          >
+                            <Ionicons
+                              name={
+                                profileImage
+                                  ? "checkmark-circle"
+                                  : "cloud-upload-outline"
+                              }
+                              size={20}
+                              color={profileImage ? "#10B981" : "#9CA3AF"}
+                              style={styles.inputIcon}
+                            />
+                            {uploadingProfileImage ? (
+                              <View style={styles.uploadingContainer}>
+                                <ActivityIndicator
+                                  size="small"
+                                  color="#06B6D4"
+                                />
+                                <Text style={styles.uploadingText}>
+                                  სურათი იტვირთება...
+                                </Text>
+                              </View>
+                            ) : (
+                              <Text
+                                style={[
+                                  styles.filePickerText,
+                                  profileImage && styles.filePickerTextActive,
+                                ]}
+                              >
+                                {profileImage
+                                  ? profileImage.name
+                                  : "აირჩიე პროფილის სურათი"}
+                              </Text>
+                            )}
+                            <Ionicons
+                              name="image-outline"
+                              size={20}
+                              color="#9CA3AF"
+                            />
+                          </TouchableOpacity>
+                          <Text style={styles.profileHint}>
+                            დაშვებულია JPG/PNG/WebP • მაქს 5MB
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  </>
+                )}
+
+                {/* Password Input */}
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>
+                    {t("auth.register.password.label")} *
+                  </Text>
                   <TouchableOpacity
-                    onPress={() => setShowPassword(!showPassword)}
-                    style={styles.eyeIcon}
+                    activeOpacity={1}
+                    style={styles.inputWrapper}
+                    onPress={() => passwordInputRef.current?.focus()}
                   >
                     <Ionicons
-                      name={showPassword ? "eye-off-outline" : "eye-outline"}
+                      name="lock-closed-outline"
                       size={20}
                       color="#9CA3AF"
+                      style={styles.inputIcon}
                     />
+                    <TextInput
+                      ref={passwordInputRef}
+                      style={styles.input}
+                      secureTextEntry={!showPassword}
+                      placeholder={t("auth.register.password.placeholder")}
+                      placeholderTextColor="#9CA3AF"
+                      value={password}
+                      onChangeText={setPassword}
+                      textContentType="none"
+                      autoComplete="off"
+                      autoCorrect={false}
+                      keyboardType="default"
+                    />
+                    <TouchableOpacity
+                      onPress={() => setShowPassword(!showPassword)}
+                      style={styles.eyeIcon}
+                    >
+                      <Ionicons
+                        name={showPassword ? "eye-off-outline" : "eye-outline"}
+                        size={20}
+                        color="#9CA3AF"
+                      />
+                    </TouchableOpacity>
                   </TouchableOpacity>
-                </TouchableOpacity>
-              </View>
+                </View>
 
-              {/* Confirm Password Input */}
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>
-                  {t("auth.register.confirmPassword.label")} *
-                </Text>
-                <TouchableOpacity
-                  activeOpacity={1}
-                  style={styles.inputWrapper}
-                  onPress={() => confirmPasswordInputRef.current?.focus()}
-                >
-                  <Ionicons
-                    name="lock-closed-outline"
-                    size={20}
-                    color="#9CA3AF"
-                    style={styles.inputIcon}
-                  />
-                  <TextInput
-                    ref={confirmPasswordInputRef}
-                    style={styles.input}
-                    secureTextEntry={!showPassword}
-                    placeholder={t("auth.register.confirmPassword.placeholder")}
-                    placeholderTextColor="#9CA3AF"
-                    value={confirmPassword}
-                    onChangeText={setConfirmPassword}
-                    textContentType="none"
-                    autoComplete="off"
-                    autoCorrect={false}
-                    keyboardType="default"
-                  />
+                {/* Confirm Password Input */}
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>
+                    {t("auth.register.confirmPassword.label")} *
+                  </Text>
                   <TouchableOpacity
-                    onPress={() => setShowPassword(!showPassword)}
-                    style={styles.eyeIcon}
+                    activeOpacity={1}
+                    style={styles.inputWrapper}
+                    onPress={() => confirmPasswordInputRef.current?.focus()}
                   >
                     <Ionicons
-                      name={showPassword ? "eye-off-outline" : "eye-outline"}
+                      name="lock-closed-outline"
                       size={20}
                       color="#9CA3AF"
+                      style={styles.inputIcon}
                     />
+                    <TextInput
+                      ref={confirmPasswordInputRef}
+                      style={styles.input}
+                      secureTextEntry={!showPassword}
+                      placeholder={t(
+                        "auth.register.confirmPassword.placeholder",
+                      )}
+                      placeholderTextColor="#9CA3AF"
+                      value={confirmPassword}
+                      onChangeText={setConfirmPassword}
+                      textContentType="none"
+                      autoComplete="off"
+                      autoCorrect={false}
+                      keyboardType="default"
+                    />
+                    <TouchableOpacity
+                      onPress={() => setShowPassword(!showPassword)}
+                      style={styles.eyeIcon}
+                    >
+                      <Ionicons
+                        name={showPassword ? "eye-off-outline" : "eye-outline"}
+                        size={20}
+                        color="#9CA3AF"
+                      />
+                    </TouchableOpacity>
                   </TouchableOpacity>
-                </TouchableOpacity>
-              </View>
+                </View>
 
-              {/* Terms of Service / Privacy Policy notice + checkbox */}
-              <View style={styles.tosInlineContainer}>
-                <Text style={styles.tosInlineText}>
-                  {t("auth.register.tos.inlineText") + " "}
-                  <Text
-                    style={styles.tosInlineLink}
-                    onPress={() => setTosModalVisible(true)}
-                  >
-                    {t("auth.register.tos.readMore")}
+                {/* Terms of Service / Privacy Policy notice + checkbox */}
+                <View style={styles.tosInlineContainer}>
+                  <Text style={styles.tosInlineText}>
+                    {t("auth.register.tos.inlineText") + " "}
+                    <Text
+                      style={styles.tosInlineLink}
+                      onPress={() => setTosModalVisible(true)}
+                    >
+                      {t("auth.register.tos.readMore")}
+                    </Text>
                   </Text>
-                </Text>
+                  <TouchableOpacity
+                    style={styles.tosCheckboxRow}
+                    onPress={() => {
+                      const next = !hasAcceptedTos;
+                      setHasAcceptedTos(next);
+                      if (next) {
+                        setTosModalVisible(true);
+                      }
+                    }}
+                  >
+                    <View
+                      style={[
+                        styles.tosCheckbox,
+                        hasAcceptedTos && styles.tosCheckboxChecked,
+                      ]}
+                    >
+                      {hasAcceptedTos && (
+                        <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                      )}
+                    </View>
+                    <Text style={styles.tosCheckboxLabel}>
+                      {t("auth.register.tos.checkboxLabel")}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Signup Button */}
                 <TouchableOpacity
-                  style={styles.tosCheckboxRow}
-                  onPress={() => {
-                    const next = !hasAcceptedTos;
-                    setHasAcceptedTos(next);
-                    if (next) {
-                      setTosModalVisible(true);
-                    }
-                  }}
+                  style={[
+                    styles.signupButton,
+                    isLoading && styles.signupButtonDisabled,
+                  ]}
+                  onPress={handleSignup}
+                  disabled={isLoading}
                 >
-                  <View
-                    style={[
-                      styles.tosCheckbox,
-                      hasAcceptedTos && styles.tosCheckboxChecked,
-                    ]}
-                  >
-                    {hasAcceptedTos && (
-                      <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                    )}
-                  </View>
-                  <Text style={styles.tosCheckboxLabel}>
-                    {t("auth.register.tos.checkboxLabel")}
+                  <Text style={styles.signupButtonText}>
+                    {isLoading
+                      ? t("auth.register.submitting")
+                      : t("auth.register.submit")}
                   </Text>
                 </TouchableOpacity>
-              </View>
 
-              {/* Signup Button */}
-              <TouchableOpacity
-                style={[
-                  styles.signupButton,
-                  isLoading && styles.signupButtonDisabled,
-                ]}
-                onPress={handleSignup}
-                disabled={isLoading}
-              >
-                <Text style={styles.signupButtonText}>
-                {isLoading
-                  ? t("auth.register.submitting")
-                  : t("auth.register.submit")}
-                </Text>
-              </TouchableOpacity>
-
-              {/* Signin Link */}
-              <View style={styles.signinContainer}>
-              <Text style={styles.signinText}>
-                {t("auth.register.signin.question")}
-              </Text>
-                <TouchableOpacity onPress={handleSignin}>
-                <Text style={styles.signinLink}>
-                  {t("auth.register.signin.action")}
-                </Text>
-                </TouchableOpacity>
+                {/* Signin Link */}
+                <View style={styles.signinContainer}>
+                  <Text style={styles.signinText}>
+                    {t("auth.register.signin.question")}
+                  </Text>
+                  <TouchableOpacity onPress={handleSignin}>
+                    <Text style={styles.signinLink}>
+                      {t("auth.register.signin.action")}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
             )}
           </ScrollView>
         </SafeAreaView>
@@ -2787,7 +3154,7 @@ export default function RegisterScreen() {
                     {t("doctor.dob.modalCancel")}
                   </Text>
                 </TouchableOpacity>
-                
+
                 <TouchableOpacity
                   onPress={() => setShowDatePicker(false)}
                   style={styles.datePickerDoneButton}
@@ -2834,56 +3201,66 @@ export default function RegisterScreen() {
               <Text style={styles.modalTitle}>
                 სამედიცინო ლიცენზიის ატვირთვის ინფორმაცია
               </Text>
-
             </View>
             <ScrollView style={styles.modalList}>
-              <View style={{
-                backgroundColor: "#FEF3C7",
-                borderRadius: 8,
-                padding: 16,
-                marginBottom: 16,
-              }}>
-                <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
-                  <Ionicons
-                    name="warning-outline"
-                    size={24}
-                    color="#D97706"
-                  />
+              <View
+                style={{
+                  backgroundColor: "#FEF3C7",
+                  borderRadius: 8,
+                  padding: 16,
+                  marginBottom: 16,
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "flex-start",
+                    gap: 12,
+                  }}
+                >
+                  <Ionicons name="warning-outline" size={24} color="#D97706" />
                   <View style={{ flex: 1 }}>
-                    <Text style={{
-                      fontSize: 14,
-                      fontFamily: "Poppins-SemiBold",
-                      color: "#92400E",
-                      marginBottom: 8,
-                    }}>
+                    <Text
+                      style={{
+                        fontSize: 14,
+                        fontFamily: "Poppins-SemiBold",
+                        color: "#92400E",
+                        marginBottom: 8,
+                      }}
+                    >
                       მნიშვნელოვანი ინფორმაცია
                     </Text>
-                    <Text style={{
-                      fontSize: 13,
-                      fontFamily: "Poppins-Regular",
-                      color: "#78350F",
-                      lineHeight: 20,
-                    }}>
-                      ლიცენზია იტვირთება მხოლოდ ერთხელ. გთხოვთ, ყურადღებით შეამოწმოთ არჩეული ფაილი სანამ ატვირთვას დააწყებთ. შეცდომის შემთხვევაში ლიცენზიის შეცვლა შესაძლებელი იქნება მხოლოდ ადმინისტრატორის მხარდაჭერით.
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontFamily: "Poppins-Regular",
+                        color: "#78350F",
+                        lineHeight: 20,
+                      }}
+                    >
+                      ლიცენზია იტვირთება მხოლოდ ერთხელ. გთხოვთ, ყურადღებით
+                      შეამოწმოთ არჩეული ფაილი სანამ ატვირთვას დააწყებთ. შეცდომის
+                      შემთხვევაში ლიცენზიის შეცვლა შესაძლებელი იქნება მხოლოდ
+                      ადმინისტრატორის მხარდაჭერით.
                     </Text>
                   </View>
                 </View>
               </View>
             </ScrollView>
-            <View style={{
-              paddingHorizontal: 20,
-              paddingBottom: 20,
-              paddingTop: 12,
-              borderTopWidth: 1,
-              borderTopColor: "#E5E7EB",
-            }}>
+            <View
+              style={{
+                paddingHorizontal: 20,
+                paddingBottom: 20,
+                paddingTop: 12,
+                borderTopWidth: 1,
+                borderTopColor: "#E5E7EB",
+              }}
+            >
               <TouchableOpacity
                 onPress={() => setShowLicenseInfoModal(false)}
                 style={styles.modalPrimaryButton}
               >
-                <Text style={styles.modalPrimaryButtonText}>
-                  გასაგებია
-                </Text>
+                <Text style={styles.modalPrimaryButtonText}>გასაგებია</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -2902,7 +3279,9 @@ export default function RegisterScreen() {
       >
         <SafeAreaView style={styles.identomatModalContainer}>
           <View style={styles.identomatModalHeader}>
-            <Text style={styles.identomatModalTitle}>IDENTOMAT იდენტიფიკაცია</Text>
+            <Text style={styles.identomatModalTitle}>
+              IDENTOMAT იდენტიფიკაცია
+            </Text>
             <TouchableOpacity
               onPress={async () => {
                 // If modal is closed, try to get result before closing
@@ -2927,13 +3306,19 @@ export default function RegisterScreen() {
               startInLoadingState={true}
               scalesPageToFit={true}
               onLoadStart={() => {
-                console.log("🔄 [IDENTOMAT] WebView load started:", identomatUrl);
+                console.log(
+                  "🔄 [IDENTOMAT] WebView load started:",
+                  identomatUrl,
+                );
               }}
               onLoadEnd={() => {
                 console.log("✅ [IDENTOMAT] WebView load ended");
               }}
               onLoadProgress={({ nativeEvent }) => {
-                console.log("📊 [IDENTOMAT] WebView load progress:", Math.round(nativeEvent.progress * 100) + "%");
+                console.log(
+                  "📊 [IDENTOMAT] WebView load progress:",
+                  Math.round(nativeEvent.progress * 100) + "%",
+                );
               }}
               onNavigationStateChange={async (navState: WebViewNavigation) => {
                 // Handle IDENTOMAT callback
@@ -2946,9 +3331,13 @@ export default function RegisterScreen() {
                   canGoBack: navState.canGoBack,
                   canGoForward: navState.canGoForward,
                 });
-                
+
                 // Check if IDENTOMAT process is complete (URL contains success indicators)
-                if (url.includes("success") || url.includes("complete") || url.includes("finished")) {
+                if (
+                  url.includes("success") ||
+                  url.includes("complete") ||
+                  url.includes("finished")
+                ) {
                   // Wait a bit for IDENTOMAT to finalize, then get result
                   setTimeout(async () => {
                     await handleIdentomatResult();
@@ -2958,31 +3347,54 @@ export default function RegisterScreen() {
               onError={(syntheticEvent: any) => {
                 const { nativeEvent } = syntheticEvent;
                 console.error("❌ [IDENTOMAT] WebView error:", nativeEvent);
-                console.error("❌ [IDENTOMAT] Error details:", JSON.stringify(nativeEvent, null, 2));
+                console.error(
+                  "❌ [IDENTOMAT] Error details:",
+                  JSON.stringify(nativeEvent, null, 2),
+                );
                 Alert.alert(
                   "შეცდომა",
-                  `IDENTOMAT-ის ჩატვირთვა ვერ მოხერხდა: ${nativeEvent.description || nativeEvent.message || "უცნობი შეცდომა"}`
+                  `IDENTOMAT-ის ჩატვირთვა ვერ მოხერხდა: ${nativeEvent.description || nativeEvent.message || "უცნობი შეცდომა"}`,
                 );
               }}
               onHttpError={(syntheticEvent: any) => {
                 const { nativeEvent } = syntheticEvent;
                 console.error("❌ [IDENTOMAT] HTTP error:", nativeEvent);
-                console.error("❌ [IDENTOMAT] HTTP error status:", nativeEvent.statusCode);
+                console.error(
+                  "❌ [IDENTOMAT] HTTP error status:",
+                  nativeEvent.statusCode,
+                );
                 Alert.alert(
                   "HTTP შეცდომა",
-                  `IDENTOMAT-ის სერვერთან დაკავშირება ვერ მოხერხდა: ${nativeEvent.statusCode || "უცნობი"}`
+                  `IDENTOMAT-ის სერვერთან დაკავშირება ვერ მოხერხდა: ${nativeEvent.statusCode || "უცნობი"}`,
                 );
               }}
               onMessage={(event: any) => {
-                console.log("📨 [IDENTOMAT] WebView message:", event.nativeEvent.data);
+                console.log(
+                  "📨 [IDENTOMAT] WebView message:",
+                  event.nativeEvent.data,
+                );
               }}
-              renderError={(errorDomain: string | undefined, errorCode: number, errorDesc: string) => {
-                console.error("❌ [IDENTOMAT] WebView render error:", { errorDomain, errorCode, errorDesc });
+              renderError={(
+                errorDomain: string | undefined,
+                errorCode: number,
+                errorDesc: string,
+              ) => {
+                console.error("❌ [IDENTOMAT] WebView render error:", {
+                  errorDomain,
+                  errorCode,
+                  errorDesc,
+                });
                 return (
                   <View style={styles.identomatErrorContainer}>
-                    <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
+                    <Ionicons
+                      name="alert-circle-outline"
+                      size={48}
+                      color="#EF4444"
+                    />
                     <Text style={styles.identomatErrorText}>შეცდომა</Text>
-                    <Text style={styles.identomatErrorDescription}>{errorDesc || "ვერ ჩაიტვირთა"}</Text>
+                    <Text style={styles.identomatErrorDescription}>
+                      {errorDesc || "ვერ ჩაიტვირთა"}
+                    </Text>
                     <TouchableOpacity
                       style={styles.identomatRetryButton}
                       onPress={() => {
@@ -2993,7 +3405,9 @@ export default function RegisterScreen() {
                         }, 100);
                       }}
                     >
-                      <Text style={styles.identomatRetryButtonText}>ხელახლა სცადე</Text>
+                      <Text style={styles.identomatRetryButtonText}>
+                        ხელახლა სცადე
+                      </Text>
                     </TouchableOpacity>
                   </View>
                 );
@@ -3025,7 +3439,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FFFFFF",
-    paddingHorizontal: 24
+    paddingHorizontal: 24,
   },
   safeArea: {
     flex: 1,

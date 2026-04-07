@@ -52,17 +52,19 @@ const mongoose_1 = require("@nestjs/mongoose");
 const bcrypt = __importStar(require("bcrypt"));
 const crypto_1 = require("crypto");
 const mongoose = __importStar(require("mongoose"));
+const mis_auth_service_1 = require("../integrations/mis-auth.service");
 const notifications_service_1 = require("../notifications/notifications.service");
 const notification_schema_1 = require("../schemas/notification.schema");
 const refresh_token_schema_1 = require("../schemas/refresh-token.schema");
 const user_schema_1 = require("../schemas/user.schema");
 const phone_verification_service_1 = require("./phone-verification.service");
 let AuthService = class AuthService {
-    constructor(userModel, refreshTokenModel, jwtService, phoneVerificationService, notificationsService) {
+    constructor(userModel, refreshTokenModel, jwtService, phoneVerificationService, misAuthService, notificationsService) {
         this.userModel = userModel;
         this.refreshTokenModel = refreshTokenModel;
         this.jwtService = jwtService;
         this.phoneVerificationService = phoneVerificationService;
+        this.misAuthService = misAuthService;
         this.notificationsService = notificationsService;
         if (!this.notificationsService) {
             console.error('❌ NotificationsService is not injected!');
@@ -273,6 +275,50 @@ let AuthService = class AuthService {
                 console.error('Error stack:', error.stack);
             }
         }
+        let misPersonId = null;
+        if (savedUser.role === user_schema_1.UserRole.PATIENT) {
+            const nameParts = (savedUser.name || '').trim().split(/\s+/);
+            const firstName = nameParts[0] || savedUser.name || '';
+            const lastName = nameParts.length > 1
+                ? nameParts[nameParts.length - 1]
+                : savedUser.name || '';
+            const misSyncResult = await this.misAuthService.upsertPatient({
+                ID: savedUser._id.toString(),
+                PersonalID: savedUser.idNumber || '',
+                FirstName: firstName,
+                LastName: lastName,
+                FatherName: '',
+                Gender: savedUser.gender === user_schema_1.Gender.FEMALE ? 1 : 0,
+                BirthDate: savedUser.dateOfBirth
+                    ? new Date(savedUser.dateOfBirth).toISOString()
+                    : undefined,
+                Phone: savedUser.phone || '',
+                Mobile: savedUser.phone || '',
+                Email: savedUser.email || '',
+                LegalAddress: savedUser.address || '',
+                ActualAddress: savedUser.address || '',
+                Description: '',
+                IdentificationStatus: 0,
+                ConsentForm: true,
+                Encrypted: false,
+                UserID: savedUser._id.toString(),
+                UserFirstName: firstName,
+                UserLastName: lastName,
+                DateCreated: new Date().toISOString(),
+                DateChanged: new Date().toISOString(),
+                IsFromEMR: false,
+            });
+            if (!misSyncResult.success) {
+                await this.userModel.findByIdAndDelete(savedUser._id);
+                throw new common_1.BadRequestException('Patient sync to MIS failed. Registration cancelled.');
+            }
+            if (misSyncResult.personId) {
+                await this.userModel.findByIdAndUpdate(savedUser._id, {
+                    misPersonId: misSyncResult.personId,
+                });
+                misPersonId = misSyncResult.personId;
+            }
+        }
         const tokens = await this.generateTokens(savedUser._id.toString());
         return {
             success: true,
@@ -284,6 +330,7 @@ let AuthService = class AuthService {
                     name: savedUser.name,
                     email: savedUser.email,
                     phone: savedUser.phone,
+                    misPersonId,
                     isVerified: savedUser.isVerified,
                     approvalStatus: savedUser.approvalStatus,
                 },
@@ -626,9 +673,10 @@ exports.AuthService = AuthService = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, mongoose_1.InjectModel)(user_schema_1.User.name)),
     __param(1, (0, mongoose_1.InjectModel)(refresh_token_schema_1.RefreshToken.name)),
-    __param(4, (0, common_1.Inject)((0, common_1.forwardRef)(() => notifications_service_1.NotificationsService))),
+    __param(5, (0, common_1.Inject)((0, common_1.forwardRef)(() => notifications_service_1.NotificationsService))),
     __metadata("design:paramtypes", [mongoose.Model, mongoose.Model, jwt_1.JwtService,
         phone_verification_service_1.PhoneVerificationService,
+        mis_auth_service_1.MisAuthService,
         notifications_service_1.NotificationsService])
 ], AuthService);
 //# sourceMappingURL=auth.service.js.map

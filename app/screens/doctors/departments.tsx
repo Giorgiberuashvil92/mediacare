@@ -8,7 +8,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { apiService, Specialization } from "../../_services/api";
@@ -16,18 +16,18 @@ import { apiService, Specialization } from "../../_services/api";
 // Icon mapping for specializations
 const getIconForSpecialization = (name: string) => {
   const iconMap: Record<string, any> = {
-    "ნევროლოგია": require("../../../assets/images/icons/brain1.png"),
-    "კარდიოლოგია": require("../../../assets/images/icons/cardiology.png"),
-    "გინეკოლოგია": require("../../../assets/images/icons/pregnant.png"),
-    "პედიატრია": require("../../../assets/images/icons/baby.png"),
-    "ალერგოლოგია": require("../../../assets/images/icons/allergy.png"),
-    "სტომატოლოგია": require("../../../assets/images/icons/dendist.png"),
-    "უროლოგია": require("../../../assets/images/icons/urology.png"),
-    "გასტროენტეროლოგია": require("../../../assets/images/icons/gastrology.png"),
-    "დერმატოლოგია": require("../../../assets/images/icons/cardiology.png"),
-    "ორთოპედია": require("../../../assets/images/icons/brain1.png"),
-    "ოფთალმოლოგია": require("../../../assets/images/icons/allergy.png"),
-    "ფსიქოლოგია": require("../../../assets/images/icons/phycatry.png"),
+    ნევროლოგია: require("../../../assets/images/icons/brain1.png"),
+    კარდიოლოგია: require("../../../assets/images/icons/cardiology.png"),
+    გინეკოლოგია: require("../../../assets/images/icons/pregnant.png"),
+    პედიატრია: require("../../../assets/images/icons/baby.png"),
+    ალერგოლოგია: require("../../../assets/images/icons/allergy.png"),
+    სტომატოლოგია: require("../../../assets/images/icons/dendist.png"),
+    უროლოგია: require("../../../assets/images/icons/urology.png"),
+    გასტროენტეროლოგია: require("../../../assets/images/icons/gastrology.png"),
+    დერმატოლოგია: require("../../../assets/images/icons/cardiology.png"),
+    ორთოპედია: require("../../../assets/images/icons/brain1.png"),
+    ოფთალმოლოგია: require("../../../assets/images/icons/allergy.png"),
+    ფსიქოლოგია: require("../../../assets/images/icons/phycatry.png"),
   };
   return iconMap[name] || require("../../../assets/images/icons/brain1.png");
 };
@@ -35,18 +35,18 @@ const getIconForSpecialization = (name: string) => {
 // Background color mapping
 const getBgColorForSpecialization = (name: string) => {
   const colorMap: Record<string, string> = {
-    "ნევროლოგია": "#E3F2FD",
-    "კარდიოლოგია": "#FFEBEE",
-    "გინეკოლოგია": "#F3E5F5",
-    "პედიატრია": "#E8F5E8",
-    "ალერგოლოგია": "#FFF3E0",
-    "სტომატოლოგია": "#E0F2F1",
-    "უროლოგია": "#E1F5FE",
-    "გასტროენტეროლოგია": "#FCE4EC",
-    "დერმატოლოგია": "#FFF8E1",
-    "ორთოპედია": "#E8EAF6",
-    "ოფთალმოლოგია": "#F1F8E9",
-    "ფსიქოლოგია": "#FCE4EC",
+    ნევროლოგი: "#E3F2FD",
+    კარდიოლოგი: "#FFEBEE",
+    გინეკოლოგი: "#F3E5F5",
+    პედიატრი: "#E8F5E8",
+    ალერგოლოგი: "#FFF3E0",
+    სტომატოლოგი: "#E0F2F1",
+    უროლოგი: "#E1F5FE",
+    გასტროენტეროლოგი: "#FCE4EC",
+    დერმატოლოგი: "#FFF8E1",
+    ორთოპედი: "#E8EAF6",
+    ოფთალმოლოგი: "#F1F8E9",
+    ფსიქოლოგი: "#FCE4EC",
   };
   return colorMap[name] || "#E3F2FD";
 };
@@ -137,9 +137,7 @@ const DepartmentsScreen = () => {
             ))}
           </View>
         )}
-       
       </ScrollView>
-
     </SafeAreaView>
   );
 };

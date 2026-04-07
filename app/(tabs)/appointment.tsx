@@ -204,8 +204,14 @@ const mapAppointmentFromAPI = (
     isPaid:
       appointment.paymentStatus === "paid" ||
       appointment.paymentStatus === "completed",
-    symptoms: appointment.patientDetails?.problem || appointment.notes || "",
-    diagnosis: appointment.diagnosis || "",
+    // პაციენტის ტექსტი არა appointment.notes-ში (იქ ბინის/სხვა შენიშვნა შეიძლება იყოს)
+    symptoms:
+      appointment.patientDetails?.problem ||
+      appointment.consultationSummary?.symptoms ||
+      "",
+    diagnosis:
+      (appointment.consultationSummary?.diagnosis || appointment.diagnosis || "")
+        .trim(),
     visitAddress: appointment.visitAddress,
     homeVisitCompletedAt: appointment.homeVisitCompletedAt,
     doctorImage: doctorImage,
@@ -473,10 +479,12 @@ const Appointment = () => {
   // Check if join button should be active
   // Button is active before appointment time and until 1 hour after appointment time
   const isJoinButtonActive = (appointment: PatientAppointment) => {
-    // Only show for scheduled or in-progress appointments
+    // scheduled / in-progress + raw API სტატუსები (todayAppointment-თან ერთნაირი ლოგიკა)
     if (
       appointment.status !== "scheduled" &&
-      appointment.status !== "in-progress"
+      appointment.status !== "in-progress" &&
+      appointment.status !== "confirmed" &&
+      appointment.status !== "pending"
     ) {
       return false;
     }
@@ -497,6 +505,32 @@ const Appointment = () => {
     // - From appointment time until 1 hour after (diff <= 0 && diff >= -oneHourInMs)
     // So: diff >= -oneHourInMs covers both cases
     return diff >= -oneHourInMs;
+  };
+
+  /** დღევანდელი თარიღი YYYY-MM-DD (ლოკალური) — join ღილაკი მხოლოდ ამ დღის ვიდეოზე */
+  const isAppointmentDateTodayLocal = (a: PatientAppointment) => {
+    if (!a.date) return false;
+    const n = currentTime;
+    const y = n.getFullYear();
+    const m = String(n.getMonth() + 1).padStart(2, "0");
+    const d = String(n.getDate()).padStart(2, "0");
+    return a.date === `${y}-${m}-${d}`;
+  };
+
+  /** სლოტიდან 1+ საათი გასული — ვიდეო ზარზე შესვლის ფანჯარა დაკეტილი */
+  const isVideoJoinWindowClosed = (a: PatientAppointment) => {
+    if (!a.date || !a.time) return true;
+    const appointmentDateTime = new Date(`${a.date}T${a.time}`);
+    const diff = appointmentDateTime.getTime() - currentTime.getTime();
+    return diff < -60 * 60 * 1000;
+  };
+
+  const canShowJoinVideoConsultation = (a: PatientAppointment) => {
+    if (a.type !== "video") return false;
+    if (!isAppointmentDateTodayLocal(a)) return false;
+    if (!isJoinButtonActive(a)) return false;
+    if (isVideoJoinWindowClosed(a)) return false;
+    return true;
   };
 
   // Check if consultation time has not yet arrived (more than 30 minutes before)
@@ -712,8 +746,14 @@ const Appointment = () => {
                     laboratoryTests: fullAppointment.laboratoryTests || [],
                     symptoms:
                       fullAppointment.patientDetails?.problem ||
-                      fullAppointment.notes ||
+                      fullAppointment.consultationSummary?.symptoms ||
                       apt.symptoms,
+                    diagnosis: (
+                      fullAppointment.consultationSummary?.diagnosis ||
+                      fullAppointment.diagnosis ||
+                      apt.diagnosis ||
+                      ""
+                    ).trim(),
                   }
                 : apt,
             ),
@@ -1312,11 +1352,7 @@ const Appointment = () => {
 
               return (
                 <View key={appointment.id} style={styles.appointmentCard}>
-                  <TouchableOpacity
-                    style={{ flex: 1 }}
-                    onPress={() => toggleAppointmentExpansion(appointment)}
-                    activeOpacity={0.7}
-                  >
+                  <View style={{ flex: 1 }}>
                     <View style={styles.appointmentHeader}>
                       <View style={styles.doctorInfo}>
                         <View style={styles.avatarContainer}>
@@ -1393,18 +1429,24 @@ const Appointment = () => {
                           {getStatusLabel(appointment.status)}
                         </Text>
                       </View>
-                      <TouchableOpacity
-                        onPress={() => toggleAppointmentExpansion(appointment)}
-                        style={styles.expandButton}
-                      >
-                        <Ionicons
-                          name={isExpanded ? "chevron-up" : "chevron-down"}
-                          size={20}
-                          color="#6B7280"
-                        />
-                      </TouchableOpacity>
                     </View>
-                  </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => toggleAppointmentExpansion(appointment)}
+                      style={styles.expandDetailsRow}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.expandDetailsButtonText}>
+                        {isExpanded
+                          ? "დეტალების დაფარვა"
+                          : "დეტალების ნახვა"}
+                      </Text>
+                      <Ionicons
+                        name={isExpanded ? "chevron-up" : "chevron-down"}
+                        size={18}
+                        color="#06B6D4"
+                      />
+                    </TouchableOpacity>
 
                   <View style={styles.appointmentBody}>
                     <View style={styles.infoRow}>
@@ -1444,6 +1486,40 @@ const Appointment = () => {
                           </Text>
                         </View>
                       )}
+
+                    {canShowJoinVideoConsultation(appointment) && (
+                      <TouchableOpacity
+                        style={[
+                          styles.joinCallButton,
+                          isAppointmentSoon(appointment) &&
+                            styles.joinCallButtonPulsing,
+                        ]}
+                        activeOpacity={0.85}
+                        onPress={() => {
+                          const id = String(appointment.id || "").trim();
+                          if (!id) return;
+                          router.push({
+                            pathname: "/screens/video-call",
+                            params: {
+                              appointmentId: id,
+                              doctorName: appointment.doctorName || "ექიმი",
+                              roomName: `medicare-${id}`,
+                            },
+                          });
+                        }}
+                      >
+                        <Ionicons name="videocam" size={20} color="#FFFFFF" />
+                        <Text style={styles.joinCallText}>
+                          შესვლა კონსულტაციაზე
+                        </Text>
+                        <Ionicons
+                          name="arrow-forward"
+                          size={16}
+                          color="#FFFFFF"
+                        />
+                      </TouchableOpacity>
+                    )}
+
                     {/* File indicator */}
                     {documents.length > 0 && (
                       <View style={styles.infoRow}>
@@ -1457,6 +1533,7 @@ const Appointment = () => {
                         </Text>
                       </View>
                     )}
+                  </View>
                   </View>
 
                   {/* Expanded Details */}
@@ -1595,31 +1672,7 @@ const Appointment = () => {
                             )}
                           </View>
                         )}
-
-                      {/* Collapse Button */}
-                      <TouchableOpacity
-                        style={styles.viewDetailsButton}
-                        onPress={() => toggleAppointmentExpansion(appointment)}
-                      >
-                        <Text style={styles.viewDetailsButtonText}>
-                          დეტალების დაფარვა
-                        </Text>
-                        <Ionicons name="chevron-up" size={18} color="#0EA5E9" />
-                      </TouchableOpacity>
                     </View>
-                  )}
-
-                  {/* View Details Button */}
-                  {!isExpanded && (
-                    <TouchableOpacity
-                      style={styles.viewDetailsButton}
-                      onPress={() => toggleAppointmentExpansion(appointment)}
-                    >
-                      <Text style={styles.viewDetailsButtonText}>
-                        დეტალების ნახვა
-                      </Text>
-                      <Ionicons name="chevron-down" size={18} color="#0EA5E9" />
-                    </TouchableOpacity>
                   )}
 
                   {/* Reminder & Join Call Section - Only for video consultations */}
@@ -2660,7 +2713,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: 12,
+    marginBottom: 8,
   },
   doctorInfo: {
     flexDirection: "row",
@@ -3314,8 +3367,18 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins-Medium",
     color: "#0EA5E9",
   },
-  expandButton: {
-    padding: 4,
+  expandDetailsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 10,
+    marginBottom: 8,
+  },
+  expandDetailsButtonText: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#06B6D4",
   },
   expandedSection: {
     marginTop: 12,
@@ -3392,23 +3455,6 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins-Regular",
     color: "#374151",
     lineHeight: 20,
-  },
-  viewDetailsButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 12,
-    marginTop: 8,
-    backgroundColor: "#F0F9FF",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#E0F2FE",
-  },
-  viewDetailsButtonText: {
-    fontSize: 14,
-    fontFamily: "Poppins-SemiBold",
-    color: "#0EA5E9",
   },
   fileIndicatorBadge: {
     width: 20,

@@ -133,7 +133,15 @@ export class AppointmentsService {
   }
 
   async getDocuments(userId: string, appointmentId: string) {
-    const appointment = await this.appointmentModel.findById(appointmentId);
+    let appointment = await this.appointmentModel.findById(appointmentId);
+    if (
+      !appointment &&
+      mongoose.Types.ObjectId.isValid(appointmentId) === false
+    ) {
+      appointment = await this.appointmentModel.findOne({
+        appointmentNumber: appointmentId,
+      });
+    }
     if (!appointment) {
       throw new NotFoundException('Appointment not found');
     }
@@ -200,7 +208,7 @@ export class AppointmentsService {
     const normalizedDate = new Date(appointmentDate);
     normalizedDate.setHours(0, 0, 0, 0);
 
-    // Build full appointment DateTime and enforce 2 hour lead time
+    // Build full appointment DateTime (ვიდეო: მინ. შეზღუდვა არაა; ბინაზე: 2 სთ — ზემოთ)
     const [hoursStr, minutesStr] = (
       createAppointmentDto.appointmentTime || ''
     ).split(':');
@@ -218,20 +226,34 @@ export class AppointmentsService {
       throw new BadRequestException('Invalid appointment time');
     }
 
-    const appointmentDateTime = new Date(appointmentDate);
-    appointmentDateTime.setHours(hours, minutes, 0, 0);
-
-    const now = new Date();
-    // ონლაინის შემთხვევაში: 2 საათით ადრე
-    // ბინაზე ვიზიტისას: 12 საათით ადრე
-    const requiredHours =
-      createAppointmentDto.type === AppointmentType.VIDEO ? 2 : 12;
-    const requiredMs = requiredHours * 60 * 60 * 1000;
-
-    if (appointmentDateTime.getTime() - now.getTime() < requiredMs) {
-      throw new BadRequestException(
-        `ჯავშნის გაკეთება შესაძლებელია მინიმუმ ${requiredHours} საათით ადრე`,
-      );
+    // ბინაზე: პაციენტი მინიმუმ 2 საათით ადრე უნდა დაჯავშნოს (ლოკალური კალენდარი + დრო)
+    const dateOnly = String(createAppointmentDto.appointmentDate)
+      .trim()
+      .split('T')[0];
+    const calParts = dateOnly.split('-').map(Number);
+    if (calParts.length !== 3 || calParts.some((n) => Number.isNaN(n))) {
+      throw new BadRequestException('Invalid appointment date');
+    }
+    const [calY, calM, calD] = calParts;
+    const appointmentStartLocal = new Date(
+      calY,
+      calM - 1,
+      calD,
+      hours,
+      minutes,
+      0,
+      0,
+    );
+    const HOME_VISIT_MIN_LEAD_MS = 2 * 60 * 60 * 1000;
+    if (createAppointmentDto.type === AppointmentType.HOME_VISIT) {
+      if (
+        appointmentStartLocal.getTime() - Date.now() <
+        HOME_VISIT_MIN_LEAD_MS
+      ) {
+        throw new BadRequestException(
+          'ბინაზე ვიზიტის ჯავშანი შესაძლებელია მინიმუმ 2 საათით ადრე.',
+        );
+      }
     }
 
     // Check doctor's availability for the specific appointment type (video/home-visit)
@@ -1120,10 +1142,15 @@ export class AppointmentsService {
 
     await appointment.save();
 
+    // პასუხში ახალი თარიღი/დრო — იგივე დოკუმენტის ინსტანცია ზოგჯერ სერილიზაციაში ძველს აჩვენებს
+    const fresh = await this.appointmentModel
+      .findById(new mongoose.Types.ObjectId(appointmentId))
+      .lean();
+
     return {
       success: true,
       message: 'გადაჯავშნა დამტკიცდა',
-      data: appointment,
+      data: fresh ?? appointment.toObject(),
     };
   }
 
@@ -1289,6 +1316,22 @@ export class AppointmentsService {
       throw new BadRequestException(
         'Visit address is required for home-visit appointments',
       );
+    }
+
+    if (appointmentType === AppointmentType.HOME_VISIT) {
+      const ds = String(dto.date).split('T')[0];
+      const dp = ds.split('-').map(Number);
+      if (dp.length === 3 && !dp.some((n) => Number.isNaN(n))) {
+        const [fy, fm, fd] = dp;
+        const [th, tmi] = dto.time.split(':').map(Number);
+        const startLocal = new Date(fy, fm - 1, fd, th, tmi || 0, 0, 0);
+        const HOME_VISIT_MIN_LEAD_MS = 2 * 60 * 60 * 1000;
+        if (startLocal.getTime() - Date.now() < HOME_VISIT_MIN_LEAD_MS) {
+          throw new BadRequestException(
+            'ბინაზე ვიზიტის ჯავშანი შესაძლებელია მინიმუმ 2 საათით ადრე.',
+          );
+        }
+      }
     }
 
     // Check doctor's availability for the selected type and time slot

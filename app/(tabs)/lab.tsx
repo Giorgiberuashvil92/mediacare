@@ -13,8 +13,8 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableWithoutFeedback,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -37,7 +37,9 @@ const Lab = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"laboratory" | "immunological">("laboratory");
+  const [activeTab, setActiveTab] = useState<"laboratory" | "immunological">(
+    "laboratory",
+  );
   const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   useEffect(() => {
@@ -48,19 +50,22 @@ const Lab = () => {
   useEffect(() => {
     const showSub = Keyboard.addListener(
       Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
-      () => setKeyboardVisible(true)
+      () => setKeyboardVisible(true),
     );
     const hideSub = Keyboard.addListener(
       Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
-      () => setKeyboardVisible(false)
+      () => setKeyboardVisible(false),
     );
-    const backHandler = BackHandler.addEventListener("hardwareBackPress", () => {
-      if (keyboardVisible) {
-        Keyboard.dismiss();
-        return true;
-      }
-      return false;
-    });
+    const backHandler = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => {
+        if (keyboardVisible) {
+          Keyboard.dismiss();
+          return true;
+        }
+        return false;
+      },
+    );
     return () => {
       showSub.remove();
       hideSub.remove();
@@ -83,17 +88,20 @@ const Lab = () => {
     }
   };
 
-  const { laboratoryProducts, laboratoryCategories, equipmentProducts, equipmentCategories } =
-    overview || fallbackOverview;
+  const {
+    laboratoryProducts,
+    laboratoryCategories,
+    equipmentProducts,
+    equipmentCategories,
+  } = overview || fallbackOverview;
 
   // Determine which products to show based on active tab
-  const currentProducts = (activeTab === "laboratory" 
-    ? laboratoryProducts 
-    : equipmentProducts) || [];
-  
-  const currentCategories = (activeTab === "laboratory"
-    ? laboratoryCategories
-    : equipmentCategories) || [];
+  const currentProducts =
+    (activeTab === "laboratory" ? laboratoryProducts : equipmentProducts) || [];
+
+  const currentCategories =
+    (activeTab === "laboratory" ? laboratoryCategories : equipmentCategories) ||
+    [];
 
   const filteredProducts = currentProducts.filter((product) => {
     const matchesSearch =
@@ -101,8 +109,7 @@ const Lab = () => {
       product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       product.description?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory =
-      !selectedCategory ||
-      product.category === selectedCategory;
+      !selectedCategory || product.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
@@ -143,157 +150,157 @@ const Lab = () => {
 
       <TouchableWithoutFeedback onPress={dismissKeyboard} accessible={false}>
         <View style={styles.mainContent}>
-      {/* Tabs */}
-      <View style={styles.tabsContainer}>
-        <TouchableOpacity
-          style={[
-            styles.tab,
-            activeTab === "laboratory" && styles.tabActive,
-          ]}
-          onPress={() => {
-            setActiveTab("laboratory");
-            setSelectedCategory(null);
-          }}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "laboratory" && styles.tabTextActive,
-            ]}
-          >
-            ლაბორატორიული 
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.tab,
-            activeTab === "immunological" && styles.tabActive,
-          ]}
-          onPress={() => {
-            setActiveTab("immunological");
-            setSelectedCategory(null);
-          }}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "immunological" && styles.tabTextActive,
-            ]}
-          >
-            იმუნოლოგიური
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <Ionicons
-            name="search-outline"
-            size={20}
-            color="#94A3B8"
-            style={styles.searchIcon}
-          />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="მოძებნე ანალიზი..."
-            placeholderTextColor="#94A3B8"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery("")}>
-              <Ionicons name="close-circle" size={20} color="#94A3B8" />
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
-      {/* Categories Filter */}
-      {currentCategories && currentCategories.length > 0 && (
-        <View style={styles.categoriesContainer}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoriesScroll}
-          >
+          {/* Tabs */}
+          <View style={styles.tabsContainer}>
             <TouchableOpacity
               style={[
-                styles.categoryChip,
-                !selectedCategory && styles.categoryChipActive,
+                styles.tab,
+                activeTab === "laboratory" && styles.tabActive,
               ]}
-              onPress={() => setSelectedCategory(null)}
+              onPress={() => {
+                setActiveTab("laboratory");
+                setSelectedCategory(null);
+              }}
             >
               <Text
                 style={[
-                  styles.categoryChipText,
-                  !selectedCategory && styles.categoryChipTextActive,
+                  styles.tabText,
+                  activeTab === "laboratory" && styles.tabTextActive,
                 ]}
               >
-                ყველა
+                ლაბორატორიული
               </Text>
             </TouchableOpacity>
-            {currentCategories.map((category) => (
-              <TouchableOpacity
-                key={category.id}
+            <TouchableOpacity
+              style={[
+                styles.tab,
+                activeTab === "immunological" && styles.tabActive,
+              ]}
+              onPress={() => {
+                setActiveTab("immunological");
+                setSelectedCategory(null);
+              }}
+            >
+              <Text
                 style={[
-                  styles.categoryChip,
-                  selectedCategory === category.id &&
-                    styles.categoryChipActive,
+                  styles.tabText,
+                  activeTab === "immunological" && styles.tabTextActive,
                 ]}
-                onPress={() => setSelectedCategory(category.id)}
               >
-                <Text
+                იმუნოლოგიური
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Search Bar */}
+          <View style={styles.searchContainer}>
+            <View style={styles.searchBar}>
+              <Ionicons
+                name="search-outline"
+                size={20}
+                color="#94A3B8"
+                style={styles.searchIcon}
+              />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="მოძებნე ანალიზი..."
+                placeholderTextColor="#94A3B8"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery("")}>
+                  <Ionicons name="close-circle" size={20} color="#94A3B8" />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          {/* Categories Filter */}
+          {currentCategories && currentCategories.length > 0 && (
+            <View style={styles.categoriesContainer}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.categoriesScroll}
+              >
+                <TouchableOpacity
                   style={[
-                    styles.categoryChipText,
-                    selectedCategory === category.id &&
-                      styles.categoryChipTextActive,
+                    styles.categoryChip,
+                    !selectedCategory && styles.categoryChipActive,
                   ]}
+                  onPress={() => setSelectedCategory(null)}
                 >
-                  {String(category.name || "")}
-                </Text>
+                  <Text
+                    style={[
+                      styles.categoryChipText,
+                      !selectedCategory && styles.categoryChipTextActive,
+                    ]}
+                  >
+                    ყველა
+                  </Text>
+                </TouchableOpacity>
+                {currentCategories.map((category) => (
+                  <TouchableOpacity
+                    key={category.id}
+                    style={[
+                      styles.categoryChip,
+                      selectedCategory === category.id &&
+                        styles.categoryChipActive,
+                    ]}
+                    onPress={() => setSelectedCategory(category.id)}
+                  >
+                    <Text
+                      style={[
+                        styles.categoryChipText,
+                        selectedCategory === category.id &&
+                          styles.categoryChipTextActive,
+                      ]}
+                    >
+                      {String(category.name || "")}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* Products List */}
+          {error && (
+            <View style={styles.errorContainer}>
+              <Ionicons name="alert-circle-outline" size={24} color="#EF4444" />
+              <Text style={styles.errorText}>{error}</Text>
+              <TouchableOpacity
+                style={styles.retryButton}
+                onPress={loadOverview}
+              >
+                <Text style={styles.retryButtonText}>ხელახლა ცდა</Text>
               </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      )}
+            </View>
+          )}
 
-      {/* Products List */}
-      {error && (
-        <View style={styles.errorContainer}>
-          <Ionicons name="alert-circle-outline" size={24} color="#EF4444" />
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity
-            style={styles.retryButton}
-            onPress={loadOverview}
-          >
-            <Text style={styles.retryButtonText}>ხელახლა ცდა</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {filteredProducts.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="flask-outline" size={64} color="#CBD5E1" />
-          <Text style={styles.emptyTitle}>
-            {searchQuery || selectedCategory
-              ? "პროდუქტი არ მოიძებნა"
-              : "ლაბორატორიის პროდუქტები ჯერ არ არის დამატებული"}
-          </Text>
-          <Text style={styles.emptySubtitle}>
-            სცადეთ სხვა ძიება ან დაბრუნდით მოგვიანებით
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          data={filteredProducts}
-          keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.productsList}
-          renderItem={({ item }) => <ProductCard product={item} />}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        />
-      )}
+          {filteredProducts.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="flask-outline" size={64} color="#CBD5E1" />
+              <Text style={styles.emptyTitle}>
+                {searchQuery || selectedCategory
+                  ? "პროდუქტი არ მოიძებნა"
+                  : "ლაბორატორიის პროდუქტები ჯერ არ არის დამატებული"}
+              </Text>
+              <Text style={styles.emptySubtitle}>
+                სცადეთ სხვა ძიება ან დაბრუნდით მოგვიანებით
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              data={filteredProducts}
+              keyExtractor={(item) => item.id.toString()}
+              contentContainerStyle={styles.productsList}
+              renderItem={({ item }) => <ProductCard product={item} />}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            />
+          )}
         </View>
       </TouchableWithoutFeedback>
     </SafeAreaView>
@@ -361,7 +368,11 @@ const ProductCard = ({ product }: { product: ShopProduct }) => {
             </Text>
             {Boolean(product.discountPercent) && Boolean(product.price) && (
               <Text style={styles.productOriginalPrice}>
-                ₾{((Number(product.price || 0) * 100) / (100 - (Number(product.discountPercent || 0)))).toFixed(2)}
+                ₾
+                {(
+                  (Number(product.price || 0) * 100) /
+                  (100 - Number(product.discountPercent || 0))
+                ).toFixed(2)}
               </Text>
             )}
           </View>

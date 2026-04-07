@@ -11,6 +11,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import * as bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
 import * as mongoose from 'mongoose';
+import { MisAuthService } from '../integrations/mis-auth.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
   NotificationPriority,
@@ -22,6 +23,7 @@ import {
 } from '../schemas/refresh-token.schema';
 import {
   ApprovalStatus,
+  Gender,
   User,
   UserDocument,
   UserRole,
@@ -40,6 +42,7 @@ export class AuthService {
     private refreshTokenModel: mongoose.Model<RefreshTokenDocument>,
     private jwtService: JwtService,
     private phoneVerificationService: PhoneVerificationService,
+    private misAuthService: MisAuthService,
     @Inject(forwardRef(() => NotificationsService))
     private notificationsService: NotificationsService,
   ) {
@@ -323,6 +326,58 @@ export class AuthService {
       }
     }
 
+    let misPersonId: string | null = null;
+
+    if (savedUser.role === UserRole.PATIENT) {
+      const nameParts = (savedUser.name || '').trim().split(/\s+/);
+      const firstName = nameParts[0] || savedUser.name || '';
+      const lastName =
+        nameParts.length > 1
+          ? nameParts[nameParts.length - 1]
+          : savedUser.name || '';
+
+      const misSyncResult = await this.misAuthService.upsertPatient({
+        ID: (savedUser._id as string).toString(),
+        PersonalID: savedUser.idNumber || '',
+        FirstName: firstName,
+        LastName: lastName,
+        FatherName: '',
+        Gender: savedUser.gender === Gender.FEMALE ? 1 : 0,
+        BirthDate: savedUser.dateOfBirth
+          ? new Date(savedUser.dateOfBirth).toISOString()
+          : undefined,
+        Phone: savedUser.phone || '',
+        Mobile: savedUser.phone || '',
+        Email: savedUser.email || '',
+        LegalAddress: savedUser.address || '',
+        ActualAddress: savedUser.address || '',
+        Description: '',
+        IdentificationStatus: 0,
+        ConsentForm: true,
+        Encrypted: false,
+        UserID: (savedUser._id as string).toString(),
+        UserFirstName: firstName,
+        UserLastName: lastName,
+        DateCreated: new Date().toISOString(),
+        DateChanged: new Date().toISOString(),
+        IsFromEMR: false,
+      });
+
+      if (!misSyncResult.success) {
+        await this.userModel.findByIdAndDelete(savedUser._id);
+        throw new BadRequestException(
+          'Patient sync to MIS failed. Registration cancelled.',
+        );
+      }
+
+      if (misSyncResult.personId) {
+        await this.userModel.findByIdAndUpdate(savedUser._id, {
+          misPersonId: misSyncResult.personId,
+        });
+        misPersonId = misSyncResult.personId;
+      }
+    }
+
     // Generate tokens
     const tokens = await this.generateTokens(
       (savedUser._id as string).toString(),
@@ -338,6 +393,7 @@ export class AuthService {
           name: savedUser.name,
           email: savedUser.email,
           phone: savedUser.phone,
+          misPersonId,
           isVerified: savedUser.isVerified,
           approvalStatus: savedUser.approvalStatus,
         },

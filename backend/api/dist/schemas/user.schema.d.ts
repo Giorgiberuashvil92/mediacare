@@ -26,6 +26,7 @@ export declare class User {
     password: string;
     phone?: string;
     idNumber?: string;
+    misPersonId?: string;
     dateOfBirth?: Date;
     gender?: Gender;
     profileImage?: string;

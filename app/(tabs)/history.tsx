@@ -1,7 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import * as DocumentPicker from "expo-document-picker";
 import { useRouter } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -18,20 +17,69 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { apiService } from "../_services/api";
 import { useAuth } from "../contexts/AuthContext";
 
+/** Mongo / API id → სტრიქონი (GET /documents-ისთვის) */
+function normalizeAppointmentId(raw: unknown): string {
+  if (raw == null || raw === "") return "";
+  if (typeof raw === "string") return raw.trim();
+  if (typeof raw === "object" && raw !== null && "$oid" in raw) {
+    const o = (raw as { $oid?: string }).$oid;
+    return typeof o === "string" ? o : "";
+  }
+  try {
+    const s = String(raw);
+    return s === "[object Object]" ? "" : s;
+  } catch {
+    return "";
+  }
+}
+
+function extractDocumentsListFromResponse(res: unknown): any[] {
+  if (!res || typeof res !== "object") return [];
+  const r = res as { success?: boolean; data?: unknown };
+  if (r.success === false) return [];
+  const d = r.data;
+  if (Array.isArray(d)) return d;
+  if (
+    d &&
+    typeof d === "object" &&
+    Array.isArray((d as { data?: unknown[] }).data)
+  ) {
+    return (d as { data: any[] }).data;
+  }
+  return [];
+}
+
+function buildVisitDocumentUrl(
+  doc: { url?: string },
+  baseURL: string,
+): string | null {
+  const u = doc?.url;
+  if (!u || typeof u !== "string") return null;
+  const t = u.trim();
+  if (!t) return null;
+  if (t.startsWith("http://") || t.startsWith("https://")) return t;
+  if (t.startsWith("//")) return `https:${t}`;
+  const path = t.startsWith("/") ? t.slice(1) : t;
+  return `${baseURL.replace(/\/$/, "")}/${path}`;
+}
+
+function isVisitDocumentImage(doc: {
+  mimeType?: string;
+  type?: string;
+}): boolean {
+  const m = (doc.mimeType || doc.type || "").toLowerCase();
+  return m.startsWith("image/");
+}
+
 const History = () => {
   const router = useRouter();
   const { isAuthenticated, user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedVisit, setSelectedVisit] = useState<any>(null);
-  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [visits, setVisits] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [checkingEligibility, setCheckingEligibility] = useState(false);
-  const [followUpEligible, setFollowUpEligible] = useState<boolean | null>(
-    null,
-  );
   const [uploadingResult, setUploadingResult] = useState<string | null>(null);
   const [expandedVisits, setExpandedVisits] = useState<Set<string>>(new Set());
 
@@ -57,8 +105,15 @@ const History = () => {
     string | null
   >(null);
   const [loadingAvailability, setLoadingAvailability] = useState(false);
-  const [visitDocuments, setVisitDocuments] = useState<any[]>([]);
-  const [loadingVisitDocuments, setLoadingVisitDocuments] = useState(false);
+  /** მხოლოდ ჩაშლილი ბარათის დოკუმენტები */
+  const [documentsByVisitId, setDocumentsByVisitId] = useState<
+    Record<string, any[]>
+  >({});
+  const [loadingDocVisitId, setLoadingDocVisitId] = useState<string | null>(
+    null,
+  );
+  const loadedVisitDocIdsRef = useRef<Set<string>>(new Set());
+  const inFlightDocVisitIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (isAuthenticated && user?.id) {
@@ -67,31 +122,6 @@ const History = () => {
       setLoading(false);
     }
   }, [isAuthenticated, user?.id]);
-
-  useEffect(() => {
-    if (!selectedVisit?.id) {
-      setVisitDocuments([]);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      setLoadingVisitDocuments(true);
-      setVisitDocuments([]);
-      try {
-        const res = await apiService.getAppointmentDocuments(selectedVisit.id);
-        if (!cancelled && res.success && Array.isArray(res.data)) {
-          setVisitDocuments(res.data);
-        }
-      } catch {
-        if (!cancelled) setVisitDocuments([]);
-      } finally {
-        if (!cancelled) setLoadingVisitDocuments(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedVisit?.id]);
 
   const loadPastAppointments = async () => {
     try {
@@ -142,6 +172,8 @@ const History = () => {
 
         console.log("📋 History - Filtered visits count:", mapped.length);
         setVisits(mapped);
+        setDocumentsByVisitId({});
+        loadedVisitDocIdsRef.current.clear();
       } else {
         setVisits([]);
       }
@@ -172,57 +204,50 @@ const History = () => {
     });
   }, [visits, searchQuery]);
 
-  const toggleVisitExpansion = (visit: any) => {
-    const isExpanded = expandedVisits.has(visit.id);
-    if (isExpanded) {
-      setExpandedVisits((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(visit.id);
-        return newSet;
-      });
-    } else {
-      setExpandedVisits((prev) => new Set(prev).add(visit.id));
+  const loadVisitDocumentsIfNeeded = async (visitCardId: string) => {
+    if (loadedVisitDocIdsRef.current.has(visitCardId)) {
+      setLoadingDocVisitId((cur) => (cur === visitCardId ? null : cur));
+      return;
+    }
+    if (inFlightDocVisitIdsRef.current.has(visitCardId)) {
+      return;
+    }
+    inFlightDocVisitIdsRef.current.add(visitCardId);
+    const vid = normalizeAppointmentId(visitCardId);
+    try {
+      const list = vid
+        ? extractDocumentsListFromResponse(
+            await apiService.getAppointmentDocuments(vid),
+          )
+        : [];
+      setDocumentsByVisitId((p) => ({ ...p, [visitCardId]: list }));
+    } catch (e) {
+      console.error("[History] expand documents:", visitCardId, e);
+      setDocumentsByVisitId((p) => ({ ...p, [visitCardId]: [] }));
+    } finally {
+      inFlightDocVisitIdsRef.current.delete(visitCardId);
+      loadedVisitDocIdsRef.current.add(visitCardId);
+      setLoadingDocVisitId((cur) => (cur === visitCardId ? null : cur));
     }
   };
 
-  const openDetails = async (visit: any) => {
-    console.log("📋 History - openDetails called with visit:", {
-      id: visit?.id,
-      doctorId: visit?.doctorId,
-      doctorIdType: typeof visit?.doctorId,
-      doctorIdValue: visit?.doctorId,
-      doctorId_id: visit?.doctorId?._id,
-      doctorId_idType: typeof visit?.doctorId?._id,
-      status: visit?.status,
-    });
-
-    setSelectedVisit(visit);
-    setShowDetailsModal(true);
-
-    // Check follow-up eligibility when modal opens
-    if (visit.id && visit.status === "completed") {
-      try {
-        setCheckingEligibility(true);
-        const response = await apiService.checkFollowUpEligibility(visit.id);
-        // If response has success and eligible properties, use them
-        if (response && typeof response === "object" && "success" in response) {
-          setFollowUpEligible(response.success && (response as any).eligible);
-        } else {
-          // If response is the direct result (eligible: true), treat as eligible
-          setFollowUpEligible(
-            (response as any)?.eligible === true ||
-              (response as any)?.success === true,
-          );
-        }
-      } catch (err: any) {
-        console.error("Error checking follow-up eligibility:", err);
-        // If error contains message about eligibility, show it
-        setFollowUpEligible(false);
-      } finally {
-        setCheckingEligibility(false);
-      }
+  const toggleVisitExpansion = (visit: any) => {
+    const id = visit.id;
+    const isExpanded = expandedVisits.has(id);
+    if (isExpanded) {
+      setExpandedVisits((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(id);
+        return newSet;
+      });
     } else {
-      setFollowUpEligible(false);
+      setExpandedVisits((prev) => new Set(prev).add(id));
+      if (!loadedVisitDocIdsRef.current.has(id)) {
+        setLoadingDocVisitId(id);
+      }
+      queueMicrotask(() => {
+        loadVisitDocumentsIfNeeded(id);
+      });
     }
   };
 
@@ -230,8 +255,6 @@ const History = () => {
     if (!selectedVisit?.id) return;
 
     try {
-      // Check eligibility first
-      setCheckingEligibility(true);
       const eligibilityResponse = await apiService.checkFollowUpEligibility(
         selectedVisit.id,
       );
@@ -289,7 +312,6 @@ const History = () => {
       if (doctorId && doctorId.trim()) {
         const doctorIdString = String(doctorId).trim();
         console.log("📋 History - Navigating with doctorId:", doctorIdString);
-        setShowDetailsModal(false);
         router.push({
           pathname: "/screens/doctors/doctor/[id]",
           params: {
@@ -320,8 +342,6 @@ const History = () => {
       }
 
       Alert.alert("განმეორებითი ვიზიტი", errorMessage);
-    } finally {
-      setCheckingEligibility(false);
     }
   };
 
@@ -383,23 +403,31 @@ const History = () => {
           ) : (
             filteredVisits.map((visit) => {
               const isExpanded = expandedVisits.has(visit.id);
+              const visitDocs = documentsByVisitId[visit.id] || [];
 
               return (
                 <View key={visit.id} style={styles.visitCard}>
-                  <TouchableOpacity
-                    style={{ flex: 1 }}
-                    onPress={() => toggleVisitExpansion(visit)}
-                    activeOpacity={0.7}
-                  >
+                  <View style={{ flex: 1 }}>
                     <View style={styles.visitHeader}>
                       <View style={styles.doctorInfo}>
                         <View style={styles.avatarContainer}>
                           <Ionicons name="medical" size={24} color="#06B6D4" />
                         </View>
                         <View style={styles.doctorDetails}>
-                          <Text style={styles.doctorName}>
-                            {visit.doctorName}
-                          </Text>
+                          <View style={styles.doctorNameRow}>
+                            <Text style={styles.doctorName}>
+                              {visit.doctorName}
+                            </Text>
+                            {visitDocs.length > 0 && (
+                              <View style={styles.fileIndicatorBadge}>
+                                <Ionicons
+                                  name="document-attach"
+                                  size={12}
+                                  color="#0EA5E9"
+                                />
+                              </View>
+                            )}
+                          </View>
                           <Text style={styles.doctorSpecialty}>
                             {visit.doctorSpecialty || "სპეციალისტი"}
                           </Text>
@@ -434,17 +462,22 @@ const History = () => {
                           {visit.statusLabel || "დასრულებული"}
                         </Text>
                       </View>
-                      <TouchableOpacity
-                        onPress={() => toggleVisitExpansion(visit)}
-                        style={styles.expandButton}
-                      >
-                        <Ionicons
-                          name={isExpanded ? "chevron-up" : "chevron-down"}
-                          size={20}
-                          color="#6B7280"
-                        />
-                      </TouchableOpacity>
                     </View>
+
+                    <TouchableOpacity
+                      onPress={() => toggleVisitExpansion(visit)}
+                      style={styles.expandDetailsRow}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.expandDetailsButtonText}>
+                        {isExpanded ? "დეტალების დაფარვა" : "დეტალების ნახვა"}
+                      </Text>
+                      <Ionicons
+                        name={isExpanded ? "chevron-up" : "chevron-down"}
+                        size={18}
+                        color="#06B6D4"
+                      />
+                    </TouchableOpacity>
 
                     <View style={styles.visitBody}>
                       <View style={styles.infoRow}>
@@ -475,7 +508,10 @@ const History = () => {
                             color="#6B7280"
                           />
                           <Text style={styles.infoText}>
-                            {getConsultationTypeLabel(visit.consultationType, (visit as any).isFollowUp)}
+                            {getConsultationTypeLabel(
+                              visit.consultationType,
+                              (visit as any).isFollowUp,
+                            )}
                           </Text>
                         </View>
                       )}
@@ -525,6 +561,18 @@ const History = () => {
                         }
                         return null;
                       })()}
+                      {visitDocs.length > 0 && (
+                        <View style={styles.infoRow}>
+                          <Ionicons
+                            name="document-attach-outline"
+                            size={16}
+                            color="#0EA5E9"
+                          />
+                          <Text style={[styles.infoText, { color: "#0EA5E9" }]}>
+                            {visitDocs.length} ფაილი ატვირთულია
+                          </Text>
+                        </View>
+                      )}
                       {(() => {
                         const isFollowUpAppointment =
                           visit.followUp?.appointmentId;
@@ -548,7 +596,21 @@ const History = () => {
                             setSelectedSymptoms(symptomsText);
                             setShowSymptomsModal(true);
                           }}
-                        ></TouchableOpacity>
+                        >
+                          <Ionicons
+                            name="medical-outline"
+                            size={18}
+                            color="#06B6D4"
+                          />
+                          <Text style={styles.actionButtonText}>
+                            სიმპტომები
+                          </Text>
+                          <Ionicons
+                            name="chevron-forward"
+                            size={16}
+                            color="#6B7280"
+                          />
+                        </TouchableOpacity>
                       )}
 
                       {/* Diagnosis Button - Show only if not requiring follow-up or if it's a follow-up appointment */}
@@ -684,27 +746,79 @@ const History = () => {
                           </TouchableOpacity>
                         )}
                     </View>
-                  </TouchableOpacity>
+                  </View>
 
-                  {/* More Details Button - Always visible - Expands the card */}
-                  <TouchableOpacity
-                    style={styles.moreDetailsButton}
-                    onPress={() => toggleVisitExpansion(visit)}
-                  >
-                    <Text style={styles.moreDetailsButtonText}>
-                      მეტის ნახვა
-                    </Text>
-                    <Ionicons
-                      name={isExpanded ? "chevron-up" : "chevron-down"}
-                      size={16}
-                      color="#06B6D4"
-                    />
-                  </TouchableOpacity>
-
-                  {/* Expanded Details */}
                   {isExpanded && (
                     <View style={styles.expandedSection}>
-                      {/* Notes */}
+                      <View style={styles.detailSection}>
+                        <Text style={styles.detailSectionTitle}>
+                          დოკუმენტები
+                        </Text>
+                        {loadingDocVisitId === visit.id ? (
+                          <View style={styles.visitDocsLoading}>
+                            <ActivityIndicator size="small" color="#0EA5E9" />
+                            <Text style={styles.visitDocsLoadingText}>
+                              იტვირთება...
+                            </Text>
+                          </View>
+                        ) : visitDocs.length > 0 ? (
+                          <View style={styles.uploadedDocList}>
+                            {visitDocs.map((doc: any, idx: number) => {
+                              const url = buildVisitDocumentUrl(
+                                doc,
+                                apiService.getBaseURL(),
+                              );
+                              const isImage = isVisitDocumentImage(doc);
+                              return (
+                                <TouchableOpacity
+                                  key={doc.url || doc.publicId || idx}
+                                  style={styles.uploadedDocItem}
+                                  onPress={() => {
+                                    if (url) {
+                                      Linking.openURL(url).catch(() =>
+                                        Alert.alert(
+                                          "შეცდომა",
+                                          "ფაილის გახსნა ვერ მოხერხდა",
+                                        ),
+                                      );
+                                    }
+                                  }}
+                                  disabled={!url}
+                                  activeOpacity={0.7}
+                                >
+                                  <Ionicons
+                                    name={
+                                      isImage
+                                        ? "image-outline"
+                                        : "document-text"
+                                    }
+                                    size={18}
+                                    color="#0EA5E9"
+                                  />
+                                  <Text
+                                    style={styles.uploadedDocName}
+                                    numberOfLines={1}
+                                  >
+                                    {doc.name || "დოკუმენტი"}
+                                  </Text>
+                                  {url ? (
+                                    <Ionicons
+                                      name="open-outline"
+                                      size={16}
+                                      color="#6B7280"
+                                    />
+                                  ) : null}
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </View>
+                        ) : (
+                          <Text style={styles.visitDocsEmpty}>
+                            ამ ვიზიტზე დოკუმენტები არ არის
+                          </Text>
+                        )}
+                      </View>
+
                       {visit.instrumentalTests &&
                         visit.instrumentalTests.length > 0 && (
                           <View style={styles.detailSection}>
@@ -937,10 +1051,6 @@ const History = () => {
                           </View>
                         </View>
                       )}
-
-                      {/* Medications Details */}
-
-                      {/* Instrumental Tests */}
                     </View>
                   )}
                 </View>
@@ -950,821 +1060,33 @@ const History = () => {
         </View>
       </ScrollView>
 
-      {/* Details Modal */}
+      {/* Symptoms Modal */}
       <Modal
-        visible={showDetailsModal}
+        visible={showSymptomsModal}
         animationType="slide"
         transparent={true}
-        onRequestClose={() => setShowDetailsModal(false)}
+        onRequestClose={() => setShowSymptomsModal(false)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>ვიზიტის დეტალები</Text>
+              <Text style={styles.modalTitle}>სიმპტომები</Text>
               <TouchableOpacity
-                onPress={() => setShowDetailsModal(false)}
+                onPress={() => setShowSymptomsModal(false)}
                 style={styles.closeButton}
               >
                 <Ionicons name="close" size={24} color="#6B7280" />
               </TouchableOpacity>
             </View>
-
-            {selectedVisit && (
-              <ScrollView style={styles.modalBody}>
-                {/* Doctor Info */}
-                <View style={styles.detailSection}>
-                  <Text style={styles.detailLabel}>ექიმი</Text>
-                  <Text style={styles.detailValue}>
-                    {selectedVisit.doctorName}
-                  </Text>
-                  <Text style={styles.detailSubValue}>
-                    {selectedVisit.doctorSpecialty}
-                  </Text>
-                </View>
-
-                {/* Date */}
-                <View style={styles.detailSection}>
-                  <Text style={styles.detailLabel}>თარიღი</Text>
-                  <Text style={styles.detailValue}>{selectedVisit.date}</Text>
-                </View>
-
-                {/* Time */}
-                {selectedVisit.appointmentTime && (
-                  <View style={styles.detailSection}>
-                    <Text style={styles.detailLabel}>დრო</Text>
-                    <Text style={styles.detailValue}>
-                      {selectedVisit.appointmentTime}
-                    </Text>
-                  </View>
-                )}
-
-                {/* Consultation Type */}
-                {selectedVisit.consultationType && (
-                  <View style={styles.detailSection}>
-                    <Text style={styles.detailLabel}>კონსულტაციის ტიპი</Text>
-                    <Text style={styles.detailValue}>
-                      {getConsultationTypeLabel(selectedVisit.consultationType, (selectedVisit as any).isFollowUp)}
-                    </Text>
-                  </View>
-                )}
-
-                {/* Vital Signs */}
-                {selectedVisit.vitalSigns && (
-                  <View style={styles.detailSection}>
-                    <Text style={styles.detailLabel}>ვიტალური ნიშნები</Text>
-                    <View style={styles.vitalSignsGrid}>
-                      <View style={styles.vitalSignCard}>
-                        <Ionicons name="pulse" size={20} color="#EF4444" />
-                        <Text style={styles.vitalSignLabel}>
-                          არტერიული წნევა
-                        </Text>
-                        <Text style={styles.vitalSignValue}>
-                          {selectedVisit.vitalSigns.bloodPressure}
-                        </Text>
-                      </View>
-                      <View style={styles.vitalSignCard}>
-                        <Ionicons name="heart" size={20} color="#10B981" />
-                        <Text style={styles.vitalSignLabel}>პულსი</Text>
-                        <Text style={styles.vitalSignValue}>
-                          {selectedVisit.vitalSigns.heartRate}
-                        </Text>
-                      </View>
-                      <View style={styles.vitalSignCard}>
-                        <Ionicons
-                          name="thermometer"
-                          size={20}
-                          color="#F59E0B"
-                        />
-                        <Text style={styles.vitalSignLabel}>ტემპერატურა</Text>
-                        <Text style={styles.vitalSignValue}>
-                          {selectedVisit.vitalSigns.temperature}
-                        </Text>
-                      </View>
-                      <View style={styles.vitalSignCard}>
-                        <Ionicons name="scale" size={20} color="#8B5CF6" />
-                        <Text style={styles.vitalSignLabel}>წონა</Text>
-                        <Text style={styles.vitalSignValue}>
-                          {selectedVisit.vitalSigns.weight}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                )}
-
-                {/* Medications */}
-                {selectedVisit.medications &&
-                  selectedVisit.medications.length > 0 && (
-                    <View style={styles.detailSection}>
-                      <Text style={styles.detailLabel}>
-                        დანიშნული მედიკამენტები
-                      </Text>
-                      {selectedVisit.medications.map(
-                        (med: any, index: number) => (
-                          <View key={index} style={styles.medicationCard}>
-                            <View style={styles.medicationHeader}>
-                              <Ionicons
-                                name="medkit-outline"
-                                size={20}
-                                color="#8B5CF6"
-                              />
-                              <Text style={styles.medicationName}>
-                                {med.name}
-                              </Text>
-                            </View>
-                            <View style={styles.medicationDetails}>
-                              <View style={styles.medicationDetailRow}>
-                                <Text style={styles.medicationDetailLabel}>
-                                  დოზა:
-                                </Text>
-                                <Text style={styles.medicationDetailValue}>
-                                  {med.dosage}
-                                </Text>
-                              </View>
-                              <View style={styles.medicationDetailRow}>
-                                <Text style={styles.medicationDetailLabel}>
-                                  სიხშირე:
-                                </Text>
-                                <Text style={styles.medicationDetailValue}>
-                                  {med.frequency}
-                                </Text>
-                              </View>
-                              <View style={styles.medicationDetailRow}>
-                                <Text style={styles.medicationDetailLabel}>
-                                  ხანგრძლივობა:
-                                </Text>
-                                <Text style={styles.medicationDetailValue}>
-                                  {med.duration}
-                                </Text>
-                              </View>
-                              {med.instructions && (
-                                <View style={styles.medicationInstructions}>
-                                  <Text
-                                    style={styles.medicationInstructionsText}
-                                  >
-                                    {med.instructions}
-                                  </Text>
-                                </View>
-                              )}
-                            </View>
-                          </View>
-                        ),
-                      )}
-                    </View>
-                  )}
-
-                {/* Notes */}
-                {selectedVisit.notes && (
-                  <View style={styles.detailSection}>
-                    <Text style={styles.detailLabel}>შენიშვნები</Text>
-                    <Text style={styles.notesText}>{selectedVisit.notes}</Text>
-                  </View>
-                )}
-
-                {/* Instrumental Tests */}
-                {selectedVisit.instrumentalTests &&
-                  selectedVisit.instrumentalTests.length > 0 && (
-                    <View style={styles.detailSection}>
-                      <Text style={styles.detailLabel}>
-                        დანიშნული ინსტრუმენტული კვლევები
-                      </Text>
-                      {selectedVisit.instrumentalTests.map(
-                        (test: any, index: number) => (
-                          <View key={index} style={styles.laboratoryTestCard}>
-                            <View style={styles.laboratoryTestHeader}>
-                              <Ionicons
-                                name="pulse-outline"
-                                size={20}
-                                color="#8B5CF6"
-                              />
-                              <View style={styles.laboratoryTestInfo}>
-                                <Text style={styles.laboratoryTestName}>
-                                  {test.productName}
-                                </Text>
-                                {test.clinicName && (
-                                  <Text style={styles.laboratoryTestClinic}>
-                                    კლინიკა: {test.clinicName}
-                                  </Text>
-                                )}
-                                {test.notes && (
-                                  <Text style={styles.laboratoryTestClinic}>
-                                    შენიშვნა: {test.notes}
-                                  </Text>
-                                )}
-                              </View>
-                            </View>
-                            {!test.booked && (
-                              <TouchableOpacity
-                                style={styles.bookTestButton}
-                                onPress={() => {
-                                  // Close modal before navigating
-                                  setShowDetailsModal(false);
-                                  // Navigate to clinic selection for this test
-                                  router.push({
-                                    pathname: "/screens/lab/select-clinic",
-                                    params: {
-                                      productId: test.productId,
-                                      productName: test.productName,
-                                      productPrice: "0", // Price will be fetched from product
-                                      appointmentId: selectedVisit.id,
-                                      testType: "instrumental", // Indicate this is for instrumental test
-                                    },
-                                  });
-                                }}
-                              >
-                                <Ionicons
-                                  name="calendar-outline"
-                                  size={16}
-                                  color="#FFFFFF"
-                                />
-                                <Text style={styles.bookTestButtonText}>
-                                  დაჯავშნა
-                                </Text>
-                              </TouchableOpacity>
-                            )}
-                            {test.booked && (
-                              <View style={styles.bookedBadge}>
-                                <Ionicons
-                                  name="checkmark-circle"
-                                  size={16}
-                                  color="#10B981"
-                                />
-                                <Text style={styles.bookedBadgeText}>
-                                  დაჯავშნილია
-                                </Text>
-                              </View>
-                            )}
-                            {/* Upload button - works for all assigned tests (booked or not) */}
-                            <TouchableOpacity
-                              style={[
-                                styles.uploadResultButton,
-                                uploadingResult === test.productId &&
-                                  styles.uploadResultButtonDisabled,
-                              ]}
-                              onPress={async () => {
-                                if (uploadingResult === test.productId) return;
-
-                                try {
-                                  const result =
-                                    await DocumentPicker.getDocumentAsync({
-                                      type: [
-                                        "application/pdf",
-                                        "image/jpeg",
-                                        "image/jpg",
-                                        "image/png",
-                                        "image/webp",
-                                      ],
-                                      copyToCacheDirectory: true,
-                                    });
-
-                                  if (result.canceled) return;
-                                  const file = result.assets?.[0];
-                                  if (!file) return;
-
-                                  if (
-                                    file.size &&
-                                    file.size > 10 * 1024 * 1024
-                                  ) {
-                                    Alert.alert(
-                                      "შეცდომა",
-                                      "ფაილი უნდა იყოს 10MB-მდე",
-                                    );
-                                    return;
-                                  }
-
-                                  setUploadingResult(test.productId);
-
-                                  // Use uploadInstrumentalTestResult for assigned tests (they have productId)
-                                  // This works for both booked and non-booked tests
-                                  const uploadResp =
-                                    await apiService.uploadInstrumentalTestResult(
-                                      selectedVisit.id,
-                                      test.productId,
-                                      {
-                                        uri: file.uri,
-                                        name: file.name || "document",
-                                        type:
-                                          file.mimeType || "application/pdf",
-                                      },
-                                    );
-
-                                  if (uploadResp.success) {
-                                    Alert.alert(
-                                      "წარმატება",
-                                      "ინსტრუმენტული კვლევის შედეგი წარმატებით ატვირთა",
-                                    );
-                                    loadPastAppointments();
-                                  } else {
-                                    Alert.alert(
-                                      "შეცდომა",
-                                      uploadResp?.message ||
-                                        "ატვირთვა ვერ მოხერხდა",
-                                    );
-                                  }
-                                } catch (err: any) {
-                                  console.error(
-                                    "Instrumental result upload error:",
-                                    err,
-                                  );
-                                  Alert.alert(
-                                    "შეცდომა",
-                                    err?.message ||
-                                      "ფაილის ატვირთვა ვერ მოხერხდა",
-                                  );
-                                } finally {
-                                  setUploadingResult(null);
-                                }
-                              }}
-                              disabled={uploadingResult === test.productId}
-                            >
-                              {uploadingResult === test.productId ? (
-                                <>
-                                  <ActivityIndicator
-                                    size="small"
-                                    color="#FFFFFF"
-                                  />
-                                  <Text style={styles.uploadResultButtonText}>
-                                    ატვირთვა...
-                                  </Text>
-                                </>
-                              ) : (
-                                <>
-                                  <Ionicons
-                                    name="cloud-upload-outline"
-                                    size={16}
-                                    color="#FFFFFF"
-                                  />
-                                  <Text style={styles.uploadResultButtonText}>
-                                    {test.resultFile
-                                      ? "შედეგის განახლება"
-                                      : "შედეგის ატვირთვა"}
-                                  </Text>
-                                </>
-                              )}
-                            </TouchableOpacity>
-                            {test.resultFile && (
-                              <TouchableOpacity
-                                style={styles.viewResultButton}
-                                onPress={async () => {
-                                  if (test.resultFile?.url) {
-                                    const url = test.resultFile.url;
-                                    const isPdf =
-                                      test.resultFile.type ===
-                                        "application/pdf" ||
-                                      url.endsWith(".pdf");
-
-                                    if (isPdf) {
-                                      // Use Google Docs Viewer to display PDF
-                                      const googleDocsUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=false`;
-                                      Linking.openURL(googleDocsUrl).catch(() =>
-                                        Alert.alert(
-                                          "შეცდომა",
-                                          "ფაილის გახსნა ვერ მოხერხდა",
-                                        ),
-                                      );
-                                    } else {
-                                      // For non-PDFs, open in browser
-                                      Linking.openURL(url).catch(() =>
-                                        Alert.alert(
-                                          "შეცდომა",
-                                          "ფაილის გახსნა ვერ მოხერხდა",
-                                        ),
-                                      );
-                                    }
-                                  }
-                                }}
-                              >
-                                <Ionicons
-                                  name="document-text-outline"
-                                  size={16}
-                                  color="#8B5CF6"
-                                />
-                                <Text style={styles.viewResultButtonText}>
-                                  შედეგის ნახვა
-                                </Text>
-                              </TouchableOpacity>
-                            )}
-                          </View>
-                        ),
-                      )}
-                    </View>
-                  )}
-
-                {/* Laboratory Tests */}
-                {selectedVisit.laboratoryTests &&
-                  selectedVisit.laboratoryTests.length > 0 && (
-                    <View style={styles.detailSection}>
-                      <Text style={styles.detailLabel}>
-                        დანიშნული ლაბორატორიული კვლევები
-                      </Text>
-                      {selectedVisit.laboratoryTests.map(
-                        (test: any, index: number) => (
-                          <View key={index} style={styles.laboratoryTestCard}>
-                            <View style={styles.laboratoryTestHeader}>
-                              <Ionicons
-                                name="flask-outline"
-                                size={20}
-                                color="#06B6D4"
-                              />
-                              <View style={styles.laboratoryTestInfo}>
-                                <Text style={styles.laboratoryTestName}>
-                                  {test.productName}
-                                </Text>
-                                {test.clinicName && (
-                                  <Text style={styles.laboratoryTestClinic}>
-                                    კლინიკა: {test.clinicName}
-                                  </Text>
-                                )}
-                              </View>
-                            </View>
-                            {!test.booked && (
-                              <TouchableOpacity
-                                style={styles.bookTestButton}
-                                onPress={() => {
-                                  // Close modal before navigating
-                                  setShowDetailsModal(false);
-                                  // Navigate to clinic selection for this test
-                                  router.push({
-                                    pathname: "/screens/lab/select-clinic",
-                                    params: {
-                                      productId: test.productId,
-                                      productName: test.productName,
-                                      productPrice: "0", // Price will be fetched from product
-                                      appointmentId: selectedVisit.id,
-                                    },
-                                  });
-                                }}
-                              >
-                                <Ionicons
-                                  name="calendar-outline"
-                                  size={16}
-                                  color="#FFFFFF"
-                                />
-                                <Text style={styles.bookTestButtonText}>
-                                  დაჯავშნა
-                                </Text>
-                              </TouchableOpacity>
-                            )}
-                            {test.booked && (
-                              <View style={styles.bookedBadge}>
-                                <Ionicons
-                                  name="checkmark-circle"
-                                  size={16}
-                                  color="#10B981"
-                                />
-                                <Text style={styles.bookedBadgeText}>
-                                  დაჯავშნილია
-                                </Text>
-                              </View>
-                            )}
-                            {/* Upload button - works for all assigned tests (booked or not) */}
-                            <TouchableOpacity
-                              style={[
-                                styles.uploadResultButton,
-                                uploadingResult === test.productId &&
-                                  styles.uploadResultButtonDisabled,
-                              ]}
-                              onPress={async () => {
-                                if (uploadingResult === test.productId) return;
-
-                                try {
-                                  const result =
-                                    await DocumentPicker.getDocumentAsync({
-                                      type: [
-                                        "application/pdf",
-                                        "image/jpeg",
-                                        "image/jpg",
-                                        "image/png",
-                                        "image/webp",
-                                      ],
-                                      copyToCacheDirectory: true,
-                                    });
-
-                                  if (result.canceled) return;
-                                  const file = result.assets?.[0];
-                                  if (!file) return;
-
-                                  if (
-                                    file.size &&
-                                    file.size > 10 * 1024 * 1024
-                                  ) {
-                                    Alert.alert(
-                                      "შეცდომა",
-                                      "ფაილი უნდა იყოს 10MB-მდე",
-                                    );
-                                    return;
-                                  }
-
-                                  setUploadingResult(test.productId);
-
-                                  // Always use uploadLaboratoryTestResult for assigned tests (they have productId)
-                                  // This works for both booked and non-booked tests
-                                  const uploadResp =
-                                    await apiService.uploadLaboratoryTestResult(
-                                      selectedVisit.id,
-                                      test.productId,
-                                      {
-                                        uri: file.uri,
-                                        name: file.name || "document",
-                                        type:
-                                          file.mimeType || "application/pdf",
-                                      },
-                                    );
-
-                                  if (uploadResp.success) {
-                                    Alert.alert(
-                                      "წარმატება",
-                                      "ლაბორატორიული კვლევის შედეგი წარმატებით ატვირთა",
-                                    );
-                                    loadPastAppointments();
-                                  } else {
-                                    Alert.alert(
-                                      "შეცდომა",
-                                      uploadResp?.message ||
-                                        "ატვირთვა ვერ მოხერხდა",
-                                    );
-                                  }
-                                } catch (err: any) {
-                                  console.error(
-                                    "Laboratory result upload error:",
-                                    err,
-                                  );
-                                  Alert.alert(
-                                    "შეცდომა",
-                                    err?.message ||
-                                      "ფაილის ატვირთვა ვერ მოხერხდა",
-                                  );
-                                } finally {
-                                  setUploadingResult(null);
-                                }
-                              }}
-                              disabled={uploadingResult === test.productId}
-                            >
-                              {uploadingResult === test.productId ? (
-                                <>
-                                  <ActivityIndicator
-                                    size="small"
-                                    color="#FFFFFF"
-                                  />
-                                  <Text style={styles.uploadResultButtonText}>
-                                    ატვირთვა...
-                                  </Text>
-                                </>
-                              ) : (
-                                <>
-                                  <Ionicons
-                                    name="cloud-upload-outline"
-                                    size={16}
-                                    color="#FFFFFF"
-                                  />
-                                  <Text style={styles.uploadResultButtonText}>
-                                    {test.resultFile
-                                      ? "შედეგის განახლება"
-                                      : "შედეგის ატვირთვა"}
-                                  </Text>
-                                </>
-                              )}
-                            </TouchableOpacity>
-                            {test.resultFile && (
-                              <TouchableOpacity
-                                style={styles.viewResultButton}
-                                onPress={async () => {
-                                  if (test.resultFile?.url) {
-                                    const url = test.resultFile.url;
-                                    const isPdf =
-                                      test.resultFile.type ===
-                                        "application/pdf" ||
-                                      url.endsWith(".pdf");
-
-                                    if (isPdf) {
-                                      // Use Google Docs Viewer to display PDF
-                                      const googleDocsUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=false`;
-                                      Linking.openURL(googleDocsUrl).catch(() =>
-                                        Alert.alert(
-                                          "შეცდომა",
-                                          "ფაილის გახსნა ვერ მოხერხდა",
-                                        ),
-                                      );
-                                    } else {
-                                      // For non-PDFs, open in browser
-                                      Linking.openURL(url).catch(() =>
-                                        Alert.alert(
-                                          "შეცდომა",
-                                          "ფაილის გახსნა ვერ მოხერხდა",
-                                        ),
-                                      );
-                                    }
-                                  }
-                                }}
-                              >
-                                <Ionicons
-                                  name="document-text-outline"
-                                  size={16}
-                                  color="#06B6D4"
-                                />
-                                <Text style={styles.viewResultButtonText}>
-                                  შედეგის ნახვა
-                                </Text>
-                              </TouchableOpacity>
-                            )}
-                          </View>
-                        ),
-                      )}
-                    </View>
-                  )}
-
-                {/* Follow-up */}
-                {selectedVisit.followUp && selectedVisit.followUp.required && (
-                  <View style={styles.detailSection}>
-                    <View style={styles.followUpCard}>
-                      <Ionicons name="calendar" size={24} color="#06B6D4" />
-                      <View style={styles.followUpContent}>
-                        <Text style={styles.followUpTitle}>
-                          განმეორებითი ვიზიტი
-                        </Text>
-                        {selectedVisit.followUp.date && (
-                          <Text style={styles.followUpDate}>
-                            {selectedVisit.followUp.date}
-                          </Text>
-                        )}
-                        {selectedVisit.followUp.reason && (
-                          <Text style={styles.followUpReason}>
-                            {selectedVisit.followUp.reason}
-                          </Text>
-                        )}
-                      </View>
-                    </View>
-                  </View>
-                )}
-
-                {/* Follow-up Button - Show only for completed appointments without existing follow-up */}
-                {selectedVisit.status === "completed" &&
-                  !selectedVisit.followUp?.appointmentId && (
-                    <View style={styles.detailSection}>
-                      {checkingEligibility ? (
-                        <View style={styles.followUpButton}>
-                          <ActivityIndicator size="small" color="#06B6D4" />
-                          <Text style={styles.followUpButtonText}>
-                            შემოწმება...
-                          </Text>
-                        </View>
-                      ) : followUpEligible ? (
-                        <TouchableOpacity
-                          style={styles.followUpButton}
-                          onPress={handleFollowUpAppointment}
-                        >
-                          <Ionicons
-                            name="calendar-outline"
-                            size={20}
-                            color="#FFFFFF"
-                          />
-                          <Text style={styles.followUpButtonText}>
-                            განმეორებითი ვიზიტისთვის
-                          </Text>
-                          <Ionicons
-                            name="arrow-forward"
-                            size={16}
-                            color="#FFFFFF"
-                          />
-                        </TouchableOpacity>
-                      ) : followUpEligible === false ? (
-                        <TouchableOpacity
-                          style={styles.followUpButtonDisabled}
-                          onPress={handleFollowUpAppointment}
-                        >
-                          <Ionicons
-                            name="calendar-outline"
-                            size={20}
-                            color="#9CA3AF"
-                          />
-                          <Text style={styles.followUpButtonTextDisabled}>
-                            განმეორებითი ვიზიტი ჯერ არ არის ხელმისაწვდომი
-                          </Text>
-                        </TouchableOpacity>
-                      ) : null}
-                    </View>
-                  )}
-
-                {/* Form 100 */}
-                {selectedVisit.form100 && (
-                  <View style={styles.detailSection}>
-                    <View style={styles.form100Card}>
-                      <View style={styles.form100Header}>
-                        <Ionicons
-                          name="document-text"
-                          size={24}
-                          color="#10B981"
-                        />
-                        <View style={styles.form100Info}>
-                          <Text style={styles.form100Title}>ფორმა 100</Text>
-                          <Text style={styles.form100Id}>
-                            ID: {selectedVisit.form100.id}
-                          </Text>
-                        </View>
-                      </View>
-                      <View style={styles.form100Details}>
-                        <View style={styles.form100DetailRow}>
-                          <Text style={styles.form100DetailLabel}>
-                            გაცემის თარიღი:
-                          </Text>
-                          <Text style={styles.form100DetailValue}>
-                            {selectedVisit.form100.issueDate}
-                          </Text>
-                        </View>
-                        <View style={styles.form100DetailRow}>
-                          <Text style={styles.form100DetailLabel}>
-                            მოქმედებს:
-                          </Text>
-                          <Text style={styles.form100DetailValue}>
-                            {selectedVisit.form100.validUntil}
-                          </Text>
-                        </View>
-                      </View>
-                      <TouchableOpacity
-                        style={styles.form100DownloadButton}
-                        onPress={() => {
-                          if (selectedVisit.form100?.pdfUrl) {
-                            Linking.openURL(selectedVisit.form100.pdfUrl);
-                          }
-                        }}
-                      >
-                        <Ionicons
-                          name="download-outline"
-                          size={20}
-                          color="#10B981"
-                        />
-                        <Text style={styles.form100DownloadText}>
-                          PDF-ის ჩამოტვირთვა
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                )}
-
-                {/* ჯავშანზე ატვირთული დოკუმენტები (როგორც ფორმა 100) */}
-                <View style={styles.detailSection}>
-                  <Text style={styles.detailLabel}>დოკუმენტები</Text>
-                  {loadingVisitDocuments ? (
-                    <View style={styles.visitDocsLoading}>
-                      <ActivityIndicator size="small" color="#0EA5E9" />
-                      <Text style={styles.visitDocsLoadingText}>
-                        იტვირთება...
-                      </Text>
-                    </View>
-                  ) : visitDocuments.length > 0 ? (
-                    visitDocuments.map((doc: any, index: number) => {
-                      const url = doc.url?.startsWith("http")
-                        ? doc.url
-                        : doc.url
-                          ? `${apiService.getBaseURL()}/${doc.url}`
-                          : null;
-                      return (
-                        <TouchableOpacity
-                          key={doc.url || index}
-                          style={styles.visitDocCard}
-                          onPress={() => url && Linking.openURL(url)}
-                          disabled={!url}
-                        >
-                          <View style={styles.form100Header}>
-                            <Ionicons
-                              name={
-                                (doc.mimeType || doc.type)?.startsWith(
-                                  "image/",
-                                )
-                                  ? "image-outline"
-                                  : "document-text"
-                              }
-                              size={24}
-                              color="#0EA5E9"
-                            />
-                            <View style={styles.form100Info}>
-                              <Text style={styles.visitDocTitle}>
-                                {doc.name || "დოკუმენტი"}
-                              </Text>
-                            </View>
-                            {url && (
-                              <Ionicons
-                                name="open-outline"
-                                size={20}
-                                color="#0EA5E9"
-                              />
-                            )}
-                          </View>
-                        </TouchableOpacity>
-                      );
-                    })
-                  ) : (
-                    <Text style={styles.visitDocsEmpty}>
-                      ამ ვიზიტზე დოკუმენტები არ არის
-                    </Text>
-                  )}
-                </View>
-              </ScrollView>
-            )}
-
+            <ScrollView style={styles.modalBody}>
+              <View style={styles.detailSection}>
+                <Text style={styles.detailValue}>{selectedSymptoms}</Text>
+              </View>
+            </ScrollView>
             <View style={styles.modalFooter}>
               <TouchableOpacity
                 style={styles.modalButton}
-                onPress={() => setShowDetailsModal(false)}
+                onPress={() => setShowSymptomsModal(false)}
               >
                 <Text style={styles.modalButtonText}>დახურვა</Text>
               </TouchableOpacity>
@@ -1772,8 +1094,6 @@ const History = () => {
           </View>
         </View>
       </Modal>
-
-      {/* Symptoms Modal */}
 
       {/* Diagnosis Modal */}
       <Modal
@@ -2011,7 +1331,9 @@ const mapAppointmentToVisit = (appointment: any) => {
 
   const visit = {
     id:
-      appointment._id || appointment.id || Math.random().toString(36).slice(2),
+      normalizeAppointmentId(appointment._id) ||
+      normalizeAppointmentId(appointment.id) ||
+      Math.random().toString(36).slice(2),
     doctorId: doctorId,
     doctorName: doctor?.name || "უცნობი ექიმი",
     doctorSpecialty: doctor?.specialization || doctor?.speciality || "",
@@ -2020,14 +1342,11 @@ const mapAppointmentToVisit = (appointment: any) => {
     appointmentTime: appointment.appointmentTime || appointment.time || "",
     consultationType: appointment.type || "video",
     isFollowUp: appointment.isFollowUp === true,
-    diagnosis:
-      summary.diagnosis ||
-      appointment.diagnosis ||
-      appointment.patientDetails?.problem ||
-      "",
+    // მხოლოდ ექიმის შევსებული — არა patientDetails.problem / ჯავშნის notes
+    diagnosis: (summary.diagnosis || appointment.diagnosis || "").trim(),
     symptoms,
     medications,
-    notes: summary.notes || appointment.notes || "",
+    notes: (summary.notes || "").trim(),
     vitalSigns: appointment.vitalSigns || summary.vitals,
     consultationSummary: summary,
     followUp: appointment.followUp,
@@ -2046,11 +1365,6 @@ const mapAppointmentToVisit = (appointment: any) => {
 
   // Log laboratory tests for debugging
   if (visit.laboratoryTests && visit.laboratoryTests.length > 0) {
-    console.log("🧪 [History] Lab tests for visit:", visit.id);
-    console.log(
-      "🧪 [History] Lab tests data:",
-      JSON.stringify(visit.laboratoryTests, null, 2),
-    );
     visit.laboratoryTests.forEach((test: any, idx: number) => {
       console.log(`🧪 [History] Test ${idx}:`, {
         productId: test.productId,
@@ -2286,11 +1600,16 @@ const styles = StyleSheet.create({
   doctorDetails: {
     flex: 1,
   },
+  doctorNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 2,
+  },
   doctorName: {
     fontSize: 16,
     fontFamily: "Poppins-SemiBold",
     color: "#1F2937",
-    marginBottom: 2,
   },
   bookedCountText: {
     fontFamily: "Poppins-SemiBold",
@@ -2314,8 +1633,27 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: "Poppins-SemiBold",
   },
-  expandButton: {
-    padding: 4,
+  expandDetailsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 10,
+    marginBottom: 8,
+  },
+  expandDetailsButtonText: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#06B6D4",
+  },
+  fileIndicatorBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#E0F2FE",
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 6,
   },
   expandedSection: {
     marginTop: 12,
@@ -2373,23 +1711,25 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins-Regular",
     color: "#6B7280",
   },
-  moreDetailsButton: {
+  uploadedDocList: {
+    gap: 8,
+  },
+  uploadedDocItem: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
     gap: 8,
-    marginTop: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: "#F0FDFA",
-    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#06B6D4",
+    borderColor: "#E2E8F0",
   },
-  moreDetailsButtonText: {
-    fontSize: 14,
-    fontFamily: "Poppins-SemiBold",
-    color: "#06B6D4",
+  uploadedDocName: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: "Poppins-Regular",
+    color: "#374151",
   },
   visitBody: {
     gap: 8,
@@ -2796,20 +2136,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Poppins-SemiBold",
     color: "#FFFFFF",
-  },
-  visitDocCard: {
-    backgroundColor: "#F0F9FF",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: "#BAE6FD",
-  },
-  visitDocTitle: {
-    fontSize: 15,
-    fontFamily: "Poppins-SemiBold",
-    color: "#0C4A6E",
-    flex: 1,
   },
   visitDocsLoading: {
     flexDirection: "row",

@@ -91,7 +91,6 @@ const Services = () => {
         ))}
       </View>
 
-      {/* Pharmacy WIP modal */}
       <Modal
         visible={pharmacyModalVisible}
         transparent

@@ -1,9 +1,9 @@
 // API Service for Medicare Admin Panel
-import { ADMIN_DEV_TOKEN } from './dev-token';
+import { ADMIN_DEV_TOKEN } from "./dev-token";
 
-const API_BASE_URL = 
-  process.env.NEXT_PUBLIC_API_URL || 
-  'https://mediacare-production.up.railway.app';
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  "https://mediacare-production.up.railway.app";
 
 // DEVELOPMENT MODE: Skip auth and use static token (from dev-token.ts)
 const DISABLE_AUTH = true;
@@ -16,19 +16,19 @@ export interface ApiResponse<T> {
 
 export interface User {
   id: string;
-  role: 'patient' | 'doctor' | 'admin';
+  role: "patient" | "doctor" | "admin";
   name: string;
   email: string;
   phone?: string;
   idNumber?: string; // Personal ID number (პირადი ნომერი)
   dateOfBirth?: string;
-  gender?: 'male' | 'female' | 'other';
+  gender?: "male" | "female" | "other";
   profileImage?: string;
   address?: string; // Address for patients
   identificationDocument?: string; // პირადობა/პასპორტი PDF path or URL
   isVerified: boolean;
   isActive: boolean;
-  approvalStatus?: 'pending' | 'approved' | 'rejected';
+  approvalStatus?: "pending" | "approved" | "rejected";
   createdAt?: string;
   updatedAt?: string;
   // Doctor specific
@@ -83,7 +83,7 @@ export interface Specialization {
   updatedAt?: string;
 }
 
-export type ShopEntityType = 'laboratory' | 'equipment';
+export type ShopEntityType = "laboratory" | "equipment";
 
 export interface ShopCategory {
   id: string;
@@ -140,10 +140,17 @@ export interface Clinic {
 
 export interface Notification {
   id: string;
-  type: 'user_registered' | 'user_updated' | 'doctor_approved' | 'doctor_rejected' | 'appointment_created' | 'appointment_cancelled' | 'system_alert';
+  type:
+    | "user_registered"
+    | "user_updated"
+    | "doctor_approved"
+    | "doctor_rejected"
+    | "appointment_created"
+    | "appointment_cancelled"
+    | "system_alert";
   title: string;
   message: string;
-  priority: 'low' | 'medium' | 'high';
+  priority: "low" | "medium" | "high";
   read: boolean;
   readAt?: string;
   userId?: {
@@ -164,21 +171,22 @@ class ApiService {
 
   constructor() {
     this.baseURL = API_BASE_URL;
-    if (typeof window !== 'undefined') {
-      this.token = localStorage.getItem('accessToken');
+    if (typeof window !== "undefined") {
+      this.token = localStorage.getItem("accessToken");
     }
   }
 
   private getHeaders(): HeadersInit {
     const headers: HeadersInit = {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     };
 
     // Use static token in dev mode if available (curl .../auth/dev-token → put in dev-token.ts)
-    const tokenToUse = DISABLE_AUTH && ADMIN_DEV_TOKEN ? ADMIN_DEV_TOKEN : this.token;
-    
+    const tokenToUse =
+      DISABLE_AUTH && ADMIN_DEV_TOKEN ? ADMIN_DEV_TOKEN : this.token;
+
     if (tokenToUse) {
-      headers['Authorization'] = `Bearer ${tokenToUse}`;
+      headers["Authorization"] = `Bearer ${tokenToUse}`;
     }
 
     return headers;
@@ -186,11 +194,11 @@ class ApiService {
 
   setToken(token: string | null) {
     this.token = token;
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       if (token) {
-        localStorage.setItem('accessToken', token);
+        localStorage.setItem("accessToken", token);
       } else {
-        localStorage.removeItem('accessToken');
+        localStorage.removeItem("accessToken");
       }
     }
   }
@@ -205,15 +213,15 @@ class ApiService {
         const useDevToken = DISABLE_AUTH && ADMIN_DEV_TOKEN;
         if (!useDevToken) {
           this.setToken(null);
-          if (typeof window !== 'undefined') {
-            localStorage.removeItem('accessToken');
-            localStorage.removeItem('refreshToken');
-            localStorage.removeItem('user');
-            window.location.href = '/auth/sign-in';
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("accessToken");
+            localStorage.removeItem("refreshToken");
+            localStorage.removeItem("user");
+            window.location.href = "/auth/sign-in";
           }
         } else {
           console.warn(
-            '[API] 401 with dev token – token may be expired. Update ADMIN_DEV_TOKEN (curl .../auth/dev-token).',
+            "[API] 401 with dev token – token may be expired. Update ADMIN_DEV_TOKEN (curl .../auth/dev-token).",
           );
         }
       }
@@ -226,13 +234,13 @@ class ApiService {
   // Auth endpoints
   async login(credentials: LoginRequest): Promise<AuthResponse> {
     const response = await fetch(`${this.baseURL}/auth/login`, {
-      method: 'POST',
+      method: "POST",
       headers: this.getHeaders(),
       body: JSON.stringify(credentials),
     });
 
     const data = await this.handleResponse<AuthResponse>(response);
-    
+
     if (data.data.token) {
       this.setToken(data.data.token);
     }
@@ -241,32 +249,37 @@ class ApiService {
   }
 
   async logout(): Promise<void> {
-    const refreshToken = localStorage.getItem('refreshToken');
+    const refreshToken = localStorage.getItem("refreshToken");
     if (refreshToken) {
       try {
         await fetch(`${this.baseURL}/auth/logout`, {
-          method: 'POST',
+          method: "POST",
           headers: this.getHeaders(),
           body: JSON.stringify({ refreshToken }),
         });
       } catch (error) {
-        console.error('Logout error:', error);
+        console.error("Logout error:", error);
       }
     }
 
     this.setToken(null);
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('user');
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("refreshToken");
+      localStorage.removeItem("user");
     }
   }
 
-  async sendPhoneVerificationCode(phone: string): Promise<{ success: boolean; message: string }> {
-    const response = await fetch(`${this.baseURL}/auth/send-verification-code`, {
-      method: 'POST',
-      headers: this.getHeaders(),
-      body: JSON.stringify({ phone }),
-    });
+  async sendPhoneVerificationCode(
+    phone: string,
+  ): Promise<{ success: boolean; message: string }> {
+    const response = await fetch(
+      `${this.baseURL}/auth/send-verification-code`,
+      {
+        method: "POST",
+        headers: this.getHeaders(),
+        body: JSON.stringify({ phone }),
+      },
+    );
 
     return this.handleResponse<{ success: boolean; message: string }>(response);
   }
@@ -276,31 +289,35 @@ class ApiService {
     code: string,
   ): Promise<{ success: boolean; message: string; verified: boolean }> {
     const response = await fetch(`${this.baseURL}/auth/verify-phone`, {
-      method: 'POST',
+      method: "POST",
       headers: this.getHeaders(),
       body: JSON.stringify({ phone, code }),
     });
 
-    return this.handleResponse<{ success: boolean; message: string; verified: boolean }>(response);
+    return this.handleResponse<{
+      success: boolean;
+      message: string;
+      verified: boolean;
+    }>(response);
   }
 
   // Users endpoints
   async getUsers(params?: {
     page?: number;
     limit?: number;
-    role?: 'patient' | 'doctor';
+    role?: "patient" | "doctor";
     search?: string;
   }): Promise<ApiResponse<{ users: User[]; pagination: any }>> {
     const queryParams = new URLSearchParams();
-    if (params?.page) queryParams.append('page', params.page.toString());
-    if (params?.limit) queryParams.append('limit', params.limit.toString());
-    if (params?.role) queryParams.append('role', params.role);
-    if (params?.search) queryParams.append('search', params.search);
+    if (params?.page) queryParams.append("page", params.page.toString());
+    if (params?.limit) queryParams.append("limit", params.limit.toString());
+    if (params?.role) queryParams.append("role", params.role);
+    if (params?.search) queryParams.append("search", params.search);
 
     const response = await fetch(
       `${this.baseURL}/admin/users?${queryParams.toString()}`,
       {
-        method: 'GET',
+        method: "GET",
         headers: this.getHeaders(),
       },
     );
@@ -312,7 +329,7 @@ class ApiService {
 
   async getUserById(userId: string): Promise<ApiResponse<User>> {
     const response = await fetch(`${this.baseURL}/admin/users/${userId}`, {
-      method: 'GET',
+      method: "GET",
       headers: this.getHeaders(),
     });
 
@@ -320,13 +337,13 @@ class ApiService {
   }
 
   async createUser(userData: {
-    role: 'patient' | 'doctor';
+    role: "patient" | "doctor";
     name: string;
     email: string;
     password: string;
     phone?: string;
     dateOfBirth?: string;
-    gender?: 'male' | 'female' | 'other';
+    gender?: "male" | "female" | "other";
     isActive?: boolean;
     specialization?: string;
     degrees?: string;
@@ -335,14 +352,18 @@ class ApiService {
     followUpFee?: number;
     about?: string;
     location?: string;
-  }): Promise<ApiResponse<{ id: string; role: string; name: string; email: string }>> {
+  }): Promise<
+    ApiResponse<{ id: string; role: string; name: string; email: string }>
+  > {
     const response = await fetch(`${this.baseURL}/admin/users`, {
-      method: 'POST',
+      method: "POST",
       headers: this.getHeaders(),
       body: JSON.stringify(userData),
     });
 
-    return this.handleResponse<ApiResponse<{ id: string; role: string; name: string; email: string }>>(response);
+    return this.handleResponse<
+      ApiResponse<{ id: string; role: string; name: string; email: string }>
+    >(response);
   }
 
   async updateUser(
@@ -353,11 +374,11 @@ class ApiService {
       password?: string;
       phone?: string;
       dateOfBirth?: string;
-      gender?: 'male' | 'female' | 'other';
+      gender?: "male" | "female" | "other";
       profileImage?: string;
       isVerified?: boolean;
       isActive?: boolean;
-      approvalStatus?: 'pending' | 'approved' | 'rejected';
+      approvalStatus?: "pending" | "approved" | "rejected";
       specialization?: string;
       degrees?: string;
       experience?: string;
@@ -366,28 +387,34 @@ class ApiService {
       about?: string;
       location?: string;
     },
-  ): Promise<ApiResponse<{ id: string; role: string; name: string; email: string }>> {
+  ): Promise<
+    ApiResponse<{ id: string; role: string; name: string; email: string }>
+  > {
     const response = await fetch(`${this.baseURL}/admin/users/${userId}`, {
-      method: 'PUT',
+      method: "PUT",
       headers: this.getHeaders(),
       body: JSON.stringify(userData),
     });
 
-    return this.handleResponse<ApiResponse<{ id: string; role: string; name: string; email: string }>>(response);
+    return this.handleResponse<
+      ApiResponse<{ id: string; role: string; name: string; email: string }>
+    >(response);
   }
 
   async deleteUser(userId: string): Promise<ApiResponse<{ message: string }>> {
     const response = await fetch(`${this.baseURL}/admin/users/${userId}`, {
-      method: 'DELETE',
+      method: "DELETE",
       headers: this.getHeaders(),
     });
 
     return this.handleResponse<ApiResponse<{ message: string }>>(response);
   }
 
-  async hardDeleteUser(userId: string): Promise<ApiResponse<{ message: string }>> {
+  async hardDeleteUser(
+    userId: string,
+  ): Promise<ApiResponse<{ message: string }>> {
     const response = await fetch(`${this.baseURL}/admin/users/${userId}/hard`, {
-      method: 'DELETE',
+      method: "DELETE",
       headers: this.getHeaders(),
     });
 
@@ -401,28 +428,28 @@ class ApiService {
     specialization?: string;
     location?: string;
     search?: string;
-    status?: 'pending' | 'approved' | 'rejected' | 'all' | 'awaiting_schedule';
+    status?: "pending" | "approved" | "rejected" | "all" | "awaiting_schedule";
   }): Promise<ApiResponse<{ doctors: any[]; pagination: any }>> {
     const queryParams = new URLSearchParams();
-    if (params?.page) queryParams.append('page', params.page.toString());
-    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.page) queryParams.append("page", params.page.toString());
+    if (params?.limit) queryParams.append("limit", params.limit.toString());
     if (params?.specialization)
-      queryParams.append('specialization', params.specialization);
-    if (params?.location) queryParams.append('location', params.location);
-    if (params?.search) queryParams.append('search', params.search);
-    if (params?.status) queryParams.append('status', params.status);
+      queryParams.append("specialization", params.specialization);
+    if (params?.location) queryParams.append("location", params.location);
+    if (params?.search) queryParams.append("search", params.search);
+    if (params?.status) queryParams.append("status", params.status);
 
     const response = await fetch(
       `${this.baseURL}/doctors?${queryParams.toString()}`,
       {
-        method: 'GET',
+        method: "GET",
         headers: this.getHeaders(),
       },
     );
 
-    return this.handleResponse<ApiResponse<{ doctors: any[]; pagination: any }>>(
-      response,
-    );
+    return this.handleResponse<
+      ApiResponse<{ doctors: any[]; pagination: any }>
+    >(response);
   }
 
   async getDoctorById(
@@ -431,13 +458,13 @@ class ApiService {
   ): Promise<ApiResponse<User>> {
     const queryParams = new URLSearchParams();
     if (includePending) {
-      queryParams.append('includePending', 'true');
+      queryParams.append("includePending", "true");
     }
 
     const response = await fetch(
       `${this.baseURL}/doctors/${id}?${queryParams.toString()}`,
       {
-        method: 'GET',
+        method: "GET",
         headers: this.getHeaders(),
       },
     );
@@ -449,17 +476,17 @@ class ApiService {
     doctorId: string,
     startDate?: string,
     endDate?: string,
-    type?: 'video' | 'home-visit',
+    type?: "video" | "home-visit",
   ): Promise<ApiResponse<any>> {
     const queryParams = new URLSearchParams();
-    if (startDate) queryParams.append('startDate', startDate);
-    if (endDate) queryParams.append('endDate', endDate);
-    if (type) queryParams.append('type', type);
+    if (startDate) queryParams.append("startDate", startDate);
+    if (endDate) queryParams.append("endDate", endDate);
+    if (type) queryParams.append("type", type);
 
     const response = await fetch(
       `${this.baseURL}/doctors/${doctorId}/availability?${queryParams.toString()}`,
       {
-        method: 'GET',
+        method: "GET",
         headers: this.getHeaders(),
       },
     );
@@ -473,14 +500,17 @@ class ApiService {
       date: string;
       timeSlots: string[];
       isAvailable: boolean;
-      type: 'video' | 'home-visit';
+      type: "video" | "home-visit";
     }[],
   ): Promise<ApiResponse<any>> {
-    const response = await fetch(`${this.baseURL}/admin/doctors/${doctorId}/availability`, {
-      method: 'PUT',
-      headers: this.getHeaders(),
-      body: JSON.stringify({ availability }),
-    });
+    const response = await fetch(
+      `${this.baseURL}/admin/doctors/${doctorId}/availability`,
+      {
+        method: "PUT",
+        headers: this.getHeaders(),
+        body: JSON.stringify({ availability }),
+      },
+    );
 
     return this.handleResponse<ApiResponse<any>>(response);
   }
@@ -490,7 +520,7 @@ class ApiService {
     data: Partial<User>,
   ): Promise<ApiResponse<User>> {
     const response = await fetch(`${this.baseURL}/doctors/${id}`, {
-      method: 'PUT',
+      method: "PUT",
       headers: this.getHeaders(),
       body: JSON.stringify(data),
     });
@@ -498,25 +528,35 @@ class ApiService {
     return this.handleResponse<ApiResponse<User>>(response);
   }
 
-  async uploadLicenseDocument(
-    file: File,
-  ): Promise<ApiResponse<{ filePath: string; fileName: string; fileSize: number; mimeType: string }>> {
+  async uploadLicenseDocument(file: File): Promise<
+    ApiResponse<{
+      filePath: string;
+      fileName: string;
+      fileSize: number;
+      mimeType: string;
+    }>
+  > {
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append("file", file);
 
     const headers: HeadersInit = {};
     if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
+      headers["Authorization"] = `Bearer ${this.token}`;
     }
 
     const response = await fetch(`${this.baseURL}/upload/license`, {
-      method: 'POST',
+      method: "POST",
       headers,
       body: formData,
     });
 
     return this.handleResponse<
-      ApiResponse<{ filePath: string; fileName: string; fileSize: number; mimeType: string }>
+      ApiResponse<{
+        filePath: string;
+        fileName: string;
+        fileSize: number;
+        mimeType: string;
+      }>
     >(response);
   }
 
@@ -524,15 +564,15 @@ class ApiService {
     file: File,
   ): Promise<ApiResponse<{ url: string; publicId: string }>> {
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append("file", file);
 
     const headers: HeadersInit = {};
     if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
+      headers["Authorization"] = `Bearer ${this.token}`;
     }
 
     const response = await fetch(`${this.baseURL}/uploads/image`, {
-      method: 'POST',
+      method: "POST",
       headers,
       body: formData,
     });
@@ -545,7 +585,7 @@ class ApiService {
   // Stats endpoint
   async getStats(): Promise<ApiResponse<any>> {
     const response = await fetch(`${this.baseURL}/admin/stats`, {
-      method: 'GET',
+      method: "GET",
       headers: this.getHeaders(),
     });
 
@@ -559,33 +599,33 @@ class ApiService {
     specialization?: string;
     location?: string;
     search?: string;
-    status?: 'pending' | 'approved' | 'rejected' | 'all';
+    status?: "pending" | "approved" | "rejected" | "all";
   }): Promise<ApiResponse<{ doctors: any[]; pagination: any }>> {
     const queryParams = new URLSearchParams();
-    if (params?.page) queryParams.append('page', params.page.toString());
-    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.page) queryParams.append("page", params.page.toString());
+    if (params?.limit) queryParams.append("limit", params.limit.toString());
     if (params?.specialization)
-      queryParams.append('specialization', params.specialization);
-    if (params?.location) queryParams.append('location', params.location);
-    if (params?.search) queryParams.append('search', params.search);
-    if (params?.status) queryParams.append('status', params.status);
+      queryParams.append("specialization", params.specialization);
+    if (params?.location) queryParams.append("location", params.location);
+    if (params?.search) queryParams.append("search", params.search);
+    if (params?.status) queryParams.append("status", params.status);
 
     const response = await fetch(
       `${this.baseURL}/specializations?${queryParams.toString()}`,
       {
-        method: 'GET',
+        method: "GET",
         headers: this.getHeaders(),
       },
     );
 
-    return this.handleResponse<ApiResponse<{ doctors: any[]; pagination: any }>>(
-      response,
-    );
+    return this.handleResponse<
+      ApiResponse<{ doctors: any[]; pagination: any }>
+    >(response);
   }
 
   async getPublicSpecializations(): Promise<ApiResponse<Specialization[]>> {
     const response = await fetch(`${this.baseURL}/specializations`, {
-      method: 'GET',
+      method: "GET",
       headers: this.getHeaders(),
     });
 
@@ -594,7 +634,7 @@ class ApiService {
 
   async getSpecializationsAdmin(): Promise<ApiResponse<Specialization[]>> {
     const response = await fetch(`${this.baseURL}/specializations/admin`, {
-      method: 'GET',
+      method: "GET",
       headers: this.getHeaders(),
     });
 
@@ -608,7 +648,7 @@ class ApiService {
     symptoms?: string[];
   }): Promise<ApiResponse<Specialization>> {
     const response = await fetch(`${this.baseURL}/specializations`, {
-      method: 'POST',
+      method: "POST",
       headers: this.getHeaders(),
       body: JSON.stringify(data),
     });
@@ -623,7 +663,7 @@ class ApiService {
     const response = await fetch(
       `${this.baseURL}/specializations/${id}/toggle?isActive=${isActive}`,
       {
-        method: 'PATCH',
+        method: "PATCH",
         headers: this.getHeaders(),
       },
     );
@@ -633,10 +673,15 @@ class ApiService {
 
   async updateSpecialization(
     id: string,
-    data: { name?: string; description?: string; isActive?: boolean; symptoms?: string[] },
+    data: {
+      name?: string;
+      description?: string;
+      isActive?: boolean;
+      symptoms?: string[];
+    },
   ): Promise<ApiResponse<Specialization>> {
     const response = await fetch(`${this.baseURL}/specializations/${id}`, {
-      method: 'PATCH',
+      method: "PATCH",
       headers: this.getHeaders(),
       body: JSON.stringify(data),
     });
@@ -646,7 +691,7 @@ class ApiService {
 
   async deleteSpecialization(id: string): Promise<ApiResponse<null>> {
     const response = await fetch(`${this.baseURL}/specializations/${id}`, {
-      method: 'DELETE',
+      method: "DELETE",
       headers: this.getHeaders(),
     });
 
@@ -654,15 +699,19 @@ class ApiService {
   }
 
   // Create super admin (public endpoint for initial setup)
-  async createSuperAdmin(): Promise<ApiResponse<{ email: string; password: string; note?: string }>> {
+  async createSuperAdmin(): Promise<
+    ApiResponse<{ email: string; password: string; note?: string }>
+  > {
     const response = await fetch(`${this.baseURL}/admin/create-superadmin`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
     });
 
-    return this.handleResponse<ApiResponse<{ email: string; password: string; note?: string }>>(response);
+    return this.handleResponse<
+      ApiResponse<{ email: string; password: string; note?: string }>
+    >(response);
   }
 
   // Admin Appointments Management
@@ -672,29 +721,8 @@ class ApiService {
     status?: string;
     paymentStatus?: string;
     search?: string;
-  }): Promise<ApiResponse<{
-    appointments: any[];
-    pagination: {
-      page: number;
-      limit: number;
-      total: number;
-      totalPages: number;
-    };
-  }>> {
-    const queryParams = new URLSearchParams();
-    
-    if (params.page) queryParams.append('page', params.page.toString());
-    if (params.limit) queryParams.append('limit', params.limit.toString());
-    if (params.status && params.status !== 'all') queryParams.append('status', params.status);
-    if (params.paymentStatus && params.paymentStatus !== 'all') queryParams.append('paymentStatus', params.paymentStatus);
-    if (params.search) queryParams.append('search', params.search);
-
-    const response = await fetch(`${this.baseURL}/admin/appointments?${queryParams.toString()}`, {
-      method: 'GET',
-      headers: this.getHeaders(),
-    });
-
-    return this.handleResponse<ApiResponse<{
+  }): Promise<
+    ApiResponse<{
       appointments: any[];
       pagination: {
         page: number;
@@ -702,14 +730,47 @@ class ApiService {
         total: number;
         totalPages: number;
       };
-    }>>(response);
+    }>
+  > {
+    const queryParams = new URLSearchParams();
+
+    if (params.page) queryParams.append("page", params.page.toString());
+    if (params.limit) queryParams.append("limit", params.limit.toString());
+    if (params.status && params.status !== "all")
+      queryParams.append("status", params.status);
+    if (params.paymentStatus && params.paymentStatus !== "all")
+      queryParams.append("paymentStatus", params.paymentStatus);
+    if (params.search) queryParams.append("search", params.search);
+
+    const response = await fetch(
+      `${this.baseURL}/admin/appointments?${queryParams.toString()}`,
+      {
+        method: "GET",
+        headers: this.getHeaders(),
+      },
+    );
+
+    return this.handleResponse<
+      ApiResponse<{
+        appointments: any[];
+        pagination: {
+          page: number;
+          limit: number;
+          total: number;
+          totalPages: number;
+        };
+      }>
+    >(response);
   }
 
   async getAppointmentById(appointmentId: string): Promise<ApiResponse<any>> {
-    const response = await fetch(`${this.baseURL}/appointments/${appointmentId}`, {
-      method: 'GET',
-      headers: this.getHeaders(),
-    });
+    const response = await fetch(
+      `${this.baseURL}/appointments/${appointmentId}`,
+      {
+        method: "GET",
+        headers: this.getHeaders(),
+      },
+    );
 
     return this.handleResponse<ApiResponse<any>>(response);
   }
@@ -719,35 +780,47 @@ class ApiService {
     newDate: string,
     newTime: string,
   ): Promise<ApiResponse<any>> {
-    const response = await fetch(`${this.baseURL}/appointments/${appointmentId}/reschedule`, {
-      method: 'PUT',
-      headers: this.getHeaders(),
-      body: JSON.stringify({ newDate, newTime }),
-    });
+    const response = await fetch(
+      `${this.baseURL}/appointments/${appointmentId}/reschedule`,
+      {
+        method: "PUT",
+        headers: this.getHeaders(),
+        body: JSON.stringify({ newDate, newTime }),
+      },
+    );
 
     return this.handleResponse<ApiResponse<any>>(response);
   }
 
-  async updateAppointmentStatus(appointmentId: string, status: string): Promise<ApiResponse<any>> {
-    const response = await fetch(`${this.baseURL}/admin/appointments/${appointmentId}/status`, {
-      method: 'PUT',
-      headers: this.getHeaders(),
-      body: JSON.stringify({ status }),
-    });
+  async updateAppointmentStatus(
+    appointmentId: string,
+    status: string,
+  ): Promise<ApiResponse<any>> {
+    const response = await fetch(
+      `${this.baseURL}/admin/appointments/${appointmentId}/status`,
+      {
+        method: "PUT",
+        headers: this.getHeaders(),
+        body: JSON.stringify({ status }),
+      },
+    );
 
     return this.handleResponse<ApiResponse<any>>(response);
   }
 
   async updateDoctorApproval(
-    doctorId: string, 
-    approvalStatus: 'pending' | 'approved' | 'rejected', 
-    isActive?: boolean
+    doctorId: string,
+    approvalStatus: "pending" | "approved" | "rejected",
+    isActive?: boolean,
   ): Promise<ApiResponse<any>> {
-    const response = await fetch(`${this.baseURL}/admin/doctors/${doctorId}/approval`, {
-      method: 'PUT',
-      headers: this.getHeaders(),
-      body: JSON.stringify({ approvalStatus, isActive }),
-    });
+    const response = await fetch(
+      `${this.baseURL}/admin/doctors/${doctorId}/approval`,
+      {
+        method: "PUT",
+        headers: this.getHeaders(),
+        body: JSON.stringify({ approvalStatus, isActive }),
+      },
+    );
 
     return this.handleResponse<ApiResponse<any>>(response);
   }
@@ -755,7 +828,7 @@ class ApiService {
   // Advisors endpoints
   async getAdvisors(): Promise<ApiResponse<any[]>> {
     const response = await fetch(`${this.baseURL}/advisors`, {
-      method: 'GET',
+      method: "GET",
       headers: this.getHeaders(),
     });
 
@@ -764,7 +837,7 @@ class ApiService {
 
   async getActiveAdvisors(): Promise<ApiResponse<any[]>> {
     const response = await fetch(`${this.baseURL}/advisors/active`, {
-      method: 'GET',
+      method: "GET",
       headers: this.getHeaders(),
     });
 
@@ -778,7 +851,7 @@ class ApiService {
     isActive?: boolean;
   }): Promise<ApiResponse<any>> {
     const response = await fetch(`${this.baseURL}/advisors`, {
-      method: 'POST',
+      method: "POST",
       headers: this.getHeaders(),
       body: JSON.stringify(data),
     });
@@ -791,7 +864,7 @@ class ApiService {
     data: { bio?: string; order?: number; isActive?: boolean },
   ): Promise<ApiResponse<any>> {
     const response = await fetch(`${this.baseURL}/advisors/${id}`, {
-      method: 'PUT',
+      method: "PUT",
       headers: this.getHeaders(),
       body: JSON.stringify(data),
     });
@@ -801,7 +874,7 @@ class ApiService {
 
   async deleteAdvisor(id: string): Promise<ApiResponse<any>> {
     const response = await fetch(`${this.baseURL}/advisors/${id}`, {
-      method: 'DELETE',
+      method: "DELETE",
       headers: this.getHeaders(),
     });
 
@@ -809,69 +882,113 @@ class ApiService {
   }
 
   // Terms endpoints
-  async getTerms(type: 'cancellation' | 'service' | 'privacy' | 'contract' | 'usage' | 'doctor-cancellation' | 'doctor-service'): Promise<ApiResponse<{ type: string; content: string; updatedAt?: string }>> {
+  async getTerms(
+    type:
+      | "cancellation"
+      | "service"
+      | "privacy"
+      | "contract"
+      | "usage"
+      | "doctor-cancellation"
+      | "doctor-service",
+  ): Promise<
+    ApiResponse<{ type: string; content: string; updatedAt?: string }>
+  > {
     const response = await fetch(`${this.baseURL}/terms/${type}`, {
-      method: 'GET',
+      method: "GET",
       headers: this.getHeaders(),
     });
 
-    return this.handleResponse<ApiResponse<{ type: string; content: string; updatedAt?: string }>>(response);
+    return this.handleResponse<
+      ApiResponse<{ type: string; content: string; updatedAt?: string }>
+    >(response);
   }
 
-  async updateTerms(type: 'cancellation' | 'service' | 'privacy' | 'contract' | 'usage' | 'doctor-cancellation' | 'doctor-service', content: string): Promise<ApiResponse<{ type: string; content: string }>> {
+  async updateTerms(
+    type:
+      | "cancellation"
+      | "service"
+      | "privacy"
+      | "contract"
+      | "usage"
+      | "doctor-cancellation"
+      | "doctor-service",
+    content: string,
+  ): Promise<ApiResponse<{ type: string; content: string }>> {
     const response = await fetch(`${this.baseURL}/terms/${type}`, {
-      method: 'PUT',
+      method: "PUT",
       headers: this.getHeaders(),
       body: JSON.stringify({ content }),
     });
 
-    return this.handleResponse<ApiResponse<{ type: string; content: string }>>(response);
+    return this.handleResponse<ApiResponse<{ type: string; content: string }>>(
+      response,
+    );
   }
 
-  async getAllTerms(): Promise<ApiResponse<{ type: string; content: string; updatedAt?: string }[]>> {
+  async getAllTerms(): Promise<
+    ApiResponse<{ type: string; content: string; updatedAt?: string }[]>
+  > {
     const response = await fetch(`${this.baseURL}/terms`, {
-      method: 'GET',
+      method: "GET",
       headers: this.getHeaders(),
     });
 
-    return this.handleResponse<ApiResponse<{ type: string; content: string; updatedAt?: string }[]>>(response);
+    return this.handleResponse<
+      ApiResponse<{ type: string; content: string; updatedAt?: string }[]>
+    >(response);
   }
 
   // Help Center endpoints
-  async getHelpCenter(): Promise<ApiResponse<{
-    faqs: { question: string; answer: string; isActive?: boolean; order?: number }[];
-    contactInfo: {
-      phone?: string;
-      whatsapp?: string;
-      email?: string;
-      website?: string;
-      address?: string;
-      workingHours?: string;
-    };
-    updatedAt?: string;
-  }>> {
+  async getHelpCenter(): Promise<
+    ApiResponse<{
+      faqs: {
+        question: string;
+        answer: string;
+        isActive?: boolean;
+        order?: number;
+      }[];
+      contactInfo: {
+        phone?: string;
+        whatsapp?: string;
+        email?: string;
+        website?: string;
+        address?: string;
+        workingHours?: string;
+      };
+      updatedAt?: string;
+    }>
+  > {
     const response = await fetch(`${this.baseURL}/help-center`, {
-      method: 'GET',
+      method: "GET",
       headers: this.getHeaders(),
     });
 
     return this.handleResponse(response);
   }
 
-  async getHelpCenterAdmin(): Promise<ApiResponse<{
-    faqs: { question: string; answer: string; isActive: boolean; order: number; role?: 'doctor' | 'patient' }[];
-    contactInfo: {
-      phone?: string;
-      whatsapp?: string;
-      email?: string;
-      website?: string;
-      address?: string;
-      workingHours?: string;
-    };
-    updatedAt?: string;
-  }>> {
+  async getHelpCenterAdmin(): Promise<
+    ApiResponse<{
+      faqs: {
+        question: string;
+        answer: string;
+        isActive: boolean;
+        order: number;
+        role?: "doctor" | "patient";
+      }[];
+      contactInfo: {
+        phone?: string;
+        whatsapp?: string;
+        email?: string;
+        website?: string;
+        address?: string;
+        workingHours?: string;
+      };
+      updatedAt?: string;
+    }>
+  > {
     const response = await fetch(`${this.baseURL}/help-center/admin`, {
-      method: 'GET',
+      method: "GET",
       headers: this.getHeaders(),
     });
 
@@ -879,7 +996,13 @@ class ApiService {
   }
 
   async updateHelpCenter(data: {
-    faqs?: { question: string; answer: string; isActive?: boolean; order?: number; role?: 'doctor' | 'patient' }[];
+    faqs?: {
+      question: string;
+      answer: string;
+      isActive?: boolean;
+      order?: number;
+      role?: "doctor" | "patient";
+    }[];
     contactInfo?: {
       phone?: string;
       whatsapp?: string;
@@ -890,7 +1013,7 @@ class ApiService {
     };
   }): Promise<ApiResponse<any>> {
     const response = await fetch(`${this.baseURL}/help-center`, {
-      method: 'PUT',
+      method: "PUT",
       headers: this.getHeaders(),
       body: JSON.stringify(data),
     });
@@ -907,18 +1030,19 @@ class ApiService {
     includeProducts?: boolean;
   }): Promise<ApiResponse<ShopCategory[]>> {
     const queryParams = new URLSearchParams();
-    if (params?.type) queryParams.append('type', params.type);
-    if (params?.search) queryParams.append('search', params.search);
-    if (typeof params?.isActive === 'boolean')
-      queryParams.append('isActive', String(params.isActive));
-    if (params?.parentCategory) queryParams.append('parentCategory', params.parentCategory);
+    if (params?.type) queryParams.append("type", params.type);
+    if (params?.search) queryParams.append("search", params.search);
+    if (typeof params?.isActive === "boolean")
+      queryParams.append("isActive", String(params.isActive));
+    if (params?.parentCategory)
+      queryParams.append("parentCategory", params.parentCategory);
     if (params?.includeProducts)
-      queryParams.append('includeProducts', String(params.includeProducts));
+      queryParams.append("includeProducts", String(params.includeProducts));
 
     const response = await fetch(
       `${this.baseURL}/shop/categories?${queryParams.toString()}`,
       {
-        method: 'GET',
+        method: "GET",
         headers: this.getHeaders(),
       },
     );
@@ -927,21 +1051,21 @@ class ApiService {
   }
 
   async createShopCategory(
-    data: Pick<ShopCategory, 'name' | 'type'> &
+    data: Pick<ShopCategory, "name" | "type"> &
       Partial<
         Pick<
           ShopCategory,
-          | 'description'
-          | 'imageUrl'
-          | 'isActive'
-          | 'order'
-          | 'parentCategory'
-          | 'metadata'
+          | "description"
+          | "imageUrl"
+          | "isActive"
+          | "order"
+          | "parentCategory"
+          | "metadata"
         >
       >,
   ): Promise<ApiResponse<ShopCategory>> {
     const response = await fetch(`${this.baseURL}/admin/shop/categories`, {
-      method: 'POST',
+      method: "POST",
       headers: this.getHeaders(),
       body: JSON.stringify(data),
     });
@@ -956,7 +1080,7 @@ class ApiService {
     const response = await fetch(
       `${this.baseURL}/admin/shop/categories/${id}`,
       {
-        method: 'PATCH',
+        method: "PATCH",
         headers: this.getHeaders(),
         body: JSON.stringify(data),
       },
@@ -965,11 +1089,13 @@ class ApiService {
     return this.handleResponse<ApiResponse<ShopCategory>>(response);
   }
 
-  async deleteShopCategory(id: string): Promise<ApiResponse<{ message: string }>> {
+  async deleteShopCategory(
+    id: string,
+  ): Promise<ApiResponse<{ message: string }>> {
     const response = await fetch(
       `${this.baseURL}/admin/shop/categories/${id}`,
       {
-        method: 'DELETE',
+        method: "DELETE",
         headers: this.getHeaders(),
       },
     );
@@ -987,22 +1113,27 @@ class ApiService {
   }): Promise<
     ApiResponse<{
       items: ShopProduct[];
-      pagination: { page: number; limit: number; total: number; totalPages: number };
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+      };
     }>
   > {
     const queryParams = new URLSearchParams();
-    if (params?.type) queryParams.append('type', params.type);
-    if (params?.category) queryParams.append('category', params.category);
-    if (params?.search) queryParams.append('search', params.search);
-    if (typeof params?.isActive === 'boolean')
-      queryParams.append('isActive', String(params.isActive));
-    if (params?.page) queryParams.append('page', params.page.toString());
-    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.type) queryParams.append("type", params.type);
+    if (params?.category) queryParams.append("category", params.category);
+    if (params?.search) queryParams.append("search", params.search);
+    if (typeof params?.isActive === "boolean")
+      queryParams.append("isActive", String(params.isActive));
+    if (params?.page) queryParams.append("page", params.page.toString());
+    if (params?.limit) queryParams.append("limit", params.limit.toString());
 
     const response = await fetch(
       `${this.baseURL}/shop/products?${queryParams.toString()}`,
       {
-        method: 'GET',
+        method: "GET",
         headers: this.getHeaders(),
       },
     );
@@ -1010,35 +1141,40 @@ class ApiService {
     return this.handleResponse<
       ApiResponse<{
         items: ShopProduct[];
-        pagination: { page: number; limit: number; total: number; totalPages: number };
+        pagination: {
+          page: number;
+          limit: number;
+          total: number;
+          totalPages: number;
+        };
       }>
     >(response);
   }
 
   async createShopProduct(
-    data: Pick<ShopProduct, 'name' | 'type'> &
+    data: Pick<ShopProduct, "name" | "type"> &
       Partial<
         Pick<
           ShopProduct,
-          | 'icdCode'
-          | 'description'
-          | 'price'
-          | 'currency'
-          | 'discountPercent'
-          | 'stock'
-          | 'unit'
-          | 'category'
-          | 'isActive'
-          | 'isFeatured'
-          | 'imageUrl'
-          | 'order'
-          | 'metadata'
-          | 'clinic'
+          | "icdCode"
+          | "description"
+          | "price"
+          | "currency"
+          | "discountPercent"
+          | "stock"
+          | "unit"
+          | "category"
+          | "isActive"
+          | "isFeatured"
+          | "imageUrl"
+          | "order"
+          | "metadata"
+          | "clinic"
         >
       >,
   ): Promise<ApiResponse<ShopProduct>> {
     const response = await fetch(`${this.baseURL}/admin/shop/products`, {
-      method: 'POST',
+      method: "POST",
       headers: this.getHeaders(),
       body: JSON.stringify(data),
     });
@@ -1051,7 +1187,7 @@ class ApiService {
     data: Partial<ShopProduct>,
   ): Promise<ApiResponse<ShopProduct>> {
     const response = await fetch(`${this.baseURL}/admin/shop/products/${id}`, {
-      method: 'PATCH',
+      method: "PATCH",
       headers: this.getHeaders(),
       body: JSON.stringify(data),
     });
@@ -1059,9 +1195,11 @@ class ApiService {
     return this.handleResponse<ApiResponse<ShopProduct>>(response);
   }
 
-  async deleteShopProduct(id: string): Promise<ApiResponse<{ message: string }>> {
+  async deleteShopProduct(
+    id: string,
+  ): Promise<ApiResponse<{ message: string }>> {
     const response = await fetch(`${this.baseURL}/admin/shop/products/${id}`, {
-      method: 'DELETE',
+      method: "DELETE",
       headers: this.getHeaders(),
     });
 
@@ -1071,14 +1209,14 @@ class ApiService {
   // Clinic endpoints
   async getClinics(isActive?: boolean): Promise<ApiResponse<Clinic[]>> {
     const queryParams = new URLSearchParams();
-    if (typeof isActive === 'boolean') {
-      queryParams.append('isActive', String(isActive));
+    if (typeof isActive === "boolean") {
+      queryParams.append("isActive", String(isActive));
     }
 
     const response = await fetch(
       `${this.baseURL}/admin/shop/clinics?${queryParams.toString()}`,
       {
-        method: 'GET',
+        method: "GET",
         headers: this.getHeaders(),
       },
     );
@@ -1088,7 +1226,7 @@ class ApiService {
 
   async getClinicById(id: string): Promise<ApiResponse<Clinic>> {
     const response = await fetch(`${this.baseURL}/admin/shop/clinics/${id}`, {
-      method: 'GET',
+      method: "GET",
       headers: this.getHeaders(),
     });
 
@@ -1103,7 +1241,7 @@ class ApiService {
     isActive?: boolean;
   }): Promise<ApiResponse<Clinic>> {
     const response = await fetch(`${this.baseURL}/admin/shop/clinics`, {
-      method: 'POST',
+      method: "POST",
       headers: this.getHeaders(),
       body: JSON.stringify(data),
     });
@@ -1116,7 +1254,7 @@ class ApiService {
     data: Partial<Clinic>,
   ): Promise<ApiResponse<Clinic>> {
     const response = await fetch(`${this.baseURL}/admin/shop/clinics/${id}`, {
-      method: 'PATCH',
+      method: "PATCH",
       headers: this.getHeaders(),
       body: JSON.stringify(data),
     });
@@ -1126,7 +1264,7 @@ class ApiService {
 
   async deleteClinic(id: string): Promise<ApiResponse<{ message: string }>> {
     const response = await fetch(`${this.baseURL}/admin/shop/clinics/${id}`, {
-      method: 'DELETE',
+      method: "DELETE",
       headers: this.getHeaders(),
     });
 
@@ -1168,33 +1306,34 @@ class ApiService {
     }>
   > {
     const queryParams = new URLSearchParams();
-    if (params?.limit) queryParams.append('limit', params.limit.toString());
-    if (params?.skip) queryParams.append('skip', params.skip.toString());
-    if (params?.unreadOnly) queryParams.append('unreadOnly', 'true');
-    if (params?.type) queryParams.append('type', params.type);
+    if (params?.limit) queryParams.append("limit", params.limit.toString());
+    if (params?.skip) queryParams.append("skip", params.skip.toString());
+    if (params?.unreadOnly) queryParams.append("unreadOnly", "true");
+    if (params?.type) queryParams.append("type", params.type);
 
     const queryString = queryParams.toString();
-    const endpoint = `/notifications${queryString ? `?${queryString}` : ''}`;
+    const endpoint = `/notifications${queryString ? `?${queryString}` : ""}`;
 
     return this.apiCall(endpoint);
   }
 
   async getUnreadNotificationCount(): Promise<ApiResponse<{ count: number }>> {
-    return this.apiCall('/notifications/unread-count');
+    return this.apiCall("/notifications/unread-count");
   }
 
-  async markNotificationAsRead(notificationId: string): Promise<ApiResponse<void>> {
+  async markNotificationAsRead(
+    notificationId: string,
+  ): Promise<ApiResponse<void>> {
     return this.apiCall(`/notifications/mark-read/${notificationId}`, {
-      method: 'POST',
+      method: "POST",
     });
   }
 
   async markAllNotificationsAsRead(): Promise<ApiResponse<void>> {
-    return this.apiCall('/notifications/mark-all-read', {
-      method: 'POST',
+    return this.apiCall("/notifications/mark-all-read", {
+      method: "POST",
     });
   }
 }
 
 export const apiService = new ApiService();
-

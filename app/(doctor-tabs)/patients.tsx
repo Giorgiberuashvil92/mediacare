@@ -1110,32 +1110,6 @@ export default function DoctorPatients() {
         </View>
 
         {/* Type Filter */}
-        <View style={styles.typeFilterSection}>
-          <Text style={styles.typeFilterTitle}>კონსულტაციის ტიპი</Text>
-          <View style={styles.typeFilterRow}>
-            <TouchableOpacity
-              style={[
-                styles.typeFilterCard,
-                filterType === "video" && styles.typeFilterCardActiveVideo,
-              ]}
-              onPress={() => setFilterType("video")}
-            >
-              <Ionicons
-                name="videocam-outline"
-                size={20}
-                color={filterType === "video" ? "#FFFFFF" : "#2563EB"}
-              />
-              <Text
-                style={[
-                  styles.typeFilterText,
-                  filterType === "video" && styles.typeFilterTextActive,
-                ]}
-              >
-                ვიდეო
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
 
         {/* Consultations List */}
         <View style={styles.listSection}>
@@ -1161,11 +1135,7 @@ export default function DoctorPatients() {
 
               return (
                 <View key={consultation.id} style={styles.consultationCard}>
-                  <TouchableOpacity
-                    style={{ flex: 1 }}
-                    onPress={() => toggleConsultationExpansion(consultation)}
-                    activeOpacity={0.7}
-                  >
+                  <View style={{ flex: 1 }}>
                     <View style={styles.consultationHeader}>
                       <View style={styles.patientInfo}>
                         <Image
@@ -1237,124 +1207,129 @@ export default function DoctorPatients() {
                           {getStatusLabel(consultation.status)}
                         </Text>
                       </View>
-                      <TouchableOpacity
-                        onPress={() =>
-                          toggleConsultationExpansion(consultation)
-                        }
-                        style={styles.expandButton}
-                      >
-                        <Ionicons
-                          name={isExpanded ? "chevron-up" : "chevron-down"}
-                          size={20}
-                          color="#6B7280"
-                        />
-                      </TouchableOpacity>
                     </View>
-                  </TouchableOpacity>
 
-                  <View style={styles.consultationBody}>
-                    <View style={styles.datetimeRow}>
-                      <View style={styles.infoRow}>
-                        <Ionicons
-                          name="calendar-outline"
-                          size={16}
-                          color="#6B7280"
-                        />
-                        <Text style={styles.infoText}>
-                          {(consultation as any).date ||
-                            (consultation as any).appointmentDate?.split?.(
-                              "T",
-                            )?.[0] ||
-                            "—"}
-                        </Text>
-                      </View>
-                      <View style={styles.divider} />
-                      <View style={styles.infoRow}>
-                        <Ionicons
-                          name="time-outline"
-                          size={16}
-                          color="#6B7280"
-                        />
-                        <Text style={styles.infoText}>
-                          {(consultation as any).time ||
-                            (consultation as any).appointmentTime ||
-                            "—"}
-                        </Text>
-                      </View>
-                    </View>
-                    {/* მხოლოდ problem (ჩივილები) - სიმპტომი არ ვაჩვენოთ აქ */}
-                    {consultation.status !== "completed" &&
-                    consultation.patientDetails?.problem ? (
-                      <View style={styles.infoRow}>
-                        <Ionicons
-                          name="chatbubble-ellipses-outline"
-                          size={16}
-                          color="#6B7280"
-                        />
-                        <Text style={styles.infoText} numberOfLines={2}>
-                          <Text style={{ fontWeight: "600", color: "#374151" }}>
-                            ჩივილები:{" "}
-                          </Text>
-                          {consultation.patientDetails.problem}
-                        </Text>
-                      </View>
-                    ) : null}
-                    {consultation.type === "home-visit" &&
-                      (consultation as any).visitAddress && (
-                        <View style={styles.symptomsRow}>
+                    <TouchableOpacity
+                      onPress={() => toggleConsultationExpansion(consultation)}
+                      style={styles.expandDetailsRow}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.expandDetailsButtonText}>
+                        {isExpanded ? "დეტალების დაფარვა" : "დეტალების ნახვა"}
+                      </Text>
+                      <Ionicons
+                        name={isExpanded ? "chevron-up" : "chevron-down"}
+                        size={18}
+                        color="#06B6D4"
+                      />
+                    </TouchableOpacity>
+
+                    <View style={styles.consultationBody}>
+                      <View style={styles.datetimeRow}>
+                        <View style={styles.infoRow}>
                           <Ionicons
-                            name="home-outline"
+                            name="calendar-outline"
                             size={16}
                             color="#6B7280"
                           />
-                          <Text style={styles.symptomsText}>
-                            {(consultation as any).visitAddress}
+                          <Text style={styles.infoText}>
+                            {(consultation as any).date ||
+                              (consultation as any).appointmentDate?.split?.(
+                                "T",
+                              )?.[0] ||
+                              "—"}
                           </Text>
                         </View>
-                      )}
-                    {/* File indicator - show if user has uploaded files or waiting */}
-                    {/* Diagnosis - სიმპტომები არ ვაჩვენოთ აქ, მხოლოდ problem (ჩივილები) ზემოთ */}
-                    {consultation.type !== "home-visit" && (
-                      <>
-                        {consultation.status === "completed" ? (
-                          <>
-                            {(consultation.consultationSummary?.diagnosis ||
-                              consultation.diagnosis) && (
-                              <View style={styles.infoRow}>
-                                <MaterialCommunityIcons
-                                  name="file-document"
-                                  size={16}
-                                  color="#10B981"
-                                />
-                                <Text style={styles.infoText}>
-                                  დიაგნოზი ჩანს დეტალებში
-                                </Text>
-                              </View>
-                            )}
-                          </>
-                        ) : (
-                          <>
-                            {(consultation.consultationSummary?.diagnosis ||
-                              consultation.diagnosis) && (
-                              <View style={styles.diagnosisRow}>
-                                <MaterialCommunityIcons
-                                  name="file-document"
-                                  size={16}
-                                  color="#10B981"
-                                />
-                                <Text
-                                  style={styles.diagnosisText}
-                                  numberOfLines={isExpanded ? undefined : 2}
-                                >
-                                  {consultation.consultationSummary
-                                    ?.diagnosis || consultation.diagnosis}
-                                </Text>
-                              </View>
-                            )}
-                          </>
+                        <View style={styles.divider} />
+                        <View style={styles.infoRow}>
+                          <Ionicons
+                            name="time-outline"
+                            size={16}
+                            color="#6B7280"
+                          />
+                          <Text style={styles.infoText}>
+                            {(consultation as any).time ||
+                              (consultation as any).appointmentTime ||
+                              "—"}
+                          </Text>
+                        </View>
+                      </View>
+                      {/* მხოლოდ problem (ჩივილები) - სიმპტომი არ ვაჩვენოთ აქ */}
+                      {consultation.status !== "completed" &&
+                      consultation.patientDetails?.problem ? (
+                        <View style={styles.infoRow}>
+                          <Ionicons
+                            name="chatbubble-ellipses-outline"
+                            size={16}
+                            color="#6B7280"
+                          />
+                          <Text style={styles.infoText} numberOfLines={2}>
+                            <Text
+                              style={{ fontWeight: "600", color: "#374151" }}
+                            >
+                              ჩივილები:{" "}
+                            </Text>
+                            {consultation.patientDetails.problem}
+                          </Text>
+                        </View>
+                      ) : null}
+                      {consultation.type === "home-visit" &&
+                        (consultation as any).visitAddress && (
+                          <View style={styles.symptomsRow}>
+                            <Ionicons
+                              name="home-outline"
+                              size={16}
+                              color="#6B7280"
+                            />
+                            <Text style={styles.symptomsText}>
+                              {(consultation as any).visitAddress}
+                            </Text>
+                          </View>
                         )}
-                      </>
-                    )}
+                      {/* File indicator - show if user has uploaded files or waiting */}
+                      {/* Diagnosis - სიმპტომები არ ვაჩვენოთ აქ, მხოლოდ problem (ჩივილები) ზემოთ */}
+                      {consultation.type !== "home-visit" && (
+                        <>
+                          {consultation.status === "completed" ? (
+                            <>
+                              {(consultation.consultationSummary?.diagnosis ||
+                                consultation.diagnosis) && (
+                                <View style={styles.infoRow}>
+                                  <MaterialCommunityIcons
+                                    name="file-document"
+                                    size={16}
+                                    color="#10B981"
+                                  />
+                                  <Text style={styles.infoText}>
+                                    დიაგნოზი ჩანს დეტალებში
+                                  </Text>
+                                </View>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              {(consultation.consultationSummary?.diagnosis ||
+                                consultation.diagnosis) && (
+                                <View style={styles.diagnosisRow}>
+                                  <MaterialCommunityIcons
+                                    name="file-document"
+                                    size={16}
+                                    color="#10B981"
+                                  />
+                                  <Text
+                                    style={styles.diagnosisText}
+                                    numberOfLines={isExpanded ? undefined : 2}
+                                  >
+                                    {consultation.consultationSummary
+                                      ?.diagnosis || consultation.diagnosis}
+                                  </Text>
+                                </View>
+                              )}
+                            </>
+                          )}
+                        </>
+                      )}
+                    </View>
                   </View>
 
                   {/* Expanded Details */}
@@ -1394,7 +1369,7 @@ export default function DoctorPatients() {
 
                             <View style={styles.patientInfoRow}>
                               <Text style={styles.patientInfoLabel}>
-                                დაბადების თარიღი:
+                                ასაკი:
                               </Text>
                               <Text style={styles.patientInfoValue}>
                                 {(consultation as any).patientDetails
@@ -1714,33 +1689,7 @@ export default function DoctorPatients() {
                           )}
                         </View>
                       )}
-
-                      {/* Collapse Button */}
-                      <TouchableOpacity
-                        style={styles.viewDetailsButton}
-                        onPress={() =>
-                          toggleConsultationExpansion(consultation)
-                        }
-                      >
-                        <Text style={styles.viewDetailsButtonText}>
-                          დეტალების დაფარვა
-                        </Text>
-                        <Ionicons name="chevron-up" size={18} color="#0EA5E9" />
-                      </TouchableOpacity>
                     </View>
-                  )}
-
-                  {/* View Details Button */}
-                  {!isExpanded && (
-                    <TouchableOpacity
-                      style={styles.viewDetailsButton}
-                      onPress={() => toggleConsultationExpansion(consultation)}
-                    >
-                      <Text style={styles.viewDetailsButtonText}>
-                        მეტის ნახვა
-                      </Text>
-                      <Ionicons name="chevron-down" size={18} color="#0EA5E9" />
-                    </TouchableOpacity>
                   )}
 
                   <View style={styles.statusActionsRow}>
@@ -3178,7 +3127,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: 16,
+    marginBottom: 8,
   },
   patientInfo: {
     flexDirection: "row",
@@ -4057,8 +4006,18 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins-Bold",
     color: "#0EA5E9",
   },
-  expandButton: {
-    padding: 4,
+  expandDetailsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 10,
+    marginBottom: 8,
+  },
+  expandDetailsButtonText: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#06B6D4",
   },
   expandedSection: {
     marginTop: 12,
@@ -4195,23 +4154,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Poppins-Regular",
     color: "#6B7280",
-  },
-  viewDetailsButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginTop: 8,
-    borderRadius: 10,
-    backgroundColor: "#ECFEFF",
-    borderWidth: 1,
-    borderColor: "#BAE6FD",
-  },
-  viewDetailsButtonText: {
-    fontSize: 14,
-    fontFamily: "Poppins-SemiBold",
-    color: "#0369A1",
   },
 });

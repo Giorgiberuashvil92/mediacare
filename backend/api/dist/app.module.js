@@ -27,6 +27,7 @@ const profile_module_1 = require("./profile/profile.module");
 const shop_module_1 = require("./shop/shop.module");
 const specializations_module_1 = require("./specializations/specializations.module");
 const terms_module_1 = require("./terms/terms.module");
+const integrations_module_1 = require("./integrations/integrations.module");
 const upload_module_1 = require("./upload/upload.module");
 const moduleImports = [
     config_1.ConfigModule.forRoot({
@@ -46,6 +47,7 @@ const moduleImports = [
             limit: 10,
         },
     ]),
+    integrations_module_1.IntegrationsModule,
     auth_module_1.AuthModule,
     upload_module_1.UploadModule,
     cloudinary_module_1.CloudinaryModule,

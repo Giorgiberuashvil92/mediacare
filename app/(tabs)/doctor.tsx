@@ -16,6 +16,24 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+const formatGel = (n: unknown): string | null => {
+  if (n === null || n === undefined) return null;
+  const num = typeof n === "number" ? n : parseFloat(String(n));
+  if (Number.isNaN(num)) return null;
+  return `${num} ₾`;
+};
+
+const buildFeeSummary = (doctor: any): string | null => {
+  const video = formatGel(doctor.videoConsultationFee);
+  const home = formatGel(doctor.homeVisitFee);
+  const base = formatGel(doctor.consultationFee);
+  const parts: string[] = [];
+  if (video) parts.push(`ვიდეო ${video}`);
+  if (home) parts.push(`ბინაზე ${home}`);
+  if (parts.length > 0) return parts.join(" · ");
+  return base;
+};
+
 const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
   let imageSource;
   if (doctor.profileImage) {
@@ -28,6 +46,9 @@ const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
     imageSource = require("@/assets/images/doctors/doctor1.png");
   }
 
+  const feeSummary = buildFeeSummary(doctor);
+  const baseFee = formatGel(doctor.consultationFee);
+
   return {
     id: doctor.id, // Keep as string (MongoDB ObjectId)
     name: doctor.name || "",
@@ -39,10 +60,9 @@ const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
     image: imageSource,
     degrees: doctor.degrees || "",
     location: doctor.location || "",
-    consultationFee: doctor.consultationFee
-      ? `$${doctor.consultationFee}`
-      : undefined,
-    followUpFee: doctor.followUpFee ? `$${doctor.followUpFee}` : undefined,
+    feeSummary,
+    consultationFee: baseFee || undefined,
+    followUpFee: doctor.followUpFee ? `${doctor.followUpFee} ₾` : undefined,
     about: doctor.about || "", // This is "working language" from onboarding
     availabilityTypes: doctor.availabilityTypes || [], // Array of 'video' | 'home-visit'
   };
@@ -254,11 +274,23 @@ const Doctor = () => {
             {doctor.location}
           </Text>
         )}
-        <View style={styles.ratingRow}>
-          <Ionicons name="star" size={16} color="#F59E0B" />
-          <Text style={styles.ratingText}>
-            {doctor.rating ? doctor.rating.toFixed(1) : "0.0"}
-          </Text>
+        <View style={styles.ratingFeeRow}>
+          <View style={styles.ratingRowCompact}>
+            <Ionicons name="star" size={16} color="#F59E0B" />
+            <Text style={styles.ratingText}>
+              {doctor.rating ? doctor.rating.toFixed(1) : "0.0"}
+            </Text>
+          </View>
+          {doctor.feeSummary ? (
+            <Text
+              style={styles.doctorFeeInline}
+              numberOfLines={2}
+            >
+              {doctor.feeSummary}
+            </Text>
+          ) : (
+            <View style={styles.ratingFeeSpacer} />
+          )}
         </View>
       </View>
 
@@ -450,7 +482,9 @@ const Doctor = () => {
                   <View style={styles.doctorDetailsModal}>
                     <View style={styles.consultationFeeModal}>
                       <Text style={styles.consultationFeeTextModal}>
-                        {selectedDoctor.consultationFee || "არ არის მითითებული"}
+                        {selectedDoctor.feeSummary ||
+                          selectedDoctor.consultationFee ||
+                          "არ არის მითითებული"}
                       </Text>
                     </View>
                     <View style={styles.ratingContainerModal}>
@@ -670,11 +704,29 @@ const styles = StyleSheet.create({
     color: "#6B7280",
     marginBottom: 6,
   },
-  ratingRow: {
+  ratingFeeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
+    gap: 12,
+  },
+  ratingRowCompact: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    marginBottom: 6,
+    flexShrink: 0,
+  },
+  doctorFeeInline: {
+    flex: 1,
+    flexShrink: 1,
+    fontSize: 13,
+    fontFamily: "Poppins-SemiBold",
+    color: "#0D9488",
+    textAlign: "right",
+  },
+  ratingFeeSpacer: {
+    flex: 1,
   },
   ratingText: {
     fontSize: 13,

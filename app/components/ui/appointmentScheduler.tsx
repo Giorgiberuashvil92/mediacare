@@ -165,40 +165,8 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
     setSelectedTime(""); // Reset time selection when date changes
   };
 
-  // Helper function to check if a time slot can be booked (at least 2 hours in advance)
-  const canBookTimeSlot = (dateStr: string, time: string): boolean => {
-    try {
-      const [hours, minutes] = time.split(":").map(Number);
-      const slotDateTime = new Date(dateStr);
-      slotDateTime.setHours(hours, minutes || 0, 0, 0);
-
-      const now = new Date();
-      const diffMs = slotDateTime.getTime() - now.getTime();
-      const diffHours = diffMs / (1000 * 60 * 60);
-
-      // ონლაინის შემთხვევაში: 2 საათით ადრე
-      // ბინაზე ვიზიტისას: 12 საათით ადრე
-      const requiredHours = mode === "video" ? 2 : 12;
-      return diffHours >= requiredHours;
-    } catch (error) {
-      console.error("Error calculating time difference:", error);
-      return false;
-    }
-  };
-
   const handleTimeSelect = (time: string) => {
     if (!selectedDate) return;
-
-    // Check if booking is allowed (at least 2 hours for video, 12 hours for home-visit)
-    if (!canBookTimeSlot(selectedDate, time)) {
-      const requiredHours = mode === "video" ? 2 : 12;
-      Alert.alert(
-        "დრო არ არის ხელმისაწვდომი",
-        `ჯავშნის გაკეთება შესაძლებელია მინიმუმ ${requiredHours} საათით ადრე. გთხოვთ აირჩიოთ სხვა დრო.`,
-      );
-      return;
-    }
-
     setSelectedTime(time);
   };
 
@@ -242,13 +210,34 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
       return false;
     };
 
+    /** ბინაზე: ჯავშანი მინიმუმ 2 საათით ადრე (იგივე წესი, რაც ბექენდზე) */
+    const HOME_VISIT_MIN_LEAD_MS = 2 * 60 * 60 * 1000;
+    const isHomeVisitSlotTooSoon = (
+      dateStr: string,
+      timeStr: string,
+    ): boolean => {
+      if (mode !== "home-visit") return false;
+      const dp = dateStr.split("-").map(Number);
+      if (dp.length !== 3 || dp.some((n) => Number.isNaN(n))) return false;
+      const [yy, mo, da] = dp;
+      const tm = timeStr.split(":").map(Number);
+      const hh = tm[0];
+      const mi = tm[1] ?? 0;
+      if (Number.isNaN(hh)) return false;
+      const slotStart = new Date(yy, mo - 1, da, hh, mi, 0, 0);
+      return slotStart.getTime() - now.getTime() < HOME_VISIT_MIN_LEAD_MS;
+    };
+
     // Full-day override if declared 24/7
     if (isTwentyFourSeven) {
       const fullDaySlots = generateFullDaySlots();
       // Filter out passed time slots
       const availableSlots = fullDaySlots.filter((time) => {
         if (!selectedDate) return false;
-        return !isTimeSlotPassed(selectedDate, time);
+        return (
+          !isTimeSlotPassed(selectedDate, time) &&
+          !isHomeVisitSlotTooSoon(selectedDate, time)
+        );
       });
 
       console.log("📅 AppointmentScheduler - 24/7 mode (filtered):", {
@@ -278,10 +267,13 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
           ? homeVisitSlots
           : genericSlots;
 
-    // Filter out passed time slots
+    // Filter out passed time slots (+ ბინაზე: 2 სთ-ზე უადრე)
     const availableSlots = slotsByMode.filter((time) => {
       if (!selectedDate) return false;
-      return !isTimeSlotPassed(selectedDate, time);
+      return (
+        !isTimeSlotPassed(selectedDate, time) &&
+        !isHomeVisitSlotTooSoon(selectedDate, time)
+      );
     });
 
     // Return filtered slots (excluding passed times)
@@ -446,10 +438,6 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
             {getVisibleTimeSlots().map((time) => {
               const isBooked =
                 selectedDayAvailability?.bookedSlots?.includes(time) || false;
-              const canBook = selectedDate
-                ? canBookTimeSlot(selectedDate, time)
-                : true;
-              const isTooSoon = !canBook && !isBooked;
 
               return (
                 <TouchableOpacity
@@ -458,19 +446,15 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
                     styles.timeSlot,
                     selectedTime === time && styles.selectedTimeSlot,
                     isBooked && styles.bookedTimeSlot,
-                    isTooSoon && styles.disabledTimeSlot,
                   ]}
-                  onPress={() =>
-                    !isBooked && !isTooSoon && handleTimeSelect(time)
-                  }
-                  disabled={isBooked || isTooSoon}
+                  onPress={() => !isBooked && handleTimeSelect(time)}
+                  disabled={isBooked}
                 >
                   <Text
                     style={[
                       styles.timeText,
                       selectedTime === time && styles.selectedTimeText,
                       isBooked && styles.bookedTimeText,
-                      isTooSoon && styles.disabledTimeText,
                     ]}
                   >
                     {time}
@@ -478,11 +462,6 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
                   {isBooked && (
                     <View style={styles.bookedIndicator}>
                       <Ionicons name="lock-closed" size={12} color="#EF4444" />
-                    </View>
-                  )}
-                  {isTooSoon && (
-                    <View style={styles.bookedIndicator}>
-                      <Ionicons name="time-outline" size={12} color="#F59E0B" />
                     </View>
                   )}
                 </TouchableOpacity>
@@ -523,16 +502,6 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
         disabled={!selectedDate || !selectedTime}
         onPress={async () => {
           if (!selectedDate || !selectedTime || !doctorId) return;
-
-          // Validate: booking must be at least 2 hours for video, 12 hours for home-visit
-          if (!canBookTimeSlot(selectedDate, selectedTime)) {
-            const requiredHours = mode === "video" ? 2 : 12;
-            Alert.alert(
-              "დრო არ არის ხელმისაწვდომი",
-              `ჯავშნის გაკეთება შესაძლებელია მინიმუმ ${requiredHours} საათით ადრე. გთხოვთ აირჩიოთ სხვა დრო.`,
-            );
-            return;
-          }
 
           try {
             // გადამოწმება: ისევ თავისუფალია ეს დრო ამ ტიპისთვის?

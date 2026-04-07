@@ -321,21 +321,6 @@ const MakeAppointment = () => {
   )} | ${selectedTime}`;
 
   const handleMakeAppointment = async () => {
-    // Client-side guard: at least 2 hours before for video, 12 hours for home-visit
-    if (selectedDate && selectedTime) {
-      const candidate = new Date(`${selectedDate}T${selectedTime}:00`);
-      const now = new Date();
-      const requiredHours = appointmentType === "home-visit" ? 12 : 2;
-      const requiredMs = requiredHours * 60 * 60 * 1000;
-      if (candidate.getTime() - now.getTime() < requiredMs) {
-        Alert.alert(
-          "შეზღუდვა",
-          `ჯავშნის გაკეთება შესაძლებელია მინიმუმ ${requiredHours} საათით ადრე.`,
-        );
-        return;
-      }
-    }
-
     // Validate home visit address if needed
     if (appointmentType === "home-visit" && !visitAddress.trim()) {
       Alert.alert("შეცდომა", "გთხოვთ მიუთითოთ ბინაზე ვიზიტის მისამართი");
@@ -352,17 +337,24 @@ const MakeAppointment = () => {
       uploadedFiles.length > 0 ? JSON.stringify(uploadedFiles) : "";
 
     // ლოგი: make-appointment-დან რას ვაგზავნით payment-ზე
-    console.log("📤 [make-appointment] ჯავშნის გაკეთება — რას ვაგზავნით payment-ზე:", {
-      doctorId,
-      selectedDate,
-      selectedTime,
-      appointmentType,
-      problemDescriptionLength: problemDescription.length,
-      uploadedFilesCount: uploadedFiles.length,
-      uploadedFiles: uploadedFiles.map((f) => ({ name: f.name, type: f.type, uriPreview: f.uri ? `${f.uri.slice(0, 60)}...` : null })),
-      uploadedFileParamLength: uploadedFileParam.length,
-      uploadedFileParamPreview: uploadedFileParam.slice(0, 200),
-    });
+    console.log(
+      "📤 [make-appointment] ჯავშნის გაკეთება — რას ვაგზავნით payment-ზე:",
+      {
+        doctorId,
+        selectedDate,
+        selectedTime,
+        appointmentType,
+        problemDescriptionLength: problemDescription.length,
+        uploadedFilesCount: uploadedFiles.length,
+        uploadedFiles: uploadedFiles.map((f) => ({
+          name: f.name,
+          type: f.type,
+          uriPreview: f.uri ? `${f.uri.slice(0, 60)}...` : null,
+        })),
+        uploadedFileParamLength: uploadedFileParam.length,
+        uploadedFileParamPreview: uploadedFileParam.slice(0, 200),
+      },
+    );
 
     // make-appointment-ის შემდეგ გადახდის გვერდზე
     router.push({

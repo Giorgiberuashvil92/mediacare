@@ -18,6 +18,7 @@ import { ProfileModule } from './profile/profile.module';
 import { ShopModule } from './shop/shop.module';
 import { SpecializationsModule } from './specializations/specializations.module';
 import { TermsModule } from './terms/terms.module';
+import { IntegrationsModule } from './integrations/integrations.module';
 import { UploadModule } from './upload/upload.module';
 
 const moduleImports: Array<
@@ -43,6 +44,7 @@ const moduleImports: Array<
       limit: 10,
     },
   ]),
+  IntegrationsModule,
   AuthModule,
   UploadModule,
   CloudinaryModule,

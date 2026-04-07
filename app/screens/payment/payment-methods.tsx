@@ -518,13 +518,6 @@ const PaymentMethods = () => {
             <Text style={styles.summaryLabel}>კონსულტაციის საფასური</Text>
             <Text style={styles.summaryValue}>{consultationFeeAmount} ₾</Text>
           </View>
-
-          <View style={styles.summaryDivider} />
-
-          <View style={styles.summaryRow}>
-            <Text style={styles.totalLabel}>საერთო თანხა</Text>
-            <Text style={styles.totalValue}>{totalAmount} ₾</Text>
-          </View>
         </View>
 
         {/* Payment Methods Section */}

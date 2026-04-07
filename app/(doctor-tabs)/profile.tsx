@@ -21,7 +21,6 @@ import { showToast } from "../utils/toast";
 
 export default function DoctorProfile() {
   const { user, logout } = useAuth();
-  const [language, setLanguage] = useState<"ka" | "en">("ka");
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [notifications, setNotifications] = useState({
     appointments: true,
@@ -298,13 +297,13 @@ export default function DoctorProfile() {
           </TouchableOpacity>
         </View>
 
-        {/* Language Settings */}
+        {/* Language — იგივე ეკრანი, რაც პაციენტის პარამეტრებში */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>ენა და რეგიონი</Text>
           <View style={styles.menuCard}>
             <TouchableOpacity
               style={styles.menuItem}
-              onPress={() => setLanguage(language === "ka" ? "en" : "ka")}
+              onPress={() => router.push("/screens/profile/language")}
             >
               <View style={styles.menuItemLeft}>
                 <View style={styles.menuIconContainer}>
@@ -317,12 +316,7 @@ export default function DoctorProfile() {
                   </Text>
                 </View>
               </View>
-              <View style={styles.languageSelector}>
-                <Text style={styles.languageText}>
-                  {language === "ka" ? "🇬🇪 ქართული" : "🇬🇧 English"}
-                </Text>
-                <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
-              </View>
+              <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
             </TouchableOpacity>
           </View>
         </View>
@@ -584,8 +578,8 @@ export default function DoctorProfile() {
                 <View style={styles.recommendationBox}>
                   <Ionicons name="bulb-outline" size={20} color="#F59E0B" />
                   <Text style={styles.recommendationText}>
-                    რეკომენდაცია: პერიოდულად გადახედეთ და განაახლეთ თქვენი
-                    პროფილი, რომ პაციენტებს ჰქონდეთ აქტუალური ინფორმაცია.
+                    ექიმის შესახებ ინფორმაციის განახლებისათვის მიწერეთ
+                    პლატფორმის ადმინისტრაციას
                   </Text>
                 </View>
               </View>
@@ -840,16 +834,6 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: "#F3F4F6",
     marginLeft: 72,
-  },
-  languageSelector: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  languageText: {
-    fontSize: 14,
-    fontFamily: "Poppins-Medium",
-    color: "#1F2937",
   },
   logoutSection: {
     marginTop: 24,

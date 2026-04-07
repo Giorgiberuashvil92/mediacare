@@ -47,6 +47,9 @@ export class User {
   idNumber?: string; // Personal ID number (პირადი ნომერი)
 
   @Prop()
+  misPersonId?: string; // PersonID returned from MIS Ambulatory API
+
+  @Prop()
   dateOfBirth?: Date;
 
   @Prop({ enum: Gender })

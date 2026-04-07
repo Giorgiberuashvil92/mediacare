@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import InputGroup from '@/components/FormElements/InputGroup';
-import { apiService, Specialization, User } from '@/lib/api';
-import React, { useEffect, useState } from 'react';
+import InputGroup from "@/components/FormElements/InputGroup";
+import { apiService, Specialization, User } from "@/lib/api";
+import React, { useEffect, useState } from "react";
 
 interface EditDoctorFormProps {
   doctor: User;
@@ -22,28 +22,36 @@ export function EditDoctorForm({
   const [licenseFile, setLicenseFile] = useState<File | null>(null);
 
   const [formData, setFormData] = useState({
-    name: doctor.name || '',
-    email: doctor.email || '',
-    phone: doctor.phone || '',
-    idNumber: doctor.idNumber || '',
-    specializations: (doctor.specialization || '')
-      .split(',')
+    name: doctor.name || "",
+    email: doctor.email || "",
+    phone: doctor.phone || "",
+    idNumber: doctor.idNumber || "",
+    specializations: (doctor.specialization || "")
+      .split(",")
       .map((s) => s.trim())
       .filter(Boolean),
-    degrees: doctor.degrees || '',
-    experience: doctor.experience || '',
-    about: doctor.about || '',
-    location: doctor.location || '',
-    consultationFee: doctor.consultationFee?.toString() || '',
-    followUpFee: doctor.followUpFee?.toString() || '',
-    videoConsultationFee: doctor.videoConsultationFee?.toString() || '',
-    homeVisitFee: doctor.homeVisitFee?.toString() || '',
-    approvalStatus: doctor.approvalStatus || 'pending',
+    degrees: doctor.degrees || "",
+    experience: doctor.experience || "",
+    about: doctor.about || "",
+    location: doctor.location || "",
+    consultationFee: doctor.consultationFee?.toString() || "",
+    followUpFee: doctor.followUpFee?.toString() || "",
+    videoConsultationFee: doctor.videoConsultationFee?.toString() || "",
+    homeVisitFee: doctor.homeVisitFee?.toString() || "",
+    approvalStatus: doctor.approvalStatus || "pending",
     isActive: doctor.isActive !== undefined ? doctor.isActive : true,
-    gender: doctor.gender || 'male',
-    minWorkingDaysRequired: doctor.minWorkingDaysRequired?.toString() || '',
-    contractDocument: (doctor as any).contractDocument || '',
-    adminNotes: (doctor as any).adminNotes || '',
+    gender: doctor.gender || "male",
+    minWorkingDaysRequired: doctor.minWorkingDaysRequired?.toString() || "",
+    contractDocument: (doctor as any).contractDocument || "",
+    adminNotes: (doctor as any).adminNotes || "",
+    rating:
+      doctor.rating !== undefined && doctor.rating !== null
+        ? String(doctor.rating)
+        : "",
+    reviewCount:
+      doctor.reviewCount !== undefined && doctor.reviewCount !== null
+        ? String(doctor.reviewCount)
+        : "",
   });
 
   useEffect(() => {
@@ -55,7 +63,7 @@ export function EditDoctorForm({
           setSpecializations(response.data.filter((spec) => spec.isActive));
         }
       } catch (err: any) {
-        setError(err.message || 'სპეციალიზაციების ჩატვირთვა ვერ მოხერხდა');
+        setError(err.message || "სპეციალიზაციების ჩატვირთვა ვერ მოხერხდა");
       } finally {
         setLoadingSpecializations(false);
       }
@@ -100,11 +108,31 @@ export function EditDoctorForm({
     setError(null);
     setLoading(true);
 
+    const ratingTrim = formData.rating.trim();
+    if (ratingTrim !== "") {
+      const r = parseFloat(ratingTrim.replace(",", "."));
+      if (Number.isNaN(r) || r < 0 || r > 5) {
+        setError("რეიტინგი უნდა იყოს რიცხვი 0-დან 5-მდე");
+        setLoading(false);
+        return;
+      }
+    }
+    const reviewTrim = formData.reviewCount.trim();
+    if (reviewTrim !== "") {
+      const rc = parseInt(reviewTrim, 10);
+      if (Number.isNaN(rc) || rc < 0 || !Number.isInteger(Number(reviewTrim))) {
+        setError("შეფასებების რაოდენობა უნდა იყოს მთელი არაუარყოფითი რიცხვი");
+        setLoading(false);
+        return;
+      }
+    }
+
     try {
       // Upload license document if a new file is selected
       let licenseDocumentUrl: string | undefined;
       if (licenseFile) {
-        const uploadResponse = await apiService.uploadLicenseDocument(licenseFile);
+        const uploadResponse =
+          await apiService.uploadLicenseDocument(licenseFile);
         if (uploadResponse.success) {
           licenseDocumentUrl = uploadResponse.data.filePath;
         }
@@ -119,7 +147,7 @@ export function EditDoctorForm({
           formData.specializations
             .map((s) => s.trim())
             .filter(Boolean)
-            .join(', ') || undefined,
+            .join(", ") || undefined,
         degrees: formData.degrees.trim() || undefined,
         experience: formData.experience.trim() || undefined,
         about: formData.about.trim() || undefined,
@@ -137,31 +165,49 @@ export function EditDoctorForm({
       }
 
       // Handle fee fields - send even if empty to allow clearing values
-      if (formData.consultationFee !== undefined && formData.consultationFee !== '') {
+      if (
+        formData.consultationFee !== undefined &&
+        formData.consultationFee !== ""
+      ) {
         updateData.consultationFee = parseFloat(formData.consultationFee);
-      } else if (formData.consultationFee === '') {
+      } else if (formData.consultationFee === "") {
         updateData.consultationFee = undefined;
       }
-      if (formData.followUpFee !== undefined && formData.followUpFee !== '') {
+      if (formData.followUpFee !== undefined && formData.followUpFee !== "") {
         updateData.followUpFee = parseFloat(formData.followUpFee);
-      } else if (formData.followUpFee === '') {
+      } else if (formData.followUpFee === "") {
         updateData.followUpFee = undefined;
       }
-      if (formData.videoConsultationFee !== undefined && formData.videoConsultationFee !== '') {
-        updateData.videoConsultationFee = parseFloat(formData.videoConsultationFee);
-      } else if (formData.videoConsultationFee === '') {
+      if (
+        formData.videoConsultationFee !== undefined &&
+        formData.videoConsultationFee !== ""
+      ) {
+        updateData.videoConsultationFee = parseFloat(
+          formData.videoConsultationFee,
+        );
+      } else if (formData.videoConsultationFee === "") {
         updateData.videoConsultationFee = undefined;
       }
-      if (formData.homeVisitFee !== undefined && formData.homeVisitFee !== '') {
+      if (formData.homeVisitFee !== undefined && formData.homeVisitFee !== "") {
         updateData.homeVisitFee = parseFloat(formData.homeVisitFee);
-      } else if (formData.homeVisitFee === '') {
+      } else if (formData.homeVisitFee === "") {
         updateData.homeVisitFee = undefined;
       }
       if (formData.minWorkingDaysRequired) {
-        updateData.minWorkingDaysRequired = parseInt(formData.minWorkingDaysRequired, 10);
+        updateData.minWorkingDaysRequired = parseInt(
+          formData.minWorkingDaysRequired,
+          10,
+        );
       }
 
-      console.log('💰 [EditDoctorForm] Sending updateData to API:', {
+      if (ratingTrim !== "") {
+        updateData.rating = parseFloat(ratingTrim.replace(",", "."));
+      }
+      if (reviewTrim !== "") {
+        updateData.reviewCount = parseInt(reviewTrim, 10);
+      }
+
+      console.log("💰 [EditDoctorForm] Sending updateData to API:", {
         consultationFee: updateData.consultationFee,
         followUpFee: updateData.followUpFee,
         videoConsultationFee: updateData.videoConsultationFee,
@@ -175,7 +221,7 @@ export function EditDoctorForm({
         onSuccess?.();
       }
     } catch (err: any) {
-      setError(err.message || 'ექიმის განახლება ვერ მოხერხდა');
+      setError(err.message || "ექიმის განახლება ვერ მოხერხდა");
     } finally {
       setLoading(false);
     }
@@ -258,7 +304,6 @@ export function EditDoctorForm({
               >
                 <option value="male">კაცი</option>
                 <option value="female">ქალი</option>
-                <option value="other">სხვა</option>
               </select>
             </div>
           </div>
@@ -287,7 +332,9 @@ export function EditDoctorForm({
               ) : (
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {specializations.map((spec) => {
-                    const checked = formData.specializations.includes(spec.name);
+                    const checked = formData.specializations.includes(
+                      spec.name,
+                    );
                     return (
                       <label
                         key={spec._id}
@@ -345,6 +392,32 @@ export function EditDoctorForm({
               height="sm"
             />
           </div>
+
+          <div className="mb-5.5 flex flex-col gap-5.5 sm:flex-row">
+            <InputGroup
+              className="w-full sm:w-1/2"
+              type="number"
+              name="rating"
+              label="რეიტინგი (0–5)"
+              placeholder="მაგ. 4.8"
+              value={formData.rating}
+              handleChange={handleChange}
+              height="sm"
+            />
+            <InputGroup
+              className="w-full sm:w-1/2"
+              type="number"
+              name="reviewCount"
+              label="შეფასებების რაოდენობა"
+              placeholder="მაგ. 24"
+              value={formData.reviewCount}
+              handleChange={handleChange}
+              height="sm"
+            />
+          </div>
+          <p className="-mt-3 mb-5.5 text-xs text-dark-4 dark:text-dark-6">
+            ეს მნიშვნელობები ჩანს მობაილ აპში ექიმის ბარათზე და პროფილზე.
+          </p>
 
           <div className="mb-5.5 flex flex-col gap-5.5 sm:flex-row">
             <InputGroup
@@ -421,7 +494,8 @@ export function EditDoctorForm({
               className="w-full rounded-lg border border-stroke bg-transparent px-5 py-3 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
             />
             <p className="mt-2 text-xs text-dark-4 dark:text-dark-6">
-              მხოლოდ ადმინისთვის ხილული ველი — დეტალური ინფორმაცია/ნოტები ექიმის შესახებ.
+              მხოლოდ ადმინისთვის ხილული ველი — დეტალური ინფორმაცია/ნოტები ექიმის
+              შესახებ.
             </p>
           </div>
 
@@ -477,7 +551,8 @@ export function EditDoctorForm({
               className="w-full rounded-lg border border-stroke bg-transparent px-5 py-3 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
             />
             <p className="mt-2 text-xs text-dark-4 dark:text-dark-6">
-              ეს ხელშეკრულება გამოჩნდება ამ ექიმის პროფილში. თუ ცარიელია, გამოჩნდება ზოგადი ხელშეკრულება.
+              ეს ხელშეკრულება გამოჩნდება ამ ექიმის პროფილში. თუ ცარიელია,
+              გამოჩნდება ზოგადი ხელშეკრულება.
             </p>
           </div>
 
@@ -490,10 +565,10 @@ export function EditDoctorForm({
               <div className="mb-3">
                 <a
                   href={
-                    doctor.licenseDocument.startsWith('http://') ||
-                    doctor.licenseDocument.startsWith('https://')
+                    doctor.licenseDocument.startsWith("http://") ||
+                    doctor.licenseDocument.startsWith("https://")
                       ? doctor.licenseDocument
-                      : `${process.env.NEXT_PUBLIC_API_URL || 'https://mediacare-production.up.railway.app'}/${doctor.licenseDocument}`
+                      : `${process.env.NEXT_PUBLIC_API_URL || "https://mediacare-production.up.railway.app"}/${doctor.licenseDocument}`
                   }
                   target="_blank"
                   rel="noopener noreferrer"
@@ -545,7 +620,8 @@ export function EditDoctorForm({
               height="sm"
             />
             <p className="mt-1 text-xs text-dark-4 dark:text-dark-6">
-              ექიმმა მომავალი 2 კვირის განმავლობაში მინიმუმ ამდენი დღე უნდა ჰქონდეს გრაფიკი დაყენებული
+              ექიმმა მომავალი 2 კვირის განმავლობაში მინიმუმ ამდენი დღე უნდა
+              ჰქონდეს გრაფიკი დაყენებული
             </p>
           </div>
 
@@ -565,7 +641,7 @@ export function EditDoctorForm({
               type="submit"
               disabled={loading}
             >
-              {loading ? 'განახლება...' : 'ექიმის განახლება'}
+              {loading ? "განახლება..." : "ექიმის განახლება"}
             </button>
           </div>
         </form>
@@ -573,4 +649,3 @@ export function EditDoctorForm({
     </div>
   );
 }
-

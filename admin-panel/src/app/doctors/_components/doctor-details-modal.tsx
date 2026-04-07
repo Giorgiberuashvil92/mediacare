@@ -123,11 +123,7 @@ export function DoctorDetailsModal({
                         სქესი
                       </label>
                       <p className="text-dark dark:text-white capitalize">
-                        {doctor.gender === "male"
-                          ? "კაცი"
-                          : doctor.gender === "female"
-                            ? "ქალი"
-                            : "სხვა"}
+                        {doctor.gender === "male" ? "კაცი" : "ქალი"}
                       </p>
                     </div>
                   )}

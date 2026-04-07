@@ -13,6 +13,7 @@ import { useAuth } from "../../contexts/AuthContext";
 
 interface PatientAppointment {
   id: string;
+  _id?: string;
   doctorName: string;
   doctorSpecialty: string;
   date: string;
@@ -116,7 +117,12 @@ const TodayAppointment = () => {
               } else {
                 appointmentDate = appointment.date;
               }
-              return { ...appointment, formattedDate: appointmentDate };
+              const rawId = appointment._id ?? appointment.id;
+              return {
+                ...appointment,
+                formattedDate: appointmentDate,
+                id: rawId != null ? String(rawId) : "",
+              };
             });
 
           // Sort by time (closest first)
@@ -155,7 +161,13 @@ const TodayAppointment = () => {
 
   // Get the first appointment (or closest one)
   const appointment = todayAppointments[0];
-  
+
+  const isVideoConsultation = (() => {
+    const t = appointment.type;
+    if (t == null || t === "") return true;
+    return String(t).toLowerCase() === "video";
+  })();
+
   // Appointment is always today since we filtered for today only
   const isToday = true;
 
@@ -301,17 +313,32 @@ const TodayAppointment = () => {
                   <Ionicons name="time-outline" size={20} color="#9CA3AF" />
                   <Text style={styles.timePassedText}>დრო უკვე გავიდა</Text>
                 </View>
-              ) : isJoinButtonActive() ? (
+              ) : isJoinButtonActive() && isVideoConsultation ? (
                 <TouchableOpacity
                   style={[styles.joinCallButton, isUrgent() && styles.joinCallButtonUrgent]}
                   onPress={() => {
+                    const appointmentId = String(
+                      appointment.id ||
+                        appointment._id ||
+                        "",
+                    ).trim();
+                    if (!appointmentId) {
+                      return;
+                    }
+                    const doctorName =
+                      appointment.doctorName ||
+                      (typeof appointment.doctorId === "object" &&
+                      appointment.doctorId != null
+                        ? (appointment.doctorId as { name?: string }).name
+                        : undefined) ||
+                      "ექიმი";
                     setShowModal(false);
                     router.push({
                       pathname: "/screens/video-call",
                       params: {
-                        appointmentId: appointment.id,
-                        doctorName: appointment.doctorName,
-                        roomName: `medicare-${appointment.id}`,
+                        appointmentId,
+                        doctorName: String(doctorName),
+                        roomName: `medicare-${appointmentId}`,
                       },
                     });
                   }}

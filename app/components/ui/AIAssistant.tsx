@@ -241,7 +241,6 @@ export default function AIAssistant() {
 const styles = StyleSheet.create({
   container: {
     marginHorizontal: 16,
-    marginTop: 16,
     marginBottom: 8,
   },
   card: {

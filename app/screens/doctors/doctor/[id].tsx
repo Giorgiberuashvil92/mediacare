@@ -216,16 +216,7 @@ const DoctorDetail = () => {
         >
           <Ionicons name="arrow-back" size={24} color="#0F172A" />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.favoriteButton}
-          onPress={() => toggleFavorite(doctor)}
-        >
-          <Ionicons
-            name={isFavorite(doctor.id) ? "heart" : "heart-outline"}
-            size={24}
-            color={isFavorite(doctor.id) ? "#EF4444" : "#64748B"}
-          />
-        </TouchableOpacity>
+
         <View style={styles.profileImageContainer}>
           <Image source={doctor.image} style={styles.profileImage} />
         </View>
@@ -250,36 +241,15 @@ const DoctorDetail = () => {
         {/* Compact Stats */}
         <View style={styles.metaRow}>
           <View style={styles.metaChip}>
-            <Ionicons name="star" size={16} color="#FACC15" />
-            <Text style={styles.metaValue}>{doctor.rating || 0}</Text>
-            <Text style={styles.metaLabel}>რეიტინგი</Text>
-          </View>
-          <View style={styles.metaChip}>
             <Ionicons name="briefcase-outline" size={16} color="#4B5563" />
             <Text style={styles.metaValue}>
+              გამოცდილება:{" "}
               {doctor.experience ? `${doctor.experience} წელი` : "-"}
             </Text>
           </View>
         </View>
 
         {/* Price Card */}
-        <View style={styles.priceCard}>
-          <View>
-            <Text style={styles.priceLabel}>კონსულტაციის საფასური</Text>
-            <Text style={styles.priceValue}>
-              {doctor.consultationFee || "—"}
-            </Text>
-            {doctor.followUpFee && (
-              <Text style={styles.priceSub}>
-                განმეორებითი ვიზიტი: {doctor.followUpFee}
-              </Text>
-            )}
-          </View>
-          <View style={styles.priceTag}>
-            <Ionicons name="time-outline" size={16} color="#0369A1" />
-            <Text style={styles.priceTagText}>30-45 წთ</Text>
-          </View>
-        </View>
 
         {/* About Doctor */}
         {(doctor.adminNotes || doctor.about) && (

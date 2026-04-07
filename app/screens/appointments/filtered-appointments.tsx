@@ -189,10 +189,8 @@ export default function FilteredAppointmentsScreen() {
   };
 
   const isJoinButtonActive = (appointment: PatientAppointment) => {
-    // Only show for scheduled or in-progress appointments
     if (
       appointment.status !== "scheduled" &&
-      appointment.status !== "in-progress" &&
       appointment.status !== "pending" &&
       appointment.status !== "confirmed"
     ) {

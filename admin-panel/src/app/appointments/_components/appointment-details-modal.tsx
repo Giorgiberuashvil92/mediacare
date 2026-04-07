@@ -33,7 +33,13 @@ interface AppointmentDetails {
   appointmentDate: string;
   appointmentTime: string;
   type: 'video' | 'home-visit';
-  status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
+  status:
+    | 'pending'
+    | 'confirmed'
+    | 'in-progress'
+    | 'completed'
+    | 'cancelled'
+    | 'blocked';
   consultationFee: number;
   totalAmount: number;
   paymentStatus: 'pending' | 'paid' | 'failed';
@@ -164,10 +170,39 @@ export function AppointmentDetailsModal({
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'confirmed': return 'bg-blue-500 text-white';
-      case 'completed': return 'bg-green-500 text-white';
-      case 'cancelled': return 'bg-red-500 text-white';
-      default: return 'bg-yellow-500 text-white';
+      case 'confirmed':
+        return 'bg-blue-500 text-white';
+      case 'pending':
+        return 'bg-amber-500 text-white';
+      case 'in-progress':
+        return 'bg-orange-500 text-white';
+      case 'completed':
+        return 'bg-green-500 text-white';
+      case 'cancelled':
+        return 'bg-red-500 text-white';
+      case 'blocked':
+        return 'bg-slate-500 text-white';
+      default:
+        return 'bg-gray-500 text-white';
+    }
+  };
+
+  const getAppointmentStatusLabel = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return 'მოლოდინში';
+      case 'confirmed':
+        return 'დანიშნული';
+      case 'in-progress':
+        return 'მიმდინარე';
+      case 'completed':
+        return 'დასრულებული';
+      case 'cancelled':
+        return 'გაუქმებული';
+      case 'blocked':
+        return 'დაბლოკილი';
+      default:
+        return status;
     }
   };
 
@@ -393,10 +428,7 @@ export function AppointmentDetailsModal({
                 </div>
                 <div className="flex gap-2">
                   <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusColor(appointment.status)}`}>
-                    {appointment.status === 'pending' && 'მოლოდინში'}
-                    {appointment.status === 'confirmed' && 'დადასტურებული'}
-                    {appointment.status === 'completed' && 'დასრულებული'}
-                    {appointment.status === 'cancelled' && 'გაუქმებული'}
+                    {getAppointmentStatusLabel(appointment.status)}
                   </span>
                   {appointment.status === 'cancelled' && appointment.cancelledAt && (
                     <p className="text-xs text-dark-4 dark:text-dark-6 mt-1">
@@ -453,7 +485,7 @@ export function AppointmentDetailsModal({
                       }`}
                     >
                       {status === 'pending' && 'მოლოდინში'}
-                      {status === 'confirmed' && 'დადასტურებული'}
+                      {status === 'confirmed' && 'დანიშნული'}
                       {status === 'completed' && 'დასრულებული'}
                       {status === 'cancelled' && 'გაუქმებული'}
                       {updatingStatus && appointment.status === status && '...'}
