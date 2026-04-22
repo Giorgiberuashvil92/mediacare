@@ -28,7 +28,6 @@ export declare class AuthService {
                 email: string;
                 phone: string;
                 misPersonId: string;
-                misGeneratedServiceId: string;
                 isVerified: boolean;
                 approvalStatus: ApprovalStatus;
             };

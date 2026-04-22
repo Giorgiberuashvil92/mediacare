@@ -5,6 +5,8 @@ import {
   Param,
   Post,
   Put,
+  Query,
+  StreamableFile,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -58,6 +60,13 @@ export class AppointmentsController {
   @UseGuards(JwtAuthGuard, PatientGuard)
   async getPatientAppointments(@CurrentUser() user: { sub: string }) {
     return this.appointmentsService.getAppointmentsByPatient(user.sub);
+  }
+
+  /** უკუთავსობა: ფორმები Mongo-ში აღარ ინახება — პასუხი მხოლოდ ინფორმაციულია */
+  @Post('patient/sync-mis-print-forms')
+  @UseGuards(JwtAuthGuard, PatientGuard)
+  async syncPatientMisPrintForms(@CurrentUser() user: { sub: string }) {
+    return this.appointmentsService.syncMisPrintFormsForPatient(user.sub);
   }
 
   // ექიმი ხედავს თავის appointments-ებს
@@ -301,6 +310,50 @@ export class AppointmentsController {
       file,
       body.testName,
     );
+  }
+
+  /**
+   * HIS PrintForm/GetFormsByServiceID — ყოველთვის პირდაპირ HIS-იდან; Mongo-ში ფორმები არ ინახება.
+   * `?refetch=true` უკუთავსობისთვის რჩება, ლოგიკაში იგივეა (ყოველთვის ახალი მოთხოვნა).
+   */
+  @Get(':id/mis-print-forms')
+  @UseGuards(JwtAuthGuard)
+  async getMisPrintForms(
+    @CurrentUser() user: { sub: string },
+    @Param('id') appointmentId: string,
+    @Query('refetch') refetch?: string,
+  ) {
+    const doRefetch = refetch === 'true' || refetch === '1';
+    return this.appointmentsService.getMisPrintFormsForAppointment(
+      user.sub,
+      appointmentId,
+      doRefetch,
+    );
+  }
+
+  /** HIS ფორმის PDF attachment-ად გადმოწერა */
+  @Get(':id/mis-print-forms/pdf')
+  @UseGuards(JwtAuthGuard)
+  async downloadMisPrintFormPdf(
+    @CurrentUser() user: { sub: string },
+    @Param('id') appointmentId: string,
+    @Query('index') index?: string,
+    @Query('refetch') refetch?: string,
+  ): Promise<StreamableFile> {
+    const doRefetch = refetch === 'true' || refetch === '1';
+    const parsedIndex =
+      index != null && index !== '' ? Number.parseInt(index, 10) : 0;
+    const pdf = await this.appointmentsService.getMisPrintFormPdfForAppointment(
+      user.sub,
+      appointmentId,
+      parsedIndex,
+      doRefetch,
+    );
+
+    return new StreamableFile(pdf.buffer, {
+      type: pdf.contentType || 'application/pdf',
+      disposition: `attachment; filename="${pdf.fileName}"`,
+    });
   }
 
   // Agora token generation for video calls

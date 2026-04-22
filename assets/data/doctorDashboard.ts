@@ -71,6 +71,24 @@ export interface Form100Info {
   fileName?: string;
 }
 
+/** ექიმის ატვირთული ფორმა 100 (PDF). */
+export function hasForm100PdfUploaded(
+  c: { form100?: Form100Info | null } | null | undefined,
+): boolean {
+  const url = c?.form100?.pdfUrl?.trim();
+  return !!url;
+}
+
+/** ვიდეო/არა-ბინაზე ვიზიტის დასრულება: მხოლოდ HIS mis-print-forms (`misForm100AvailableAt`). ატვირთული PDF არ ითვლება. */
+export function hasForm100ForVisitCompletion(
+  c: { misForm100AvailableAt?: string | null } | null | undefined,
+): boolean {
+  const t = c?.misForm100AvailableAt;
+  if (typeof t === "string" && t.trim() && !Number.isNaN(Date.parse(t)))
+    return true;
+  return false;
+}
+
 export interface PatientDetails {
   name?: string;
   lastName?: string;
@@ -103,6 +121,8 @@ export interface Consultation {
   consultationSummary?: ConsultationSummary;
   followUp?: FollowUpInfo;
   form100?: Form100Info;
+  /** ბექენდი ამოწმებს HIS GET mis-print-forms-ს; თარიღი ჩაიწერება ფორმა IV–100 რომ ნახა. */
+  misForm100AvailableAt?: string | null;
   patientDetails?: PatientDetails; // Full patient details for Form 100 generation
   laboratoryTests?: any[]; // Laboratory tests assigned to this appointment
   instrumentalTests?: any[]; // Instrumental tests assigned to this appointment

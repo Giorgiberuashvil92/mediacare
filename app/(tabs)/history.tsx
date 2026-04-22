@@ -1,6 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useRouter } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import * as Sharing from "expo-sharing";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -14,10 +15,17 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  filterMisPrintDocumentsDoctorVisible,
+  isMisDocumentForm100,
+  misHisCalculationBestIndexInBody,
+  misHisForm100FirstIndexInBody,
+  parseMisPrintFormDocuments,
+} from "@/lib/mis-print-forms/html";
+import { runMisPrintFormsPdfAction } from "@/lib/mis-print-forms/pdf";
 import { apiService } from "../_services/api";
 import { useAuth } from "../contexts/AuthContext";
 
-/** Mongo / API id → სტრიქონი (GET /documents-ისთვის) */
 function normalizeAppointmentId(raw: unknown): string {
   if (raw == null || raw === "") return "";
   if (typeof raw === "string") return raw.trim();
@@ -71,6 +79,20 @@ function isVisitDocumentImage(doc: {
   return m.startsWith("image/");
 }
 
+/** ისტორიაში ფორმა 100: ატვირთული PDF ან HIS-ზე დადასტურებული IV–100. */
+function historyVisitHasForm100(visit: {
+  form100?: { pdfUrl?: string } | null;
+  misForm100AvailableAt?: string | null;
+}): boolean {
+  if (visit.form100?.pdfUrl?.trim()) return true;
+  const t = visit.misForm100AvailableAt;
+  return (
+    typeof t === "string" &&
+    t.trim().length > 0 &&
+    !Number.isNaN(Date.parse(t))
+  );
+}
+
 const History = () => {
   const router = useRouter();
   const { isAuthenticated, user } = useAuth();
@@ -81,6 +103,12 @@ const History = () => {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [uploadingResult, setUploadingResult] = useState<string | null>(null);
+  const [openingForm100VisitId, setOpeningForm100VisitId] = useState<
+    string | null
+  >(null);
+  const [openingMisCalcVisitId, setOpeningMisCalcVisitId] = useState<
+    string | null
+  >(null);
   const [expandedVisits, setExpandedVisits] = useState<Set<string>>(new Set());
 
   // Symptoms and Diagnosis modal states
@@ -105,7 +133,6 @@ const History = () => {
     string | null
   >(null);
   const [loadingAvailability, setLoadingAvailability] = useState(false);
-  /** მხოლოდ ჩაშლილი ბარათის დოკუმენტები */
   const [documentsByVisitId, setDocumentsByVisitId] = useState<
     Record<string, any[]>
   >({});
@@ -122,6 +149,30 @@ const History = () => {
       setLoading(false);
     }
   }, [isAuthenticated, user?.id]);
+
+  const runMisPrintFormsSync = useCallback(() => {
+    if (!isAuthenticated || !user?.id || apiService.isMockMode()) return;
+    void apiService.syncPatientMisPrintForms().then(
+      (r) => {
+        if (r.success && r.data) {
+          console.log(
+            "📄 [History] MIS print forms sync:",
+            r.data.processed,
+            "processed,",
+            r.data.saved,
+            "saved",
+          );
+        }
+      },
+      (e) => console.warn("[History] MIS print forms sync failed:", e),
+    );
+  }, [isAuthenticated, user?.id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      runMisPrintFormsSync();
+    }, [runMisPrintFormsSync]),
+  );
 
   const loadPastAppointments = async () => {
     try {
@@ -189,7 +240,9 @@ const History = () => {
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadPastAppointments();
+    void loadPastAppointments().then(() => {
+      runMisPrintFormsSync();
+    });
   };
 
   const filteredVisits = useMemo(() => {
@@ -248,6 +301,178 @@ const History = () => {
       queueMicrotask(() => {
         loadVisitDocumentsIfNeeded(id);
       });
+    }
+  };
+
+  const openVisitForm100 = async (visit: any) => {
+    const id = visit?.id;
+    if (!id) return;
+
+    if (visit.form100?.pdfUrl?.trim()) {
+      try {
+        const url = visit.form100.pdfUrl.trim();
+        const canOpen = await Linking.canOpenURL(url);
+        if (canOpen) await Linking.openURL(url);
+        else Alert.alert("შეცდომა", "PDF ფაილის გახსნა ვერ მოხერხდა");
+      } catch (e) {
+        console.error("Error opening Form 100:", e);
+        Alert.alert("შეცდომა", "PDF ფაილის გახსნა ვერ მოხერხდა");
+      }
+      return;
+    }
+
+    if (!historyVisitHasForm100(visit)) {
+      Alert.alert("ინფორმაცია", "ფორმა 100 ჯერ არ არის ხელმისაწვდომი.");
+      return;
+    }
+
+    setOpeningForm100VisitId(id);
+    try {
+      const mis = await apiService.getMisPrintForms(id, true);
+      if (!mis.success || !mis.data) {
+        Alert.alert("შეცდომა", "HIS ფორმები ვერ ჩაიტვირთა");
+        return;
+      }
+      const d = mis.data;
+      const raw = d.misPrintFormsByService;
+
+      /** HIS: მხოლოდ IV–100 (კალკულაცია — ცალკე `openVisitMisCalculation`). */
+      if (raw != null) {
+        const visible = filterMisPrintDocumentsDoctorVisible(
+          parseMisPrintFormDocuments(raw),
+        );
+        const formDoc = visible.find((doc) => isMisDocumentForm100(doc));
+        let htmlForPdf = formDoc?.html?.trim() ?? "";
+
+        if (!htmlForPdf && Array.isArray(raw)) {
+          const idx = misHisForm100FirstIndexInBody(raw);
+          if (idx != null) {
+            const row = raw[idx] as Record<string, unknown>;
+            const td = row?.templateData;
+            if (typeof td === "string") htmlForPdf = td.trim();
+          }
+        }
+
+        if (htmlForPdf) {
+          await runMisPrintFormsPdfAction({
+            appointmentId: id,
+            action: "download",
+            htmlForPdf,
+            shareDialogTitle: "ფორმა 100",
+          });
+          return;
+        }
+      }
+
+      let formIndex: number | null = null;
+      if (
+        typeof d.misForm100PrintFormIndex === "number" &&
+        Number.isInteger(d.misForm100PrintFormIndex)
+      ) {
+        formIndex = d.misForm100PrintFormIndex;
+      }
+      if (formIndex == null && raw != null) {
+        formIndex = misHisForm100FirstIndexInBody(raw);
+      }
+      if (
+        formIndex == null &&
+        typeof visit.misForm100PrintFormIndex === "number" &&
+        Number.isInteger(visit.misForm100PrintFormIndex)
+      ) {
+        formIndex = visit.misForm100PrintFormIndex;
+      }
+      if (formIndex == null) {
+        Alert.alert(
+          "ინფორმაცია",
+          "ფორმა IV–100-ის მონაცემი ვერ მოიძებნა. სთხოვეთ ექიმს ერთხელ მაინც გახსნას ამ ჯავშნის HIS ფორმები აპში, შემდეგ სცადეთ თავიდან.",
+        );
+        return;
+      }
+      const dl = await apiService.downloadMisPrintFormPdf(id, {
+        index: formIndex,
+        refetch: true,
+      });
+      if (dl.success && dl.uri) {
+        const canShare = await Sharing.isAvailableAsync();
+        if (canShare) {
+          await Sharing.shareAsync(dl.uri, {
+            mimeType: dl.contentType || "application/pdf",
+            dialogTitle: "ფორმა 100",
+          });
+        } else {
+          await Linking.openURL(dl.uri);
+        }
+      } else {
+        Alert.alert("შეცდომა", "PDF-ის ჩამოტვირთვა ვერ მოხერხდა");
+      }
+    } catch (e: unknown) {
+      console.error("[History] Form 100 HIS/PDF:", e);
+      const msg = e instanceof Error ? e.message : String(e);
+      Alert.alert("შეცდომა", msg || "ფორმა 100 ვერ გაიხსნა");
+    } finally {
+      setOpeningForm100VisitId(null);
+    }
+  };
+
+  const openVisitMisCalculation = async (visit: any) => {
+    const id = visit?.id;
+    if (!id) return;
+
+    if (!visit.misForm100AvailableAt?.trim?.()) {
+      Alert.alert(
+        "ინფორმაცია",
+        "კალკულაცია ხელმისაწვდომია მხოლოდ HIS-ზე დადასტურებული ვიზიტისთვის.",
+      );
+      return;
+    }
+
+    setOpeningMisCalcVisitId(id);
+    try {
+      const mis = await apiService.getMisPrintForms(id, true);
+      if (!mis.success || !mis.data) {
+        Alert.alert("შეცდომა", "HIS ფორმები ვერ ჩაიტვირთა");
+        return;
+      }
+      const d = mis.data;
+      const raw = d.misPrintFormsByService;
+
+      if (raw != null) {
+        const visible = filterMisPrintDocumentsDoctorVisible(
+          parseMisPrintFormDocuments(raw),
+        );
+        const calcDoc = visible.find((doc) => !isMisDocumentForm100(doc));
+        let htmlForPdf = calcDoc?.html?.trim() ?? "";
+
+        if (!htmlForPdf && Array.isArray(raw)) {
+          const idx = misHisCalculationBestIndexInBody(raw);
+          if (idx != null) {
+            const row = raw[idx] as Record<string, unknown>;
+            const td = row?.templateData;
+            if (typeof td === "string") htmlForPdf = td.trim();
+          }
+        }
+
+        if (htmlForPdf) {
+          await runMisPrintFormsPdfAction({
+            appointmentId: id,
+            action: "download",
+            htmlForPdf,
+            shareDialogTitle: "კალკულაცია",
+          });
+          return;
+        }
+      }
+
+      Alert.alert(
+        "ინფორმაცია",
+        "კალკულაცია ამ ვიზიტისთვის ვერ მოიძებნა ან ჯერ არ არის HIS-ში.",
+      );
+    } catch (e: unknown) {
+      console.error("[History] MIS calculation:", e);
+      const msg = e instanceof Error ? e.message : String(e);
+      Alert.alert("შეცდომა", msg || "კალკულაცია ვერ გაიხსნა");
+    } finally {
+      setOpeningMisCalcVisitId(null);
     }
   };
 
@@ -418,15 +643,6 @@ const History = () => {
                             <Text style={styles.doctorName}>
                               {visit.doctorName}
                             </Text>
-                            {visitDocs.length > 0 && (
-                              <View style={styles.fileIndicatorBadge}>
-                                <Ionicons
-                                  name="document-attach"
-                                  size={12}
-                                  color="#0EA5E9"
-                                />
-                              </View>
-                            )}
                           </View>
                           <Text style={styles.doctorSpecialty}>
                             {visit.doctorSpecialty || "სპეციალისტი"}
@@ -640,44 +856,25 @@ const History = () => {
                         </View>
                       )}
 
-                      {/* Form 100 Button */}
-                      {visit.form100 && (
+                      {/* ფორმა 100 — PDF ან HIS; HIS-ზე კალკულაცია ცალკე ღილაკი */}
+                      {historyVisitHasForm100(visit) && (
                         <TouchableOpacity
                           style={styles.actionButton}
-                          onPress={async () => {
-                            try {
-                              if (visit.form100.pdfUrl) {
-                                const canOpen = await Linking.canOpenURL(
-                                  visit.form100.pdfUrl,
-                                );
-                                if (canOpen) {
-                                  await Linking.openURL(visit.form100.pdfUrl);
-                                } else {
-                                  Alert.alert(
-                                    "შეცდომა",
-                                    "PDF ფაილის გახსნა ვერ მოხერხდა",
-                                  );
-                                }
-                              } else {
-                                Alert.alert(
-                                  "ინფორმაცია",
-                                  "PDF ფაილი ჯერ არ არის ხელმისაწვდომი",
-                                );
-                              }
-                            } catch (error) {
-                              console.error("Error opening Form 100:", error);
-                              Alert.alert(
-                                "შეცდომა",
-                                "PDF ფაილის გახსნა ვერ მოხერხდა",
-                              );
-                            }
-                          }}
+                          disabled={
+                            openingForm100VisitId === visit.id ||
+                            openingMisCalcVisitId === visit.id
+                          }
+                          onPress={() => void openVisitForm100(visit)}
                         >
-                          <Ionicons
-                            name="document-text"
-                            size={18}
-                            color="#10B981"
-                          />
+                          {openingForm100VisitId === visit.id ? (
+                            <ActivityIndicator size="small" color="#10B981" />
+                          ) : (
+                            <Ionicons
+                              name="document-text"
+                              size={18}
+                              color="#10B981"
+                            />
+                          )}
                           <Text style={styles.actionButtonText}>ფორმა 100</Text>
                           <Ionicons
                             name="chevron-forward"
@@ -686,6 +883,35 @@ const History = () => {
                           />
                         </TouchableOpacity>
                       )}
+                      {visit.misForm100AvailableAt &&
+                        historyVisitHasForm100(visit) && (
+                          <TouchableOpacity
+                            style={styles.actionButton}
+                            disabled={
+                              openingForm100VisitId === visit.id ||
+                              openingMisCalcVisitId === visit.id
+                            }
+                            onPress={() => void openVisitMisCalculation(visit)}
+                          >
+                            {openingMisCalcVisitId === visit.id ? (
+                              <ActivityIndicator size="small" color="#0D9488" />
+                            ) : (
+                              <Ionicons
+                                name="calculator-outline"
+                                size={18}
+                                color="#0D9488"
+                              />
+                            )}
+                            <Text style={styles.actionButtonText}>
+                              კალკულაცია
+                            </Text>
+                            <Ionicons
+                              name="chevron-forward"
+                              size={16}
+                              color="#6B7280"
+                            />
+                          </TouchableOpacity>
+                        )}
 
                       {/* Prescription Button */}
                       {visit.medications && visit.medications.length > 0 && (
@@ -1351,6 +1577,21 @@ const mapAppointmentToVisit = (appointment: any) => {
     consultationSummary: summary,
     followUp: appointment.followUp,
     form100: appointment.form100,
+    misForm100AvailableAt: (() => {
+      const v = appointment.misForm100AvailableAt;
+      if (v == null || v === "") return undefined;
+      if (typeof v === "string" && v.trim()) return v.trim();
+      try {
+        return new Date(v as string | number | Date).toISOString();
+      } catch {
+        return undefined;
+      }
+    })(),
+    misForm100PrintFormIndex:
+      typeof appointment.misForm100PrintFormIndex === "number" &&
+      Number.isInteger(appointment.misForm100PrintFormIndex)
+        ? appointment.misForm100PrintFormIndex
+        : undefined,
     laboratoryTests: appointment.laboratoryTests || [],
     instrumentalTests: appointment.instrumentalTests || [],
     status,
@@ -1645,15 +1886,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Poppins-SemiBold",
     color: "#06B6D4",
-  },
-  fileIndicatorBadge: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: "#E0F2FE",
-    justifyContent: "center",
-    alignItems: "center",
-    marginLeft: 6,
   },
   expandedSection: {
     marginTop: 12,

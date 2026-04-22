@@ -3305,6 +3305,7 @@ export default function RegisterScreen() {
               domStorageEnabled={true}
               startInLoadingState={true}
               scalesPageToFit={true}
+              allowsInlineMediaPlayback
               onLoadStart={() => {
                 console.log(
                   "🔄 [IDENTOMAT] WebView load started:",

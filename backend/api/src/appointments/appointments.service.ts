@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -9,7 +10,14 @@ import { RtcRole, RtcTokenBuilder } from 'agora-access-token';
 import mongoose from 'mongoose';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { Availability } from '../doctors/schemas/availability.schema';
+import { misAttachGeneratedServiceId } from '../integrations/mis-appointment-generate.sync';
+import { MisAuthService } from '../integrations/mis-auth.service';
+import {
+  misHisForm100FirstIndex,
+  misHisPrintFormsIncludeForm100,
+} from '../integrations/mis-form100-his-detect';
 import { User, UserRole } from '../schemas/user.schema';
+import { appointmentHasForm100ReadyForCompletion } from './appointment-form100-ready.util';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import {
   Appointment,
@@ -22,6 +30,8 @@ import {
 
 @Injectable()
 export class AppointmentsService {
+  private readonly logger = new Logger(AppointmentsService.name);
+
   constructor(
     @InjectModel(Appointment.name)
     private appointmentModel: mongoose.Model<AppointmentDocument>,
@@ -30,25 +40,237 @@ export class AppointmentsService {
     @InjectModel(Availability.name)
     private availabilityModel: mongoose.Model<any>,
     private readonly cloudinaryService: CloudinaryService,
+    private readonly misAuthService: MisAuthService,
   ) {
     setInterval(() => {
       void this.cleanupExpiredBlocks();
     }, 60000);
   }
 
+  /**
+   * populate-ის შემდეგ patientId/doctorId შეიძლება იყოს დოკუმენტი {_id,...} — არა მხოლოდ ObjectId.
+   * `.toString()` ობიექტზე იძლევა `[object Object]`-ს და ავტორიზაცია ყოველთვის ვარდება.
+   */
+  private appointmentUserRefId(ref: unknown): string {
+    if (ref == null) return '';
+    if (ref instanceof mongoose.Types.ObjectId) {
+      return ref.toHexString();
+    }
+    if (typeof ref === 'string') return ref;
+    if (typeof ref === 'object' && ref !== null && '_id' in ref) {
+      return this.appointmentUserRefId((ref as { _id: unknown })._id);
+    }
+    return '';
+  }
+
   private ensurePatientOwner(patientId: string, apt: AppointmentDocument) {
-    if (apt.patientId.toString() !== patientId.toString()) {
+    if (this.appointmentUserRefId(apt.patientId) !== patientId.toString()) {
       throw new UnauthorizedException('Not allowed for this appointment');
     }
   }
 
   private ensureDoctorOrPatient(userId: string, apt: AppointmentDocument) {
+    const uid = userId.toString();
     const isOwner =
-      apt.patientId.toString() === userId.toString() ||
-      apt.doctorId.toString() === userId.toString();
+      this.appointmentUserRefId(apt.patientId) === uid ||
+      this.appointmentUserRefId(apt.doctorId) === uid;
     if (!isOwner) {
       throw new UnauthorizedException('Not allowed for this appointment');
     }
+  }
+
+  /**
+   * HIS/MIS ველები პასუხის JSON-ში.
+   * `misPrintForms*` Mongo-ში აღარ ინახება — ყოველთვის null (HIS მხოლოდ GET mis-print-forms-ით).
+   */
+  private withExplicitMisFields(
+    doc: Record<string, unknown>,
+  ): Record<string, unknown> {
+    return {
+      ...doc,
+      misGeneratedServiceId: doc.misGeneratedServiceId ?? null,
+      misPrintFormsByService: null,
+      misPrintFormsFetchedAt: null,
+    };
+  }
+
+  /** MIS ფორმების ტელი სერვერზე — მოკლე შინაარსი (არა სრული JSON). */
+  private summarizeMisPrintFormsForLog(body: unknown): Record<string, unknown> {
+    if (body == null) {
+      return { present: false };
+    }
+    if (Array.isArray(body)) {
+      return {
+        present: true,
+        kind: 'array',
+        length: body.length,
+        firstItemKeys:
+          body[0] != null && typeof body[0] === 'object'
+            ? Object.keys(body[0] as object).slice(0, 15)
+            : [],
+      };
+    }
+    if (typeof body === 'object') {
+      const keys = Object.keys(body);
+      let jsonLen = 0;
+      try {
+        jsonLen = JSON.stringify(body).length;
+      } catch {
+        jsonLen = -1;
+      }
+      return {
+        present: true,
+        kind: 'object',
+        keyCount: keys.length,
+        keysSample: keys.slice(0, 20),
+        approxJsonChars: jsonLen,
+      };
+    }
+    return { present: true, kind: typeof body };
+  }
+
+  private logAppointmentResponseMis(
+    context: string,
+    appointmentId: string,
+    data: Record<string, unknown>,
+  ) {
+    this.logger.log(
+      JSON.stringify({
+        tag: 'appointment-response-mis',
+        context,
+        appointmentId,
+        misGeneratedServiceId: data.misGeneratedServiceId ?? null,
+        misPrintFormsFetchedAt: data.misPrintFormsFetchedAt ?? null,
+        misPrintFormsByServiceSummary: this.summarizeMisPrintFormsForLog(
+          data.misPrintFormsByService,
+        ),
+      }),
+    );
+  }
+
+  private async findAppointmentByIdOrNumber(
+    appointmentIdOrNumber: string,
+  ): Promise<AppointmentDocument | null> {
+    let appointment: AppointmentDocument | null = null;
+    if (mongoose.Types.ObjectId.isValid(appointmentIdOrNumber)) {
+      appointment = await this.appointmentModel.findById(
+        new mongoose.Types.ObjectId(appointmentIdOrNumber),
+      );
+    }
+
+    if (!appointment) {
+      appointment = await this.appointmentModel.findOne({
+        appointmentNumber: appointmentIdOrNumber,
+      });
+    }
+    return appointment;
+  }
+
+  private getFormsArrayFromMisBody(body: unknown): unknown[] {
+    if (Array.isArray(body)) {
+      return body;
+    }
+    if (!body || typeof body !== 'object') {
+      return [];
+    }
+
+    const obj = body as Record<string, unknown>;
+    for (const key of [
+      'value',
+      'Value',
+      'data',
+      'Data',
+      'forms',
+      'Forms',
+      'items',
+      'Items',
+      'result',
+      'Result',
+    ]) {
+      const value = obj[key];
+      if (Array.isArray(value)) {
+        return value;
+      }
+    }
+    return [];
+  }
+
+  private getStringByKeys(
+    obj: Record<string, unknown>,
+    keys: string[],
+  ): string | null {
+    for (const key of keys) {
+      const value = obj[key];
+      if (typeof value === 'string' && value.trim()) {
+        return value.trim();
+      }
+    }
+    return null;
+  }
+
+  private getPdfSourceFromForm(form: unknown): {
+    url: string | null;
+    base64: string | null;
+    fileName: string | null;
+  } {
+    if (!form || typeof form !== 'object') {
+      return { url: null, base64: null, fileName: null };
+    }
+
+    const obj = form as Record<string, unknown>;
+    const url = this.getStringByKeys(obj, [
+      'pdfUrl',
+      'PdfUrl',
+      'pdfURL',
+      'PdfURL',
+      'url',
+      'Url',
+      'fileUrl',
+      'FileUrl',
+      'downloadUrl',
+      'DownloadUrl',
+      'link',
+      'Link',
+    ]);
+    const base64 = this.getStringByKeys(obj, [
+      'pdfBase64',
+      'PdfBase64',
+      'base64',
+      'Base64',
+      'contentBase64',
+      'ContentBase64',
+      'fileContent',
+      'FileContent',
+      'content',
+      'Content',
+      'raw',
+      'Raw',
+    ]);
+    const fileName = this.getStringByKeys(obj, [
+      'fileName',
+      'FileName',
+      'name',
+      'Name',
+      'title',
+      'Title',
+    ]);
+
+    return { url, base64, fileName };
+  }
+
+  private decodeBase64Pdf(value: string): Buffer {
+    const trimmed = value.trim();
+    const commaIdx = trimmed.indexOf(',');
+    const payload =
+      trimmed.startsWith('data:') && commaIdx > -1
+        ? trimmed.slice(commaIdx + 1)
+        : trimmed;
+
+    const buf = Buffer.from(payload, 'base64');
+    if (buf.length === 0) {
+      throw new BadRequestException('MIS form-ის PDF base64 ცარიელია.');
+    }
+    return buf;
   }
 
   async addDocument(
@@ -193,6 +415,22 @@ export class AppointmentsService {
       throw new NotFoundException('User not found');
     }
 
+    const misPersonId =
+      typeof patient.misPersonId === 'string' ? patient.misPersonId.trim() : '';
+    if (!misPersonId) {
+      throw new BadRequestException(
+        'HIS პაციენტის ID აკლია — ჯავშანი შეუძლებელია. დარწმუნდით, რომ პროფილი HIS-თან არის დასინქრონებული.',
+      );
+    }
+
+    const doctorPersonalId =
+      typeof doctor.idNumber === 'string' ? doctor.idNumber.trim() : '';
+    if (!doctorPersonalId) {
+      throw new BadRequestException(
+        'ექიმს არ აქვს პირადი ნომერი — ჯავშანი შეუძლებელია (MIS DoctorPersonalID).',
+      );
+    }
+
     // If patientDetails are provided and different from logged-in user,
     // it means booking for someone else, but patientId remains the logged-in user
     // This allows tracking who created the appointment
@@ -330,6 +568,7 @@ export class AppointmentsService {
       appointmentDate: normalizedDate,
       appointmentTime: createAppointmentDto.appointmentTime,
       type: createAppointmentDto.type, // Include appointment type (video/home-visit)
+      ...(createAppointmentDto.isFollowUp === true ? { isFollowUp: true } : {}),
       status: AppointmentStatus.PENDING,
       consultationFee: createAppointmentDto.consultationFee,
       totalAmount: createAppointmentDto.totalAmount,
@@ -345,12 +584,33 @@ export class AppointmentsService {
 
     await appointment.save();
 
+    await misAttachGeneratedServiceId(
+      this.misAuthService,
+      this.appointmentModel,
+      appointment,
+      {
+        misPersonId,
+        doctorPersonalId,
+        serviceDateIso: appointmentStartLocal.toISOString(),
+      },
+      this.logger,
+    );
+
     // Note: We don't remove time slots from availability anymore.
     // Instead, we track booked slots dynamically by querying appointments.
 
+    const createdPayload = this.withExplicitMisFields(
+      appointment.toObject() as unknown as Record<string, unknown>,
+    );
+    this.logAppointmentResponseMis(
+      'createAppointment',
+      (appointment._id as mongoose.Types.ObjectId).toString(),
+      createdPayload,
+    );
+
     return {
       success: true,
-      data: appointment,
+      data: createdPayload,
     };
   }
 
@@ -505,6 +765,337 @@ export class AppointmentsService {
     };
   }
 
+  /**
+   * HIS GetFormsByServiceID — მხოლოდ წაკითხვა; Mongo-ში ფორმები აღარ ინახება.
+   */
+  private async fetchMisPrintFormsBodyFromHis(
+    serviceId: string,
+  ): Promise<{ ok: boolean; body: unknown | null }> {
+    const r = await this.misAuthService.getFormsByServiceId(serviceId);
+    if (r.success && r.body != null) {
+      return { ok: true, body: r.body };
+    }
+    return { ok: false, body: null };
+  }
+
+  /** ლოგი: HIS პასუხის სრული სტრუქტურა, `templateData` — სიგრძე + ნაწყვეტები (არა მთელი HTML). */
+  private misPrintFormsPayloadForLog(body: unknown): string {
+    try {
+      return JSON.stringify(
+        body,
+        (key, value) => {
+          if (key === 'templateData' && typeof value === 'string') {
+            const s = value;
+            return {
+              _htmlChars: s.length,
+              _htmlStart: s.slice(0, 500),
+              ...(s.length > 900 ? { _htmlEnd: s.slice(-400) } : {}),
+            };
+          }
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- JSON.stringify replacer
+          return value;
+        },
+        2,
+      );
+    } catch {
+      return '[misPrintFormsPayloadForLog: error]';
+    }
+  }
+
+  /** HIS HTML ფრაგმენტში უსაფრთხო ჩასმა */
+  private escapeMisHtmlFragment(text: string): string {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  /** ჯავშნიდან პაციენტის სახელი (patientDetails ან დაკავშირებული User). */
+  private getPatientDisplayNameForMis(
+    appointment: AppointmentDocument,
+  ): string {
+    const pd = appointment.patientDetails;
+    const fromDetails = [pd?.name?.trim(), pd?.lastName?.trim()]
+      .filter(Boolean)
+      .join(' ')
+      .trim();
+    if (fromDetails) return fromDetails;
+    const pop = appointment.patientId as unknown as { name?: string };
+    if (pop && typeof pop === 'object' && typeof pop.name === 'string') {
+      return pop.name.trim();
+    }
+    return '';
+  }
+
+  private getDoctorLineForMis(appointment: AppointmentDocument): string {
+    const d = appointment.doctorId as unknown as {
+      name?: string;
+      specialization?: string;
+    };
+    if (!d || typeof d !== 'object') return '';
+    const name = typeof d.name === 'string' ? d.name.trim() : '';
+    const spec =
+      typeof d.specialization === 'string' ? d.specialization.trim() : '';
+    return [name, spec].filter(Boolean).join(', ');
+  }
+
+  /**
+   * HIS ხშირად ტოვებს ცარიელს პაციენტის/ექიმის ველებში — ვავსებთ ჯავშნის მონაცემებით (არა Mongo-ში შენახვა).
+   */
+  private enrichMisPrintFormsBodyFromAppointment(
+    appointment: AppointmentDocument,
+    body: unknown,
+  ): unknown {
+    if (!Array.isArray(body)) {
+      return body;
+    }
+    const patientName = this.getPatientDisplayNameForMis(appointment);
+    const personalId = appointment.patientDetails?.personalId?.trim() ?? '';
+    const doctorLine = this.getDoctorLineForMis(appointment);
+
+    return body.map((row) => {
+      if (!row || typeof row !== 'object') return row;
+      const o = row as Record<string, unknown>;
+      const td = o.templateData;
+      if (typeof td !== 'string' || td.length === 0) return row;
+      let html = td;
+      if (patientName) {
+        const safe = this.escapeMisHtmlFragment(patientName);
+        html = html.replace(
+          /(<strong>პაციენტი:<\/strong>)(\s+)(<strong[^>]*>[^<]*ასაკი:)/i,
+          `$1 ${safe} $3`,
+        );
+      }
+      if (personalId) {
+        const safeId = this.escapeMisHtmlFragment(personalId);
+        html = html.replace(
+          /(პირადი ნომერი:<\/strong>)(\s+)(<strong>)/i,
+          `$1 ${safeId} $3`,
+        );
+      }
+      if (doctorLine) {
+        const safeDoc = this.escapeMisHtmlFragment(doctorLine);
+        html = html.replace(
+          /(ექიმის სახელი და გვარი, სპეციალობა:)(\s*,)/i,
+          `$1 ${safeDoc}$2`,
+        );
+      }
+      return { ...o, templateData: html };
+    });
+  }
+
+  /**
+   * უკუთავსობა: ადრე Mongo-ში ინახებოდა; ახლა ფორმები მხოლოდ GET /appointments/:id/mis-print-forms-ით იტვირთება HIS-იდან.
+   */
+  async syncMisPrintFormsForPatient(patientId: string) {
+    const appointments = await this.appointmentModel.find({
+      patientId: new mongoose.Types.ObjectId(patientId),
+      misGeneratedServiceId: { $exists: true, $nin: [null, ''] },
+    });
+
+    return {
+      success: true,
+      data: {
+        processed: appointments.length,
+        saved: 0,
+        message:
+          'HIS ბეჭდვის ფორმები Mongo-ში აღარ ინახება — გამოიყენეთ ჯავშნის GET .../mis-print-forms.',
+      },
+    };
+  }
+
+  async getMisPrintFormsForAppointment(
+    userId: string,
+    appointmentId: string,
+    _refetch: boolean,
+  ) {
+    let appointment = await this.findAppointmentByIdOrNumber(appointmentId);
+    if (!appointment) {
+      throw new NotFoundException('Appointment not found');
+    }
+    appointment = await this.appointmentModel
+      .findById(appointment._id)
+      .populate('patientId', 'name email phone')
+      .populate('doctorId', 'name specialization');
+    if (!appointment) {
+      throw new NotFoundException('Appointment not found');
+    }
+
+    this.ensureDoctorOrPatient(userId, appointment);
+
+    const sid = appointment.misGeneratedServiceId?.trim();
+
+    if (!sid) {
+      const hisAt = appointment.misForm100AvailableAt;
+      const idx = appointment.misForm100PrintFormIndex;
+      return {
+        success: true,
+        data: {
+          misGeneratedServiceId: appointment.misGeneratedServiceId ?? null,
+          misPrintFormsByService: null,
+          misPrintFormsFetchedAt: null,
+          misForm100AvailableAt: hisAt ? new Date(hisAt).toISOString() : null,
+          misForm100PrintFormIndex:
+            typeof idx === 'number' && Number.isInteger(idx) ? idx : null,
+        },
+      };
+    }
+
+    const { ok, body } = await this.fetchMisPrintFormsBodyFromHis(sid);
+    if (!ok || body == null) {
+      const hisAt = appointment.misForm100AvailableAt;
+      const storedIdx = appointment.misForm100PrintFormIndex;
+      if (
+        hisAt != null &&
+        typeof storedIdx === 'number' &&
+        Number.isInteger(storedIdx) &&
+        storedIdx >= 0
+      ) {
+        return {
+          success: true,
+          data: {
+            misGeneratedServiceId: sid,
+            misPrintFormsByService: null,
+            misPrintFormsFetchedAt: null,
+            misForm100AvailableAt: new Date(hisAt).toISOString(),
+            misForm100PrintFormIndex: storedIdx,
+            misHisfetchDegraded: true,
+          },
+        };
+      }
+      throw new BadRequestException(
+        'HIS PrintForm/GetFormsByServiceID ვერ მოხერხდა.',
+      );
+    }
+
+    this.logger.log(
+      `HIS GetFormsByServiceID RAW appointment=${appointmentId} serviceId=${sid} kind=${Array.isArray(body) ? `array[len=${body.length}]` : typeof body}\n${this.misPrintFormsPayloadForLog(body)}`,
+    );
+
+    const enriched = this.enrichMisPrintFormsBodyFromAppointment(
+      appointment,
+      body,
+    );
+
+    this.logger.log(
+      `HIS mis-print-forms ENRICHED → API appointment=${appointmentId} serviceId=${sid}\n${this.misPrintFormsPayloadForLog(enriched)}`,
+    );
+
+    const hasHisForm100 = misHisPrintFormsIncludeForm100(enriched);
+    const form100Idx = hasHisForm100 ? misHisForm100FirstIndex(enriched) : null;
+    const markedAt = new Date();
+    await this.appointmentModel.updateOne(
+      { _id: appointment._id },
+      {
+        $set: {
+          misForm100AvailableAt: hasHisForm100 ? markedAt : null,
+          misForm100PrintFormIndex:
+            hasHisForm100 && form100Idx != null ? form100Idx : null,
+        },
+      },
+    );
+
+    return {
+      success: true,
+      data: {
+        misGeneratedServiceId: sid,
+        misPrintFormsByService: enriched,
+        misPrintFormsFetchedAt: markedAt.toISOString(),
+        misForm100AvailableAt: hasHisForm100 ? markedAt.toISOString() : null,
+        misForm100PrintFormIndex:
+          hasHisForm100 && form100Idx != null ? form100Idx : null,
+      },
+    };
+  }
+
+  async getMisPrintFormPdfForAppointment(
+    userId: string,
+    appointmentId: string,
+    formIndex: number,
+    _refetch: boolean,
+  ): Promise<{ buffer: Buffer; contentType: string; fileName: string }> {
+    if (!Number.isInteger(formIndex) || formIndex < 0) {
+      throw new BadRequestException(
+        'ფორმის ინდექსი უნდა იყოს 0 ან მეტი მთელი რიცხვი.',
+      );
+    }
+
+    let appointment = await this.findAppointmentByIdOrNumber(appointmentId);
+    if (!appointment) {
+      throw new NotFoundException('Appointment not found');
+    }
+    appointment = await this.appointmentModel
+      .findById(appointment._id)
+      .populate('patientId', 'name email phone')
+      .populate('doctorId', 'name specialization');
+    if (!appointment) {
+      throw new NotFoundException('Appointment not found');
+    }
+    this.ensureDoctorOrPatient(userId, appointment);
+
+    const sid = appointment.misGeneratedServiceId?.trim();
+    if (!sid) {
+      throw new BadRequestException(
+        'ამ ჯავშანზე HIS სერვისის ID არ არის — ფორმები ხელმიუწვდომელია.',
+      );
+    }
+
+    const { ok, body } = await this.fetchMisPrintFormsBodyFromHis(sid);
+    if (!ok || body == null) {
+      throw new BadRequestException(
+        'HIS PrintForm/GetFormsByServiceID ვერ მოხერხდა.',
+      );
+    }
+
+    const enriched = this.enrichMisPrintFormsBodyFromAppointment(
+      appointment,
+      body,
+    );
+
+    const forms = this.getFormsArrayFromMisBody(enriched);
+    if (forms.length === 0) {
+      throw new BadRequestException('ამ ჯავშანზე HIS ფორმები ცარიელია.');
+    }
+    if (formIndex >= forms.length) {
+      throw new BadRequestException(
+        `ფორმის ინდექსი მიუწვდომელია: მაქს=${forms.length - 1}`,
+      );
+    }
+
+    const selectedForm = forms[formIndex];
+    const source = this.getPdfSourceFromForm(selectedForm);
+
+    const fallbackFileName = `appointment-${(appointment._id as mongoose.Types.ObjectId).toString()}-mis-form-${formIndex + 1}.pdf`;
+    if (source.url) {
+      const downloaded = await this.misAuthService.downloadBinaryFromMis(
+        source.url,
+      );
+      if (!downloaded.success || !downloaded.buffer) {
+        throw new BadRequestException(
+          'MIS form PDF ჩამოტვირთვა ვერ მოხერხდა მოცემული URL-იდან.',
+        );
+      }
+      return {
+        buffer: downloaded.buffer,
+        contentType: downloaded.contentType || 'application/pdf',
+        fileName: downloaded.fileName || source.fileName || fallbackFileName,
+      };
+    }
+
+    if (source.base64) {
+      return {
+        buffer: this.decodeBase64Pdf(source.base64),
+        contentType: 'application/pdf',
+        fileName: source.fileName || fallbackFileName,
+      };
+    }
+
+    throw new BadRequestException(
+      'ფორმაში PDF წყარო ვერ მოიძებნა (არც URL და არც base64).',
+    );
+  }
+
   async getAppointmentById(appointmentId: string) {
     let appointment;
 
@@ -528,9 +1119,16 @@ export class AppointmentsService {
       throw new NotFoundException('Appointment not found');
     }
 
+    const byIdPayload = this.withExplicitMisFields(
+      appointment as unknown as Record<string, unknown>,
+    );
+    const rawId = (appointment as { _id?: mongoose.Types.ObjectId })._id;
+    const idForLog = rawId != null ? rawId.toString() : appointmentId;
+    this.logAppointmentResponseMis('getAppointmentById', idForLog, byIdPayload);
+
     return {
       success: true,
-      data: appointment,
+      data: byIdPayload,
     };
   }
 
@@ -1288,6 +1886,37 @@ export class AppointmentsService {
     );
     const originalAppointment = eligibilityCheck.originalAppointment;
 
+    const patientForMis = await this.userModel.findById(
+      new mongoose.Types.ObjectId(patientId),
+    );
+    if (!patientForMis) {
+      throw new NotFoundException('User not found');
+    }
+    const followUpMisPersonId =
+      typeof patientForMis.misPersonId === 'string'
+        ? patientForMis.misPersonId.trim()
+        : '';
+    if (!followUpMisPersonId) {
+      throw new BadRequestException(
+        'HIS პაციენტის ID აკლია — განმეორებითი ვიზიტი შეუძლებელია.',
+      );
+    }
+    const doctorForMis = await this.userModel.findById(
+      originalAppointment.doctorId,
+    );
+    if (!doctorForMis || doctorForMis.role !== UserRole.DOCTOR) {
+      throw new NotFoundException('Doctor not found');
+    }
+    const followUpDoctorPersonalId =
+      typeof doctorForMis.idNumber === 'string'
+        ? doctorForMis.idNumber.trim()
+        : '';
+    if (!followUpDoctorPersonalId) {
+      throw new BadRequestException(
+        'ექიმს არ აქვს პირადი ნომერი — განმეორებითი ვიზიტი შეუძლებელია.',
+      );
+    }
+
     if (!dto.date || !dto.time) {
       throw new BadRequestException('Follow-up date and time are required');
     }
@@ -1431,6 +2060,19 @@ export class AppointmentsService {
     });
 
     await followUpAppointment.save();
+
+    await misAttachGeneratedServiceId(
+      this.misAuthService,
+      this.appointmentModel,
+      followUpAppointment,
+      {
+        misPersonId: followUpMisPersonId,
+        doctorPersonalId: followUpDoctorPersonalId,
+        serviceDateIso: followUpDateTime.toISOString(),
+      },
+      this.logger,
+    );
+
     await followUpAppointment.populate(
       'patientId',
       'name dateOfBirth gender email phone',
@@ -2152,6 +2794,12 @@ export class AppointmentsService {
     // Check if already completed
     if (appointment.completedAt) {
       throw new BadRequestException('Consultation already completed');
+    }
+
+    if (!appointmentHasForm100ReadyForCompletion(appointment)) {
+      throw new BadRequestException(
+        'ფორმა IV–100 უნდა ჩანდეს HIS mis-print-forms-ზე (აპში ჩაიტვირთეთ ჯავშნის HIS ფორმები), სანამ ვიდეო კონსულტაციას დაასრულებთ. ატვირთული PDF არ ითვლება.',
+      );
     }
 
     // Mark as completed and set subStatus to conducted

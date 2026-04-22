@@ -1,7 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import * as DocumentPicker from "expo-document-picker";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
 import { useEffect, useRef, useState } from "react";
@@ -27,6 +27,7 @@ import {
   getConsultationTypeLabel,
   getStatusColor,
   getStatusLabel,
+  hasForm100ForVisitCompletion,
 } from "../../assets/data/doctorDashboard";
 import { apiService, Clinic, ShopProduct } from "../_services/api";
 import { useAuth } from "../contexts/AuthContext";
@@ -746,8 +747,68 @@ export default function DoctorPatients() {
       return;
     }
 
+    const isHomeVisitComplete = selectedConsultation.type === "home-visit";
+    /** სიიდან არჩეულ ჯავშანს ხშირად არ აქვს `misForm100AvailableAt` — შენახვამდე ერთი HIS GET ასინქრონებს ბაზას და სტეითს. */
+    let consultationForForm100Check: Consultation = selectedConsultation;
+    if (!isHomeVisitComplete) {
+      try {
+        const misRes = await apiService.getMisPrintForms(
+          selectedConsultation.id,
+          true,
+        );
+        if (misRes.success && misRes.data) {
+          const at = misRes.data.misForm100AvailableAt;
+          if (at !== undefined) {
+            consultationForForm100Check = {
+              ...selectedConsultation,
+              misForm100AvailableAt: at,
+            };
+            setSelectedConsultation(consultationForForm100Check);
+          }
+        }
+      } catch (e) {
+        console.warn("[DoctorPatients] getMisPrintForms before save", e);
+      }
+      if (!hasForm100ForVisitCompletion(consultationForForm100Check)) {
+        alert(
+          "ფორმა IV–100 უნდა ჩანდეს HIS mis-print-forms-ზე (ჯავშანზე HIS ფორმების ჩატვირთვა). ატვირთული PDF დასრულებისთვის არ ითვლება.",
+        );
+        return;
+      }
+    }
+
     try {
       setSavingAppointment(true);
+
+      let latestConsultation: Consultation | null = selectedConsultation;
+
+      if (!isHomeVisitComplete && form100File) {
+        const formResponse = await apiService.uploadForm100Document(
+          selectedConsultation.id,
+          {
+            diagnosis: appointmentData.diagnosis.trim() || undefined,
+          },
+          {
+            uri: form100File.uri,
+            name: form100File.name,
+            mimeType: form100File.mimeType,
+          },
+        );
+        if (!formResponse.success) {
+          Alert.alert(
+            "შეცდომა",
+            (formResponse as { message?: string }).message ||
+              "ფორმა 100 ვერ აიტვირთა",
+          );
+          return;
+        }
+        if (formResponse.data) {
+          latestConsultation = formResponse.data as Consultation;
+          updateConsultationState(latestConsultation);
+          setSelectedConsultation(latestConsultation);
+        }
+        setForm100File(null);
+      }
 
       // Convert medications array to JSON string for backend
       const medicationsString =
@@ -773,8 +834,6 @@ export default function DoctorPatients() {
             }
           : { required: false },
       };
-
-      let latestConsultation: Consultation | null = selectedConsultation;
 
       const response = (await apiService.updateDoctorAppointment(
         selectedConsultation.id,
@@ -892,6 +951,25 @@ export default function DoctorPatients() {
             [selectedConsultation.id]: (prev[selectedConsultation.id] || 0) + 1,
           }));
         }
+      }
+
+      if (isHomeVisitComplete && form100File) {
+        const formResponse = await apiService.uploadForm100Document(
+          selectedConsultation.id,
+          {
+            diagnosis: appointmentData.diagnosis.trim() || undefined,
+          },
+          {
+            uri: form100File.uri,
+            name: form100File.name,
+            mimeType: form100File.mimeType,
+          },
+        );
+        if (formResponse.success && formResponse.data) {
+          latestConsultation = formResponse.data as Consultation;
+          updateConsultationState(latestConsultation);
+        }
+        setForm100File(null);
       }
 
       if (latestConsultation) {

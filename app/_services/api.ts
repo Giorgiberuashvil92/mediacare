@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
+import * as FileSystem from "expo-file-system/legacy";
 import { logger } from "../utils/logger";
 
 // Development build-ისთვის IP მისამართის ავტომატურად გამოყენება
@@ -7,29 +8,36 @@ const getDevelopmentIP = (): string | null => {
   // დეტალური ლოგირება debug-ისთვის
   console.log("🔍 IP Detection Debug Info:");
   console.log("  - Constants.debuggerHost:", Constants.debuggerHost);
-  console.log("  - Constants.expoConfig?.hostUri:", Constants.expoConfig?.hostUri);
-  console.log("  - Constants.manifest?.hostUri:", (Constants.manifest as any)?.hostUri);
-  
+  console.log(
+    "  - Constants.expoConfig?.hostUri:",
+    Constants.expoConfig?.hostUri,
+  );
+  console.log(
+    "  - Constants.manifest?.hostUri:",
+    (Constants.manifest as any)?.hostUri,
+  );
+
   // პირველ რიგში ვცდილობთ expo-constants-დან ავტომატურად მივიღოთ IP
   const debuggerHost = Constants.debuggerHost;
   if (debuggerHost) {
     // debuggerHost არის "IP:port" ფორმატში, მაგ: "192.168.1.100:8081"
-    const ip = debuggerHost.split(':')[0];
+    const ip = debuggerHost.split(":")[0];
     console.log(`  - Extracted IP from debuggerHost: ${ip}`);
-    if (ip && ip !== 'localhost' && ip !== '127.0.0.1') {
+    if (ip && ip !== "localhost" && ip !== "127.0.0.1") {
       console.log(`🌐 ✅ Auto-detected IP from debuggerHost: ${ip}`);
       return ip;
     }
   }
 
   // ალტერნატიულად ვცდილობთ hostUri-დან
-  const hostUri = Constants.expoConfig?.hostUri || (Constants.manifest as any)?.hostUri;
+  const hostUri =
+    Constants.expoConfig?.hostUri || (Constants.manifest as any)?.hostUri;
   if (hostUri) {
     console.log(`  - hostUri value: ${hostUri}`);
-    
+
     // hostUri შეიძლება იყოს "exp://IP:port", "http://IP:port" ან "IP:port" ფორმატში
     let ip: string | null = null;
-    
+
     // ვცდილობთ exp:// ან http:// prefix-ით
     const matchWithPrefix = hostUri.match(/(?:exp|http):\/\/([^:]+)/);
     if (matchWithPrefix && matchWithPrefix[1]) {
@@ -43,8 +51,8 @@ const getDevelopmentIP = (): string | null => {
         console.log(`  - Extracted IP from hostUri (without prefix): ${ip}`);
       }
     }
-    
-    if (ip && ip !== 'localhost' && ip !== '127.0.0.1') {
+
+    if (ip && ip !== "localhost" && ip !== "127.0.0.1") {
       console.log(`🌐 ✅ Auto-detected IP from hostUri: ${ip}`);
       return ip;
     }
@@ -82,10 +90,14 @@ const getDefaultBaseUrl = () => {
 
   // Production-ისთვის (არა development) გამოვიყენოთ Railway URL
   if (!__DEV__) {
-  // თუ envUrl არის განსაზღვრული და არ არის localhost, გამოვიყენოთ ის
-  if (envUrl && !envUrl.includes("localhost") && !envUrl.includes("127.0.0.1")) {
+    // თუ envUrl არის განსაზღვრული და არ არის localhost, გამოვიყენოთ ის
+    if (
+      envUrl &&
+      !envUrl.includes("localhost") &&
+      !envUrl.includes("127.0.0.1")
+    ) {
       console.log("✅ Using production URL from env:", envUrl);
-    return envUrl;
+      return envUrl;
     }
     // Production-ისთვის Railway URL
     console.log("🚂 Using Railway production URL:", RAILWAY_URL);
@@ -94,17 +106,21 @@ const getDefaultBaseUrl = () => {
 
   // Development build-ისთვის გამოვიყენოთ ავტომატურად გამოვლენილი IP
   // თუ envUrl არის განსაზღვრული და არ არის localhost, გამოვიყენოთ ის
-  if (envUrl && !envUrl.includes("localhost") && !envUrl.includes("127.0.0.1")) {
+  if (
+    envUrl &&
+    !envUrl.includes("localhost") &&
+    !envUrl.includes("127.0.0.1")
+  ) {
     console.log("✅ Using development URL from env:", envUrl);
     return envUrl;
   }
 
   // Development-ისთვის IP-ის გამოყენება
-    const devIP = getDevelopmentIP();
-    if (devIP) {
-      const devUrl = `http://${devIP}:4001`;
+  const devIP = getDevelopmentIP();
+  if (devIP) {
+    const devUrl = `http://${devIP}:4001`;
     console.log("🔧 Using development URL with IP:", devUrl);
-      return devUrl;
+    return devUrl;
   }
 
   // Fallback
@@ -150,20 +166,18 @@ export interface RegisterRequest {
   role: "doctor" | "patient";
   idNumber: string;
   phone: string;
-  verificationCode: string; // OTP code for phone verification
+  verificationCode: string;
   specialization?: string;
   licenseDocument?: string;
   profileImage?: string;
-  /** ექიმის Mongo _id — პაციენტის რეგისტრაცია ვიზიტით → MIS GenerateService */
   appointmentDoctorId?: string;
-  /** ISO თარიღი/დრო ვიზიტისთვის */
   appointmentServiceDate?: string;
 }
 
 export interface AuthResponse {
   success: boolean;
   message: string;
-  requiresOTP?: boolean; // If true, OTP verification is required before login
+  requiresOTP?: boolean;
   data: {
     user: User;
     token?: string; // Optional if requiresOTP is true
@@ -248,6 +262,23 @@ export interface CreateSessionRequest {
   initiator_type: "customer" | "doctor";
 }
 
+export type AIMessageFeedbackRating = "like" | "dislike";
+
+export type AIMessageFeedbackProblem =
+  | "incorrect"
+  | "incomplete"
+  | "unsafe"
+  | "hard_to_understand"
+  | "other";
+
+export interface AIMessageFeedback {
+  rating: AIMessageFeedbackRating;
+  problem: AIMessageFeedbackProblem | null;
+  details: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface AIMessage {
   id: string;
   session_id: string;
@@ -255,6 +286,7 @@ export interface AIMessage {
   content: string;
   created_at: string;
   image_url?: string;
+  feedback?: AIMessageFeedback | null;
   // Additional metadata that AI might return (e.g., doctor recommendations)
   metadata?: {
     doctors?: {
@@ -311,6 +343,33 @@ class ApiService {
       "Content-Type": "application/json",
       ...(token && { Authorization: `Bearer ${token}` }),
     };
+  }
+
+  private extractFileNameFromContentDisposition(
+    contentDisposition?: string,
+  ): string | null {
+    if (!contentDisposition) {
+      return null;
+    }
+
+    const utf8Match = /filename\*\s*=\s*UTF-8''([^;]+)/i.exec(
+      contentDisposition,
+    );
+    if (utf8Match?.[1]) {
+      try {
+        return decodeURIComponent(utf8Match[1]);
+      } catch {
+        return utf8Match[1];
+      }
+    }
+
+    const quotedMatch = /filename\s*=\s*"([^"]+)"/i.exec(contentDisposition);
+    if (quotedMatch?.[1]) {
+      return quotedMatch[1];
+    }
+
+    const plainMatch = /filename\s*=\s*([^;]+)/i.exec(contentDisposition);
+    return plainMatch?.[1]?.trim() || null;
   }
 
   private async handleResponse<T>(response: Response): Promise<T> {
@@ -391,21 +450,26 @@ class ApiService {
     // Store tokens only if OTP is NOT required
     // If OTP is required, tokens will be stored after OTP verification
     // Also, if user has a phone number, always require OTP (force OTP after logout)
-    if (!data.requiresOTP && (!data.data.user.phone || !data.data.user.phone.trim())) {
+    if (
+      !data.requiresOTP &&
+      (!data.data.user.phone || !data.data.user.phone.trim())
+    ) {
       // Only store tokens if OTP is not required AND user doesn't have a phone
-    if (data.data.token) {
-      await AsyncStorage.setItem("accessToken", data.data.token);
-    }
-    if (data.data.refreshToken) {
-      await AsyncStorage.setItem("refreshToken", data.data.refreshToken);
-    }
-    if (data.data.user) {
-      await AsyncStorage.setItem("user", JSON.stringify(data.data.user));
+      if (data.data.token) {
+        await AsyncStorage.setItem("accessToken", data.data.token);
+      }
+      if (data.data.refreshToken) {
+        await AsyncStorage.setItem("refreshToken", data.data.refreshToken);
+      }
+      if (data.data.user) {
+        await AsyncStorage.setItem("user", JSON.stringify(data.data.user));
       }
     } else {
       // OTP required or user has phone - don't store tokens yet
       // They will be stored after OTP verification in verifyLoginOTP
-      console.log('⚠️ [ApiService] OTP required or user has phone - not storing tokens yet');
+      console.log(
+        "⚠️ [ApiService] OTP required or user has phone - not storing tokens yet",
+      );
     }
 
     return data;
@@ -504,8 +568,11 @@ class ApiService {
       },
     );
 
-    const result = await this.handleResponse<{ success: boolean; message: string }>(response);
-    
+    const result = await this.handleResponse<{
+      success: boolean;
+      message: string;
+    }>(response);
+
     console.log("📞 [API] Phone verification code response:", {
       success: result.success,
       message: result.message,
@@ -649,7 +716,7 @@ class ApiService {
       if (!response.ok) {
         const errorText = await response.text();
         let errorMessage = `HTTP error! status: ${response.status}`;
-        
+
         try {
           const errorData = JSON.parse(errorText);
           errorMessage = errorData.message || errorMessage;
@@ -690,8 +757,8 @@ class ApiService {
       throw new Error("Invalid response format from server");
     } catch (error) {
       console.error("❌ Profile image upload error:", error);
-      throw error instanceof Error 
-        ? error 
+      throw error instanceof Error
+        ? error
         : new Error("Failed to upload profile image");
     }
   }
@@ -1020,13 +1087,12 @@ class ApiService {
       body: JSON.stringify({ phone }),
     });
 
-    return this.handleResponse<{ success: boolean; message?: string }>(response);
+    return this.handleResponse<{ success: boolean; message?: string }>(
+      response,
+    );
   }
 
-  async resetPassword(data: {
-    phone: string;
-    newPassword: string;
-  }): Promise<{
+  async resetPassword(data: { phone: string; newPassword: string }): Promise<{
     success: boolean;
     message?: string;
   }> {
@@ -1045,7 +1111,9 @@ class ApiService {
       body: JSON.stringify(data),
     });
 
-    return this.handleResponse<{ success: boolean; message?: string }>(response);
+    return this.handleResponse<{ success: boolean; message?: string }>(
+      response,
+    );
   }
 
   // Doctor Dashboard endpoints
@@ -1200,6 +1268,7 @@ class ApiService {
         pdfUrl?: string;
         fileName?: string;
       };
+      misForm100AvailableAt?: string | null;
     }[];
   }> {
     if (USE_MOCK_API) {
@@ -1530,6 +1599,8 @@ class ApiService {
     appointmentDate: string;
     appointmentTime: string;
     type: AppointmentType;
+    /** განმეორებითი ვიდეო — HIS სხვა ServiceID */
+    isFollowUp?: boolean;
     consultationFee: number;
     totalAmount: number;
     paymentMethod?: string;
@@ -1655,6 +1726,19 @@ class ApiService {
 
     return this.apiCall("/appointments/patient", {
       method: "GET",
+    });
+  }
+
+  /** HIS ფორმების სინქი პაციენტის ყველა misGeneratedServiceId-იან ჯავშანზე */
+  async syncPatientMisPrintForms(): Promise<{
+    success: boolean;
+    data?: { processed: number; saved: number };
+  }> {
+    if (USE_MOCK_API) {
+      return Promise.resolve({ success: true, data: { processed: 0, saved: 0 } });
+    }
+    return this.apiCall("/appointments/patient/sync-mis-print-forms", {
+      method: "POST",
     });
   }
 
@@ -1800,6 +1884,102 @@ class ApiService {
     });
   }
 
+  /** HIS PrintForm / GetFormsByServiceID — შენახული ან `refetch` HIS-იდან */
+  async getMisPrintForms(
+    appointmentId: string,
+    refetch = false,
+  ): Promise<{
+    success: boolean;
+    data?: {
+      misGeneratedServiceId?: string | null;
+      misPrintFormsByService?: unknown;
+      misPrintFormsFetchedAt?: string | null;
+      misForm100AvailableAt?: string | null;
+      misForm100PrintFormIndex?: number | null;
+      misHisfetchDegraded?: boolean;
+    };
+  }> {
+    if (USE_MOCK_API) {
+      return Promise.resolve({
+        success: true,
+        data: {
+          misGeneratedServiceId: null,
+          misPrintFormsByService: null,
+          misPrintFormsFetchedAt: null,
+          misForm100AvailableAt: null,
+          misForm100PrintFormIndex: null,
+        },
+      });
+    }
+    const q = refetch ? "?refetch=true" : "";
+    return this.apiCall(`/appointments/${appointmentId}/mis-print-forms${q}`, {
+      method: "GET",
+    });
+  }
+
+  /** HIS PrintForm PDF-ის ჩამოტვირთვა ლოკალურად (auth header-ით) */
+  async downloadMisPrintFormPdf(
+    appointmentId: string,
+    options?: { index?: number; refetch?: boolean },
+  ): Promise<{
+    success: boolean;
+    uri?: string;
+    fileName?: string;
+    contentType?: string;
+    status?: number;
+  }> {
+    if (USE_MOCK_API) {
+      return Promise.resolve({ success: false });
+    }
+
+    const index =
+      typeof options?.index === "number" && Number.isInteger(options.index)
+        ? options.index
+        : 0;
+    const refetch = options?.refetch === true;
+    const token = await AsyncStorage.getItem("accessToken");
+
+    const params = new URLSearchParams();
+    params.set("index", String(index));
+    if (refetch) {
+      params.set("refetch", "true");
+    }
+
+    const endpoint = `/appointments/${appointmentId}/mis-print-forms/pdf?${params.toString()}`;
+    const url = `${this.baseURL}${endpoint}`;
+    const cacheDir = (FileSystem as any).cacheDirectory || "";
+    const fallbackName = `mis-form-${appointmentId}-${index + 1}.pdf`;
+    const targetUri = `${cacheDir}${fallbackName}`;
+
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    const result = await FileSystem.downloadAsync(url, targetUri, { headers });
+    if (result.status !== 200) {
+      throw new Error(`MIS PDF download failed: HTTP ${result.status}`);
+    }
+
+    const responseHeaders = (result.headers || {}) as Record<string, string>;
+    const contentType =
+      responseHeaders["content-type"] || responseHeaders["Content-Type"];
+    const contentDisposition =
+      responseHeaders["content-disposition"] ||
+      responseHeaders["Content-Disposition"];
+    const fileName =
+      this.extractFileNameFromContentDisposition(contentDisposition) ||
+      fallbackName;
+
+    return {
+      success: true,
+      uri: result.uri,
+      fileName,
+      contentType,
+      status: result.status,
+    };
+  }
+
   // Complete video consultation - called by doctor after both parties leave
   async completeConsultation(appointmentId: string): Promise<{
     success: boolean;
@@ -1925,12 +2105,15 @@ class ApiService {
     // Content-Type არ ვაყენებთ – React Native თავად დააყენებს multipart/form-data boundary-ით (როგორც რეგისტრაციაზე)
 
     const url = `${this.baseURL}/appointments/${appointmentId}/documents`;
-    console.log("📤 [uploadAppointmentDocument] Sending file to backend (backend will upload to Cloudinary):", {
-      appointmentId,
-      name: file.name,
-      type: file.type,
-      endpoint: url,
-    });
+    console.log(
+      "📤 [uploadAppointmentDocument] Sending file to backend (backend will upload to Cloudinary):",
+      {
+        appointmentId,
+        name: file.name,
+        type: file.type,
+        endpoint: url,
+      },
+    );
 
     const response = await fetch(url, {
       method: "POST",
@@ -2224,7 +2407,7 @@ class ApiService {
   async apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const fullUrl = `${this.baseURL}${endpoint}`;
     const timeoutMs = 30000; // 30 seconds timeout
-    
+
     console.log("📡 API Call:", {
       method: options.method || "GET",
       url: fullUrl,
@@ -2292,18 +2475,20 @@ class ApiService {
       return this.handleResponse<T>(response);
     } catch (error: any) {
       clearTimeout(timeoutId);
-      
+
       // Network error handling
       if (error.name === "AbortError") {
         console.error("⏱️ Request timeout:", fullUrl);
         throw new Error(
-          `მოთხოვნა დრო ამოეწურა. გთხოვთ შეამოწმოთ ინტერნეტ კავშირი და სცადოთ თავიდან.`
+          `მოთხოვნა დრო ამოეწურა. გთხოვთ შეამოწმოთ ინტერნეტ კავშირი და სცადოთ თავიდან.`,
         );
       }
-      
-      if (error.message?.includes("Network request failed") || 
-          error.message?.includes("Network request timed out") ||
-          error.message?.includes("Failed to connect")) {
+
+      if (
+        error.message?.includes("Network request failed") ||
+        error.message?.includes("Network request timed out") ||
+        error.message?.includes("Failed to connect")
+      ) {
         console.error("🌐 Network error:", {
           url: fullUrl,
           error: error.message,
@@ -2311,12 +2496,12 @@ class ApiService {
         });
         throw new Error(
           `ინტერნეტ კავშირი ვერ დამყარდა. გთხოვთ შეამოწმოთ:\n` +
-          `1. ინტერნეტ კავშირი\n` +
-          `2. Backend სერვერი მუშაობს: ${this.baseURL}\n` +
-          `3. WiFi/მობილური ინტერნეტი ჩართულია`
+            `1. ინტერნეტ კავშირი\n` +
+            `2. Backend სერვერი მუშაობს: ${this.baseURL}\n` +
+            `3. WiFi/მობილური ინტერნეტი ჩართულია`,
         );
       }
-      
+
       console.error("❌ API Error:", {
         url: fullUrl,
         error: error.message,
@@ -2469,9 +2654,7 @@ class ApiService {
     });
   }
 
-  async createAISession(
-    request: CreateSessionRequest
-  ): Promise<{
+  async createAISession(request: CreateSessionRequest): Promise<{
     success: boolean;
     data: AISession;
   }> {
@@ -2491,14 +2674,18 @@ class ApiService {
       const response = await fetch(`${EXTERNAL_API_URL}/sessions`, {
         method: "POST",
         headers: {
-          "accept": "application/json",
+          accept: "application/json",
           "X-API-Key": API_KEY,
           "Content-Type": "application/json",
         },
         body: JSON.stringify(request),
       });
 
-      console.log("📨 [createAISession] Response status:", response.status, response.statusText);
+      console.log(
+        "📨 [createAISession] Response status:",
+        response.status,
+        response.statusText,
+      );
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -2536,11 +2723,14 @@ class ApiService {
     const EXTERNAL_API_URL = "https://hapttic-hera.click";
     const API_KEY = "hera-api-key";
 
-    console.log("🚀🚀🚀 [getAISessions] Using EXTERNAL API (NOT backend) - DO NOT USE apiCall:", {
-      url: `${EXTERNAL_API_URL}/sessions`,
-      params: params,
-      apiKey: API_KEY,
-    });
+    console.log(
+      "🚀🚀🚀 [getAISessions] Using EXTERNAL API (NOT backend) - DO NOT USE apiCall:",
+      {
+        url: `${EXTERNAL_API_URL}/sessions`,
+        params: params,
+        apiKey: API_KEY,
+      },
+    );
 
     try {
       const queryParams = new URLSearchParams();
@@ -2560,12 +2750,16 @@ class ApiService {
       const response = await fetch(url, {
         method: "GET",
         headers: {
-          "accept": "application/json",
+          accept: "application/json",
           "X-API-Key": API_KEY,
         },
       });
 
-      console.log("📨 [getAISessions] Response status:", response.status, response.statusText);
+      console.log(
+        "📨 [getAISessions] Response status:",
+        response.status,
+        response.statusText,
+      );
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -2577,14 +2771,14 @@ class ApiService {
 
       // External API returns array of sessions directly
       const sessionsArray = await response.json();
-      
+
       console.log("✅ [getAISessions] Sessions received:", {
         count: sessionsArray.length,
         sessions: sessionsArray,
         firstSession: sessionsArray[0] || null,
         sessionStructure: sessionsArray[0] ? Object.keys(sessionsArray[0]) : [],
       });
-      
+
       // Log each session's details
       if (sessionsArray.length > 0) {
         console.log("📋 [getAISessions] Session details:");
@@ -2627,15 +2821,22 @@ class ApiService {
     });
 
     try {
-      const response = await fetch(`${EXTERNAL_API_URL}/sessions/${sessionId}`, {
-        method: "GET",
-        headers: {
-          "accept": "application/json",
-          "X-API-Key": API_KEY,
+      const response = await fetch(
+        `${EXTERNAL_API_URL}/sessions/${sessionId}`,
+        {
+          method: "GET",
+          headers: {
+            accept: "application/json",
+            "X-API-Key": API_KEY,
+          },
         },
-      });
+      );
 
-      console.log("📨 [getAISession] Response status:", response.status, response.statusText);
+      console.log(
+        "📨 [getAISession] Response status:",
+        response.status,
+        response.statusText,
+      );
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -2660,7 +2861,7 @@ class ApiService {
 
   async updateAISession(
     sessionId: string,
-    updates: Partial<Pick<AISession, "status">>
+    updates: Partial<Pick<AISession, "status">>,
   ): Promise<{
     success: boolean;
     data: AISession;
@@ -2704,7 +2905,7 @@ class ApiService {
   // AI Assistant - Messages
   async sendAIMessage(
     sessionId: string,
-    request: SendMessageRequest
+    request: SendMessageRequest,
   ): Promise<{
     success: boolean;
     data: SendMessageResponse;
@@ -2726,9 +2927,11 @@ class ApiService {
       // Note: External API currently only supports text content, not images
       // If image is provided, we'll send it as part of the content description
       const messageContent = request.content || "";
-      
+
       if (request.image) {
-        console.warn("⚠️ [sendAIMessage] Image upload not yet supported by external API, sending text only");
+        console.warn(
+          "⚠️ [sendAIMessage] Image upload not yet supported by external API, sending text only",
+        );
         // TODO: When external API supports images, implement image upload here
       }
 
@@ -2737,17 +2940,21 @@ class ApiService {
         {
           method: "POST",
           headers: {
-            "accept": "application/json",
+            accept: "application/json",
             "X-API-Key": API_KEY,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
             content: messageContent,
           }),
-        }
+        },
       );
 
-      console.log("📨 [sendAIMessage] Response status:", response.status, response.statusText);
+      console.log(
+        "📨 [sendAIMessage] Response status:",
+        response.status,
+        response.statusText,
+      );
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -2759,7 +2966,10 @@ class ApiService {
 
       // External API returns array: [user_message, assistant_message]
       const messagesArray = await response.json();
-      console.log("✅ [sendAIMessage] Messages received:", JSON.stringify(messagesArray, null, 2));
+      console.log(
+        "✅ [sendAIMessage] Messages received:",
+        JSON.stringify(messagesArray, null, 2),
+      );
 
       // Convert array format to our expected format
       if (!Array.isArray(messagesArray) || messagesArray.length < 2) {
@@ -2775,18 +2985,24 @@ class ApiService {
       try {
         // Try to parse content as JSON first (in case AI returns structured data)
         const parsedContent = JSON.parse(assistantMessage.content);
-        if (parsedContent && typeof parsedContent === 'object') {
+        if (parsedContent && typeof parsedContent === "object") {
           // If content is JSON, extract metadata
           assistantMetadata = parsedContent.metadata || parsedContent;
-          console.log("📋 [sendAIMessage] Extracted metadata from JSON content:", assistantMetadata);
+          console.log(
+            "📋 [sendAIMessage] Extracted metadata from JSON content:",
+            assistantMetadata,
+          );
         }
       } catch {
         // Content is not JSON, check if there's a metadata field in the response
         if (assistantMessage.metadata) {
           assistantMetadata = assistantMessage.metadata;
-          console.log("📋 [sendAIMessage] Found metadata in response:", assistantMetadata);
+          console.log(
+            "📋 [sendAIMessage] Found metadata in response:",
+            assistantMetadata,
+          );
         }
-        
+
         // Also try to extract doctor recommendations from content if it's in a structured format
         // This handles cases where AI returns doctor info in the content text
         // Look for patterns that might indicate doctor recommendations
@@ -2803,6 +3019,7 @@ class ApiService {
             content: userMessage.content,
             created_at: userMessage.created_at,
             image_url: request.image?.uri, // Preserve image URL if provided
+            feedback: userMessage.feedback ?? null,
           },
           assistant_message: {
             id: assistantMessage.id,
@@ -2811,6 +3028,7 @@ class ApiService {
             content: assistantMessage.content,
             created_at: assistantMessage.created_at,
             metadata: assistantMetadata, // Include extracted metadata
+            feedback: assistantMessage.feedback ?? null,
           },
         },
       };
@@ -2825,7 +3043,7 @@ class ApiService {
     params?: {
       skip?: number;
       limit?: number;
-    }
+    },
   ): Promise<{
     success: boolean;
     data: AIMessage[];
@@ -2837,12 +3055,15 @@ class ApiService {
     const EXTERNAL_API_URL = "https://hapttic-hera.click";
     const API_KEY = "hera-api-key";
 
-    console.log("🚀🚀🚀 [getAIMessages] Using EXTERNAL API (NOT backend) - DO NOT USE apiCall:", {
-      url: `${EXTERNAL_API_URL}/sessions/${sessionId}/messages`,
-      sessionId: sessionId,
-      params: params,
-      apiKey: API_KEY,
-    });
+    console.log(
+      "🚀🚀🚀 [getAIMessages] Using EXTERNAL API (NOT backend) - DO NOT USE apiCall:",
+      {
+        url: `${EXTERNAL_API_URL}/sessions/${sessionId}/messages`,
+        sessionId: sessionId,
+        params: params,
+        apiKey: API_KEY,
+      },
+    );
 
     try {
       const queryParams = new URLSearchParams();
@@ -2862,12 +3083,16 @@ class ApiService {
       const response = await fetch(url, {
         method: "GET",
         headers: {
-          "accept": "application/json",
+          accept: "application/json",
           "X-API-Key": API_KEY,
         },
       });
 
-      console.log("📨 [getAIMessages] Response status:", response.status, response.statusText);
+      console.log(
+        "📨 [getAIMessages] Response status:",
+        response.status,
+        response.statusText,
+      );
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -2893,6 +3118,124 @@ class ApiService {
       console.error("❌ [getAIMessages] Exception:", error);
       throw new Error(error.message || "Failed to get messages");
     }
+  }
+
+  async putAIMessageFeedback(
+    sessionId: string,
+    messageId: string,
+    body: {
+      rating: AIMessageFeedbackRating;
+      problem?: AIMessageFeedbackProblem;
+      details?: string;
+    },
+  ): Promise<{ success: boolean; data: AIMessage }> {
+    const EXTERNAL_API_URL = "https://hapttic-hera.click";
+    const API_KEY = "hera-api-key";
+
+    const payload: Record<string, unknown> = { rating: body.rating };
+    if (body.rating === "dislike") {
+      if (body.problem) {
+        payload.problem = body.problem;
+      }
+      if (body.details != null && body.details.trim() !== "") {
+        payload.details = body.details.trim();
+      }
+    }
+
+    const feedbackUrl = `${EXTERNAL_API_URL}/sessions/${sessionId}/messages/${messageId}/feedback`;
+    if (__DEV__) {
+      console.log("💬 [putAIMessageFeedback] →", {
+        url: feedbackUrl,
+        sessionId,
+        messageId,
+        payload,
+      });
+    }
+
+    const response = await fetch(feedbackUrl, {
+      method: "PUT",
+      headers: {
+        accept: "application/json",
+        "Content-Type": "application/json",
+        "X-API-Key": API_KEY,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      if (__DEV__) {
+        console.warn("💬 [putAIMessageFeedback] ✗ HTTP", {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorData,
+        });
+      }
+      const msg =
+        (errorData as { detail?: string }).detail ||
+        (errorData as { message?: string }).message ||
+        `HTTP ${response.status}`;
+      throw new Error(msg);
+    }
+
+    const data = (await response.json()) as AIMessage;
+    if (__DEV__) {
+      console.log("💬 [putAIMessageFeedback] ← OK", {
+        status: response.status,
+        message: data,
+      });
+    }
+    return { success: true, data };
+  }
+
+  async deleteAIMessageFeedback(
+    sessionId: string,
+    messageId: string,
+  ): Promise<{ success: boolean; data: AIMessage }> {
+    const EXTERNAL_API_URL = "https://hapttic-hera.click";
+    const API_KEY = "hera-api-key";
+
+    const feedbackUrl = `${EXTERNAL_API_URL}/sessions/${sessionId}/messages/${messageId}/feedback`;
+    if (__DEV__) {
+      console.log("💬 [deleteAIMessageFeedback] →", {
+        url: feedbackUrl,
+        sessionId,
+        messageId,
+      });
+    }
+
+    const response = await fetch(feedbackUrl, {
+      method: "DELETE",
+      headers: {
+        accept: "application/json",
+        "X-API-Key": API_KEY,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      if (__DEV__) {
+        console.warn("💬 [deleteAIMessageFeedback] ✗ HTTP", {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorData,
+        });
+      }
+      const msg =
+        (errorData as { detail?: string }).detail ||
+        (errorData as { message?: string }).message ||
+        `HTTP ${response.status}`;
+      throw new Error(msg);
+    }
+
+    const data = (await response.json()) as AIMessage;
+    if (__DEV__) {
+      console.log("💬 [deleteAIMessageFeedback] ← OK", {
+        status: response.status,
+        message: data,
+      });
+    }
+    return { success: true, data };
   }
 
   // ==================== PAYMENT METHODS ====================

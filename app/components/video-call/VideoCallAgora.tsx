@@ -24,7 +24,7 @@ import RtcEngine, {
   IRtcEngine,
   RtcSurfaceView,
 } from "react-native-agora";
-import { apiService } from "../_services/api";
+import { apiService } from "../../_services/api";
 
 /**
  * ვიდეო კონსულტაციის გვერდი - Agora Video SDK

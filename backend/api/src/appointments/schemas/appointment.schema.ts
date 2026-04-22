@@ -136,6 +136,28 @@ export class Appointment {
   @Prop()
   visitAddress?: string;
 
+  /** MIS POST /api/Services/GenerateService → `value` (დაგენერირებული სერვისის ID, ფორმებისთვის) */
+  @Prop()
+  misGeneratedServiceId?: string;
+
+  /** ბოლო წარმატებული HIS mis-print-forms GET-ზე ფორმა IV–100 იყო პასუხში (დასრულებისთვის; PDF ატვირთვა არ ითვლება). */
+  @Prop({ type: Date })
+  misForm100AvailableAt?: Date;
+
+  /** HIS `GetFormsByServiceID` მასივში IV–100-ის ინდექსი — PDF ჩამოტვირთვა HIS დროებით რომ ჩავარდეს, პაციენტს ეგ ინდექსი სჭირდება. */
+  @Prop({ type: Number })
+  misForm100PrintFormIndex?: number;
+
+  /**
+   * აღარ ინახება / აღარ იტვირთება ნაგულისხმევად — ფორმები მხოლოდ HIS-იდან GET /appointments/:id/mis-print-forms.
+   * (ძველი ჩანაწერები DB-ში შეიძლება დარჩეს; `select: false` აპლიკაციაში არ ჩანს.)
+   */
+  @Prop({ type: mongoose.Schema.Types.Mixed, select: false })
+  misPrintFormsByService?: unknown;
+
+  @Prop({ type: Date, select: false })
+  misPrintFormsFetchedAt?: Date;
+
   @Prop({
     type: {
       diagnosis: String,

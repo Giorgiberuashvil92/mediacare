@@ -2,7 +2,7 @@
   "expo": {
     "name": "medicare",
     "slug": "medicare",
-    "version": "2.0.18",
+    "version": "2.0.19",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
@@ -14,7 +14,7 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "buildNumber": "2.0.18",
+      "buildNumber": "2.0.19",
       "supportsTablet": true,
       "bundleIdentifier": "ge.medcompass",
       "backgroundModes": ["audio", "voip"],

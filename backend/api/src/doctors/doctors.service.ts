@@ -2,10 +2,12 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import mongoose, { FilterQuery } from 'mongoose';
+import { appointmentHasForm100ReadyForCompletion } from '../appointments/appointment-form100-ready.util';
 import {
   Appointment,
   AppointmentDocument,
@@ -24,6 +26,8 @@ import {
   Specialization,
   SpecializationDocument,
 } from '../specializations/schemas/specialization.schema';
+import { misAttachGeneratedServiceId } from '../integrations/mis-appointment-generate.sync';
+import { MisAuthService } from '../integrations/mis-auth.service';
 import { UploadService } from '../upload/upload.service';
 import { CreateFollowUpDto } from './dto/create-follow-up.dto';
 import { DoctorStatusFilter, GetDoctorsDto } from './dto/get-doctors.dto';
@@ -38,6 +42,8 @@ import {
 
 @Injectable()
 export class DoctorsService {
+  private readonly logger = new Logger(DoctorsService.name);
+
   constructor(
     @InjectModel(User.name) private userModel: mongoose.Model<UserDocument>,
     @InjectModel(Availability.name)
@@ -47,6 +53,7 @@ export class DoctorsService {
     @InjectModel(Appointment.name)
     private appointmentModel: mongoose.Model<AppointmentDocument>,
     private readonly uploadService: UploadService,
+    private readonly misAuthService: MisAuthService,
   ) {}
 
   private async generateAppointmentNumber(): Promise<string> {
@@ -180,6 +187,14 @@ export class DoctorsService {
             fileName: apt.form100.fileName,
           }
         : undefined,
+      misForm100AvailableAt: apt.misForm100AvailableAt
+        ? new Date(apt.misForm100AvailableAt).toISOString()
+        : undefined,
+      misForm100PrintFormIndex:
+        typeof apt.misForm100PrintFormIndex === 'number' &&
+        Number.isInteger(apt.misForm100PrintFormIndex)
+          ? apt.misForm100PrintFormIndex
+          : undefined,
       // Include full patient details for doctor to see (for Form 100 generation)
       patientDetails: apt.patientDetails
         ? {
@@ -1836,15 +1851,20 @@ export class DoctorsService {
       throw new NotFoundException('Appointment not found');
     }
 
-    // Validation: For home-visit appointments, patient must mark as completed first
-    if (
-      dto.status === AppointmentStatus.COMPLETED &&
-      appointment.type === AppointmentType.HOME_VISIT &&
-      !appointment.homeVisitCompletedAt
-    ) {
-      throw new BadRequestException(
-        'ბინაზე კონსულტაცია არ შეიძლება დასრულდეს, სანამ პაციენტმა არ მონიშნა როგორც დასრულებული. გთხოვთ დაელოდოთ პაციენტის დადასტურებას.',
-      );
+    if (dto.status === AppointmentStatus.COMPLETED) {
+      if (appointment.type === AppointmentType.HOME_VISIT) {
+        if (!appointment.homeVisitCompletedAt) {
+          throw new BadRequestException(
+            'ბინაზე კონსულტაცია არ შეიძლება დასრულდეს, სანამ პაციენტმა არ მონიშნა როგორც დასრულებული. გთხოვთ დაელოდოთ პაციენტის დადასტურებას.',
+          );
+        }
+      } else {
+        if (!appointmentHasForm100ReadyForCompletion(appointment)) {
+          throw new BadRequestException(
+            'ფორმა IV–100 უნდა ჩანდეს HIS mis-print-forms-ზე, სანამ ვიზიტს დაასრულებთ. ატვირთული PDF არ ითვლება.',
+          );
+        }
+      }
     }
 
     if (dto.status) {
@@ -1928,6 +1948,30 @@ export class DoctorsService {
 
     if (!appointment.patientId) {
       throw new BadRequestException('Appointment has no patient assigned');
+    }
+
+    const patientUser = await this.userModel.findById(appointment.patientId);
+    if (!patientUser) {
+      throw new BadRequestException('Patient user not found');
+    }
+    const followUpMisPersonId =
+      typeof patientUser.misPersonId === 'string'
+        ? patientUser.misPersonId.trim()
+        : '';
+    if (!followUpMisPersonId) {
+      throw new BadRequestException(
+        'HIS პაციენტის ID აკლია — განმეორებითი ვიზიტი შეუძლებელია.',
+      );
+    }
+    const doctorUser = await this.userModel.findById(doctorId);
+    const followUpDoctorPersonalId =
+      typeof doctorUser?.idNumber === 'string'
+        ? doctorUser.idNumber.trim()
+        : '';
+    if (!followUpDoctorPersonalId) {
+      throw new BadRequestException(
+        'ექიმს არ აქვს პირადი ნომერი — განმეორებითი ვიზიტი შეუძლებელია.',
+      );
     }
 
     if (!dto.date || !dto.time) {
@@ -2045,6 +2089,19 @@ export class DoctorsService {
     });
 
     await followUpAppointment.save();
+
+    await misAttachGeneratedServiceId(
+      this.misAuthService,
+      this.appointmentModel,
+      followUpAppointment,
+      {
+        misPersonId: followUpMisPersonId,
+        doctorPersonalId: followUpDoctorPersonalId,
+        serviceDateIso: followUpDateTime.toISOString(),
+      },
+      this.logger,
+    );
+
     await followUpAppointment.populate(
       'patientId',
       'name dateOfBirth gender email phone',

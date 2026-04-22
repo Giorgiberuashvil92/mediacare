@@ -17,6 +17,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { hasForm100ForVisitCompletion } from "../../assets/data/doctorDashboard";
 import { apiService } from "../_services/api";
 
 interface LabTest {
@@ -137,8 +138,10 @@ export default function ActivePatientsScreen() {
               isFollowUp: !!apt.isFollowUp,
               problem: apt.symptoms || undefined,
               visitAddress: apt.visitAddress,
-              // Form 100 status
-              hasForm100: !!(apt.form100?.pdfUrl || apt.form100?.id),
+              // ფორმა IV–100 HIS mis-print-forms-ზე (PDF არ ითვლება)
+              hasForm100: hasForm100ForVisitCompletion({
+                misForm100AvailableAt: apt.misForm100AvailableAt,
+              }),
               form100: apt.form100
                 ? {
                     id: apt.form100.id,

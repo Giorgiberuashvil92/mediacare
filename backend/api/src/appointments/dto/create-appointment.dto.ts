@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsEnum,
   IsNotEmpty,
   IsNumber,
@@ -55,6 +56,11 @@ export class CreateAppointmentDto {
   @IsNotEmpty()
   @IsEnum(AppointmentType)
   type: AppointmentType;
+
+  /** true = განმეორებითი ვიდეო კონსულტაცია (HIS სხვა ServiceID) */
+  @IsOptional()
+  @IsBoolean()
+  isFollowUp?: boolean;
 
   @IsNotEmpty()
   @IsNumber()

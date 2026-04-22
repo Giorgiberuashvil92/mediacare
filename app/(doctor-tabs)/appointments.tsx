@@ -1,7 +1,13 @@
+import { formatMisDocumentSectionTitle } from "@/lib/mis-print-forms/html";
+import {
+  loadMisPrintFormsFromApi,
+  type MisPrintFormDocument,
+} from "@/lib/mis-print-forms/load";
+import { runMisPrintFormsPdfAction } from "@/lib/mis-print-forms/pdf";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import * as DocumentPicker from "expo-document-picker";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
@@ -23,11 +29,13 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { WebView } from "react-native-webview";
 import {
   Consultation,
   getConsultationTypeLabel,
   getStatusColor,
   getStatusLabel,
+  hasForm100ForVisitCompletion,
 } from "../../assets/data/doctorDashboard";
 import { apiService, Clinic, ShopProduct } from "../_services/api";
 import { useAuth } from "../contexts/AuthContext";
@@ -201,6 +209,14 @@ export default function DoctorAppointments() {
     setPendingPatientDocuments([]);
     setSelectedLaboratoryTests([]);
     setSelectedInstrumentalTests([]);
+    setMisHisDocuments([]);
+    setMisHisError(null);
+    setMisHisLoading(false);
+  };
+
+  const closeAppointmentFormModal = () => {
+    resetAppointmentForm();
+    setShowAppointmentModal(false);
   };
   const [currentTime, setCurrentTime] = useState(new Date());
   const [consultations, setConsultations] = useState<Consultation[]>([]);
@@ -221,6 +237,60 @@ export default function DoctorAppointments() {
   const [pendingPatientDocuments, setPendingPatientDocuments] = useState<
     PendingPatientUploadAsset[]
   >([]);
+
+  /** HIS ფორმები ცალ-ცალკე (GetFormsByServiceID — თითო templateData) */
+  const [misHisDocuments, setMisHisDocuments] = useState<
+    MisPrintFormDocument[]
+  >([]);
+  const [misHisLoading, setMisHisLoading] = useState(false);
+  const [misHisError, setMisHisError] = useState<string | null>(null);
+  const [misPdfLoading, setMisPdfLoading] = useState(false);
+  const [showMisCompletePreviewModal, setShowMisCompletePreviewModal] =
+    useState(false);
+  const [pendingCompleteConsultation, setPendingCompleteConsultation] =
+    useState<Consultation | null>(null);
+
+  const loadMisPrintFormsForConsultation = async (appointmentId: string) => {
+    setMisHisLoading(true);
+    setMisHisError(null);
+    setMisHisDocuments([]);
+    try {
+      const { documents, error, misForm100AvailableAt } =
+        await loadMisPrintFormsFromApi(appointmentId);
+      setMisHisDocuments(documents);
+      setMisHisError(error);
+      if (misForm100AvailableAt !== undefined) {
+        setPendingCompleteConsultation((prev) => {
+          if (!prev || prev.id !== appointmentId) return prev;
+          return { ...prev, misForm100AvailableAt };
+        });
+      }
+    } finally {
+      setMisHisLoading(false);
+    }
+  };
+
+  const handleMisPdfAction = async (
+    appointmentId: string,
+    action: "view" | "download",
+    htmlForPdf: string,
+    shareDialogTitle?: string,
+  ) => {
+    try {
+      setMisPdfLoading(true);
+      await runMisPrintFormsPdfAction({
+        appointmentId,
+        action,
+        htmlForPdf,
+        shareDialogTitle,
+      });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      Alert.alert("შეცდომა", msg || "PDF მოქმედება ვერ შესრულდა");
+    } finally {
+      setMisPdfLoading(false);
+    }
+  };
 
   // Fetch consultations from API
   const fetchConsultations = async (isRefresh = false) => {
@@ -629,8 +699,7 @@ export default function DoctorAppointments() {
         // Get file extension from URL or filename
         const extension = fileName?.split(".").pop() || "pdf";
         // Use cacheDirectory if available, otherwise fallback to a temp path
-        // @ts-ignore - FileSystem.cacheDirectory exists at runtime
-        const cacheDir = FileSystem.cacheDirectory || "";
+        const cacheDir = (FileSystem as any).cacheDirectory || "";
         const fileUri = `${cacheDir}${fileName || `file_${Date.now()}.${extension}`}`;
 
         // Download file
@@ -1215,10 +1284,28 @@ export default function DoctorAppointments() {
         patientDetails:
           (apt.patientDetails as Consultation["patientDetails"]) ??
           consultation.patientDetails,
+        misGeneratedServiceId:
+          (apt.misGeneratedServiceId as string | undefined) ??
+          (consultation as any).misGeneratedServiceId,
+        misPrintFormsByService:
+          apt.misPrintFormsByService ??
+          (consultation as any).misPrintFormsByService,
+        misPrintFormsFetchedAt:
+          apt.misPrintFormsFetchedAt ??
+          (consultation as any).misPrintFormsFetchedAt,
       } as Consultation & Record<string, unknown>;
     }
 
     setSelectedConsultation(source as Consultation);
+
+    const misSid = String((source as any).misGeneratedServiceId ?? "").trim();
+    if (misSid) {
+      void loadMisPrintFormsForConsultation(consultation.id);
+    } else {
+      setMisHisDocuments([]);
+      setMisHisError(null);
+      setMisHisLoading(false);
+    }
     const summary = source.consultationSummary;
     let followUpTime = "";
     if (source.followUp?.date) {
@@ -1346,8 +1433,67 @@ export default function DoctorAppointments() {
       return;
     }
 
+    const isHomeVisitComplete = selectedConsultation.type === "home-visit";
+    let consultationForForm100Check: Consultation = selectedConsultation;
+    if (!isHomeVisitComplete) {
+      try {
+        const misRes = await apiService.getMisPrintForms(
+          selectedConsultation.id,
+          true,
+        );
+        if (misRes.success && misRes.data) {
+          const at = misRes.data.misForm100AvailableAt;
+          if (at !== undefined) {
+            consultationForForm100Check = {
+              ...selectedConsultation,
+              misForm100AvailableAt: at,
+            };
+            setSelectedConsultation(consultationForForm100Check);
+          }
+        }
+      } catch (e) {
+        console.warn("[DoctorAppointments] getMisPrintForms before save", e);
+      }
+      if (!hasForm100ForVisitCompletion(consultationForForm100Check)) {
+        alert(
+          "ფორმა IV–100 უნდა ჩანდეს HIS mis-print-forms-ზე (ჯავშანზე HIS ფორმების ჩატვირთვა). ატვირთული PDF დასრულებისთვის არ ითვლება.",
+        );
+        return;
+      }
+    }
+
     try {
       setSavingAppointment(true);
+
+      let latestConsultation: Consultation | null = selectedConsultation;
+
+      if (!isHomeVisitComplete && form100File) {
+        const formResponse = await apiService.uploadForm100Document(
+          selectedConsultation.id,
+          {
+            diagnosis: appointmentData.diagnosis.trim() || undefined,
+          },
+          {
+            uri: form100File.uri,
+            name: form100File.name,
+            mimeType: form100File.mimeType,
+          },
+        );
+        if (!formResponse.success) {
+          Alert.alert(
+            "შეცდომა",
+            (formResponse as { message?: string }).message ||
+              "ფორმა 100 ვერ აიტვირთა",
+          );
+          return;
+        }
+        if (formResponse.data) {
+          latestConsultation = formResponse.data as Consultation;
+          updateConsultationState(latestConsultation);
+          setSelectedConsultation(latestConsultation);
+        }
+        setForm100File(null);
+      }
 
       // Convert medications array to JSON string for backend
       const medicationsString =
@@ -1377,8 +1523,6 @@ export default function DoctorAppointments() {
             }
           : { required: false },
       };
-
-      let latestConsultation: Consultation | null = selectedConsultation;
 
       const response = (await apiService.updateDoctorAppointment(
         selectedConsultation.id,
@@ -1476,19 +1620,17 @@ export default function DoctorAppointments() {
         }
       }
 
-      if (form100File) {
+      if (isHomeVisitComplete && form100File) {
         const formResponse = await apiService.uploadForm100Document(
           selectedConsultation.id,
           {
             diagnosis: appointmentData.diagnosis.trim() || undefined,
           },
-          form100File
-            ? {
-                uri: form100File.uri,
-                name: form100File.name,
-                mimeType: form100File.mimeType,
-              }
-            : undefined,
+          {
+            uri: form100File.uri,
+            name: form100File.name,
+            mimeType: form100File.mimeType,
+          },
         );
 
         if (formResponse.success && formResponse.data) {
@@ -1559,6 +1701,8 @@ export default function DoctorAppointments() {
       }
 
       setShowAppointmentModal(false);
+      setFilterStatus("completed");
+      router.setParams({ status: "completed", appointmentId: undefined });
       setShowSuccessModal(true);
       resetAppointmentForm();
     } catch (error: any) {
@@ -2477,29 +2621,74 @@ export default function DoctorAppointments() {
                         <TouchableOpacity
                           style={styles.statusActionButtonComplete}
                           onPress={async () => {
+                            let merged: Consultation & Record<string, unknown> =
+                              consultation as Consultation &
+                                Record<string, unknown>;
                             try {
-                              const response =
-                                await apiService.completeConsultation(
-                                  consultation.id,
-                                );
-                              if (response.success) {
-                                Alert.alert(
-                                  "წარმატება",
-                                  "კონსულტაცია მონიშნულია როგორც ჩატარებული",
-                                );
-                                await fetchConsultations();
-                              } else {
+                              const ar = await apiService.getAppointmentById(
+                                consultation.id,
+                              );
+                              if (ar.success && ar.data) {
+                                merged = {
+                                  ...consultation,
+                                  ...(ar.data as Record<string, unknown>),
+                                } as Consultation & Record<string, unknown>;
+                              }
+                            } catch {
+                              /* ignore */
+                            }
+                            if (
+                              !hasForm100ForVisitCompletion(
+                                merged as Consultation,
+                              )
+                            ) {
+                              Alert.alert(
+                                "ფორმა IV–100 (HIS)",
+                                "სანამ ვიზიტს დაასრულებთ, ჯავშანზე უნდა ჩაიტვირთოს HIS mis-print-forms და პასუხში ჩანდეს ფორმა IV–100. ატვირთული PDF არ ითვლება.",
+                              );
+                              return;
+                            }
+                            const sid = String(
+                              (merged as any).misGeneratedServiceId ?? "",
+                            ).trim();
+                            if (!sid) {
+                              try {
+                                const response =
+                                  await apiService.completeConsultation(
+                                    consultation.id,
+                                  );
+                                if (response.success) {
+                                  Alert.alert(
+                                    "წარმატება",
+                                    "კონსულტაცია მონიშნულია როგორც ჩატარებული",
+                                  );
+                                  setFilterStatus("completed");
+                                  router.setParams({
+                                    status: "completed",
+                                    appointmentId: undefined,
+                                  });
+                                  await fetchConsultations();
+                                } else {
+                                  Alert.alert(
+                                    "შეცდომა",
+                                    response.message || "ოპერაცია ვერ მოხერხდა",
+                                  );
+                                }
+                              } catch (err: any) {
                                 Alert.alert(
                                   "შეცდომა",
-                                  response.message || "ოპერაცია ვერ მოხერხდა",
+                                  err.message || "ოპერაცია ვერ მოხერხდა",
                                 );
                               }
-                            } catch (err: any) {
-                              Alert.alert(
-                                "შეცდომა",
-                                err.message || "ოპერაცია ვერ მოხერხდა",
-                              );
+                              return;
                             }
+                            setPendingCompleteConsultation(
+                              merged as Consultation,
+                            );
+                            setShowMisCompletePreviewModal(true);
+                            await loadMisPrintFormsForConsultation(
+                              consultation.id,
+                            );
                           }}
                         >
                           <Ionicons
@@ -3077,7 +3266,7 @@ export default function DoctorAppointments() {
         visible={showAppointmentModal && !showFollowUpScheduleModal}
         animationType="slide"
         transparent={true}
-        onRequestClose={() => setShowAppointmentModal(false)}
+        onRequestClose={closeAppointmentFormModal}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -3095,7 +3284,7 @@ export default function DoctorAppointments() {
                   )}
                 </View>
                 <TouchableOpacity
-                  onPress={() => setShowAppointmentModal(false)}
+                  onPress={closeAppointmentFormModal}
                   style={styles.closeButton}
                 >
                   <Ionicons name="close" size={24} color="#6B7280" />
@@ -3108,6 +3297,173 @@ export default function DoctorAppointments() {
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={true}
               >
+                {/* HIS ფორმები (HTML) — სანამ დანიშნულებას დაასრულებთ */}
+                {String(
+                  (selectedConsultation as any)?.misGeneratedServiceId ?? "",
+                ).trim() ? (
+                  <View style={styles.misFormsWrap}>
+                    <Text style={styles.misFormsTitle}>
+                      HIS ეფოინთმენტის ფორმები (ბეჭდვადი)
+                    </Text>
+                    {misHisLoading ? (
+                      <View style={styles.misFormsLoadingBox}>
+                        <ActivityIndicator color="#06B6D4" />
+                        <Text style={styles.misFormsHint}>
+                          იტვირთება HIS-იდან...
+                        </Text>
+                      </View>
+                    ) : misHisError && misHisDocuments.length === 0 ? (
+                      <View style={styles.misFormsLoadingBox}>
+                        <Text style={styles.misFormsErrorText}>
+                          {misHisError}
+                        </Text>
+                        <TouchableOpacity
+                          style={styles.misFormsReloadBtn}
+                          onPress={() =>
+                            selectedConsultation &&
+                            void loadMisPrintFormsForConsultation(
+                              selectedConsultation.id,
+                            )
+                          }
+                        >
+                          <Ionicons name="refresh" size={18} color="#0369A1" />
+                          <Text style={styles.misFormsReloadBtnText}>
+                            ხელახლა
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : misHisDocuments.length > 0 ? (
+                      <View>
+                        {misHisError ? (
+                          <Text style={styles.misFormsStaleHint}>
+                            {misHisError}
+                          </Text>
+                        ) : null}
+                        {misHisDocuments.map((doc, idx) => {
+                          const section = formatMisDocumentSectionTitle(
+                            doc.title,
+                            {
+                              printTypeName: doc.printTypeName,
+                              html: doc.html,
+                            },
+                          );
+                          const total = misHisDocuments.length;
+                          return (
+                            <View
+                              key={`${doc.id}-${idx}`}
+                              style={[
+                                styles.misFormDocCard,
+                                idx === 0 && styles.misFormDocCardFirst,
+                              ]}
+                            >
+                              <View style={styles.misFormDocCardHeader}>
+                                <View style={styles.misFormDocHeaderTextCol}>
+                                  <Text style={styles.misFormDocHeading}>
+                                    {section.heading}
+                                  </Text>
+                                  {section.caption ? (
+                                    <Text style={styles.misFormDocCaption}>
+                                      {section.caption}
+                                    </Text>
+                                  ) : null}
+                                </View>
+                                <View style={styles.misFormDocIndexBadge}>
+                                  <Text style={styles.misFormDocIndexBadgeText}>
+                                    {idx + 1}/{total}
+                                  </Text>
+                                </View>
+                              </View>
+                              <WebView
+                                originWhitelist={["*"]}
+                                source={{ html: doc.html }}
+                                style={styles.misFormsWebView}
+                                scrollEnabled
+                                nestedScrollEnabled
+                                javaScriptEnabled
+                                domStorageEnabled
+                                allowsInlineMediaPlayback
+                              />
+                              <View style={styles.misPdfActionsRow}>
+                                <TouchableOpacity
+                                  style={[
+                                    styles.misPdfActionBtn,
+                                    misPdfLoading &&
+                                      styles.misPdfActionBtnDisabled,
+                                  ]}
+                                  disabled={
+                                    misPdfLoading || !selectedConsultation
+                                  }
+                                  onPress={() =>
+                                    selectedConsultation &&
+                                    void handleMisPdfAction(
+                                      selectedConsultation.id,
+                                      "view",
+                                      doc.html,
+                                      doc.title,
+                                    )
+                                  }
+                                >
+                                  {misPdfLoading ? (
+                                    <ActivityIndicator
+                                      size="small"
+                                      color="#0369A1"
+                                    />
+                                  ) : (
+                                    <Ionicons
+                                      name="document-text-outline"
+                                      size={16}
+                                      color="#0369A1"
+                                    />
+                                  )}
+                                  <Text style={styles.misPdfActionBtnText}>
+                                    PDF ნახვა
+                                  </Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  style={[
+                                    styles.misPdfActionBtn,
+                                    styles.misPdfActionBtnPrimary,
+                                    misPdfLoading &&
+                                      styles.misPdfActionBtnDisabled,
+                                  ]}
+                                  disabled={
+                                    misPdfLoading || !selectedConsultation
+                                  }
+                                  onPress={() =>
+                                    selectedConsultation &&
+                                    void handleMisPdfAction(
+                                      selectedConsultation.id,
+                                      "download",
+                                      doc.html,
+                                      doc.title,
+                                    )
+                                  }
+                                >
+                                  <Ionicons
+                                    name="download-outline"
+                                    size={16}
+                                    color="#FFFFFF"
+                                  />
+                                  <Text
+                                    style={styles.misPdfActionBtnTextPrimary}
+                                  >
+                                    PDF გადმოწერა
+                                  </Text>
+                                </TouchableOpacity>
+                              </View>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    ) : (
+                      <Text style={styles.misFormsHint}>
+                        ფორმები ჯერ არ არის შენახული — &quot;ხელახლა&quot;
+                        სცადეთ ან განაახლეთ ჯავშანი.
+                      </Text>
+                    )}
+                  </View>
+                ) : null}
+
                 {/* Diagnosis */}
                 <View style={styles.formSection}>
                   <Text style={styles.formLabel}>
@@ -3621,7 +3977,10 @@ export default function DoctorAppointments() {
                     </View>
                   </View>
                   {pendingPatientDocuments.map((doc, index) => (
-                    <View key={`${doc.uri}-${index}`} style={styles.patientDocRow}>
+                    <View
+                      key={`${doc.uri}-${index}`}
+                      style={styles.patientDocRow}
+                    >
                       <Ionicons
                         name={
                           (doc.mimeType || "").startsWith("image/")
@@ -3671,7 +4030,7 @@ export default function DoctorAppointments() {
               <View style={styles.modalFooter}>
                 <TouchableOpacity
                   style={[styles.modalButton, styles.modalButtonSecondary]}
-                  onPress={() => setShowAppointmentModal(false)}
+                  onPress={closeAppointmentFormModal}
                 >
                   <Text style={styles.modalButtonTextSecondary}>გაუქმება</Text>
                 </TouchableOpacity>
@@ -3685,6 +4044,266 @@ export default function DoctorAppointments() {
             </View>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* HIS ფორმები ვიდეო ჯავშნის დასრულებამდე */}
+      <Modal
+        visible={showMisCompletePreviewModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => {
+          setShowMisCompletePreviewModal(false);
+          setPendingCompleteConsultation(null);
+          setMisHisDocuments([]);
+          setMisHisError(null);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, styles.misPreviewModalContent]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>HIS ფორმები — დასრულებამდე</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowMisCompletePreviewModal(false);
+                  setPendingCompleteConsultation(null);
+                  setMisHisDocuments([]);
+                  setMisHisError(null);
+                }}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView
+              style={styles.modalBody}
+              contentContainerStyle={{ paddingBottom: 16 }}
+            >
+              {pendingCompleteConsultation &&
+              !hasForm100ForVisitCompletion(pendingCompleteConsultation) ? (
+                <View style={styles.misFormsLoadingBox}>
+                  <Text style={styles.misFormsErrorText}>
+                    HIS mis-print-forms-ის ბოლო ჩატვირთვაზე ფორმა IV–100 ჯერ არ
+                    არის დადასტურებული. ჩაიტვირთეთ HIS ფორმები ან განაახლეთ
+                    ჩამოტვირთვა, შემდეგ ისევ სცადეთ. ატვირთული PDF არ ითვლება.
+                  </Text>
+                </View>
+              ) : null}
+              {misHisLoading ? (
+                <View style={styles.misFormsLoadingBox}>
+                  <ActivityIndicator size="large" color="#06B6D4" />
+                  <Text style={styles.misFormsHint}>იტვირთება HIS-იდან...</Text>
+                </View>
+              ) : misHisError && misHisDocuments.length === 0 ? (
+                <View style={styles.misFormsLoadingBox}>
+                  <Text style={styles.misFormsErrorText}>{misHisError}</Text>
+                  <TouchableOpacity
+                    style={styles.misFormsReloadBtn}
+                    onPress={() =>
+                      pendingCompleteConsultation &&
+                      void loadMisPrintFormsForConsultation(
+                        pendingCompleteConsultation.id,
+                      )
+                    }
+                  >
+                    <Ionicons name="refresh" size={18} color="#0369A1" />
+                    <Text style={styles.misFormsReloadBtnText}>
+                      ხელახლა ჩატვირთვა
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ) : misHisDocuments.length > 0 ? (
+                <View>
+                  {misHisError ? (
+                    <Text style={styles.misFormsStaleHint}>{misHisError}</Text>
+                  ) : null}
+                  {misHisDocuments.map((doc, idx) => {
+                    const section = formatMisDocumentSectionTitle(doc.title, {
+                      printTypeName: doc.printTypeName,
+                      html: doc.html,
+                    });
+                    const total = misHisDocuments.length;
+                    return (
+                      <View
+                        key={`${doc.id}-${idx}`}
+                        style={[
+                          styles.misFormDocCard,
+                          idx === 0 && styles.misFormDocCardFirst,
+                        ]}
+                      >
+                        <View style={styles.misFormDocCardHeader}>
+                          <View style={styles.misFormDocHeaderTextCol}>
+                            <Text style={styles.misFormDocHeading}>
+                              {section.heading}
+                            </Text>
+                            {section.caption ? (
+                              <Text style={styles.misFormDocCaption}>
+                                {section.caption}
+                              </Text>
+                            ) : null}
+                          </View>
+                          <View style={styles.misFormDocIndexBadge}>
+                            <Text style={styles.misFormDocIndexBadgeText}>
+                              {idx + 1}/{total}
+                            </Text>
+                          </View>
+                        </View>
+                        <WebView
+                          originWhitelist={["*"]}
+                          source={{ html: doc.html }}
+                          style={styles.misFormsWebViewTall}
+                          scrollEnabled
+                          nestedScrollEnabled
+                          javaScriptEnabled
+                          domStorageEnabled
+                          allowsInlineMediaPlayback
+                        />
+                        <View style={styles.misPdfActionsRow}>
+                          <TouchableOpacity
+                            style={[
+                              styles.misPdfActionBtn,
+                              misPdfLoading && styles.misPdfActionBtnDisabled,
+                            ]}
+                            disabled={
+                              misPdfLoading || !pendingCompleteConsultation
+                            }
+                            onPress={() =>
+                              pendingCompleteConsultation &&
+                              void handleMisPdfAction(
+                                pendingCompleteConsultation.id,
+                                "view",
+                                doc.html,
+                                doc.title,
+                              )
+                            }
+                          >
+                            {misPdfLoading ? (
+                              <ActivityIndicator size="small" color="#0369A1" />
+                            ) : (
+                              <Ionicons
+                                name="document-text-outline"
+                                size={16}
+                                color="#0369A1"
+                              />
+                            )}
+                            <Text style={styles.misPdfActionBtnText}>
+                              PDF ნახვა
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[
+                              styles.misPdfActionBtn,
+                              styles.misPdfActionBtnPrimary,
+                              misPdfLoading && styles.misPdfActionBtnDisabled,
+                            ]}
+                            disabled={
+                              misPdfLoading || !pendingCompleteConsultation
+                            }
+                            onPress={() =>
+                              pendingCompleteConsultation &&
+                              void handleMisPdfAction(
+                                pendingCompleteConsultation.id,
+                                "download",
+                                doc.html,
+                                doc.title,
+                              )
+                            }
+                          >
+                            <Ionicons
+                              name="download-outline"
+                              size={16}
+                              color="#FFFFFF"
+                            />
+                            <Text style={styles.misPdfActionBtnTextPrimary}>
+                              PDF გადმოწერა
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              ) : (
+                <Text style={styles.misFormsHint}>
+                  ფორმების შიგთავსი ვერ მოიძებნა.
+                </Text>
+              )}
+            </ScrollView>
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonSecondary]}
+                onPress={() => {
+                  setShowMisCompletePreviewModal(false);
+                  setPendingCompleteConsultation(null);
+                  setMisHisDocuments([]);
+                  setMisHisError(null);
+                }}
+              >
+                <Text style={styles.modalButtonTextSecondary}>დახურვა</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalButton,
+                  styles.modalButtonPrimary,
+                  (misHisLoading ||
+                    !pendingCompleteConsultation ||
+                    !hasForm100ForVisitCompletion(
+                      pendingCompleteConsultation,
+                    )) &&
+                    styles.modalButtonDisabled,
+                ]}
+                disabled={
+                  misHisLoading ||
+                  !pendingCompleteConsultation ||
+                  !hasForm100ForVisitCompletion(pendingCompleteConsultation)
+                }
+                onPress={async () => {
+                  if (!pendingCompleteConsultation) return;
+                  if (
+                    !hasForm100ForVisitCompletion(pendingCompleteConsultation)
+                  ) {
+                    return;
+                  }
+                  try {
+                    const response = await apiService.completeConsultation(
+                      pendingCompleteConsultation.id,
+                    );
+                    if (response.success) {
+                      setShowMisCompletePreviewModal(false);
+                      setPendingCompleteConsultation(null);
+                      setMisHisDocuments([]);
+                      setMisHisError(null);
+                      Alert.alert(
+                        "წარმატება",
+                        "კონსულტაცია მონიშნულია როგორც ჩატარებული",
+                      );
+                      setFilterStatus("completed");
+                      router.setParams({
+                        status: "completed",
+                        appointmentId: undefined,
+                      });
+                      await fetchConsultations();
+                    } else {
+                      Alert.alert(
+                        "შეცდომა",
+                        response.message || "ოპერაცია ვერ მოხერხდა",
+                      );
+                    }
+                  } catch (err: unknown) {
+                    const msg =
+                      err instanceof Error
+                        ? err.message
+                        : "ოპერაცია ვერ მოხერხდა";
+                    Alert.alert("შეცდომა", msg);
+                  }
+                }}
+              >
+                <Text style={styles.modalButtonTextPrimary}>
+                  კონსულტაციის დასრულება
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
 
       {/* Success Modal */}
@@ -3706,11 +4325,7 @@ export default function DoctorAppointments() {
             <View style={{ flexDirection: "row", gap: 12, width: "100%" }}>
               <TouchableOpacity
                 style={[styles.successModalButton, { flex: 1 }]}
-                onPress={() => {
-                  setShowSuccessModal(false);
-                  // Navigate to patients tab (recurring appointments)
-                  router.push("/(doctor-tabs)/patients");
-                }}
+                onPress={() => setShowSuccessModal(false)}
               >
                 <Text style={styles.successModalButtonText}>დასრულება</Text>
               </TouchableOpacity>
@@ -4451,6 +5066,164 @@ const styles = StyleSheet.create({
     padding: 20,
     borderTopWidth: 1,
     borderTopColor: "#E5E7EB",
+  },
+  misPreviewModalContent: {
+    maxHeight: "92%",
+  },
+  misFormsWrap: {
+    marginBottom: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    overflow: "hidden",
+    backgroundColor: "#FFFFFF",
+  },
+  misFormsTitle: {
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 6,
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#1F2937",
+  },
+  misFormDocCard: {
+    marginTop: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#FAFAFA",
+    overflow: "hidden",
+  },
+  misFormDocCardFirst: {
+    marginTop: 0,
+  },
+  misFormDocCardHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: "#F1F5F9",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+  },
+  misFormDocHeaderTextCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  misFormDocHeading: {
+    fontSize: 15,
+    fontFamily: "Poppins-SemiBold",
+    color: "#0F172A",
+  },
+  misFormDocCaption: {
+    marginTop: 4,
+    fontSize: 12,
+    fontFamily: "Poppins-Medium",
+    color: "#64748B",
+    lineHeight: 16,
+  },
+  misFormDocIndexBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: "#E0F2FE",
+    alignSelf: "flex-start",
+  },
+  misFormDocIndexBadgeText: {
+    fontSize: 11,
+    fontFamily: "Poppins-SemiBold",
+    color: "#0369A1",
+  },
+  misFormsStaleHint: {
+    paddingHorizontal: 12,
+    paddingBottom: 10,
+    fontSize: 12,
+    fontFamily: "Poppins-Medium",
+    color: "#B45309",
+  },
+  misFormsWebView: {
+    height: 400,
+    width: "100%",
+    backgroundColor: "#FFFFFF",
+  },
+  misFormsWebViewTall: {
+    height: 480,
+    width: "100%",
+    backgroundColor: "#FFFFFF",
+  },
+  misFormsHint: {
+    padding: 12,
+    fontSize: 13,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+  },
+  misFormsLoadingBox: {
+    paddingVertical: 24,
+    paddingHorizontal: 12,
+    alignItems: "center",
+    gap: 12,
+  },
+  misFormsErrorText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#B91C1C",
+    textAlign: "center",
+  },
+  misFormsReloadBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: "#E0F2FE",
+  },
+  misFormsReloadBtnText: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#0369A1",
+  },
+  misPdfActionsRow: {
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+    paddingTop: 8,
+  },
+  misPdfActionBtn: {
+    flex: 1,
+    minHeight: 42,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#BAE6FD",
+    backgroundColor: "#F0F9FF",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingHorizontal: 8,
+  },
+  misPdfActionBtnPrimary: {
+    borderColor: "#0891B2",
+    backgroundColor: "#06B6D4",
+  },
+  misPdfActionBtnDisabled: {
+    opacity: 0.55,
+  },
+  misPdfActionBtnText: {
+    fontSize: 13,
+    fontFamily: "Poppins-SemiBold",
+    color: "#0369A1",
+  },
+  misPdfActionBtnTextPrimary: {
+    fontSize: 13,
+    fontFamily: "Poppins-SemiBold",
+    color: "#FFFFFF",
+  },
+  modalButtonDisabled: {
+    opacity: 0.45,
   },
   modalButton: {
     flex: 1,

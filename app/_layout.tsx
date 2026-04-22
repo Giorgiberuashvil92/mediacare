@@ -32,6 +32,7 @@ export default function RootLayout() {
     "Poppins-Thin": require("../assets/fonts/Poppins-Thin.ttf"),
     "Poppins-ExtraBold": require("../assets/fonts/Poppins-ExtraBold.ttf"),
     "Poppins-Black": require("../assets/fonts/Poppins-Black.ttf"),
+    "Satoshi-Bold": require("../assets/fonts/Satoshi-Bold.ttf"),
   });
 
   useEffect(() => {
