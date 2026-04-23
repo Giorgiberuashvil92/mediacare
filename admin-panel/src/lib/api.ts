@@ -342,6 +342,8 @@ class ApiService {
     email: string;
     password: string;
     phone?: string;
+    idNumber?: string;
+    address?: string;
     dateOfBirth?: string;
     gender?: "male" | "female" | "other";
     isActive?: boolean;
@@ -373,6 +375,8 @@ class ApiService {
       email?: string;
       password?: string;
       phone?: string;
+      idNumber?: string;
+      address?: string;
       dateOfBirth?: string;
       gender?: "male" | "female" | "other";
       profileImage?: string;

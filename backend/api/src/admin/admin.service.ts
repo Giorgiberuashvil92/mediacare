@@ -680,6 +680,8 @@ export class AdminService {
       email: createUserDto.email,
       password: hashedPassword,
       phone: createUserDto.phone,
+      idNumber: createUserDto.idNumber,
+      address: createUserDto.address,
       gender: createUserDto.gender,
       isActive: isPatient ? (createUserDto.isActive ?? true) : true,
       isVerified: false,
@@ -748,6 +750,10 @@ export class AdminService {
     if (updateUserDto.email) updateData.email = updateUserDto.email;
     if (updateUserDto.phone !== undefined)
       updateData.phone = updateUserDto.phone;
+    if (updateUserDto.idNumber !== undefined)
+      updateData.idNumber = updateUserDto.idNumber;
+    if (updateUserDto.address !== undefined)
+      updateData.address = updateUserDto.address;
     if (updateUserDto.gender) updateData.gender = updateUserDto.gender;
     if (updateUserDto.profileImage)
       updateData.profileImage = updateUserDto.profileImage;
