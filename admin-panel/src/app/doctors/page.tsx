@@ -54,16 +54,35 @@ export default function DoctorsPage() {
   const loadDoctors = async () => {
     try {
       setLoading(true);
-      console.log('🔍 Loading doctors with status filter:', statusFilter);
+      // approved ფილტრში უნდა გამოჩნდნენ მხოლოდ აქტიური (doctorStatus=active) ექიმები,
+      // ხოლო გრაფიკის გარეშე ექიმები უნდა გადავიდნენ awaiting_schedule ფილტრში.
+      const apiStatus = statusFilter;
+      console.log('🔍 Loading doctors with status filter:', statusFilter, 'apiStatus:', apiStatus);
       const response = await apiService.getDoctors({
         page: 1,
         limit: 50,
-        status: statusFilter,
+        status: apiStatus,
       });
       console.log('📥 Doctors API response:', response);
       if (response.success) {
+        const filteredDoctors = (response.data.doctors || []).filter((doctor: any) => {
+          if (statusFilter === 'pending') return doctor.approvalStatus === 'pending';
+          if (statusFilter === 'rejected') return doctor.approvalStatus === 'rejected';
+          if (statusFilter === 'awaiting_schedule') {
+            return (
+              doctor.approvalStatus === 'approved' &&
+              doctor.doctorStatus === 'awaiting_schedule'
+            );
+          }
+          // approved: მხოლოდ აქტიური ექიმები
+          return (
+            doctor.approvalStatus === 'approved' &&
+            doctor.doctorStatus === 'active'
+          );
+        });
+
         // Map all fields from backend response
-        const mappedDoctors = response.data.doctors.map((doctor: any) => {
+        const mappedDoctors = filteredDoctors.map((doctor: any) => {
           const mapped: Doctor = {
             id: doctor.id,
             name: doctor.name || '',

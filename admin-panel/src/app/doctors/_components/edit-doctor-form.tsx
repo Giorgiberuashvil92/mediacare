@@ -193,11 +193,9 @@ export function EditDoctorForm({
       } else if (formData.homeVisitFee === "") {
         updateData.homeVisitFee = undefined;
       }
-      if (formData.minWorkingDaysRequired) {
-        updateData.minWorkingDaysRequired = parseInt(
-          formData.minWorkingDaysRequired,
-          10,
-        );
+      const minDaysTrim = formData.minWorkingDaysRequired.trim();
+      if (minDaysTrim !== "") {
+        updateData.minWorkingDaysRequired = parseInt(minDaysTrim, 10);
       }
 
       if (ratingTrim !== "") {

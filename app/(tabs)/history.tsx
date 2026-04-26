@@ -111,11 +111,9 @@ const History = () => {
   >(null);
   const [expandedVisits, setExpandedVisits] = useState<Set<string>>(new Set());
 
-  // Symptoms and Diagnosis modal states
-  const [showSymptomsModal, setShowSymptomsModal] = useState(false);
+  // Diagnosis and Prescription modal states
   const [showDiagnosisModal, setShowDiagnosisModal] = useState(false);
   const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
-  const [selectedSymptoms, setSelectedSymptoms] = useState<string>("");
   const [selectedDiagnosis, setSelectedDiagnosis] = useState<string>("");
   const [selectedPrescription, setSelectedPrescription] = useState<any>(null);
 
@@ -789,46 +787,6 @@ const History = () => {
                           </Text>
                         </View>
                       )}
-                      {(() => {
-                        const isFollowUpAppointment =
-                          visit.followUp?.appointmentId;
-                        const requiresFollowUp =
-                          visit.followUp?.required &&
-                          !visit.followUp?.appointmentId;
-                        const shouldShow =
-                          !requiresFollowUp || isFollowUpAppointment;
-                        return (
-                          shouldShow &&
-                          visit.symptoms &&
-                          visit.symptoms.length > 0
-                        );
-                      })() && (
-                        <TouchableOpacity
-                          style={styles.actionButton}
-                          onPress={() => {
-                            const symptomsText = Array.isArray(visit.symptoms)
-                              ? visit.symptoms.join(", ")
-                              : visit.symptoms;
-                            setSelectedSymptoms(symptomsText);
-                            setShowSymptomsModal(true);
-                          }}
-                        >
-                          <Ionicons
-                            name="medical-outline"
-                            size={18}
-                            color="#06B6D4"
-                          />
-                          <Text style={styles.actionButtonText}>
-                            სიმპტომები
-                          </Text>
-                          <Ionicons
-                            name="chevron-forward"
-                            size={16}
-                            color="#6B7280"
-                          />
-                        </TouchableOpacity>
-                      )}
-
                       {/* Diagnosis Button - Show only if not requiring follow-up or if it's a follow-up appointment */}
                       {(() => {
                         const isFollowUpAppointment =
@@ -1285,41 +1243,6 @@ const History = () => {
           )}
         </View>
       </ScrollView>
-
-      {/* Symptoms Modal */}
-      <Modal
-        visible={showSymptomsModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowSymptomsModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>სიმპტომები</Text>
-              <TouchableOpacity
-                onPress={() => setShowSymptomsModal(false)}
-                style={styles.closeButton}
-              >
-                <Ionicons name="close" size={24} color="#6B7280" />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={styles.modalBody}>
-              <View style={styles.detailSection}>
-                <Text style={styles.detailValue}>{selectedSymptoms}</Text>
-              </View>
-            </ScrollView>
-            <View style={styles.modalFooter}>
-              <TouchableOpacity
-                style={styles.modalButton}
-                onPress={() => setShowSymptomsModal(false)}
-              >
-                <Text style={styles.modalButtonText}>დახურვა</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       {/* Diagnosis Modal */}
       <Modal

@@ -2592,6 +2592,47 @@ export default function DoctorAppointments() {
                       </TouchableOpacity>
                     )}
 
+                    {consultation.type === "video" &&
+                      isJoinButtonActive(consultation) && (
+                        <TouchableOpacity
+                          style={[
+                            styles.joinCallButton,
+                            isConsultationSoon(consultation) &&
+                              styles.joinCallButtonPulsing,
+                          ]}
+                          activeOpacity={0.85}
+                          onPress={async () => {
+                            try {
+                              await apiService.joinCall(consultation.id);
+                            } catch (err) {
+                              console.error(
+                                "Failed to track doctor join time:",
+                                err,
+                              );
+                            }
+                            router.push({
+                              pathname: "/screens/video-call",
+                              params: {
+                                appointmentId: consultation.id,
+                                patientName:
+                                  consultation.patientName || "პაციენტი",
+                                roomName: `medicare-${consultation.id}`,
+                              },
+                            });
+                          }}
+                        >
+                          <Ionicons name="videocam" size={20} color="#FFFFFF" />
+                          <Text style={styles.joinCallText}>
+                            შესვლა კონსულტაციაზე
+                          </Text>
+                          <Ionicons
+                            name="arrow-forward"
+                            size={16}
+                            color="#FFFFFF"
+                          />
+                        </TouchableOpacity>
+                      )}
+
                     {/* Reschedule button - only for scheduled appointments and if no pending request */}
                     {consultation.status === "scheduled" &&
                       !(

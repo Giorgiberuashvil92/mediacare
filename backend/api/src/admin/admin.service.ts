@@ -101,6 +101,7 @@ export class AdminService {
           experience: user.experience,
           consultationFee: user.consultationFee,
           followUpFee: user.followUpFee,
+          minWorkingDaysRequired: user.minWorkingDaysRequired ?? 0,
           about: user.about,
           location: user.location,
           rating: user.rating || 0,

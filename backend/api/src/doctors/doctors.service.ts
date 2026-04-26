@@ -15,6 +15,8 @@ import {
   AppointmentType,
   PaymentStatus,
 } from '../appointments/schemas/appointment.schema';
+import { misAttachGeneratedServiceId } from '../integrations/mis-appointment-generate.sync';
+import { MisAuthService } from '../integrations/mis-auth.service';
 import {
   ApprovalStatus,
   DoctorStatus,
@@ -26,8 +28,6 @@ import {
   Specialization,
   SpecializationDocument,
 } from '../specializations/schemas/specialization.schema';
-import { misAttachGeneratedServiceId } from '../integrations/mis-appointment-generate.sync';
-import { MisAuthService } from '../integrations/mis-auth.service';
 import { UploadService } from '../upload/upload.service';
 import { CreateFollowUpDto } from './dto/create-follow-up.dto';
 import { DoctorStatusFilter, GetDoctorsDto } from './dto/get-doctors.dto';
@@ -589,6 +589,7 @@ export class DoctorsService {
       homeVisitFee: doctor.homeVisitFee,
       about: doctor.about,
       adminNotes: (doctor as any).adminNotes,
+      minWorkingDaysRequired: (doctor as any).minWorkingDaysRequired ?? 0,
       dateOfBirth: doctor.dateOfBirth,
       gender: doctor.gender,
       licenseDocument: doctor.licenseDocument,
