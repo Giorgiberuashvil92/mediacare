@@ -107,6 +107,7 @@ export class DoctorsService {
       id: apt._id ? apt._id.toString() : apt.id,
       patientName:
         patient?.name || apt.patientDetails?.name || 'უცნობი პაციენტი',
+      patientProfileImage: patient?.profileImage || undefined,
       patientAge:
         patientAge ||
         (apt.patientDetails?.dateOfBirth
@@ -1714,7 +1715,7 @@ export class DoctorsService {
       .find({
         doctorId: new mongoose.Types.ObjectId(doctorId),
       })
-      .populate('patientId', 'name dateOfBirth gender email phone')
+      .populate('patientId', 'name dateOfBirth gender email phone profileImage')
       .sort({ appointmentDate: -1, appointmentTime: 1 })
       .limit(limit)
       .lean();
@@ -1846,7 +1847,10 @@ export class DoctorsService {
         _id: new mongoose.Types.ObjectId(appointmentId),
         doctorId: new mongoose.Types.ObjectId(doctorId),
       })
-      .populate('patientId', 'name dateOfBirth gender email phone');
+      .populate(
+        'patientId',
+        'name dateOfBirth gender email phone profileImage',
+      );
 
     if (!appointment) {
       throw new NotFoundException('Appointment not found');
@@ -2146,7 +2150,10 @@ export class DoctorsService {
         _id: new mongoose.Types.ObjectId(appointmentId),
         doctorId: new mongoose.Types.ObjectId(doctorId),
       })
-      .populate('patientId', 'name dateOfBirth gender email phone');
+      .populate(
+        'patientId',
+        'name dateOfBirth gender email phone profileImage',
+      );
 
     if (!appointment) {
       throw new NotFoundException('Appointment not found');
