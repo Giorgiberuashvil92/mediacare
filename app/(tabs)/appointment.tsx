@@ -911,9 +911,9 @@ const Appointment = () => {
     if (Number.isNaN(appointmentDateTime.getTime())) return false;
     const diffMs = appointmentDateTime.getTime() - currentTime.getTime();
     const twoHoursMs = 2 * 60 * 60 * 1000;
-    const twelveHoursMs = 12 * 60 * 60 * 1000;
+    const sixHoursMs = 6 * 60 * 60 * 1000;
     if (appointment.type === "home-visit") {
-      return diffMs >= twelveHoursMs;
+      return diffMs >= sixHoursMs;
     }
     return diffMs >= twoHoursMs; // video ან სხვა
   };

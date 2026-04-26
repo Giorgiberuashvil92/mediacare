@@ -12,6 +12,7 @@ import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { Availability } from '../doctors/schemas/availability.schema';
 import { misAttachGeneratedServiceId } from '../integrations/mis-appointment-generate.sync';
 import { MisAuthService } from '../integrations/mis-auth.service';
+import { resolveMisGenerateCatalog } from '../integrations/mis-generate-service-catalog';
 import {
   misHisForm100FirstIndex,
   misHisPrintFormsIncludeForm100,
@@ -271,6 +272,80 @@ export class AppointmentsService {
       throw new BadRequestException('MIS form-ის PDF base64 ცარიელია.');
     }
     return buf;
+  }
+
+  /**
+   * გადაჯავშნის შემდეგ MIS-ში ახალი ServiceDate-ით ხელახლა გენერაცია.
+   * თუ MIS ჩავარდა, თვითონ გადაჯავშნას არ ვაგდებთ — მხოლოდ ვლოგავთ.
+   */
+  private async syncMisServiceOnReschedule(
+    appointment: AppointmentDocument,
+    appointmentStartLocal: Date,
+  ): Promise<'success' | 'failed' | 'skipped'> {
+    try {
+      const appointmentIdStr = String(
+        (appointment._id as any)?.toString?.() ?? appointment._id,
+      );
+      const patient = await this.userModel
+        .findById(appointment.patientId)
+        .select('misPersonId');
+      const doctor = await this.userModel
+        .findById(appointment.doctorId)
+        .select('idNumber');
+
+      const misPersonId =
+        typeof (patient as any)?.misPersonId === 'string'
+          ? (patient as any).misPersonId.trim()
+          : '';
+      const doctorPersonalId =
+        typeof (doctor as any)?.idNumber === 'string'
+          ? (doctor as any).idNumber.trim()
+          : '';
+
+      if (!misPersonId || !doctorPersonalId) {
+        this.logger.warn(
+          `MIS reschedule sync skipped appointment=${appointmentIdStr}: missing misPersonId/doctorPersonalId`,
+        );
+        return 'skipped';
+      }
+
+      const { serviceId, contractId } = resolveMisGenerateCatalog({
+        type: appointment.type,
+        isFollowUp: appointment.isFollowUp === true,
+      });
+
+      const genResult = await this.misAuthService.generateService({
+        ServiceID: serviceId,
+        PersonID: misPersonId,
+        ContractID: contractId,
+        MakeAutoPayment: true,
+        DoctorPersonalID: doctorPersonalId,
+        ServiceDate: appointmentStartLocal.toISOString(),
+      });
+
+      if (!genResult.success || !genResult.serviceId) {
+        this.logger.warn(
+          `MIS reschedule sync failed appointment=${appointmentIdStr} type=${appointment.type}`,
+        );
+        return 'failed';
+      }
+
+      appointment.misGeneratedServiceId = genResult.serviceId;
+      await appointment.save();
+      this.logger.log(
+        `MIS reschedule sync OK appointment=${appointmentIdStr} misServiceId=${genResult.serviceId}`,
+      );
+      return 'success';
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      const appointmentIdStr = String(
+        (appointment._id as any)?.toString?.() ?? appointment._id,
+      );
+      this.logger.warn(
+        `MIS reschedule sync error appointment=${appointmentIdStr}: ${message}`,
+      );
+      return 'failed';
+    }
   }
 
   async addDocument(
@@ -1307,6 +1382,10 @@ export class AppointmentsService {
     // Explicitly ensure status is not changed
     appointment.status = previousStatus;
     await appointment.save();
+    const misRescheduleSync = await this.syncMisServiceOnReschedule(
+      appointment,
+      appointmentDateTime,
+    );
 
     console.log('Appointment rescheduled:', {
       appointmentId: (appointment._id as any).toString(),
@@ -1321,6 +1400,7 @@ export class AppointmentsService {
       success: true,
       message: 'Appointment rescheduled successfully',
       data: appointment,
+      misRescheduleSync,
     };
   }
 
@@ -1739,6 +1819,15 @@ export class AppointmentsService {
     appointment.rescheduleRequest.respondedBy = isDoctor ? 'doctor' : 'patient';
 
     await appointment.save();
+    const approvedStartLocal = new Date(finalDate);
+    const [finalHours, finalMinutes] = (finalTime || '00:00')
+      .split(':')
+      .map(Number) as [number, number];
+    approvedStartLocal.setHours(finalHours, finalMinutes || 0, 0, 0);
+    const misRescheduleSync = await this.syncMisServiceOnReschedule(
+      appointment,
+      approvedStartLocal,
+    );
 
     // პასუხში ახალი თარიღი/დრო — იგივე დოკუმენტის ინსტანცია ზოგჯერ სერილიზაციაში ძველს აჩვენებს
     const fresh = await this.appointmentModel
@@ -1749,6 +1838,7 @@ export class AppointmentsService {
       success: true,
       message: 'გადაჯავშნა დამტკიცდა',
       data: fresh ?? appointment.toObject(),
+      misRescheduleSync,
     };
   }
 

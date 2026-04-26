@@ -68,6 +68,35 @@ export default function DoctorSchedule() {
   const getCurrentModeSelectedDates = () =>
     mode === "video" ? videoSelectedDates : homeVisitSelectedDates;
 
+  const getWorkingDaysCountInNext14Days = (
+    availabilityData: {
+      date: string;
+      timeSlots: string[];
+      isAvailable: boolean;
+      type: "video" | "home-visit";
+    }[],
+  ) => {
+    const now = new Date();
+    const end14 = new Date(now);
+    end14.setDate(end14.getDate() + 14);
+    const workingDays = new Set<string>();
+
+    availabilityData.forEach((d) => {
+      const dateKey = `${d.date}-${d.type}`;
+      const bookedForDate = bookedSlots[dateKey] || [];
+      const hasAnyWorkingSlot = d.timeSlots.length > 0 || bookedForDate.length > 0;
+
+      if (!hasAnyWorkingSlot) return;
+
+      const dDate = new Date(d.date + "T12:00:00");
+      if (dDate >= now && dDate < end14) {
+        workingDays.add(d.date);
+      }
+    });
+
+    return workingDays.size;
+  };
+
   // Load existing availability
   const loadAvailability = async (isRefresh = false) => {
     if (!user?.id) {
@@ -1318,20 +1347,11 @@ export default function DoctorSchedule() {
         const minRequired =
           (profileRes?.data?.minWorkingDaysRequired as number) ?? 0;
         if (minRequired > 0) {
-          const now = new Date();
-          const end14 = new Date(now);
-          end14.setDate(end14.getDate() + 14);
-          const workingDays = new Set<string>();
-          availabilityData.forEach((d) => {
-            if (d.timeSlots.length > 0) {
-              const dDate = new Date(d.date + "T12:00:00");
-              if (dDate >= now && dDate < end14) workingDays.add(d.date);
-            }
-          });
-          if (workingDays.size < minRequired) {
+          const workingDaysCount = getWorkingDaysCountInNext14Days(availabilityData);
+          if (workingDaysCount < minRequired) {
             Alert.alert(
               "სავალდებულო დღეები",
-              `მომავალი 2 კვირის განმავლობაში სავალდებულოა მინიმუმ ${minRequired} სამუშაო დღე. ახლა არჩეული გაქვთ ${workingDays.size}. გთხოვთ დაამატოთ გრაფიკი სხვა დღეებზეც, სანამ შეინახავთ.`,
+              `მომავალი 2 კვირის განმავლობაში სავალდებულოა მინიმუმ ${minRequired} სამუშაო დღე. ახლა არჩეული გაქვთ ${workingDaysCount}. გთხოვთ დაამატოთ გრაფიკი სხვა დღეებზეც, სანამ შეინახავთ.`,
             );
             setIsSaving(false);
             return;
@@ -1496,20 +1516,11 @@ export default function DoctorSchedule() {
         const minRequired =
           (profileRes?.data?.minWorkingDaysRequired as number) ?? 0;
         if (minRequired > 0) {
-          const now = new Date();
-          const end14 = new Date(now);
-          end14.setDate(end14.getDate() + 14);
-          const workingDays = new Set<string>();
-          availabilityData.forEach((d) => {
-            if (d.timeSlots.length > 0) {
-              const dDate = new Date(d.date + "T12:00:00");
-              if (dDate >= now && dDate < end14) workingDays.add(d.date);
-            }
-          });
-          if (workingDays.size < minRequired) {
+          const workingDaysCount = getWorkingDaysCountInNext14Days(availabilityData);
+          if (workingDaysCount < minRequired) {
             Alert.alert(
               "სავალდებულო დღეები",
-              `მომავალი 2 კვირის განმავლობაში სავალდებულოა მინიმუმ ${minRequired} სამუშაო დღე. ახლა არჩეული გაქვთ ${workingDays.size}. გთხოვთ დაამატოთ გრაფიკი სხვა დღეებზეც, სანამ შეინახავთ.`,
+              `მომავალი 2 კვირის განმავლობაში სავალდებულოა მინიმუმ ${minRequired} სამუშაო დღე. ახლა არჩეული გაქვთ ${workingDaysCount}. გთხოვთ დაამატოთ გრაფიკი სხვა დღეებზეც, სანამ შეინახავთ.`,
             );
             setIsSaving(false);
             return;
