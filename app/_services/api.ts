@@ -1231,6 +1231,7 @@ class ApiService {
     data: {
       id: string;
       patientName: string;
+      patientProfileImage?: string;
       patientAge: number;
       date: string;
       time: string;

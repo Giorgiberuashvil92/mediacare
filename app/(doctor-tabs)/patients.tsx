@@ -2,9 +2,14 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import {
+  useFocusEffect,
+  useLocalSearchParams,
+  useNavigation,
+  useRouter,
+} from "expo-router";
 import * as Sharing from "expo-sharing";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -61,6 +66,7 @@ function parseMedicationsList(
 
 export default function DoctorPatients() {
   const router = useRouter();
+  const navigation = useNavigation();
   const { user } = useAuth();
   const params = useLocalSearchParams<{ appointmentId?: string }>();
   const FORM100_MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -254,6 +260,23 @@ export default function DoctorPatients() {
     fetchConsultations();
   }, []);
 
+  // როდესაც მომხმარებელი ტაბზე დაბრუნდება/დააჭერს, სია თავიდან განახლდეს
+  useFocusEffect(
+    useCallback(() => {
+      // პირველი ჩატვირთვისას useEffect აკეთებს fetch-ს; შემდეგ ფოკუსზე refresh
+      if (!loading) {
+        fetchConsultations(true);
+      }
+    }, [loading]),
+  );
+
+  useEffect(() => {
+    const unsubscribe = (navigation as any).addListener("tabPress", () => {
+      fetchConsultations(true);
+    });
+    return unsubscribe;
+  }, [navigation]);
+
   // Auto-open consultation details if appointmentId is provided
   useEffect(() => {
     if (params.appointmentId && consultations.length > 0) {
@@ -317,6 +340,24 @@ export default function DoctorPatients() {
     );
     const diff = consultationDateTime.getTime() - currentTime.getTime();
     return diff > 0 && diff <= 30 * 60 * 1000; // 30 minutes
+  };
+
+  // "შესვლა კონსულტაციაზე" ღილაკი აქტიურია ჯავშნამდე და ჯავშნიდან 1 საათის განმავლობაში
+  const isJoinButtonActive = (consultation: Consultation) => {
+    if (
+      consultation.status !== "scheduled" &&
+      consultation.status !== "in-progress"
+    ) {
+      return false;
+    }
+
+    const consultationDateTime = new Date(
+      `${consultation.date}T${consultation.time}`,
+    );
+    const diff = consultationDateTime.getTime() - currentTime.getTime();
+    const oneHourInMs = 60 * 60 * 1000;
+
+    return diff >= -oneHourInMs;
   };
 
   // Filter consultations - only show followup consultations
@@ -1218,7 +1259,9 @@ export default function DoctorPatients() {
                       <View style={styles.patientInfo}>
                         <Image
                           source={{
-                            uri: `https://picsum.photos/seed/${consultation.patientName}/200/200`,
+                            uri:
+                              consultation.patientProfileImage ||
+                              `https://picsum.photos/seed/${consultation.patientName}/200/200`,
                           }}
                           style={styles.avatarImage}
                         />
@@ -1694,7 +1737,7 @@ export default function DoctorPatients() {
                                 <Text
                                   style={{
                                     color: "#0EA5E9",
-                                    fontWeight: "600",
+                                    fontWeight: "400",
                                   }}
                                 >
                                   {" "}
@@ -1791,6 +1834,47 @@ export default function DoctorPatients() {
                         </Text>
                       </TouchableOpacity>
                     )}
+
+                    {consultation.type === "video" &&
+                      isJoinButtonActive(consultation) && (
+                        <TouchableOpacity
+                          style={[
+                            styles.joinCallButton,
+                            isConsultationSoon(consultation) &&
+                              styles.joinCallButtonPulsing,
+                          ]}
+                          activeOpacity={0.85}
+                          onPress={async () => {
+                            try {
+                              await apiService.joinCall(consultation.id);
+                            } catch (err) {
+                              console.error(
+                                "Failed to track doctor join time:",
+                                err,
+                              );
+                            }
+                            router.push({
+                              pathname: "/screens/video-call",
+                              params: {
+                                appointmentId: consultation.id,
+                                patientName:
+                                  consultation.patientName || "პაციენტი",
+                                roomName: `medicare-${consultation.id}`,
+                              },
+                            });
+                          }}
+                        >
+                          <Ionicons name="videocam" size={20} color="#FFFFFF" />
+                          <Text style={styles.joinCallText}>
+                            შესვლა კონსულტაციაზე
+                          </Text>
+                          <Ionicons
+                            name="arrow-forward"
+                            size={16}
+                            color="#FFFFFF"
+                          />
+                        </TouchableOpacity>
+                      )}
                   </View>
                 </View>
               );

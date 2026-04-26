@@ -102,6 +102,7 @@ export interface PatientDetails {
 export interface Consultation {
   id: string;
   patientName: string;
+  patientProfileImage?: string;
   patientAge: number;
   date: string;
   time: string;

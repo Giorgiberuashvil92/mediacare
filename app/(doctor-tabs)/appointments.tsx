@@ -56,7 +56,13 @@ interface PendingPatientUploadAsset {
   size?: number | null;
 }
 
-/** API-დან medications JSON სტრიქონიდან წასაკითხი ტექსტი (1 და 2 ჩვენებისთვის) */
+const getPendingDocKey = (asset: PendingPatientUploadAsset): string => {
+  const uri = asset.uri?.trim() || "";
+  const name = asset.name?.trim() || "";
+  const size = asset.size ?? "";
+  return `${uri}::${name}::${size}`;
+};
+
 function formatMedicationsForDisplay(
   medicationsJson: string | undefined,
 ): string {
@@ -829,7 +835,16 @@ export default function DoctorAppointments() {
       }
 
       if (accepted.length > 0) {
-        setPendingPatientDocuments((prev) => [...prev, ...accepted]);
+        setPendingPatientDocuments((prev) => {
+          const existing = new Set(prev.map(getPendingDocKey));
+          const uniqueNew = accepted.filter((asset) => {
+            const key = getPendingDocKey(asset);
+            if (existing.has(key)) return false;
+            existing.add(key);
+            return true;
+          });
+          return [...prev, ...uniqueNew];
+        });
       }
     } catch (error) {
       console.error("Patient documents picker error:", error);
@@ -896,7 +911,16 @@ export default function DoctorAppointments() {
       }
 
       if (accepted.length > 0) {
-        setPendingPatientDocuments((prev) => [...prev, ...accepted]);
+        setPendingPatientDocuments((prev) => {
+          const existing = new Set(prev.map(getPendingDocKey));
+          const uniqueNew = accepted.filter((asset) => {
+            const key = getPendingDocKey(asset);
+            if (existing.has(key)) return false;
+            existing.add(key);
+            return true;
+          });
+          return [...prev, ...uniqueNew];
+        });
       }
     } catch (error) {
       console.error("Gallery picker error:", error);
@@ -1411,6 +1435,10 @@ export default function DoctorAppointments() {
   };
 
   const handleSaveAppointment = async () => {
+    if (savingAppointment) {
+      return;
+    }
+
     if (!selectedConsultation) {
       return;
     }
@@ -1641,7 +1669,12 @@ export default function DoctorAppointments() {
 
       if (pendingPatientDocuments.length > 0) {
         let uploadFailures = 0;
-        for (const file of pendingPatientDocuments) {
+        const uniqueFiles = pendingPatientDocuments.filter((file, index, arr) => {
+          const key = getPendingDocKey(file);
+          return arr.findIndex((x) => getPendingDocKey(x) === key) === index;
+        });
+
+        for (const file of uniqueFiles) {
           try {
             const mime =
               file.mimeType ||
@@ -1983,7 +2016,9 @@ export default function DoctorAppointments() {
                       <View style={styles.patientInfo}>
                         <Image
                           source={{
-                            uri: `https://picsum.photos/seed/${consultation.patientName}/200/200`,
+                            uri:
+                              consultation.patientProfileImage ||
+                              `https://picsum.photos/seed/${consultation.patientName}/200/200`,
                           }}
                           style={styles.avatarImage}
                         />
@@ -4078,8 +4113,11 @@ export default function DoctorAppointments() {
                 <TouchableOpacity
                   style={[styles.modalButton, styles.modalButtonPrimary]}
                   onPress={handleSaveAppointment}
+                  disabled={savingAppointment}
                 >
-                  <Text style={styles.modalButtonTextPrimary}>შენახვა</Text>
+                  <Text style={styles.modalButtonTextPrimary}>
+                    {savingAppointment ? "ინახება..." : "შენახვა"}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>

@@ -702,9 +702,10 @@ export default function LaboratoryScreen() {
           {/* Appointment Selection */}
           <TouchableOpacity
             style={styles.selectionButton}
-            onPress={() => {
+            onPress={async () => {
               // Disable if came from dashboard (has params)
               if (!params.appointmentId && !params.patientId && !params.patientName) {
+                await loadData();
                 console.log('🧪 [Laboratory] ჯავშნის მოდალი — იხსნება, ჯავშნების ტიპები:', appointments.map((apt) => ({ id: apt.id, patientName: apt.patientName, type: apt.type, isFollowUp: apt.isFollowUp, typeLabel: apt.isFollowUp ? "განმეორებითი" : apt.type === "video" ? "ვიდეო" : apt.type === "home-visit" ? "სახლში ვიზიტი" : apt.type ?? "უცნობი" })));
                 setShowAppointmentModal(true);
               }

@@ -209,9 +209,11 @@ const mapAppointmentFromAPI = (
       appointment.patientDetails?.problem ||
       appointment.consultationSummary?.symptoms ||
       "",
-    diagnosis:
-      (appointment.consultationSummary?.diagnosis || appointment.diagnosis || "")
-        .trim(),
+    diagnosis: (
+      appointment.consultationSummary?.diagnosis ||
+      appointment.diagnosis ||
+      ""
+    ).trim(),
     visitAddress: appointment.visitAddress,
     homeVisitCompletedAt: appointment.homeVisitCompletedAt,
     doctorImage: doctorImage,
@@ -260,7 +262,9 @@ const Appointment = () => {
   const [expandedAppointments, setExpandedAppointments] = useState<Set<string>>(
     new Set(),
   );
-  const [uploadingDocForId, setUploadingDocForId] = useState<string | null>(null);
+  const [uploadingDocForId, setUploadingDocForId] = useState<string | null>(
+    null,
+  );
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [filterStartDate, setFilterStartDate] = useState("");
   const [filterEndDate, setFilterEndDate] = useState("");
@@ -835,7 +839,10 @@ const Appointment = () => {
       if (uploadResp.success && uploadResp.data) {
         setAppointmentDocuments((prev) => {
           const next = { ...prev };
-          next[appointmentId] = [uploadResp.data!, ...(prev[appointmentId] || [])];
+          next[appointmentId] = [
+            uploadResp.data!,
+            ...(prev[appointmentId] || []),
+          ];
           return next;
         });
         Alert.alert("წარმატება", "ფაილი აიტვირთა");
@@ -1376,31 +1383,13 @@ const Appointment = () => {
                             <Text style={styles.doctorName}>
                               {appointment.doctorName}
                             </Text>
-                            {appointment.status === "scheduled" &&
-                              isAppointmentSoon(appointment) && (
-                                <View style={styles.soonBadge}>
-                                  <Ionicons
-                                    name="alarm"
-                                    size={12}
-                                    color="#EF4444"
-                                  />
-                                  <Text style={styles.soonText}>მალე</Text>
-                                </View>
-                              )}
-                            {/* File indicator badge */}
-                            {documents.length > 0 && (
-                              <View style={styles.fileIndicatorBadge}>
-                                <Ionicons
-                                  name="document-attach"
-                                  size={12}
-                                  color="#0EA5E9"
-                                />
-                              </View>
-                            )}
                           </View>
                           <Text style={styles.doctorSpecialty}>
                             {appointment.doctorSpecialty} •{" "}
-                            {getConsultationTypeLabel(appointment.type, appointment.isFollowUp)}
+                            {getConsultationTypeLabel(
+                              appointment.type,
+                              appointment.isFollowUp,
+                            )}
                           </Text>
                         </View>
                       </View>
@@ -1437,9 +1426,7 @@ const Appointment = () => {
                       activeOpacity={0.7}
                     >
                       <Text style={styles.expandDetailsButtonText}>
-                        {isExpanded
-                          ? "დეტალების დაფარვა"
-                          : "დეტალების ნახვა"}
+                        {isExpanded ? "დეტალების დაფარვა" : "დეტალების ნახვა"}
                       </Text>
                       <Ionicons
                         name={isExpanded ? "chevron-up" : "chevron-down"}
@@ -1448,92 +1435,96 @@ const Appointment = () => {
                       />
                     </TouchableOpacity>
 
-                  <View style={styles.appointmentBody}>
-                    <View style={styles.infoRow}>
-                      <Ionicons
-                        name="calendar-outline"
-                        size={16}
-                        color="#6B7280"
-                      />
-                      <Text style={styles.infoText}>{appointment.date}</Text>
-                    </View>
-                    <View style={styles.infoRow}>
-                      <Ionicons name="time-outline" size={16} color="#6B7280" />
-                      <Text style={styles.infoText}>{appointment.time}</Text>
-                    </View>
-                    {appointment.diagnosis && (
-                      <View style={styles.diagnosisRow}>
+                    <View style={styles.appointmentBody}>
+                      <View style={styles.infoRow}>
                         <Ionicons
-                          name="checkmark-circle"
+                          name="calendar-outline"
                           size={16}
-                          color="#10B981"
+                          color="#6B7280"
                         />
-                        <Text style={styles.diagnosisText}>
-                          {appointment.diagnosis}
-                        </Text>
+                        <Text style={styles.infoText}>{appointment.date}</Text>
                       </View>
-                    )}
-                    {appointment.type === "home-visit" &&
-                      appointment.visitAddress && (
-                        <View style={styles.infoRow}>
+                      <View style={styles.infoRow}>
+                        <Ionicons
+                          name="time-outline"
+                          size={16}
+                          color="#6B7280"
+                        />
+                        <Text style={styles.infoText}>{appointment.time}</Text>
+                      </View>
+                      {appointment.diagnosis && (
+                        <View style={styles.diagnosisRow}>
                           <Ionicons
-                            name="location-outline"
+                            name="checkmark-circle"
                             size={16}
-                            color="#6B7280"
+                            color="#10B981"
                           />
-                          <Text style={styles.infoText}>
-                            {appointment.visitAddress}
+                          <Text style={styles.diagnosisText}>
+                            {appointment.diagnosis}
                           </Text>
                         </View>
                       )}
+                      {appointment.type === "home-visit" &&
+                        appointment.visitAddress && (
+                          <View style={styles.infoRow}>
+                            <Ionicons
+                              name="location-outline"
+                              size={16}
+                              color="#6B7280"
+                            />
+                            <Text style={styles.infoText}>
+                              {appointment.visitAddress}
+                            </Text>
+                          </View>
+                        )}
 
-                    {canShowJoinVideoConsultation(appointment) && (
-                      <TouchableOpacity
-                        style={[
-                          styles.joinCallButton,
-                          isAppointmentSoon(appointment) &&
-                            styles.joinCallButtonPulsing,
-                        ]}
-                        activeOpacity={0.85}
-                        onPress={() => {
-                          const id = String(appointment.id || "").trim();
-                          if (!id) return;
-                          router.push({
-                            pathname: "/screens/video-call",
-                            params: {
-                              appointmentId: id,
-                              doctorName: appointment.doctorName || "ექიმი",
-                              roomName: `medicare-${id}`,
-                            },
-                          });
-                        }}
-                      >
-                        <Ionicons name="videocam" size={20} color="#FFFFFF" />
-                        <Text style={styles.joinCallText}>
-                          შესვლა კონსულტაციაზე
-                        </Text>
-                        <Ionicons
-                          name="arrow-forward"
-                          size={16}
-                          color="#FFFFFF"
-                        />
-                      </TouchableOpacity>
-                    )}
+                      {canShowJoinVideoConsultation(appointment) && (
+                        <TouchableOpacity
+                          style={[
+                            styles.joinCallButton,
+                            isAppointmentSoon(appointment) &&
+                              styles.joinCallButtonPulsing,
+                          ]}
+                          activeOpacity={0.85}
+                          onPress={() => {
+                            const id = String(appointment.id || "").trim();
+                            if (!id) return;
+                            router.push({
+                              pathname: "/screens/video-call",
+                              params: {
+                                appointmentId: id,
+                                doctorName: appointment.doctorName || "ექიმი",
+                                roomName: `medicare-${id}`,
+                              },
+                            });
+                          }}
+                        >
+                          <Ionicons name="videocam" size={20} color="#FFFFFF" />
+                          <Text style={styles.joinCallText}>
+                            შესვლა კონსულტაციაზე
+                          </Text>
+                          <Ionicons
+                            name="arrow-forward"
+                            size={16}
+                            color="#FFFFFF"
+                          />
+                        </TouchableOpacity>
+                      )}
 
-                    {/* File indicator */}
-                    {documents.length > 0 && (
-                      <View style={styles.infoRow}>
-                        <Ionicons
-                          name="document-attach-outline"
-                          size={16}
-                          color="#0EA5E9"
-                        />
-                        <Text style={[styles.infoText, { color: "#0EA5E9" }]}>
-                          {documents.length} ფაილი ატვირთულია
-                        </Text>
-                      </View>
-                    )}
-                  </View>
+                      {/* File indicator */}
+                      {documents.length > 0 && (
+                        <View style={styles.infoRow}>
+                          <Ionicons
+                            name="document-attach-outline"
+                            size={16}
+                            color="#0EA5E9"
+                          />
+                          <Text style={[styles.infoText, { color: "#0EA5E9" }]}>
+                            {documents.length} ფაილი ატვირთულია
+                          </Text>
+                        </View>
+                      )}
+                    </View>
                   </View>
 
                   {/* Expanded Details */}
@@ -1877,7 +1868,10 @@ const Appointment = () => {
                 <View style={styles.detailSection}>
                   <Text style={styles.detailLabel}>ტიპი</Text>
                   <Text style={styles.detailValue}>
-                    {getConsultationTypeLabel(selectedAppointment.type, selectedAppointment.isFollowUp)}
+                    {getConsultationTypeLabel(
+                      selectedAppointment.type,
+                      selectedAppointment.isFollowUp,
+                    )}
                   </Text>
                 </View>
 

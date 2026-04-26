@@ -57,6 +57,36 @@ function extractDocumentsListFromResponse(res: unknown): any[] {
   return [];
 }
 
+function dedupeDocumentsByName(docs: any[]): any[] {
+  if (!Array.isArray(docs) || docs.length === 0) return [];
+
+  const seen = new Set<string>();
+  return docs.filter((doc) => {
+    const rawName =
+      typeof doc?.name === "string" && doc.name.trim()
+        ? doc.name.trim()
+        : typeof doc?.originalName === "string" && doc.originalName.trim()
+          ? doc.originalName.trim()
+          : "";
+
+    let normalizedName = "";
+    if (rawName) {
+      try {
+        normalizedName = decodeURIComponent(rawName).toLowerCase();
+      } catch {
+        normalizedName = rawName.toLowerCase();
+      }
+    }
+    const fallbackKey = typeof doc?.url === "string" ? doc.url.trim() : "";
+    const key = normalizedName || fallbackKey;
+
+    if (!key) return true;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function buildVisitDocumentUrl(
   doc: { url?: string },
   baseURL: string,
@@ -183,17 +213,86 @@ const History = () => {
       }
 
       const response = await apiService.getPatientAppointments();
+      console.log("📋 [History] getPatientAppointments response:", {
+        success: response?.success,
+        totalRaw: Array.isArray(response?.data) ? response.data.length : 0,
+      });
 
       if (response.success && Array.isArray(response.data)) {
+        response.data.forEach((appointment: any, index: number) => {
+          const docItems = Array.isArray(appointment?.documents)
+            ? appointment.documents
+            : [];
+          const docSummaries = docItems.map((doc: any, docIndex: number) => ({
+            index: docIndex,
+            name: doc?.name,
+            type: doc?.type || doc?.mimeType,
+            url: doc?.url,
+            uploadedAt: doc?.uploadedAt,
+          }));
+
+          console.log(`📋 [History] Raw appointment [${index}]`, {
+            id: appointment?._id || appointment?.id,
+            appointmentDate: appointment?.appointmentDate,
+            appointmentTime: appointment?.appointmentTime,
+            status: appointment?.status,
+            type: appointment?.type,
+            doctorName: appointment?.doctorId?.name,
+            hasDocs: Array.isArray(appointment?.documents)
+              ? appointment.documents.length
+              : 0,
+            hasLabTests: Array.isArray(appointment?.laboratoryTests)
+              ? appointment.laboratoryTests.length
+              : 0,
+            hasInstrumentalTests: Array.isArray(appointment?.instrumentalTests)
+              ? appointment.instrumentalTests.length
+              : 0,
+          });
+
+          if (docSummaries.length > 0) {
+            const duplicateDocUrls = docSummaries
+              .map((doc) => doc.url)
+              .filter(
+                (url, i, arr) => typeof url === "string" && arr.indexOf(url) !== i,
+              );
+
+            console.log("📎 [History] Raw appointment documents:", {
+              id: appointment?._id || appointment?.id,
+              docsCount: docSummaries.length,
+              docs: docSummaries,
+              duplicateUrls: Array.from(new Set(duplicateDocUrls)),
+            });
+          }
+
+          // კონკრეტულად 19:00 ვიზიტის დიაგნოსტიკა
+          if ((appointment?._id || appointment?.id) === "69edc2458f2c0c05603bf6c7") {
+            console.log("🎯 [History] Target appointment documents (19:00):", {
+              id: appointment?._id || appointment?.id,
+              appointmentDate: appointment?.appointmentDate,
+              appointmentTime: appointment?.appointmentTime,
+              docsCount: docSummaries.length,
+              docs: docSummaries,
+            });
+          }
+        });
+
         const mapped = response.data
           .map((appointment) => {
             const visit = mapAppointmentToVisit(appointment);
-            console.log("📋 History - Mapped visit:", {
+            console.log("📋 [History] Mapped visit:", {
               id: visit?.id,
               doctorId: visit?.doctorId,
               doctorIdType: typeof visit?.doctorId,
               doctorIdValue: visit?.doctorId,
               doctorName: visit?.doctorName,
+              appointmentDate: visit?.appointmentDate,
+              appointmentTime: visit?.appointmentTime,
+              status: visit?.status,
+              type: visit?.type,
+              diagnosis: visit?.diagnosis,
+              hasPrescription: Array.isArray(visit?.prescription)
+                ? visit.prescription.length
+                : 0,
             });
             return visit;
           })
@@ -219,7 +318,7 @@ const History = () => {
             return getDateTime(b) - getDateTime(a); // Descending - newest first
           });
 
-        console.log("📋 History - Filtered visits count:", mapped.length);
+        console.log("📋 [History] Final past visits count:", mapped.length);
         setVisits(mapped);
         setDocumentsByVisitId({});
         loadedVisitDocIdsRef.current.clear();
@@ -271,7 +370,10 @@ const History = () => {
             await apiService.getAppointmentDocuments(vid),
           )
         : [];
-      setDocumentsByVisitId((p) => ({ ...p, [visitCardId]: list }));
+      setDocumentsByVisitId((p) => ({
+        ...p,
+        [visitCardId]: dedupeDocumentsByName(list),
+      }));
     } catch (e) {
       console.error("[History] expand documents:", visitCardId, e);
       setDocumentsByVisitId((p) => ({ ...p, [visitCardId]: [] }));
