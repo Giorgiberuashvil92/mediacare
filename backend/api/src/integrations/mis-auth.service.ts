@@ -301,6 +301,15 @@ export class MisAuthService implements OnApplicationBootstrap {
       'MIS: აპლიკაციის bootstrap — GET Login, LoginToken მეხსიერებაში',
     );
     await this.refreshLoginToken();
+
+    const bootstrapToken = this.getStoredValue();
+    if (bootstrapToken) {
+      this.logger.log(
+        `MIS bootstrap token ready | length=${bootstrapToken.length} | token=${bootstrapToken}`,
+      );
+    } else {
+      this.logger.warn('MIS bootstrap token missing after initial login');
+    }
   }
 
   /**
@@ -408,6 +417,32 @@ export class MisAuthService implements OnApplicationBootstrap {
       const bodyJson = JSON.stringify(plainBody);
       this.logger.log(
         `MIS patient upsert body (მხოლოდ აპლიკაციის ველები, undefined ამოღებული):\n${JSON.stringify(plainBody, null, 2)}`,
+      );
+      this.logger.log(
+        `MIS patient upsert request payload (exact outbound):\n${JSON.stringify(
+          {
+            method: 'POST',
+            url: this.patientUpsertUrl,
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              LoginToken: loginToken,
+            },
+            body: plainBody,
+          },
+          null,
+          2,
+        )}`,
+      );
+      this.logger.log(
+        `MIS_UPSERT_OUTBOUND::${JSON.stringify({
+          method: 'POST',
+          url: this.patientUpsertUrl,
+          headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            LoginToken: loginToken,
+          },
+          body: plainBody,
+        })}`,
       );
 
       const response = await fetch(this.patientUpsertUrl, {

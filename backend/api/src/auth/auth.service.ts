@@ -333,7 +333,6 @@ export class AuthService {
         targetUserId: notification.targetUserId,
       });
     } catch (error) {
-      // Don't fail registration if notification creation fails
       console.error('❌ Failed to create notification:', error);
       console.error('Error details:', {
         message: error instanceof Error ? error.message : String(error),
@@ -341,7 +340,6 @@ export class AuthService {
         errorType: error?.constructor?.name,
         errorString: String(error),
       });
-      // Log full error object
       if (error instanceof Error) {
         console.error('Error name:', error.name);
         console.error('Error message:', error.message);

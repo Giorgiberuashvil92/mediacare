@@ -104,29 +104,18 @@ const getDefaultBaseUrl = () => {
     return RAILWAY_URL;
   }
 
-  // Development build-ისთვის გამოვიყენოთ ავტომატურად გამოვლენილი IP
-  // თუ envUrl არის განსაზღვრული და არ არის localhost, გამოვიყენოთ ის
-  if (
-    envUrl &&
-    !envUrl.includes("localhost") &&
-    !envUrl.includes("127.0.0.1")
-  ) {
+  // Development რეჟიმშიც პირველ რიგში env/apiUrl გამოვიყენოთ
+  // (მაგ. production API-ზე ტესტირებისას).
+  if (envUrl) {
     console.log("✅ Using development URL from env:", envUrl);
     return envUrl;
   }
 
-  // Development-ისთვის IP-ის გამოყენება
   const devIP = getDevelopmentIP();
   if (devIP) {
     const devUrl = `http://${devIP}:4001`;
     console.log("🔧 Using development URL with IP:", devUrl);
     return devUrl;
-  }
-
-  // Fallback
-  if (envUrl) {
-    console.log("✅ Using fallback URL:", envUrl);
-    return envUrl;
   }
 
   console.warn("⚠️ No API URL found, using localhost fallback");
@@ -339,6 +328,16 @@ class ApiService {
 
   private async getAuthHeaders(): Promise<HeadersInit> {
     const token = await AsyncStorage.getItem("accessToken");
+    if (__DEV__) {
+      const maskedToken = token
+        ? `${token.slice(0, 12)}...${token.slice(-8)}`
+        : null;
+      console.log("🔐 [AuthDebug] accessToken from storage:", {
+        hasToken: !!token,
+        tokenLength: token?.length ?? 0,
+        tokenPreview: maskedToken,
+      });
+    }
     return {
       "Content-Type": "application/json",
       ...(token && { Authorization: `Bearer ${token}` }),
@@ -1736,7 +1735,10 @@ class ApiService {
     data?: { processed: number; saved: number };
   }> {
     if (USE_MOCK_API) {
-      return Promise.resolve({ success: true, data: { processed: 0, saved: 0 } });
+      return Promise.resolve({
+        success: true,
+        data: { processed: 0, saved: 0 },
+      });
     }
     return this.apiCall("/appointments/patient/sync-mis-print-forms", {
       method: "POST",

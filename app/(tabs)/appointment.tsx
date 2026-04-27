@@ -1761,7 +1761,7 @@ const Appointment = () => {
                       </View>
                     )}
 
-                  {/* Reschedule and Cancel - ჩანს მხოლოდ სანამ კონსულტაცია მოვა; განმეორებითზე გადაჯავშნა არ ჩანს */}
+                  {/* Reschedule and Cancel - ჩანს მხოლოდ სანამ კონსულტაცია მოვა; განმეორებითზე მხოლოდ გადაჯავშნა არ ჩანს */}
                   {(appointment.status === "scheduled" ||
                     appointment.status === "pending") &&
                     !(appointment.rescheduleRequest?.status === "pending") &&
