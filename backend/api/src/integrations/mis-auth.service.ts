@@ -313,9 +313,18 @@ export class MisAuthService implements OnApplicationBootstrap {
   }
 
   /**
-   * MIS მოთხოვნამდე: თუ ტოკენი არაა (ცივი სტარტი ვერ მოასწრო ან ჩამოწმა), ხელახლა ლოგინი.
+   * MIS მოთხოვნამდე LoginToken-ის უზრუნველყოფა.
+   * forceRefresh=true → ყოველთვის ხელახლა გამოიძახებს GET /api/Home/Login-ს.
    */
-  async ensureMisLoginToken(): Promise<string | null> {
+  async ensureMisLoginToken(forceRefresh = false): Promise<string | null> {
+    if (forceRefresh) {
+      this.logger.log(
+        'MIS force refresh: მოთხოვნამდე ვიძახებთ GET /api/Home/Login-ს',
+      );
+      await this.refreshLoginToken();
+      return this.getStoredValue();
+    }
+
     let token = this.getStoredValue();
     if (!token) {
       this.logger.warn(
@@ -399,7 +408,7 @@ export class MisAuthService implements OnApplicationBootstrap {
   async upsertPatient(
     payload: MisPatientPayload,
   ): Promise<MisPatientUpsertResult> {
-    const loginToken = await this.ensureMisLoginToken();
+    const loginToken = await this.ensureMisLoginToken(true);
 
     if (!loginToken) {
       this.logger.error('Cannot upsert MIS patient: LoginToken is empty');
@@ -528,7 +537,7 @@ export class MisAuthService implements OnApplicationBootstrap {
   async generateService(
     payload: MisGenerateServicePayload,
   ): Promise<MisGenerateServiceResult> {
-    const loginToken = await this.ensureMisLoginToken();
+    const loginToken = await this.ensureMisLoginToken(true);
 
     if (!loginToken) {
       this.logger.error('Cannot call MIS GenerateService: LoginToken is empty');
@@ -640,7 +649,7 @@ export class MisAuthService implements OnApplicationBootstrap {
       };
     }
 
-    const loginToken = await this.ensureMisLoginToken();
+    const loginToken = await this.ensureMisLoginToken(true);
     if (!loginToken) {
       this.logger.error('Cannot download MIS binary: LoginToken is empty');
       return {
@@ -731,7 +740,7 @@ export class MisAuthService implements OnApplicationBootstrap {
         await this.refreshLoginToken();
       }
 
-      const loginToken = await this.ensureMisLoginToken();
+      const loginToken = await this.ensureMisLoginToken(true);
       if (!loginToken) {
         this.logger.error(
           'Cannot call MIS GetFormsByServiceID: LoginToken is empty',

@@ -1915,9 +1915,29 @@ class ApiService {
       });
     }
     const q = refetch ? "?refetch=true" : "";
-    return this.apiCall(`/appointments/${appointmentId}/mis-print-forms${q}`, {
-      method: "GET",
-    });
+    const response = (await this.apiCall(
+      `/appointments/${appointmentId}/mis-print-forms${q}`,
+      {
+        method: "GET",
+      },
+    )) as {
+      success: boolean;
+      data?: {
+        misGeneratedServiceId?: string | null;
+        misPrintFormsByService?: unknown;
+        misPrintFormsFetchedAt?: string | null;
+        misForm100AvailableAt?: string | null;
+        misForm100PrintFormIndex?: number | null;
+        misHisfetchDegraded?: boolean;
+      };
+    };
+    if (__DEV__) {
+      console.log(
+        `🧾 [MIS_PRINT_FORMS_JSON] appointmentId=${appointmentId} refetch=${refetch} ::`,
+        JSON.stringify(response, null, 2),
+      );
+    }
+    return response;
   }
 
   /** HIS PrintForm PDF-ის ჩამოტვირთვა ლოკალურად (auth header-ით) */

@@ -648,22 +648,31 @@ export default function DoctorPatients() {
     setShowDetailsModal(true);
 
     try {
-      // Fetch full appointment details to get patient email and phone
+      // ყოველთვის ახლიდან წამოვიღოთ ჯავშანი მოდალის გახსნისას
       const appointmentResponse = await apiService.getAppointmentById(
         consultation.id,
       );
 
       if (appointmentResponse.success && appointmentResponse.data) {
         const appointment = appointmentResponse.data as any;
-        // Merge patient contact info from populated patientId
+        // ახლად წამოღებულ დეტალებს მივაბათ contact ველები populated patient-იდან
         const updatedConsultation = {
           ...consultation,
           patientPhone:
             appointment.patientId?.phone || (consultation as any).patientPhone,
           patientEmail:
             appointment.patientId?.email || (consultation as any).patientEmail,
+          ...(appointment as Consultation),
         };
-        setSelectedConsultation(updatedConsultation as Consultation);
+        const misRes = await apiService.getMisPrintForms(consultation.id, true);
+        const fresh = {
+          ...(updatedConsultation as Consultation),
+          ...(misRes.success && misRes.data
+            ? (misRes.data as Partial<Consultation>)
+            : {}),
+        } as Consultation;
+        setSelectedConsultation(fresh);
+        updateConsultationState(fresh);
       }
     } catch (error) {
       console.error("Error fetching appointment details:", error);
@@ -674,11 +683,39 @@ export default function DoctorPatients() {
   };
 
   const openAppointment = async (consultation: Consultation) => {
-    setSelectedConsultation(consultation);
-    const summary = consultation.consultationSummary;
+    // ყველა გახსნაზე ახლიდან წამოვიღოთ latest appointment
+    let latestConsultation = consultation;
+    try {
+      const appointmentResponse = await apiService.getAppointmentById(
+        consultation.id,
+      );
+      if (appointmentResponse.success && appointmentResponse.data) {
+        latestConsultation = appointmentResponse.data as Consultation;
+      }
+    } catch (error) {
+      console.warn("[DoctorPatients] openAppointment refresh failed:", error);
+    }
+
+    // MIS-ში ცვლილებები (მაგ. PrintForm ტექსტი) live რომ წამოვიდეს,
+    // მოდალის ყოველ გახსნაზე refetch=true-ით ვიძახებთ.
+    try {
+      const misRes = await apiService.getMisPrintForms(consultation.id, true);
+      if (misRes.success && misRes.data) {
+        latestConsultation = {
+          ...latestConsultation,
+          ...(misRes.data as Partial<Consultation>),
+        };
+      }
+    } catch (error) {
+      console.warn("[DoctorPatients] openAppointment mis-print-forms:", error);
+    }
+
+    setSelectedConsultation(latestConsultation);
+    updateConsultationState(latestConsultation);
+    const summary = latestConsultation.consultationSummary;
     let followUpTime = "";
-    if (consultation.followUp?.date) {
-      const followUpDate = new Date(consultation.followUp.date);
+    if (latestConsultation.followUp?.date) {
+      const followUpDate = new Date(latestConsultation.followUp.date);
       if (!Number.isNaN(followUpDate.getTime())) {
         followUpTime =
           followUpDate.toISOString().split("T")[1]?.slice(0, 5) || "";
@@ -696,26 +733,27 @@ export default function DoctorPatients() {
     }
 
     setAppointmentData({
-      diagnosis: summary?.diagnosis || consultation.diagnosis || "",
-      symptoms: summary?.symptoms || consultation.symptoms || "",
+      diagnosis: summary?.diagnosis || latestConsultation.diagnosis || "",
+      symptoms: summary?.symptoms || latestConsultation.symptoms || "",
       medications,
       notes: summary?.notes || "",
-      followUpRequired: consultation.followUp?.required ?? false,
-      followUpDate: consultation.followUp?.date
-        ? consultation.followUp?.date.split("T")[0]
+      followUpRequired: latestConsultation.followUp?.required ?? false,
+      followUpDate: latestConsultation.followUp?.date
+        ? latestConsultation.followUp?.date.split("T")[0]
         : "",
       followUpTime,
-      followUpType: (consultation as any).followUpType || "video",
-      followUpVisitAddress: (consultation as any).followUpVisitAddress || "",
-      followUpReason: consultation.followUp?.reason || "",
+      followUpType: (latestConsultation as any).followUpType || "video",
+      followUpVisitAddress:
+        (latestConsultation as any).followUpVisitAddress || "",
+      followUpReason: latestConsultation.followUp?.reason || "",
     });
     setForm100File(null);
     setDoctorAttachmentFile(null);
 
     // Load existing laboratory tests if appointment has them
-    if ((consultation as any).laboratoryTests) {
+    if ((latestConsultation as any).laboratoryTests) {
       setSelectedLaboratoryTests(
-        (consultation as any).laboratoryTests.map((test: any) => ({
+        (latestConsultation as any).laboratoryTests.map((test: any) => ({
           productId: test.productId,
           productName: test.productName,
           clinicId: test.clinicId,
@@ -728,9 +766,9 @@ export default function DoctorPatients() {
       setSelectedLaboratoryTests([]);
     }
 
-    if ((consultation as any).instrumentalTests?.length) {
+    if ((latestConsultation as any).instrumentalTests?.length) {
       setSelectedInstrumentalTests(
-        (consultation as any).instrumentalTests.map((test: any) => ({
+        (latestConsultation as any).instrumentalTests.map((test: any) => ({
           productId: test.productId,
           productName: test.productName,
           notes: test.notes,

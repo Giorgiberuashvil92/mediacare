@@ -404,6 +404,44 @@ const History = () => {
     }
   };
 
+  /** HIS-იდან მიმდინარე ფორმების/კალკულაციის სტატუსის განახლება ერთი ვიზიტისთვის. */
+  const refreshVisitMisState = async (visit: any): Promise<any> => {
+    const id = visit?.id;
+    if (!id) return visit;
+
+    try {
+      const mis = await apiService.getMisPrintForms(id, true);
+      if (!mis.success || !mis.data) return visit;
+
+      const refreshed = {
+        ...visit,
+        misGeneratedServiceId:
+          mis.data.misGeneratedServiceId ?? visit.misGeneratedServiceId ?? null,
+        misPrintFormsByService:
+          mis.data.misPrintFormsByService ?? visit.misPrintFormsByService ?? null,
+        misPrintFormsFetchedAt:
+          mis.data.misPrintFormsFetchedAt ?? visit.misPrintFormsFetchedAt ?? null,
+        misForm100AvailableAt:
+          mis.data.misForm100AvailableAt ?? visit.misForm100AvailableAt ?? null,
+        misForm100PrintFormIndex:
+          mis.data.misForm100PrintFormIndex ??
+          visit.misForm100PrintFormIndex ??
+          null,
+      };
+
+      setVisits((prev) =>
+        prev.map((item) => (item.id === id ? { ...item, ...refreshed } : item)),
+      );
+      if (selectedVisit?.id === id) {
+        setSelectedVisit((prev: any) => ({ ...(prev || {}), ...refreshed }));
+      }
+      return refreshed;
+    } catch (e) {
+      console.warn("[History] refreshVisitMisState failed:", e);
+      return visit;
+    }
+  };
+
   const openVisitForm100 = async (visit: any) => {
     const id = visit?.id;
     if (!id) return;
@@ -421,7 +459,9 @@ const History = () => {
       return;
     }
 
-    if (!historyVisitHasForm100(visit)) {
+    const freshVisit = await refreshVisitMisState(visit);
+
+    if (!historyVisitHasForm100(freshVisit)) {
       Alert.alert("ინფორმაცია", "ფორმა 100 ჯერ არ არის ხელმისაწვდომი.");
       return;
     }
@@ -476,10 +516,10 @@ const History = () => {
       }
       if (
         formIndex == null &&
-        typeof visit.misForm100PrintFormIndex === "number" &&
-        Number.isInteger(visit.misForm100PrintFormIndex)
+        typeof freshVisit.misForm100PrintFormIndex === "number" &&
+        Number.isInteger(freshVisit.misForm100PrintFormIndex)
       ) {
-        formIndex = visit.misForm100PrintFormIndex;
+        formIndex = freshVisit.misForm100PrintFormIndex;
       }
       if (formIndex == null) {
         Alert.alert(
@@ -518,7 +558,9 @@ const History = () => {
     const id = visit?.id;
     if (!id) return;
 
-    if (!visit.misForm100AvailableAt?.trim?.()) {
+    const freshVisit = await refreshVisitMisState(visit);
+
+    if (!freshVisit.misForm100AvailableAt?.trim?.()) {
       Alert.alert(
         "ინფორმაცია",
         "კალკულაცია ხელმისაწვდომია მხოლოდ HIS-ზე დადასტურებული ვიზიტისთვის.",
