@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnApplicationBootstrap,
+  OnModuleDestroy,
+} from '@nestjs/common';
 import { randomUUID } from 'crypto';
 
 /** ნორმალიზებული პასუხი (Swagger ხშირად PascalCase: Code, Message, Value) */
@@ -273,7 +278,7 @@ function pickFileNameFromDisposition(
 }
 
 @Injectable()
-export class MisAuthService implements OnApplicationBootstrap {
+export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(MisAuthService.name);
 
   private readonly loginUrl =
@@ -295,6 +300,11 @@ export class MisAuthService implements OnApplicationBootstrap {
 
   private storedValue: string | null = null;
   private lastResponse: MisLoginResponse | null = null;
+  private refreshTimer: NodeJS.Timeout | null = null;
+  private readonly autoRefreshIntervalMs = Number.parseInt(
+    process.env.MIS_AUTH_AUTO_REFRESH_MS || `${25 * 60 * 1000}`,
+    10,
+  );
 
   async onApplicationBootstrap(): Promise<void> {
     this.logger.log(
@@ -310,6 +320,54 @@ export class MisAuthService implements OnApplicationBootstrap {
     } else {
       this.logger.warn('MIS bootstrap token missing after initial login');
     }
+
+    this.startAutoRefresh();
+  }
+
+  onModuleDestroy(): void {
+    if (this.refreshTimer) {
+      clearInterval(this.refreshTimer);
+      this.refreshTimer = null;
+    }
+  }
+
+  private startAutoRefresh(): void {
+    if (
+      !Number.isFinite(this.autoRefreshIntervalMs) ||
+      this.autoRefreshIntervalMs < 60_000
+    ) {
+      this.logger.warn(
+        `MIS auto refresh გამორთულია: MIS_AUTH_AUTO_REFRESH_MS არავალიდურია (${this.autoRefreshIntervalMs})`,
+      );
+      return;
+    }
+
+    if (this.refreshTimer) {
+      clearInterval(this.refreshTimer);
+    }
+
+    this.refreshTimer = setInterval(() => {
+      void (async () => {
+        try {
+          this.logger.log(
+            `MIS auto refresh tick: GET /api/Home/Login ყოველ ${Math.round(
+              this.autoRefreshIntervalMs / 1000,
+            )} წამში`,
+          );
+          await this.refreshLoginToken();
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          this.logger.error(`MIS auto refresh შეცდომა: ${message}`);
+        }
+      })();
+    }, this.autoRefreshIntervalMs);
+
+    this.logger.log(
+      `MIS auto refresh ჩართულია: ${Math.round(
+        this.autoRefreshIntervalMs / 1000,
+      )} წამი`,
+    );
   }
 
   /**
