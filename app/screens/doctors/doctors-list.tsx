@@ -13,7 +13,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -22,7 +22,7 @@ const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
   let imageSource;
   if (doctor.profileImage) {
     // If profileImage is a full URL, use it; otherwise construct it
-    if (doctor.profileImage.startsWith('http')) {
+    if (doctor.profileImage.startsWith("http")) {
       imageSource = { uri: doctor.profileImage };
     } else {
       imageSource = { uri: `${apiBaseUrl}/${doctor.profileImage}` };
@@ -53,7 +53,10 @@ const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
 };
 
 export default function DoctorsListScreen() {
-  const { specialty, symptom } = useLocalSearchParams<{ specialty: string; symptom: string }>();
+  const { specialty, symptom } = useLocalSearchParams<{
+    specialty: string;
+    symptom: string;
+  }>();
   const [searchQuery, setSearchQuery] = useState("");
   const { isFavorite, toggleFavorite } = useFavorites();
   const [selectedDoctor, setSelectedDoctor] = useState<any>(null);
@@ -81,7 +84,6 @@ export default function DoctorsListScreen() {
           "Mock API mode is disabled for doctors list. Please disable USE_MOCK_API.",
         );
       }
-
 
       const response = await apiService.getDoctors({
         specialization: specialty,
@@ -164,9 +166,7 @@ export default function DoctorsListScreen() {
           <Text style={styles.doctorQualification}>{doctor.degrees}</Text>
         )}
         {doctor.consultationFee && (
-          <Text style={styles.consultationFee}>
-            {doctor.consultationFee}
-          </Text>
+          <Text style={styles.consultationFee}>{doctor.consultationFee}</Text>
         )}
       </View>
 
@@ -203,7 +203,7 @@ export default function DoctorsListScreen() {
               <Ionicons name="chevron-back" size={20} color="" />
             </View>
           </TouchableOpacity>
-          <Text style={styles.title}>Doctors list</Text>
+          <Text style={styles.title}>ექიმების სია</Text>
         </View>
 
         {/* Search Bar */}
@@ -237,10 +237,7 @@ export default function DoctorsListScreen() {
         ) : error ? (
           <View style={styles.errorContainer}>
             <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity
-              style={styles.retryButton}
-              onPress={loadDoctors}
-            >
+            <TouchableOpacity style={styles.retryButton} onPress={loadDoctors}>
               <Text style={styles.retryButtonText}>ხელახლა ცდა</Text>
             </TouchableOpacity>
           </View>
@@ -295,7 +292,8 @@ export default function DoctorsListScreen() {
                     <View style={styles.doctorDetailsModal}>
                       <View style={styles.consultationFeeModal}>
                         <Text style={styles.consultationFeeTextModal}>
-                          {selectedDoctor.consultationFee || "არ არის მითითებული"}
+                          {selectedDoctor.consultationFee ||
+                            "არ არის მითითებული"}
                         </Text>
                       </View>
                       <View style={styles.ratingContainerModal}>

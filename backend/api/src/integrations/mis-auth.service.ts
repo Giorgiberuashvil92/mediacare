@@ -55,6 +55,7 @@ type MisPatientPayload = {
   Phone: string;
   Mobile: string;
   Email: string;
+  Citizenship?: string;
   LegalAddress: string;
   ActualAddress: string;
   Description: string;

@@ -159,6 +159,8 @@ export interface RegisterRequest {
   specialization?: string;
   licenseDocument?: string;
   profileImage?: string;
+  citizenship?: string;
+  residency?: string;
   appointmentDoctorId?: string;
   appointmentServiceDate?: string;
 }

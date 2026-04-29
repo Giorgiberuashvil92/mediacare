@@ -78,6 +78,8 @@ export class AuthService {
       experience: registerDto.experience,
       about: registerDto.about,
       location: registerDto.location,
+      citizenship: registerDto.citizenship,
+      residency: registerDto.residency,
     });
 
     const {
@@ -89,6 +91,8 @@ export class AuthService {
       phone,
       appointmentDoctorId,
       appointmentServiceDate,
+      citizenship,
+      residency,
       ...userData
     } = registerDto;
 
@@ -370,6 +374,7 @@ export class AuthService {
         Phone: savedUser.phone || '',
         Mobile: savedUser.phone || '',
         Email: savedUser.email || '',
+        Citizenship: citizenship?.trim() || residency?.trim() || undefined,
         LegalAddress: savedUser.address || '',
         ActualAddress: savedUser.address || '',
         Description: '',

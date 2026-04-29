@@ -55,17 +55,6 @@ export default function AIAssistant() {
               <Text style={styles.description}>
                 იკითხე ჯანმრთელობის ნებისმიერ საკითხზე
               </Text>
-              <View style={styles.buttonsRow}>
-                <TouchableOpacity
-                  style={styles.startButton}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.buttonText}>დაწყება</Text>
-                  <View style={{ marginLeft: 8 }}>
-                    <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
-                  </View>
-                </TouchableOpacity>
-              </View>
             </View>
             <View style={styles.iconContainer}>
               <Svg width={56} height={56} viewBox="0 0 56 56" fill="none">

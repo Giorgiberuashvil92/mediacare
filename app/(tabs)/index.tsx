@@ -52,7 +52,6 @@ export default function HomeScreen() {
   const flatListRef = useRef<FlatList>(null);
 
   const onRefresh = useCallback(() => {
-    // Future: add real data reload (appointments, doctors, etc.)
     setRefreshing(true);
     setTimeout(() => {
       setRefreshing(false);
@@ -93,7 +92,6 @@ export default function HomeScreen() {
           <AIAssistant />
           <Departments />
 
-          {/* Promotional Banner Slider */}
           <View style={styles.promoContainer}>
             <FlatList
               ref={flatListRef}

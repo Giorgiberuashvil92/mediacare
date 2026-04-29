@@ -86,8 +86,7 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "auth.register.tos.inlineText":
       "გაგრძელებით, ეთანხმები HERRA-ს სერვის პირობებს და კონფიდენციალურობის პოლიტიკას.",
     "auth.register.tos.readMore": "წაიკითხე დეტალურად",
-    "auth.register.tos.title":
-      "HERRA - სერვის პირობები და პოლიტიკა",
+    "auth.register.tos.title": "HERRA - სერვის პირობები და პოლიტიკა",
     "auth.register.tos.description":
       "გთხოვ, ყურადღებით გაეცნო ჩვენს სერვის პირობებს და კონფიდენციალურობის პოლიტიკას. რეგისტრაციით ადასტურებ, რომ გესმის როგორ მუშავდება და იცავს HERRA შენს მონაცემებს.",
     "auth.register.tos.checkboxLabel":
@@ -97,8 +96,7 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "auth.register.tos.validationRequired":
       "რეგისტრაციისთვის უნდა დაეთანხმო HERRA-ს სერვის პირობებს და კონფიდენციალურობის პოლიტიკას.",
 
-    "auth.register.validation.fillAll":
-      "გთხოვთ შეავსოთ ყველა სავალდებულო ველი",
+    "auth.register.validation.fillAll": "გთხოვთ შეავსოთ ყველა სავალდებულო ველი",
     "auth.register.validation.specialization":
       "გთხოვთ აირჩიოთ ექიმის სპეციალიზაცია",
     "auth.register.validation.passwordLength":
@@ -111,10 +109,8 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "doctor.specialization.selectPlaceholder": "აირჩიე სპეციალიზაციები",
     "doctor.specialization.valuePlaceholder":
       "მინიმუმ ერთი სპეციალიზაცია აირჩიე",
-    "doctor.specialization.helper":
-      "შეგიძლია მონიშნო რამდენიმე სპეციალიზაცია",
-    "doctor.specialization.empty":
-      "ჯერ სპეციალიზაციები არ არის დამატებული.",
+    "doctor.specialization.helper": "შეგიძლია მონიშნო რამდენიმე სპეციალიზაცია",
+    "doctor.specialization.empty": "ჯერ სპეციალიზაციები არ არის დამატებული.",
     "doctor.degrees.label": "ხარისხი",
     "doctor.degrees.placeholder": "MD, PhD",
     "doctor.experience.label": "გამოცდილება",
@@ -150,8 +146,7 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "roleSelection.doctor.description":
       "შემოუერთდი როგორც სამედიცინო მომსახურების მიმწოდებელი",
     "roleSelection.patient.title": "მე ვარ პაციენტი",
-    "roleSelection.patient.description":
-      "მოძებნე ექიმი და დაჯავშნე ვიზიტი",
+    "roleSelection.patient.description": "მოძებნე ექიმი და დაჯავშნე ვიზიტი",
     "roleSelection.continue": "გასაგრძელებლად",
     "roleSelection.login.question": "უკვე გაქვს ანგარიში? ",
     "roleSelection.login.action": "შესვლა",
@@ -195,15 +190,15 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "auth.register.subtitle.doctor":
       "Join our platform as a healthcare provider",
     "auth.register.subtitle.patient": "Start using the app for free",
-    "auth.register.name.label": "Name/Surname *",
+    "auth.register.name.label": "Name/Surname",
     "auth.register.name.placeholder": "Enter your full name",
-    "auth.register.email.label": "Email *",
+    "auth.register.email.label": "Email",
     "auth.register.email.placeholder": "Enter your email",
-    "auth.register.idNumber.label": "Personal ID *",
-    "auth.register.idNumber.label.passport": "Passport Number *",
+    "auth.register.idNumber.label": "Personal ID",
+    "auth.register.idNumber.label.passport": "Passport Number",
     "auth.register.idNumber.placeholder": "Enter your personal ID",
     "auth.register.idNumber.placeholder.passport": "Enter your passport number",
-    "auth.register.nationality.label": "Nationality *",
+    "auth.register.nationality.label": "Nationality",
     "auth.register.nationality.georgian": "Georgian",
     "auth.register.nationality.nonGeorgian": "Non-Georgian",
     "auth.register.passportInfo.title": "Information",
@@ -211,9 +206,9 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "auth.register.passportInfo.ok": "OK",
     "auth.register.phone.label": "Phone",
     "auth.register.phone.placeholder": "+995 555 123 456",
-    "auth.register.password.label": "Password *",
+    "auth.register.password.label": "Password",
     "auth.register.password.placeholder": "••••••••••",
-    "auth.register.confirmPassword.label": "Confirm Password *",
+    "auth.register.confirmPassword.label": "Confirm Password",
     "auth.register.confirmPassword.placeholder": "Repeat password",
     "auth.register.submit": "Sign up",
     "auth.register.submitting": "Signing up...",
@@ -222,8 +217,7 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "auth.register.tos.inlineText":
       "By continuing, you agree to HERRA's Terms of Service and Privacy Policy.",
     "auth.register.tos.readMore": "Read in detail",
-    "auth.register.tos.title":
-      "HERRA - Terms of Service and Privacy Policy",
+    "auth.register.tos.title": "HERRA - Terms of Service and Privacy Policy",
     "auth.register.tos.description":
       "Please read our Terms of Service and Privacy Policy carefully. By registering you confirm that you understand how HERRA processes and protects your data.",
     "auth.register.tos.checkboxLabel":
@@ -246,10 +240,8 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "doctor.specialization.selectPlaceholder": "Choose specializations",
     "doctor.specialization.valuePlaceholder":
       "Select at least one specialization",
-    "doctor.specialization.helper":
-      "You can select multiple specializations",
-    "doctor.specialization.empty":
-      "No specializations have been added yet.",
+    "doctor.specialization.helper": "You can select multiple specializations",
+    "doctor.specialization.empty": "No specializations have been added yet.",
     "doctor.degrees.label": "Degree",
     "doctor.degrees.placeholder": "MD, PhD",
     "doctor.experience.label": "Experience",
@@ -283,8 +275,7 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "roleSelection.subtitle.guest":
       "Choose which profile you want to start with",
     "roleSelection.doctor.title": "I am a doctor",
-    "roleSelection.doctor.description":
-      "Join as a healthcare service provider",
+    "roleSelection.doctor.description": "Join as a healthcare service provider",
     "roleSelection.patient.title": "I am a patient",
     "roleSelection.patient.description":
       "Find a doctor and book an appointment",
@@ -341,5 +332,3 @@ export const useLanguage = () => {
   }
   return ctx;
 };
-
-

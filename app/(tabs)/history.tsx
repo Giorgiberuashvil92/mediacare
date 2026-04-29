@@ -1,6 +1,14 @@
+import {
+  filterMisPrintDocumentsDoctorVisible,
+  isMisDocumentForm100,
+  misHisCalculationBestIndexInBody,
+  misHisForm100FirstIndexInBody,
+  parseMisPrintFormDocuments,
+} from "@/lib/mis-print-forms/html";
+import { runMisPrintFormsPdfAction } from "@/lib/mis-print-forms/pdf";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import * as Sharing from "expo-sharing";
 import { useFocusEffect, useRouter } from "expo-router";
+import * as Sharing from "expo-sharing";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -15,14 +23,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import {
-  filterMisPrintDocumentsDoctorVisible,
-  isMisDocumentForm100,
-  misHisCalculationBestIndexInBody,
-  misHisForm100FirstIndexInBody,
-  parseMisPrintFormDocuments,
-} from "@/lib/mis-print-forms/html";
-import { runMisPrintFormsPdfAction } from "@/lib/mis-print-forms/pdf";
 import { apiService } from "../_services/api";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -117,9 +117,7 @@ function historyVisitHasForm100(visit: {
   if (visit.form100?.pdfUrl?.trim()) return true;
   const t = visit.misForm100AvailableAt;
   return (
-    typeof t === "string" &&
-    t.trim().length > 0 &&
-    !Number.isNaN(Date.parse(t))
+    typeof t === "string" && t.trim().length > 0 && !Number.isNaN(Date.parse(t))
   );
 }
 
@@ -253,7 +251,8 @@ const History = () => {
             const duplicateDocUrls = docSummaries
               .map((doc) => doc.url)
               .filter(
-                (url, i, arr) => typeof url === "string" && arr.indexOf(url) !== i,
+                (url, i, arr) =>
+                  typeof url === "string" && arr.indexOf(url) !== i,
               );
 
             console.log("📎 [History] Raw appointment documents:", {
@@ -264,8 +263,9 @@ const History = () => {
             });
           }
 
-          // კონკრეტულად 19:00 ვიზიტის დიაგნოსტიკა
-          if ((appointment?._id || appointment?.id) === "69edc2458f2c0c05603bf6c7") {
+          if (
+            (appointment?._id || appointment?.id) === "69edc2458f2c0c05603bf6c7"
+          ) {
             console.log("🎯 [History] Target appointment documents (19:00):", {
               id: appointment?._id || appointment?.id,
               appointmentDate: appointment?.appointmentDate,
@@ -418,9 +418,13 @@ const History = () => {
         misGeneratedServiceId:
           mis.data.misGeneratedServiceId ?? visit.misGeneratedServiceId ?? null,
         misPrintFormsByService:
-          mis.data.misPrintFormsByService ?? visit.misPrintFormsByService ?? null,
+          mis.data.misPrintFormsByService ??
+          visit.misPrintFormsByService ??
+          null,
         misPrintFormsFetchedAt:
-          mis.data.misPrintFormsFetchedAt ?? visit.misPrintFormsFetchedAt ?? null,
+          mis.data.misPrintFormsFetchedAt ??
+          visit.misPrintFormsFetchedAt ??
+          null,
         misForm100AvailableAt:
           mis.data.misForm100AvailableAt ?? visit.misForm100AvailableAt ?? null,
         misForm100PrintFormIndex:
@@ -1155,25 +1159,7 @@ const History = () => {
                             </Text>
                             {visit.instrumentalTests.map(
                               (test: any, index: number) => (
-                                <TouchableOpacity
-                                  key={index}
-                                  style={styles.testCard}
-                                  onPress={() => {
-                                    if (!test.booked && test.productId) {
-                                      router.push({
-                                        pathname: "/screens/lab/select-clinic",
-                                        params: {
-                                          productId: test.productId,
-                                          productName: test.productName,
-                                          productPrice: "0",
-                                          appointmentId: visit.id,
-                                          testType: "instrumental",
-                                        },
-                                      });
-                                    }
-                                  }}
-                                  disabled={test.booked}
-                                >
+                                <View key={index} style={styles.testCard}>
                                   <View style={styles.testHeader}>
                                     <Ionicons
                                       name="pulse-outline"
@@ -1251,7 +1237,7 @@ const History = () => {
                                       </Text>
                                     </TouchableOpacity>
                                   )}
-                                </TouchableOpacity>
+                                </View>
                               ),
                             )}
                           </View>
@@ -1266,25 +1252,7 @@ const History = () => {
                             </Text>
                             {visit.laboratoryTests.map(
                               (test: any, index: number) => (
-                                <TouchableOpacity
-                                  key={index}
-                                  style={styles.testCard}
-                                  onPress={() => {
-                                    if (!test.booked && test.productId) {
-                                      router.push({
-                                        pathname: "/screens/lab/select-clinic",
-                                        params: {
-                                          productId: test.productId,
-                                          productName: test.productName,
-                                          productPrice: "0",
-                                          appointmentId: visit.id,
-                                          testType: "laboratory",
-                                        },
-                                      });
-                                    }
-                                  }}
-                                  disabled={test.booked}
-                                >
+                                <View key={index} style={styles.testCard}>
                                   <View style={styles.testHeader}>
                                     <Ionicons
                                       name="flask-outline"
@@ -1357,7 +1325,7 @@ const History = () => {
                                       </Text>
                                     </TouchableOpacity>
                                   )}
-                                </TouchableOpacity>
+                                </View>
                               ),
                             )}
                           </View>

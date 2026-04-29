@@ -84,7 +84,8 @@ export default function DoctorSchedule() {
     availabilityData.forEach((d) => {
       const dateKey = `${d.date}-${d.type}`;
       const bookedForDate = bookedSlots[dateKey] || [];
-      const hasAnyWorkingSlot = d.timeSlots.length > 0 || bookedForDate.length > 0;
+      const hasAnyWorkingSlot =
+        d.timeSlots.length > 0 || bookedForDate.length > 0;
 
       if (!hasAnyWorkingSlot) return;
 
@@ -906,7 +907,8 @@ export default function DoctorSchedule() {
   const canAddSlotHomeVisit = (dateStr: string, time: string): boolean => {
     try {
       const slotDateTime = slotToLocalDate(dateStr, time);
-      const diffHours = (slotDateTime.getTime() - Date.now()) / (1000 * 60 * 60);
+      const diffHours =
+        (slotDateTime.getTime() - Date.now()) / (1000 * 60 * 60);
       const canAdd = diffHours >= 2;
       if (!canAdd) {
         logSlotCheck("HomeVisit", dateStr, time, slotDateTime, {
@@ -1347,7 +1349,8 @@ export default function DoctorSchedule() {
         const minRequired =
           (profileRes?.data?.minWorkingDaysRequired as number) ?? 0;
         if (minRequired > 0) {
-          const workingDaysCount = getWorkingDaysCountInNext14Days(availabilityData);
+          const workingDaysCount =
+            getWorkingDaysCountInNext14Days(availabilityData);
           if (workingDaysCount < minRequired) {
             Alert.alert(
               "სავალდებულო დღეები",
@@ -1516,7 +1519,8 @@ export default function DoctorSchedule() {
         const minRequired =
           (profileRes?.data?.minWorkingDaysRequired as number) ?? 0;
         if (minRequired > 0) {
-          const workingDaysCount = getWorkingDaysCountInNext14Days(availabilityData);
+          const workingDaysCount =
+            getWorkingDaysCountInNext14Days(availabilityData);
           if (workingDaysCount < minRequired) {
             Alert.alert(
               "სავალდებულო დღეები",
@@ -2187,6 +2191,9 @@ export default function DoctorSchedule() {
                 <Text style={styles.timeLegendText}>
                   ყვითელი — წარსული დრო ან ვადა გაუვიდა (ვერ აირჩევა)
                 </Text>
+                <Text style={styles.timeLegendText}>
+                  ან ბინაზეა არჩეული (ვერ აირჩევა)
+                </Text>
               </View>
               <View style={styles.timeLegendItem}>
                 <View
@@ -2384,13 +2391,13 @@ export default function DoctorSchedule() {
                         />
                       )}
                       {showLockedYellow && (
-                          <Ionicons
-                            name="time-outline"
-                            size={14}
-                            color="#713F12"
-                            style={{ marginRight: 4 }}
-                          />
-                        )}
+                        <Ionicons
+                          name="time-outline"
+                          size={14}
+                          color="#713F12"
+                          style={{ marginRight: 4 }}
+                        />
+                      )}
                       <Text
                         style={[
                           styles.timeChipText,

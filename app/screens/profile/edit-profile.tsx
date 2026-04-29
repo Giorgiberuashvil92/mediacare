@@ -10,14 +10,13 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
-  Linking,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import {
   SafeAreaView,
@@ -388,27 +387,27 @@ export default function EditProfileScreen() {
                     </View>
                   )}
 
-                    <TouchableOpacity
-                      style={[
-                        styles.changePhotoButton,
-                        isDoctor && styles.changePhotoButtonDisabled,
-                      ]}
-                      onPress={handleProfileImagePick}
-                      disabled={uploadingProfileImage || isDoctor}
-                    >
-                      {uploadingProfileImage ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
-                      ) : (
-                        <Ionicons name="camera" size={20} color="#FFFFFF" />
-                      )}
-                    </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.changePhotoButton,
+                      isDoctor && styles.changePhotoButtonDisabled,
+                    ]}
+                    onPress={handleProfileImagePick}
+                    disabled={uploadingProfileImage || isDoctor}
+                  >
+                    {uploadingProfileImage ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Ionicons name="camera" size={20} color="#FFFFFF" />
+                    )}
+                  </TouchableOpacity>
                 </View>
 
-                  <Text style={styles.profileImageHint}>
-                    {isDoctor
-                      ? "პროფილის ფოტო შეიძლება შეიცვალოს მხოლოდ ადმინ პანელიდან"
-                      : "დააჭირეთ კამერას პროფილის ფოტოს შესაცვლელად"}
-                  </Text>
+                <Text style={styles.profileImageHint}>
+                  {isDoctor
+                    ? "პროფილის ფოტო შეიძლება შეიცვალოს მხოლოდ ადმინ პანელიდან"
+                    : "დააჭირეთ კამერას პროფილის ფოტოს შესაცვლელად"}
+                </Text>
               </View>
 
               {/* Name */}
@@ -438,7 +437,10 @@ export default function EditProfileScreen() {
                   <Ionicons name="mail-outline" size={20} color="#06B6D4" />
                   <Text style={styles.label}>ელ. ფოსტა</Text>
                 </View>
-                <View style={[styles.input, styles.inputDisabled]} pointerEvents="none">
+                <View
+                  style={[styles.input, styles.inputDisabled]}
+                  pointerEvents="none"
+                >
                   <TextInput
                     style={[styles.textInput, styles.textInputDisabled]}
                     placeholder="შეიყვანეთ ელ. ფოსტა"
@@ -458,7 +460,10 @@ export default function EditProfileScreen() {
                   <Ionicons name="call-outline" size={20} color="#06B6D4" />
                   <Text style={styles.label}>ტელეფონი</Text>
                 </View>
-                <View style={[styles.input, styles.inputDisabled]} pointerEvents="none">
+                <View
+                  style={[styles.input, styles.inputDisabled]}
+                  pointerEvents="none"
+                >
                   <TextInput
                     style={[styles.textInput, styles.textInputDisabled]}
                     placeholder="შეიყვანეთ ტელეფონი"
@@ -477,7 +482,10 @@ export default function EditProfileScreen() {
                   <Ionicons name="card-outline" size={20} color="#06B6D4" />
                   <Text style={styles.label}>პირადი ნომერი</Text>
                 </View>
-                <View style={[styles.input, styles.inputDisabled]} pointerEvents="none">
+                <View
+                  style={[styles.input, styles.inputDisabled]}
+                  pointerEvents="none"
+                >
                   <TextInput
                     style={[styles.textInput, styles.textInputDisabled]}
                     placeholder="შეიყვანეთ პირადი ნომერი"
@@ -530,7 +538,10 @@ export default function EditProfileScreen() {
                   <Ionicons name="location-outline" size={20} color="#06B6D4" />
                   <Text style={styles.label}>მისამართი</Text>
                 </View>
-                <View style={[styles.input, styles.inputDisabled]} pointerEvents="none">
+                <View
+                  style={[styles.input, styles.inputDisabled]}
+                  pointerEvents="none"
+                >
                   <TextInput
                     style={[styles.textInput, styles.textInputDisabled]}
                     placeholder="შეიყვანეთ მისამართი"
@@ -548,7 +559,10 @@ export default function EditProfileScreen() {
                   <Ionicons name="calendar-outline" size={20} color="#06B6D4" />
                   <Text style={styles.label}>დაბადების თარიღი</Text>
                 </View>
-                <View style={[styles.input, styles.inputDisabled]} pointerEvents="none">
+                <View
+                  style={[styles.input, styles.inputDisabled]}
+                  pointerEvents="none"
+                >
                   <TextInput
                     style={[styles.textInput, styles.textInputDisabled]}
                     placeholder="მაგ: 1990-01-15"
@@ -561,7 +575,7 @@ export default function EditProfileScreen() {
               </View>
 
               {/* პირადობა / პასპორტი (მხოლოდ ნახვა) */}
-              <View style={styles.formItem}>
+              {/* <View style={styles.formItem}>
                 <View style={styles.labelContainer}>
                   <Ionicons
                     name="document-attach-outline"
@@ -599,7 +613,7 @@ export default function EditProfileScreen() {
                     დოკუმენტი არ არის ატვირთული
                   </Text>
                 )}
-              </View>
+              </View> */}
 
               {/* Doctor Specific Fields */}
               {isDoctor && (

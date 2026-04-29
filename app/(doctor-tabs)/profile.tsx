@@ -47,8 +47,8 @@ export default function DoctorProfile() {
     if (!doctorProfile.experience) {
       missingFields.push("გამოცდილება");
     }
-    if (!doctorProfile.consultationFee) {
-      missingFields.push("კონსულტაციის ფასი");
+    if (!doctorProfile.videoConsultationFee) {
+      missingFields.push("ვიდეო კონსულტაციის ფასი");
     }
     if (!doctorProfile.profileImage) {
       missingFields.push("პროფილის ფოტო");

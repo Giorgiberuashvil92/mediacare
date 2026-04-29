@@ -138,10 +138,11 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
+    justifyContent: "space-between",
+    rowGap: 12,
   },
   serviceCard: {
-    width: "47%",
+    width: "48.5%",
     borderRadius: 18,
     overflow: "hidden",
     shadowColor: "#000",

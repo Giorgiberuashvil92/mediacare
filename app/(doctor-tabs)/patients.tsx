@@ -27,6 +27,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { WebView } from "react-native-webview";
 import {
   Consultation,
   getConsultationTypeLabel,
@@ -34,6 +35,13 @@ import {
   getStatusLabel,
   hasForm100ForVisitCompletion,
 } from "../../assets/data/doctorDashboard";
+import {
+  formatMisDocumentSectionTitle,
+  misHisCalculationBestIndexInBody,
+  misHisForm100FirstIndexInBody,
+  type MisPrintFormDocument,
+} from "@/lib/mis-print-forms/html";
+import { loadMisPrintFormsFromApi } from "@/lib/mis-print-forms/load";
 import { apiService, Clinic, ShopProduct } from "../_services/api";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -45,13 +53,11 @@ interface Medication {
   instructions?: string;
 }
 
-/** ატვირთული ფაილის სახელის ჩვენებისთვის (შემოკლება) */
 function truncateFileName(name: string | undefined, maxLen = 22): string {
   if (!name) return "";
   return name.length <= maxLen ? name : name.slice(0, maxLen - 3) + "...";
 }
 
-/** consultationSummary.medications (JSON string) → Medication[] */
 function parseMedicationsList(
   medicationsJson: string | undefined,
 ): Medication[] {
@@ -97,6 +103,14 @@ export default function DoctorPatients() {
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [openingMisDocKind, setOpeningMisDocKind] = useState<
+    "form100" | "calculation" | null
+  >(null);
+  const [misHisLoading, setMisHisLoading] = useState(false);
+  const [misHisError, setMisHisError] = useState<string | null>(null);
+  const [misHisDocuments, setMisHisDocuments] = useState<MisPrintFormDocument[]>(
+    [],
+  );
   const [statusActionLoading, setStatusActionLoading] = useState<string | null>(
     null,
   );
@@ -342,7 +356,8 @@ export default function DoctorPatients() {
     return diff > 0 && diff <= 30 * 60 * 1000; // 30 minutes
   };
 
-  // "შესვლა კონსულტაციაზე" ღილაკი აქტიურია ჯავშნამდე და ჯავშნიდან 1 საათის განმავლობაში
+  // "შესვლა კონსულტაციაზე" ღილაკი ჩანს მხოლოდ კონსულტაციამდე 1 საათით ადრე
+  // და კონსულტაციიდან 1 საათის განმავლობაში.
   const isJoinButtonActive = (consultation: Consultation) => {
     if (
       consultation.status !== "scheduled" &&
@@ -357,7 +372,7 @@ export default function DoctorPatients() {
     const diff = consultationDateTime.getTime() - currentTime.getTime();
     const oneHourInMs = 60 * 60 * 1000;
 
-    return diff >= -oneHourInMs;
+    return diff <= oneHourInMs && diff >= -oneHourInMs;
   };
 
   // Filter consultations - only show followup consultations
@@ -488,6 +503,116 @@ export default function DoctorPatients() {
     Linking.openURL(url).catch(() =>
       Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა"),
     );
+  };
+
+  const hasMisFormsSource = (consultation?: Consultation | null): boolean => {
+    const c = consultation as any;
+    if (!c) return false;
+    if (typeof c.misGeneratedServiceId === "string" && c.misGeneratedServiceId.trim()) {
+      return true;
+    }
+    if (typeof c.misForm100AvailableAt === "string" && c.misForm100AvailableAt.trim()) {
+      return true;
+    }
+    return c.misPrintFormsByService != null;
+  };
+
+  const openHisPrintForm = async (
+    kind: "form100" | "calculation",
+    action: "view" | "share" = "view",
+  ) => {
+    if (!selectedConsultation?.id) return;
+    setOpeningMisDocKind(kind);
+    try {
+      const misRes = await apiService.getMisPrintForms(selectedConsultation.id, true);
+      if (!misRes.success || !misRes.data) {
+        Alert.alert("შეცდომა", "HIS ფორმები ვერ ჩაიტვირთა");
+        return;
+      }
+
+      const raw = misRes.data.misPrintFormsByService;
+      let formIndex: number | null = null;
+
+      if (kind === "form100") {
+        if (
+          typeof misRes.data.misForm100PrintFormIndex === "number" &&
+          Number.isInteger(misRes.data.misForm100PrintFormIndex)
+        ) {
+          formIndex = misRes.data.misForm100PrintFormIndex;
+        }
+        if (formIndex == null && raw != null) {
+          formIndex = misHisForm100FirstIndexInBody(raw);
+        }
+      } else {
+        if (raw != null) {
+          formIndex = misHisCalculationBestIndexInBody(raw);
+        }
+      }
+
+      if (formIndex == null) {
+        Alert.alert(
+          "ინფორმაცია",
+          kind === "form100"
+            ? "ფორმა 100 ამ ვიზიტისთვის ვერ მოიძებნა."
+            : "კალკულაცია ამ ვიზიტისთვის ვერ მოიძებნა.",
+        );
+        return;
+      }
+
+      const dl = await apiService.downloadMisPrintFormPdf(selectedConsultation.id, {
+        index: formIndex,
+        refetch: true,
+      });
+      if (!dl.success || !dl.uri) {
+        Alert.alert("შეცდომა", "PDF-ის ჩამოტვირთვა ვერ მოხერხდა");
+        return;
+      }
+
+      if (action === "view") {
+        await Linking.openURL(dl.uri);
+        return;
+      }
+
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(dl.uri, {
+          mimeType: dl.contentType || "application/pdf",
+          dialogTitle: kind === "form100" ? "ფორმა 100" : "კალკულაცია",
+        });
+      } else {
+        await Linking.openURL(dl.uri);
+      }
+    } catch (error: any) {
+      console.error("[DoctorPatients] openHisPrintForm error:", error);
+      Alert.alert("შეცდომა", error?.message || "ფორმის გახსნა ვერ მოხერხდა");
+    } finally {
+      setOpeningMisDocKind(null);
+    }
+  };
+
+  const loadMisFormsPanel = async (appointmentId: string) => {
+    setMisHisLoading(true);
+    setMisHisError(null);
+    try {
+      const state = await loadMisPrintFormsFromApi(appointmentId);
+      setMisHisError(state.error);
+      setMisHisDocuments(state.documents);
+      if (state.misForm100AvailableAt) {
+        setSelectedConsultation((prev) =>
+          prev
+            ? ({
+                ...prev,
+                misForm100AvailableAt: state.misForm100AvailableAt,
+              } as Consultation)
+            : prev,
+        );
+      }
+    } catch (error: any) {
+      setMisHisError(error?.message || "HIS ფორმები ვერ ჩაიტვირთა");
+      setMisHisDocuments([]);
+    } finally {
+      setMisHisLoading(false);
+    }
   };
 
   const handlePickForm100File = async () => {
@@ -709,6 +834,7 @@ export default function DoctorPatients() {
     } catch (error) {
       console.warn("[DoctorPatients] openAppointment mis-print-forms:", error);
     }
+    void loadMisFormsPanel(consultation.id);
 
     setSelectedConsultation(latestConsultation);
     updateConsultationState(latestConsultation);
@@ -829,31 +955,26 @@ export default function DoctorPatients() {
     const isHomeVisitComplete = selectedConsultation.type === "home-visit";
     /** სიიდან არჩეულ ჯავშანს ხშირად არ აქვს `misForm100AvailableAt` — შენახვამდე ერთი HIS GET ასინქრონებს ბაზას და სტეითს. */
     let consultationForForm100Check: Consultation = selectedConsultation;
-    if (!isHomeVisitComplete) {
-      try {
-        const misRes = await apiService.getMisPrintForms(
-          selectedConsultation.id,
-          true,
-        );
-        if (misRes.success && misRes.data) {
-          const at = misRes.data.misForm100AvailableAt;
-          if (at !== undefined) {
-            consultationForForm100Check = {
-              ...selectedConsultation,
-              misForm100AvailableAt: at,
-            };
-            setSelectedConsultation(consultationForForm100Check);
-          }
+    try {
+      const misRes = await apiService.getMisPrintForms(selectedConsultation.id, true);
+      if (misRes.success && misRes.data) {
+        const at = misRes.data.misForm100AvailableAt;
+        if (at !== undefined) {
+          consultationForForm100Check = {
+            ...selectedConsultation,
+            misForm100AvailableAt: at,
+          };
+          setSelectedConsultation(consultationForForm100Check);
         }
-      } catch (e) {
-        console.warn("[DoctorPatients] getMisPrintForms before save", e);
       }
-      if (!hasForm100ForVisitCompletion(consultationForForm100Check)) {
-        alert(
-          "ფორმა IV–100 უნდა ჩანდეს HIS mis-print-forms-ზე (ჯავშანზე HIS ფორმების ჩატვირთვა). ატვირთული PDF დასრულებისთვის არ ითვლება.",
-        );
-        return;
-      }
+    } catch (e) {
+      console.warn("[DoctorPatients] getMisPrintForms before save", e);
+    }
+    if (!hasForm100ForVisitCompletion(consultationForForm100Check)) {
+      alert(
+        "ფორმა IV–100 უნდა ჩანდეს HIS mis-print-forms-ზე (ჯავშანზე HIS ფორმების ჩატვირთვა). ატვირთული PDF დასრულებისთვის არ ითვლება.",
+      );
+      return;
     }
 
     try {
@@ -2247,14 +2368,19 @@ export default function DoctorPatients() {
                   </View>
                 )}
 
-                {selectedConsultation.form100?.pdfUrl && (
+                {(selectedConsultation.form100?.pdfUrl ||
+                  hasMisFormsSource(selectedConsultation)) && (
                   <View style={styles.detailSection}>
                     <Text style={styles.detailLabel}>ფორმა 100</Text>
                     <TouchableOpacity
                       style={styles.viewFileButton}
-                      onPress={() =>
-                        openForm100File(selectedConsultation.form100?.pdfUrl)
-                      }
+                      onPress={() => {
+                        if (selectedConsultation.form100?.pdfUrl) {
+                          openForm100File(selectedConsultation.form100?.pdfUrl);
+                          return;
+                        }
+                        void openHisPrintForm("form100");
+                      }}
                     >
                       <Ionicons
                         name="document-text"
@@ -2262,8 +2388,30 @@ export default function DoctorPatients() {
                         color="#4C1D95"
                       />
                       <Text style={styles.viewFileButtonText}>
-                        {selectedConsultation.form100?.fileName ||
-                          "ფაილის ნახვა"}
+                        {openingMisDocKind === "form100"
+                          ? "იტვირთება..."
+                          : selectedConsultation.form100?.fileName || "ფორმა 100"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {hasMisFormsSource(selectedConsultation) && (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailLabel}>კალკულაცია</Text>
+                    <TouchableOpacity
+                      style={styles.viewFileButton}
+                      onPress={() => void openHisPrintForm("calculation")}
+                    >
+                      <Ionicons
+                        name="calculator-outline"
+                        size={18}
+                        color="#0D9488"
+                      />
+                      <Text style={styles.viewFileButtonText}>
+                        {openingMisDocKind === "calculation"
+                          ? "იტვირთება..."
+                          : "კალკულაცია"}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -2342,6 +2490,150 @@ export default function DoctorPatients() {
                     }
                   />
                 </View>
+
+                {(((selectedConsultation as any)?.isFollowUp === true) ||
+                  hasMisFormsSource(selectedConsultation)) && (
+                  <View style={styles.misFormsWrap}>
+                    <Text style={styles.misFormsTitle}>
+                      HIS ეფოინთმენტის ფორმები (ბეჭდვადი)
+                    </Text>
+                    {misHisLoading ? (
+                      <View style={styles.misFormsLoadingBox}>
+                        <ActivityIndicator color="#06B6D4" />
+                        <Text style={styles.misFormsHint}>იტვირთება HIS-იდან...</Text>
+                      </View>
+                    ) : misHisError && misHisDocuments.length === 0 ? (
+                      <View style={styles.misFormsLoadingBox}>
+                        <Text style={styles.misFormsErrorText}>{misHisError}</Text>
+                        <TouchableOpacity
+                          style={styles.misFormsReloadBtn}
+                          onPress={() =>
+                            selectedConsultation &&
+                            void loadMisFormsPanel(selectedConsultation.id)
+                          }
+                        >
+                          <Ionicons name="refresh" size={18} color="#0369A1" />
+                          <Text style={styles.misFormsReloadBtnText}>ხელახლა</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <>
+                        {misHisError ? (
+                          <Text style={styles.misFormsStaleHint}>{misHisError}</Text>
+                        ) : null}
+                        {misHisDocuments.length > 0 ? (
+                          <View>
+                            {misHisDocuments.map((doc, idx) => {
+                              const section = formatMisDocumentSectionTitle(
+                                doc.title,
+                                {
+                                  printTypeName: doc.printTypeName,
+                                  html: doc.html,
+                                },
+                              );
+                              const total = misHisDocuments.length;
+                              return (
+                                <View
+                                  key={`${doc.id}-${idx}`}
+                                  style={[
+                                    styles.misFormDocCard,
+                                    idx === 0 && styles.misFormDocCardFirst,
+                                  ]}
+                                >
+                                  <View style={styles.misFormDocCardHeader}>
+                                    <View style={styles.misFormDocHeaderTextCol}>
+                                      <Text style={styles.misFormDocHeading}>
+                                        {section.heading}
+                                      </Text>
+                                      {section.caption ? (
+                                        <Text style={styles.misFormDocCaption}>
+                                          {section.caption}
+                                        </Text>
+                                      ) : null}
+                                    </View>
+                                    <View style={styles.misFormDocIndexBadge}>
+                                      <Text style={styles.misFormDocIndexBadgeText}>
+                                        {idx + 1}/{total}
+                                      </Text>
+                                    </View>
+                                  </View>
+                                  <WebView
+                                    originWhitelist={["*"]}
+                                    source={{ html: doc.html }}
+                                    style={styles.misFormsWebView}
+                                    scrollEnabled
+                                    nestedScrollEnabled
+                                    javaScriptEnabled
+                                    domStorageEnabled
+                                    allowsInlineMediaPlayback
+                                  />
+                                  <View style={styles.misPdfActionsRow}>
+                                    <TouchableOpacity
+                                      style={[
+                                        styles.misPdfActionBtn,
+                                        openingMisDocKind && styles.misPdfActionBtnDisabled,
+                                      ]}
+                                      disabled={!!openingMisDocKind}
+                                      onPress={() =>
+                                        void openHisPrintForm(
+                                          section.heading === "ფორმა 100"
+                                            ? "form100"
+                                            : "calculation",
+                                          "view",
+                                        )
+                                      }
+                                    >
+                                      {openingMisDocKind ? (
+                                        <ActivityIndicator size="small" color="#0369A1" />
+                                      ) : (
+                                        <Ionicons
+                                          name="document-text-outline"
+                                          size={16}
+                                          color="#0369A1"
+                                        />
+                                      )}
+                                      <Text style={styles.misPdfActionBtnText}>PDF ნახვა</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                      style={[
+                                        styles.misPdfActionBtn,
+                                        styles.misPdfActionBtnPrimary,
+                                        openingMisDocKind && styles.misPdfActionBtnDisabled,
+                                      ]}
+                                      disabled={!!openingMisDocKind}
+                                      onPress={() =>
+                                        void openHisPrintForm(
+                                          section.heading === "ფორმა 100"
+                                            ? "form100"
+                                            : "calculation",
+                                          "share",
+                                        )
+                                      }
+                                    >
+                                      <Ionicons
+                                        name="share-social-outline"
+                                        size={16}
+                                        color="#FFFFFF"
+                                      />
+                                      <Text style={styles.misPdfActionBtnTextPrimary}>
+                                        PDF გაზიარება
+                                      </Text>
+                                    </TouchableOpacity>
+                                  </View>
+                                </View>
+                              );
+                            })}
+                          </View>
+                        ) : (
+                          <Text style={styles.misFormsHint}>
+                            ფორმები ჯერ არ არის შენახული — &quot;ხელახლა&quot;
+                            სცადეთ ან განაახლეთ ჯავშანი.
+                          </Text>
+                        )}
+                      </>
+                    )}
+                  </View>
+                )}
 
                 {/* Symptoms */}
 
@@ -3834,6 +4126,148 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: "Poppins-Medium",
     color: "#4C1D95",
+  },
+  misFormsWrap: {
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 14,
+    padding: 12,
+    backgroundColor: "#FAFAFA",
+    marginBottom: 12,
+  },
+  misFormsTitle: {
+    fontSize: 16,
+    fontFamily: "Poppins-SemiBold",
+    color: "#1F2937",
+    marginBottom: 8,
+  },
+  misFormsLoadingBox: {
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 12,
+    backgroundColor: "#FFFFFF",
+    padding: 12,
+    alignItems: "center",
+    gap: 10,
+  },
+  misFormsHint: {
+    fontSize: 13,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+    marginTop: 2,
+  },
+  misFormsErrorText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#B91C1C",
+    textAlign: "center",
+  },
+  misFormsReloadBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#E0F2FE",
+    borderWidth: 1,
+    borderColor: "#BAE6FD",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  misFormsReloadBtnText: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#0369A1",
+  },
+  misFormsStaleHint: {
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: "#92400E",
+    marginBottom: 8,
+  },
+  misFormDocCard: {
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 12,
+    backgroundColor: "#FFFFFF",
+    padding: 10,
+    marginTop: 10,
+  },
+  misFormDocCardFirst: {
+    marginTop: 0,
+  },
+  misFormDocCardHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    marginBottom: 8,
+    gap: 8,
+  },
+  misFormDocHeaderTextCol: {
+    flex: 1,
+  },
+  misFormDocHeading: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#111827",
+  },
+  misFormDocCaption: {
+    marginTop: 2,
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+  },
+  misFormDocIndexBadge: {
+    backgroundColor: "#EFF6FF",
+    borderWidth: 1,
+    borderColor: "#DBEAFE",
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  misFormDocIndexBadgeText: {
+    fontSize: 11,
+    fontFamily: "Poppins-SemiBold",
+    color: "#1D4ED8",
+  },
+  misFormsWebView: {
+    height: 220,
+    borderRadius: 8,
+    overflow: "hidden",
+  },
+  misPdfActionsRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 8,
+  },
+  misPdfActionBtn: {
+    flex: 1,
+    minHeight: 40,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#BAE6FD",
+    backgroundColor: "#ECFEFF",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+  },
+  misPdfActionBtnPrimary: {
+    backgroundColor: "#06B6D4",
+    borderColor: "#06B6D4",
+  },
+  misPdfActionBtnDisabled: {
+    opacity: 0.6,
+  },
+  misPdfActionBtnText: {
+    fontSize: 13,
+    fontFamily: "Poppins-Medium",
+    color: "#0369A1",
+  },
+  misPdfActionBtnTextPrimary: {
+    fontSize: 13,
+    fontFamily: "Poppins-Medium",
+    color: "#FFFFFF",
   },
   formRow: {
     flexDirection: "row",

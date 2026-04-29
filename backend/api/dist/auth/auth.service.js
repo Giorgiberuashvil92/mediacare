@@ -97,8 +97,10 @@ let AuthService = class AuthService {
             experience: registerDto.experience,
             about: registerDto.about,
             location: registerDto.location,
+            citizenship: registerDto.citizenship,
+            residency: registerDto.residency,
         });
-        const { email, password, role, dateOfBirth, minWorkingDaysRequired, phone, appointmentDoctorId, appointmentServiceDate, ...userData } = registerDto;
+        const { email, password, role, dateOfBirth, minWorkingDaysRequired, phone, appointmentDoctorId, appointmentServiceDate, citizenship, residency, ...userData } = registerDto;
         const hasAppointmentDoctor = Boolean(appointmentDoctorId?.trim());
         const hasAppointmentDate = Boolean(appointmentServiceDate?.trim());
         if (hasAppointmentDoctor !== hasAppointmentDate) {
@@ -309,6 +311,7 @@ let AuthService = class AuthService {
                 Phone: savedUser.phone || '',
                 Mobile: savedUser.phone || '',
                 Email: savedUser.email || '',
+                Citizenship: citizenship?.trim() || residency?.trim() || undefined,
                 LegalAddress: savedUser.address || '',
                 ActualAddress: savedUser.address || '',
                 Description: '',

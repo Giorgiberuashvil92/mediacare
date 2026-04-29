@@ -88,22 +88,18 @@ export default function RegisterScreen() {
 
   // Patient specific fields
   const [address, setAddress] = useState("");
-  const [identificationDocument, setIdentificationDocument] = useState<{
+  const [identificationDocument] = useState<{
     uri: string;
     name: string;
     type: string;
     filePath?: string;
   } | null>(null);
-  const [uploadingIdentificationDocument, setUploadingIdentificationDocument] =
-    useState(false);
 
-  // Nationality selection (only for patients)
   const [nationality, setNationality] = useState<
     "georgian" | "non-georgian" | null
   >(null);
   const [showPassportInfoModal, setShowPassportInfoModal] = useState(false);
 
-  // IDENTOMAT states
   const [showIdentomatModal, setShowIdentomatModal] = useState(false);
   const [identomatUrl, setIdentomatUrl] = useState<string>("");
   const [isIdentomatVerified, setIsIdentomatVerified] = useState(false);
@@ -163,17 +159,11 @@ export default function RegisterScreen() {
     loadSpecializations();
   }, [selectedRole]);
 
-  const openDatePicker = () => {
-    setShowDatePicker(true);
-  };
-
   const onDateChange = (event: any, selectedDate?: Date) => {
     if (Platform.OS === "android") {
       if (event.type === "set" && selectedDate) {
         const currentDate = selectedDate;
         setSelectedDate(currentDate);
-
-        // Format the date as YYYY-MM-DD for backend
         const year = currentDate.getFullYear();
         const month = String(currentDate.getMonth() + 1).padStart(2, "0");
         const day = String(currentDate.getDate()).padStart(2, "0");
@@ -772,89 +762,6 @@ export default function RegisterScreen() {
     }
   };
 
-  const handleIdentificationDocumentPick = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ["application/pdf", "image/jpeg", "image/jpg", "image/png"],
-        copyToCacheDirectory: true,
-      });
-
-      if (result.canceled) {
-        return;
-      }
-
-      const file = result.assets[0];
-
-      // Check file size (max 5MB)
-      if (file.size && file.size > 5 * 1024 * 1024) {
-        showToast.error("ფაილის ზომა არ უნდა აღემატებოდეს 5MB-ს", "შეცდომა");
-        return;
-      }
-
-      // Upload (mock or real)
-      setUploadingIdentificationDocument(true);
-      if (apiService.isMockMode()) {
-        setIdentificationDocument({
-          uri: file.uri,
-          name: file.name,
-          type: file.mimeType || "application/pdf",
-          filePath: "/uploads/identification/mock-id.pdf",
-        });
-        showToast.success("ფაილი წარმატებით აიტვირთა (mock)", "წარმატება");
-      } else {
-        const formData = new FormData();
-        formData.append("file", {
-          uri: file.uri,
-          name: file.name,
-          type: file.mimeType || "application/pdf",
-        } as any);
-
-        const response = await fetch(
-          `${apiService.getBaseURL()}/upload/identification`,
-          {
-            method: "POST",
-            body: formData,
-            headers: {
-              "Content-Type": "multipart/form-data",
-            },
-          },
-        );
-
-        const data = await response.json();
-
-        if (data.success) {
-          // Use Cloudinary URL (data.data.url or data.data.filePath)
-          const cloudinaryUrl = data.data.url || data.data.filePath;
-          console.log(
-            "✅ [Register] Identification document uploaded to Cloudinary:",
-            {
-              url: cloudinaryUrl,
-              publicId: data.data.publicId,
-              fileName: file.name,
-            },
-          );
-          setIdentificationDocument({
-            uri: file.uri,
-            name: file.name,
-            type: file.mimeType || "application/pdf",
-            filePath: cloudinaryUrl, // Now contains Cloudinary URL instead of local path
-          });
-          showToast.success("ფაილი წარმატებით აიტვირთა", "წარმატება");
-        } else {
-          throw new Error(data.message || "ფაილის ატვირთვა ვერ მოხერხდა");
-        }
-      }
-    } catch (error) {
-      console.error("Identification document pick error:", error);
-      showToast.error(
-        error instanceof Error ? error.message : "ფაილის ატვირთვა ვერ მოხერხდა",
-        "შეცდომა",
-      );
-    } finally {
-      setUploadingIdentificationDocument(false);
-    }
-  };
-
   const handleOTPVerified = async (
     code: string,
     verificationResponse?: any,
@@ -1076,6 +983,13 @@ export default function RegisterScreen() {
       if (gender) {
         registerData.gender = gender;
       }
+      // MIS-ზე რეზიდენტობა/მოქალაქეობა გასაგზავნი ველი
+      registerData.citizenship = isDoctor
+        ? "georgian"
+        : nationality === "georgian"
+          ? "georgian"
+          : "non-georgian";
+      registerData.residency = registerData.citizenship;
       if (profileImage?.url) {
         registerData.profileImage = profileImage.url;
       }
@@ -1477,8 +1391,80 @@ export default function RegisterScreen() {
       // The response contains a 'person' object with the extracted data
       const person = resultData.person || resultData;
 
+      const wantsGeorgianIdentomatData = isDoctor || nationality === "georgian";
+
+      const pickFirstString = (...values: any[]): string | undefined => {
+        for (const v of values) {
+          if (typeof v === "string") {
+            const s = v.trim();
+            if (s) return s;
+          }
+        }
+        return undefined;
+      };
+
+      const getByKey = (obj: any, key: string): string | undefined => {
+        if (!obj || typeof obj !== "object") return undefined;
+        return pickFirstString(obj[key]);
+      };
+
+      // Identomat result often includes document-field keys suffixed with locale,
+      // e.g. Given_Names_en_US / Surname_en_US; for Georgian docs this is commonly _ka_GE or _ka.
+      const pickLocalizedDocField = (
+        obj: any,
+        baseKey: string,
+        localeVariants: string[],
+      ): string | undefined => {
+        if (!obj || typeof obj !== "object") return undefined;
+        for (const loc of localeVariants) {
+          const v = getByKey(obj, `${baseKey}_${loc}`);
+          if (v) return v;
+        }
+        return undefined;
+      };
+
+      const docSections: any[] = [
+        resultData?.id_card_front,
+        resultData?.id_card_back,
+        resultData?.passport,
+        resultData?.front,
+        resultData?.back,
+        resultData?.document?.front,
+        resultData?.document?.back,
+        resultData?.documentPages?.[0]?.front,
+        resultData?.documentPages?.[0]?.back,
+        resultData?.documents?.[0]?.front,
+        resultData?.documents?.[0]?.back,
+      ].filter(Boolean);
+
+      const extractGeorgianFromDocs = () => {
+        const localeVariants = ["ka_GE", "ka"];
+        for (const sec of docSections) {
+          const first = pickLocalizedDocField(
+            sec,
+            "Given_Names",
+            localeVariants,
+          );
+          const last = pickLocalizedDocField(sec, "Surname", localeVariants);
+          const personal = pickLocalizedDocField(
+            sec,
+            "Personal_Number",
+            localeVariants,
+          );
+          if (first || last || personal) {
+            return { first, last, personal };
+          }
+        }
+        return { first: undefined, last: undefined, personal: undefined };
+      };
+
+      const geDoc = wantsGeorgianIdentomatData
+        ? extractGeorgianFromDocs()
+        : { first: undefined, last: undefined, personal: undefined };
+
       // Try to get personal_number from person object first, then fallback to root level
       const idNumber =
+        geDoc.personal ||
         person.personal_number ||
         person.id_number ||
         person.person_number ||
@@ -1489,6 +1475,7 @@ export default function RegisterScreen() {
 
       // Try to get name from person object first, then fallback to root level
       const firstName =
+        geDoc.first ||
         person.first_name ||
         person.firstName ||
         person.name?.first ||
@@ -1496,6 +1483,7 @@ export default function RegisterScreen() {
         resultData.firstName ||
         resultData.name?.first;
       const lastName =
+        geDoc.last ||
         person.last_name ||
         person.lastName ||
         person.name?.last ||
@@ -1533,7 +1521,7 @@ export default function RegisterScreen() {
             if (!isNaN(dob.getTime())) {
               setSelectedDate(dob);
             }
-          } catch (e) {
+          } catch {
             console.warn(
               "⚠️ [IDENTOMAT] Could not parse date of birth:",
               dateOfBirth,
@@ -1727,69 +1715,6 @@ export default function RegisterScreen() {
             {/* Form */}
             {((!isDoctor && nationality !== null) || isDoctor) && (
               <View style={styles.form}>
-                {/* Name Input */}
-                <View style={styles.inputContainer}>
-                  <Text style={styles.label}>
-                    {t("auth.register.name.label")} *
-                  </Text>
-                  <TouchableOpacity
-                    activeOpacity={1}
-                    style={styles.inputWrapper}
-                    onPress={() => nameInputRef.current?.focus()}
-                  >
-                    <Ionicons
-                      name="person-outline"
-                      size={20}
-                      color="#9CA3AF"
-                      style={styles.inputIcon}
-                    />
-                    <TextInput
-                      ref={nameInputRef}
-                      style={styles.input}
-                      placeholder={t("auth.register.name.placeholder")}
-                      placeholderTextColor="#9CA3AF"
-                      value={name}
-                      onChangeText={setName}
-                      textContentType="none"
-                      autoComplete="off"
-                      autoCorrect={false}
-                      keyboardType="default"
-                    />
-                  </TouchableOpacity>
-                </View>
-
-                {/* Email Input */}
-                <View style={styles.inputContainer}>
-                  <Text style={styles.label}>
-                    {t("auth.register.email.label")} *
-                  </Text>
-                  <TouchableOpacity
-                    activeOpacity={1}
-                    style={styles.inputWrapper}
-                    onPress={() => emailInputRef.current?.focus()}
-                  >
-                    <Ionicons
-                      name="mail-outline"
-                      size={20}
-                      color="#9CA3AF"
-                      style={styles.inputIcon}
-                    />
-                    <TextInput
-                      ref={emailInputRef}
-                      style={styles.input}
-                      placeholder={t("auth.register.email.placeholder")}
-                      placeholderTextColor="#9CA3AF"
-                      value={email}
-                      onChangeText={setEmail}
-                      textContentType="none"
-                      autoComplete="off"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      keyboardType="email-address"
-                    />
-                  </TouchableOpacity>
-                </View>
-
                 {/* ID Number Input */}
                 <View style={styles.inputContainer}>
                   <View style={styles.labelRow}>
@@ -1812,6 +1737,159 @@ export default function RegisterScreen() {
                       </TouchableOpacity>
                     )}
                   </View>
+                  {((!isDoctor && nationality !== null) || isDoctor) && (
+                    <TouchableOpacity
+                      style={[
+                        styles.identomatButton,
+                        styles.identomatButtonFull,
+                        identomatLoading && styles.identomatButtonDisabled,
+                      ]}
+                      onPress={async () => {
+                        if (identomatLoading) return;
+
+                        try {
+                          setIdentomatLoading(true);
+
+                          const COMPANY_KEY =
+                            "699c6dc7915fc8ed730c5034_0c1c01bb7b27253e3abe4d2ab9c573ff0ca5931f";
+                          const beginResponse = await fetch(
+                            "https://widget.identomat.com/external-api/begin/",
+                            {
+                              method: "POST",
+                              headers: {
+                                "Content-Type": "application/json",
+                              },
+                              body: JSON.stringify({
+                                company_key: COMPANY_KEY,
+                                flags: {
+                                  skip_agreement: true,
+                                  skip_document: false,
+                                  skip_face: false,
+                                  language: isDoctor
+                                    ? "ka"
+                                    : nationality === "georgian"
+                                      ? "ka"
+                                      : "en",
+                                },
+                                steps: [
+                                  {
+                                    type: "face",
+                                    key: "face",
+                                  },
+                                  {
+                                    type: "document",
+                                    key: "document",
+                                  },
+                                ],
+                              }),
+                            },
+                          );
+
+                          console.log(
+                            "📨 [IDENTOMAT] Begin response status:",
+                            beginResponse.status,
+                            beginResponse.statusText,
+                          );
+
+                          if (!beginResponse.ok) {
+                            const errorText = await beginResponse.text();
+                            console.error(
+                              "❌ [IDENTOMAT] Begin error response:",
+                              errorText,
+                            );
+                            throw new Error(
+                              `IDENTOMAT session-ის დაწყება ვერ მოხერხდა: ${beginResponse.status} ${beginResponse.statusText}`,
+                            );
+                          }
+
+                          const beginData = await beginResponse.json();
+                          console.log(
+                            "✅ [IDENTOMAT] Begin response data:",
+                            beginData,
+                          );
+                          console.log(
+                            "✅ [IDENTOMAT] Response type:",
+                            typeof beginData,
+                          );
+
+                          // API returns session token directly as a string, not as an object
+                          let sessionToken: string;
+
+                          if (typeof beginData === "string") {
+                            // Response is a string (session token directly)
+                            sessionToken = beginData;
+                          } else if (
+                            typeof beginData === "object" &&
+                            beginData !== null
+                          ) {
+                            // Response is an object, try different possible field names
+                            sessionToken =
+                              beginData.session_token ||
+                              beginData.sessionToken ||
+                              beginData.token ||
+                              beginData.data?.session_token ||
+                              beginData.data?.token ||
+                              "";
+                          } else {
+                            throw new Error(
+                              `Unexpected response type: ${typeof beginData}`,
+                            );
+                          }
+
+                          if (!sessionToken || sessionToken.trim() === "") {
+                            console.error(
+                              "❌ [IDENTOMAT] No session token in response. Response:",
+                              beginData,
+                            );
+                            throw new Error(
+                              `Session token-ის მიღება ვერ მოხერხდა. Response: ${JSON.stringify(beginData)}`,
+                            );
+                          }
+
+                          console.log(
+                            "✅ [IDENTOMAT] Session token received:",
+                            sessionToken.substring(0, 20) + "...",
+                          );
+
+                          setIdentomatSessionToken(sessionToken);
+
+                          // Step 2: Open WebView with session token
+                          const widgetUrl = `https://widget.identomat.com/?session_token=${sessionToken}`;
+                          setIdentomatUrl(widgetUrl);
+                          setShowIdentomatModal(true);
+                        } catch (error) {
+                          console.error(
+                            "❌ [IDENTOMAT] Error starting session:",
+                            error,
+                          );
+                          Alert.alert(
+                            "შეცდომა",
+                            error instanceof Error
+                              ? error.message
+                              : "IDENTOMAT-ის იდენტიფიკაცია ვერ მოხერხდა",
+                          );
+                        } finally {
+                          setIdentomatLoading(false);
+                        }
+                      }}
+                      disabled={identomatLoading}
+                    >
+                      {identomatLoading ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <>
+                          <Ionicons
+                            name="finger-print-outline"
+                            size={20}
+                            color="#FFFFFF"
+                          />
+                          <Text style={styles.identomatButtonText}>
+                            IDENTOMAT
+                          </Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  )}
                   <View style={styles.idNumberRow}>
                     <TouchableOpacity
                       activeOpacity={1}
@@ -1839,157 +1917,9 @@ export default function RegisterScreen() {
                         autoComplete="off"
                         autoCorrect={false}
                         keyboardType="default"
-                        editable={!isIdentomatVerified}
+                        editable={false}
                       />
                     </TouchableOpacity>
-                    {((!isDoctor && nationality === "georgian") ||
-                      isDoctor) && (
-                      <TouchableOpacity
-                        style={[
-                          styles.identomatButton,
-                          identomatLoading && styles.identomatButtonDisabled,
-                        ]}
-                        onPress={async () => {
-                          if (identomatLoading) return;
-
-                          try {
-                            setIdentomatLoading(true);
-
-                            const COMPANY_KEY =
-                              "699c6dc7915fc8ed730c5034_0c1c01bb7b27253e3abe4d2ab9c573ff0ca5931f";
-                            const beginResponse = await fetch(
-                              "https://widget.identomat.com/external-api/begin/",
-                              {
-                                method: "POST",
-                                headers: {
-                                  "Content-Type": "application/json",
-                                },
-                                body: JSON.stringify({
-                                  company_key: COMPANY_KEY,
-                                  flags: {
-                                    skip_agreement: true,
-                                    skip_document: false,
-                                    skip_face: false,
-                                  },
-                                  steps: [
-                                    {
-                                      type: "face",
-                                      key: "face",
-                                    },
-                                    {
-                                      type: "document",
-                                      key: "document",
-                                    },
-                                  ],
-                                }),
-                              },
-                            );
-
-                            console.log(
-                              "📨 [IDENTOMAT] Begin response status:",
-                              beginResponse.status,
-                              beginResponse.statusText,
-                            );
-
-                            if (!beginResponse.ok) {
-                              const errorText = await beginResponse.text();
-                              console.error(
-                                "❌ [IDENTOMAT] Begin error response:",
-                                errorText,
-                              );
-                              throw new Error(
-                                `IDENTOMAT session-ის დაწყება ვერ მოხერხდა: ${beginResponse.status} ${beginResponse.statusText}`,
-                              );
-                            }
-
-                            const beginData = await beginResponse.json();
-                            console.log(
-                              "✅ [IDENTOMAT] Begin response data:",
-                              beginData,
-                            );
-                            console.log(
-                              "✅ [IDENTOMAT] Response type:",
-                              typeof beginData,
-                            );
-
-                            // API returns session token directly as a string, not as an object
-                            let sessionToken: string;
-
-                            if (typeof beginData === "string") {
-                              // Response is a string (session token directly)
-                              sessionToken = beginData;
-                            } else if (
-                              typeof beginData === "object" &&
-                              beginData !== null
-                            ) {
-                              // Response is an object, try different possible field names
-                              sessionToken =
-                                beginData.session_token ||
-                                beginData.sessionToken ||
-                                beginData.token ||
-                                beginData.data?.session_token ||
-                                beginData.data?.token ||
-                                "";
-                            } else {
-                              throw new Error(
-                                `Unexpected response type: ${typeof beginData}`,
-                              );
-                            }
-
-                            if (!sessionToken || sessionToken.trim() === "") {
-                              console.error(
-                                "❌ [IDENTOMAT] No session token in response. Response:",
-                                beginData,
-                              );
-                              throw new Error(
-                                `Session token-ის მიღება ვერ მოხერხდა. Response: ${JSON.stringify(beginData)}`,
-                              );
-                            }
-
-                            console.log(
-                              "✅ [IDENTOMAT] Session token received:",
-                              sessionToken.substring(0, 20) + "...",
-                            );
-
-                            setIdentomatSessionToken(sessionToken);
-
-                            // Step 2: Open WebView with session token
-                            const widgetUrl = `https://widget.identomat.com/?session_token=${sessionToken}`;
-                            setIdentomatUrl(widgetUrl);
-                            setShowIdentomatModal(true);
-                          } catch (error) {
-                            console.error(
-                              "❌ [IDENTOMAT] Error starting session:",
-                              error,
-                            );
-                            Alert.alert(
-                              "შეცდომა",
-                              error instanceof Error
-                                ? error.message
-                                : "IDENTOMAT-ის იდენტიფიკაცია ვერ მოხერხდა",
-                            );
-                          } finally {
-                            setIdentomatLoading(false);
-                          }
-                        }}
-                        disabled={identomatLoading}
-                      >
-                        {identomatLoading ? (
-                          <ActivityIndicator size="small" color="#FFFFFF" />
-                        ) : (
-                          <>
-                            <Ionicons
-                              name="finger-print-outline"
-                              size={20}
-                              color="#FFFFFF"
-                            />
-                            <Text style={styles.identomatButtonText}>
-                              IDENTOMAT
-                            </Text>
-                          </>
-                        )}
-                      </TouchableOpacity>
-                    )}
                   </View>
                   {isIdentomatVerified && (
                     <View style={styles.identomatSuccessContainer}>
@@ -2038,6 +1968,93 @@ export default function RegisterScreen() {
                         </Text>
                       </TouchableOpacity>
                     )}
+                </View>
+
+                {/* Name Input */}
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>
+                    {t("auth.register.name.label")} *
+                  </Text>
+                  <TouchableOpacity
+                    activeOpacity={1}
+                    style={styles.inputWrapper}
+                  >
+                    <Ionicons
+                      name="person-outline"
+                      size={20}
+                      color="#9CA3AF"
+                      style={styles.inputIcon}
+                    />
+                    <TextInput
+                      ref={nameInputRef}
+                      style={styles.input}
+                      placeholder={t("auth.register.name.placeholder")}
+                      placeholderTextColor="#9CA3AF"
+                      value={name}
+                      onChangeText={setName}
+                      textContentType="none"
+                      autoComplete="off"
+                      autoCorrect={false}
+                      keyboardType="default"
+                      editable={false}
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Date of Birth */}
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>
+                    {isDoctor ? t("doctor.dob.label") : "დაბადების თარიღი"} *
+                  </Text>
+                  <TouchableOpacity style={styles.inputWrapper} disabled>
+                    <Ionicons
+                      name="calendar-outline"
+                      size={20}
+                      color="#9CA3AF"
+                      style={styles.inputIcon}
+                    />
+                    <Text
+                      style={[
+                        styles.input,
+                        !dateOfBirth && styles.inputPlaceholder,
+                      ]}
+                    >
+                      {dateOfBirth ||
+                        (isDoctor ? t("doctor.dob.placeholder") : "აირჩიეთ თარიღი")}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Email Input */}
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>
+                    {t("auth.register.email.label")} *
+                  </Text>
+                  <TouchableOpacity
+                    activeOpacity={1}
+                    style={styles.inputWrapper}
+                    onPress={() => emailInputRef.current?.focus()}
+                  >
+                    <Ionicons
+                      name="mail-outline"
+                      size={20}
+                      color="#9CA3AF"
+                      style={styles.inputIcon}
+                    />
+                    <TextInput
+                      ref={emailInputRef}
+                      style={styles.input}
+                      placeholder={t("auth.register.email.placeholder")}
+                      placeholderTextColor="#9CA3AF"
+                      value={email}
+                      onChangeText={setEmail}
+                      textContentType="none"
+                      autoComplete="off"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      keyboardType="email-address"
+                    />
+                  </TouchableOpacity>
                 </View>
 
                 {/* Phone Input */}
@@ -2183,30 +2200,6 @@ export default function RegisterScreen() {
                       </TouchableOpacity>
                     </View>
 
-                    {/* Date of Birth */}
-                    <View style={styles.inputContainer}>
-                      <Text style={styles.label}>დაბადების თარიღი *</Text>
-                      <TouchableOpacity
-                        style={styles.inputWrapper}
-                        onPress={openDatePicker}
-                      >
-                        <Ionicons
-                          name="calendar-outline"
-                          size={20}
-                          color="#9CA3AF"
-                          style={styles.inputIcon}
-                        />
-                        <Text
-                          style={[
-                            styles.input,
-                            !dateOfBirth && styles.inputPlaceholder,
-                          ]}
-                        >
-                          {dateOfBirth || "აირჩიეთ თარიღი"}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-
                     {/* Profile Image */}
                     <View style={styles.inputContainer}>
                       <Text style={styles.label}>პროფილის სურათი</Text>
@@ -2284,61 +2277,6 @@ export default function RegisterScreen() {
                           </Text>
                         </View>
                       </View>
-                    </View>
-
-                    {/* Identification Document */}
-                    <View style={styles.inputContainer}>
-                      <Text style={styles.label}>იდენტიფიკაციის დოკუმენტი</Text>
-                      <TouchableOpacity
-                        style={[
-                          styles.filePickerButton,
-                          identificationDocument &&
-                            styles.filePickerButtonActive,
-                        ]}
-                        onPress={handleIdentificationDocumentPick}
-                        disabled={uploadingIdentificationDocument}
-                      >
-                        <Ionicons
-                          name={
-                            identificationDocument
-                              ? "checkmark-circle"
-                              : "cloud-upload-outline"
-                          }
-                          size={20}
-                          color={identificationDocument ? "#10B981" : "#9CA3AF"}
-                          style={styles.inputIcon}
-                        />
-                        {uploadingIdentificationDocument ? (
-                          <View style={styles.uploadingContainer}>
-                            <ActivityIndicator size="small" color="#06B6D4" />
-                            <Text style={styles.uploadingText}>
-                              {t("doctor.license.uploading")}
-                            </Text>
-                          </View>
-                        ) : (
-                          <Text
-                            style={[
-                              styles.filePickerText,
-                              identificationDocument &&
-                                styles.filePickerTextActive,
-                            ]}
-                          >
-                            {identificationDocument
-                              ? identificationDocument.name
-                              : "აირჩიე იდენტიფიკაციის დოკუმენტი"}
-                          </Text>
-                        )}
-                        <Ionicons
-                          name="document-attach-outline"
-                          size={20}
-                          color="#9CA3AF"
-                        />
-                      </TouchableOpacity>
-                      {identificationDocument && (
-                        <Text style={styles.fileHelper}>
-                          დოკუმენტი წარმატებით აიტვირთა
-                        </Text>
-                      )}
                     </View>
                   </>
                 )}
@@ -2496,32 +2434,6 @@ export default function RegisterScreen() {
                       </TouchableOpacity>
                     </View>
 
-                    {/* Date of Birth */}
-                    <View style={styles.inputContainer}>
-                      <Text style={styles.label}>
-                        {t("doctor.dob.label")} *
-                      </Text>
-                      <TouchableOpacity
-                        style={styles.inputWrapper}
-                        onPress={openDatePicker}
-                      >
-                        <Ionicons
-                          name="calendar-outline"
-                          size={20}
-                          color="#9CA3AF"
-                          style={styles.inputIcon}
-                        />
-                        <Text
-                          style={[
-                            styles.input,
-                            !dateOfBirth && styles.inputPlaceholder,
-                          ]}
-                        >
-                          {dateOfBirth || t("doctor.dob.placeholder")}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-
                     {/* Gender Selection */}
                     <View style={styles.inputContainer}>
                       <Text style={styles.label}>
@@ -2674,61 +2586,6 @@ export default function RegisterScreen() {
                       {licenseDocument && (
                         <Text style={styles.fileHelper}>
                           {t("doctor.license.success")}
-                        </Text>
-                      )}
-                    </View>
-
-                    {/* Identification Document */}
-                    <View style={styles.inputContainer}>
-                      <Text style={styles.label}>იდენტიფიკაციის დოკუმენტი</Text>
-                      <TouchableOpacity
-                        style={[
-                          styles.filePickerButton,
-                          identificationDocument &&
-                            styles.filePickerButtonActive,
-                        ]}
-                        onPress={handleIdentificationDocumentPick}
-                        disabled={uploadingIdentificationDocument}
-                      >
-                        <Ionicons
-                          name={
-                            identificationDocument
-                              ? "checkmark-circle"
-                              : "cloud-upload-outline"
-                          }
-                          size={20}
-                          color={identificationDocument ? "#10B981" : "#9CA3AF"}
-                          style={styles.inputIcon}
-                        />
-                        {uploadingIdentificationDocument ? (
-                          <View style={styles.uploadingContainer}>
-                            <ActivityIndicator size="small" color="#06B6D4" />
-                            <Text style={styles.uploadingText}>
-                              {t("doctor.license.uploading")}
-                            </Text>
-                          </View>
-                        ) : (
-                          <Text
-                            style={[
-                              styles.filePickerText,
-                              identificationDocument &&
-                                styles.filePickerTextActive,
-                            ]}
-                          >
-                            {identificationDocument
-                              ? identificationDocument.name
-                              : "აირჩიე იდენტიფიკაციის დოკუმენტი"}
-                          </Text>
-                        )}
-                        <Ionicons
-                          name="document-attach-outline"
-                          size={20}
-                          color="#9CA3AF"
-                        />
-                      </TouchableOpacity>
-                      {identificationDocument && (
-                        <Text style={styles.fileHelper}>
-                          დოკუმენტი წარმატებით აიტვირთა
                         </Text>
                       )}
                     </View>
@@ -4062,6 +3919,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     minWidth: 120,
     justifyContent: "center",
+  },
+  identomatButtonFull: {
+    width: "100%",
+    marginBottom: 8,
   },
   identomatButtonDisabled: {
     opacity: 0.6,

@@ -1,14 +1,8 @@
 import { apiService } from "@/app/_services/api";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
-import {
-  Modal,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
+import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useAuth } from "../../contexts/AuthContext";
 
 interface PatientAppointment {
@@ -37,129 +31,144 @@ const TodayAppointment = () => {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
   const [showModal, setShowModal] = useState(false);
-  const [todayAppointments, setTodayAppointments] = useState<PatientAppointment[]>([]);
+  const [todayAppointments, setTodayAppointments] = useState<
+    PatientAppointment[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
 
-  // Load today's appointments from API
-  useEffect(() => {
-    const loadTodayAppointments = async () => {
-      if (!isAuthenticated || !user?.id) {
-        setLoading(false);
-        return;
-      }
+  // ტაბზე დაბრუნებისას (მაგ. გადაჯავშნის შემდეგ) ხელახლა ვტვირთავთ — მხოლოდ mount-ზე არა
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
 
-      try {
-        setLoading(true);
-        console.log('🏠 TodayAppointment - Loading appointments for user:', user.id);
-        
-        const response = await apiService.getPatientAppointments();
-        console.log('🏠 TodayAppointment - API response:', response);
+      const loadTodayAppointments = async () => {
+        if (!isAuthenticated || !user?.id) {
+          if (!cancelled) setLoading(false);
+          return;
+        }
 
-        if (response.success && response.data) {
-          // Get today's date in YYYY-MM-DD format (local timezone)
-          const now = new Date();
-          const year = now.getFullYear();
-          const month = String(now.getMonth() + 1).padStart(2, '0');
-          const day = String(now.getDate()).padStart(2, '0');
-          const today = `${year}-${month}-${day}`;
-          
-          // Filter for today's scheduled appointments only
-          const todayScheduled = response.data
-            .filter((appointment: any) => {
-              // Format appointment date in local timezone
-              let appointmentDate: string;
-              if (appointment.appointmentDate) {
-                const date = new Date(appointment.appointmentDate);
-                const appYear = date.getFullYear();
-                const appMonth = String(date.getMonth() + 1).padStart(2, '0');
-                const appDay = String(date.getDate()).padStart(2, '0');
-                appointmentDate = `${appYear}-${appMonth}-${appDay}`;
-              } else {
-                appointmentDate = appointment.date;
-              }
-              
-              // Only show appointments for today
-              if (appointmentDate !== today) {
-                return false;
-              }
-              
-              // Check status
-              if (appointment.status !== "scheduled" && 
-                  appointment.status !== "confirmed" && 
+        try {
+          if (!cancelled) setLoading(true);
+          console.log(
+            "🏠 TodayAppointment - Loading appointments for user:",
+            user.id,
+          );
+
+          const response = await apiService.getPatientAppointments();
+          console.log("🏠 TodayAppointment - API response:", response);
+
+          if (!cancelled && response.success && response.data) {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, "0");
+            const day = String(now.getDate()).padStart(2, "0");
+            const today = `${year}-${month}-${day}`;
+
+            const todayScheduled = response.data
+              .filter((appointment: any) => {
+                let appointmentDate: string;
+                if (appointment.appointmentDate) {
+                  const date = new Date(appointment.appointmentDate);
+                  const appYear = date.getFullYear();
+                  const appMonth = String(date.getMonth() + 1).padStart(2, "0");
+                  const appDay = String(date.getDate()).padStart(2, "0");
+                  appointmentDate = `${appYear}-${appMonth}-${appDay}`;
+                } else {
+                  appointmentDate = appointment.date;
+                }
+
+                if (appointmentDate !== today) {
+                  return false;
+                }
+
+                if (
+                  appointment.status !== "scheduled" &&
+                  appointment.status !== "confirmed" &&
                   appointment.status !== "pending" &&
-                  appointment.status !== "in-progress") {
-                return false;
-              }
-              
-              // Check if appointment time has passed
-              const appointmentTime = appointment.appointmentTime || appointment.time || '00:00';
-              const [year, month, day] = appointmentDate.split('-').map(Number);
-              const [hours, minutes] = appointmentTime.split(':').map(Number);
-              const appointmentDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
-              
-              // If appointment time has passed more than 1 hour ago, don't show it
-              const diff = appointmentDateTime.getTime() - now.getTime();
-              const oneHourInMs = 60 * 60 * 1000;
-              
-              // Show if appointment is in the future or within 1 hour after appointment time
-              return diff >= -oneHourInMs;
-            })
-            .map((appointment: any) => {
-              // Format appointment date in local timezone
-              let appointmentDate: string;
-              if (appointment.appointmentDate) {
-                const date = new Date(appointment.appointmentDate);
-                const appYear = date.getFullYear();
-                const appMonth = String(date.getMonth() + 1).padStart(2, '0');
-                const appDay = String(date.getDate()).padStart(2, '0');
-                appointmentDate = `${appYear}-${appMonth}-${appDay}`;
-              } else {
-                appointmentDate = appointment.date;
-              }
-              const rawId = appointment._id ?? appointment.id;
-              return {
-                ...appointment,
-                formattedDate: appointmentDate,
-                id: rawId != null ? String(rawId) : "",
-              };
+                  appointment.status !== "in-progress"
+                ) {
+                  return false;
+                }
+
+                const appointmentTime =
+                  appointment.appointmentTime || appointment.time || "00:00";
+                const [y, m, d] = appointmentDate.split("-").map(Number);
+                const [hours, minutes] = appointmentTime.split(":").map(Number);
+                const appointmentDateTime = new Date(
+                  y,
+                  m - 1,
+                  d,
+                  hours,
+                  minutes,
+                  0,
+                  0,
+                );
+
+                const diff = appointmentDateTime.getTime() - now.getTime();
+                const oneHourInMs = 60 * 60 * 1000;
+                return diff >= -oneHourInMs;
+              })
+              .map((appointment: any) => {
+                let appointmentDate: string;
+                if (appointment.appointmentDate) {
+                  const date = new Date(appointment.appointmentDate);
+                  const appYear = date.getFullYear();
+                  const appMonth = String(date.getMonth() + 1).padStart(2, "0");
+                  const appDay = String(date.getDate()).padStart(2, "0");
+                  appointmentDate = `${appYear}-${appMonth}-${appDay}`;
+                } else {
+                  appointmentDate = appointment.date;
+                }
+                const rawId = appointment._id ?? appointment.id;
+                return {
+                  ...appointment,
+                  formattedDate: appointmentDate,
+                  id: rawId != null ? String(rawId) : "",
+                };
+              });
+
+            todayScheduled.sort((a: any, b: any) => {
+              const timeA = a.appointmentTime || a.time || "00:00";
+              const timeB = b.appointmentTime || b.time || "00:00";
+              return timeA.localeCompare(timeB);
             });
 
-          // Sort by time (closest first)
-          todayScheduled.sort((a: any, b: any) => {
-            const timeA = a.appointmentTime || a.time || '00:00';
-            const timeB = b.appointmentTime || b.time || '00:00';
-            return timeA.localeCompare(timeB);
-          });
-
-          console.log('🏠 TodayAppointment - Today\'s appointments:', todayScheduled);
-          setTodayAppointments(todayScheduled);
+            console.log(
+              "🏠 TodayAppointment - Today's appointments:",
+              todayScheduled,
+            );
+            setTodayAppointments(todayScheduled);
+          }
+        } catch (error) {
+          console.log(
+            "🏠 TodayAppointment - Error loading appointments:",
+            error,
+          );
+        } finally {
+          if (!cancelled) setLoading(false);
         }
-      } catch (error) {
-        console.log('🏠 TodayAppointment - Error loading appointments:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+      };
 
-    loadTodayAppointments();
-  }, [isAuthenticated, user?.id]);
+      void loadTodayAppointments();
+      return () => {
+        cancelled = true;
+      };
+    }, [isAuthenticated, user?.id]),
+  );
 
-  // Update current time every minute for countdown
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTime(new Date());
-    }, 60000); // Update every minute
+    }, 60000);
 
     return () => clearInterval(interval);
   }, []);
 
-  // If loading or no appointments for today, don't show banner
   if (loading || todayAppointments.length === 0) {
     return null;
   }
 
-  // Get the first appointment (or closest one)
   const appointment = todayAppointments[0];
 
   const isVideoConsultation = (() => {
@@ -168,20 +177,25 @@ const TodayAppointment = () => {
     return String(t).toLowerCase() === "video";
   })();
 
-  // Appointment is always today since we filtered for today only
   const isToday = true;
 
-  // Check if appointment is within 1 hour from now
   const isUrgent = () => {
-    // Use formattedDate that we already calculated
-    const appointmentDate = appointment.formattedDate || appointment.date || '';
-    const appointmentTime = appointment.time || appointment.appointmentTime || '00:00';
-    
-    // Create date from YYYY-MM-DD and HH:MM in local timezone
-    const [year, month, day] = appointmentDate.split('-').map(Number);
-    const [hours, minutes] = appointmentTime.split(':').map(Number);
-    const appointmentDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
-    
+    const appointmentDate = appointment.formattedDate || appointment.date || "";
+    const appointmentTime =
+      appointment.time || appointment.appointmentTime || "00:00";
+
+    const [year, month, day] = appointmentDate.split("-").map(Number);
+    const [hours, minutes] = appointmentTime.split(":").map(Number);
+    const appointmentDateTime = new Date(
+      year,
+      month - 1,
+      day,
+      hours,
+      minutes,
+      0,
+      0,
+    );
+
     const diff = appointmentDateTime.getTime() - currentTime.getTime();
     return diff > 0 && diff <= 60 * 60 * 1000; // 1 hour
   };
@@ -190,25 +204,31 @@ const TodayAppointment = () => {
   // Button is active from appointment time until 1 hour after appointment time
   const isJoinButtonActive = () => {
     // Only show for scheduled or in-progress appointments
-    if (appointment.status !== "scheduled" && appointment.status !== "in-progress" && appointment.status !== "confirmed" && appointment.status !== "pending") {
+    if (
+      appointment.status !== "scheduled" &&
+      appointment.status !== "in-progress" &&
+      appointment.status !== "confirmed" &&
+      appointment.status !== "pending"
+    ) {
       return false;
     }
 
     // Use formattedDate that we already calculated
-    const appointmentDate = appointment.formattedDate || appointment.date || '';
-    const appointmentTime = appointment.time || appointment.appointmentTime || '00:00';
-    
+    const appointmentDate = appointment.formattedDate || appointment.date || "";
+    const appointmentTime =
+      appointment.time || appointment.appointmentTime || "00:00";
+
     // Parse appointment date and time
     const appointmentDateTime = new Date(
-      `${appointmentDate}T${appointmentTime}`
+      `${appointmentDate}T${appointmentTime}`,
     );
-    
+
     // Calculate time difference (negative means past)
     const diff = appointmentDateTime.getTime() - currentTime.getTime();
-    
+
     // One hour in milliseconds
     const oneHourInMs = 60 * 60 * 1000;
-    
+
     // Button is active:
     // - Before appointment time (diff > 0) - always show
     // - From appointment time until 1 hour after (diff <= 0 && diff >= -oneHourInMs)
@@ -218,9 +238,12 @@ const TodayAppointment = () => {
 
   // კონსულტაციის დრო + 1 საათი გავიდა — ღილაკის ნაცვლად "დრო უკვე გავიდა"
   const isConsultationTimePassed = () => {
-    const appointmentDate = appointment.formattedDate || appointment.date || '';
-    const appointmentTime = appointment.time || appointment.appointmentTime || '00:00';
-    const appointmentDateTime = new Date(`${appointmentDate}T${appointmentTime}`);
+    const appointmentDate = appointment.formattedDate || appointment.date || "";
+    const appointmentTime =
+      appointment.time || appointment.appointmentTime || "00:00";
+    const appointmentDateTime = new Date(
+      `${appointmentDate}T${appointmentTime}`,
+    );
     const diff = appointmentDateTime.getTime() - currentTime.getTime();
     const oneHourInMs = 60 * 60 * 1000;
     return diff < -oneHourInMs;
@@ -241,16 +264,16 @@ const TodayAppointment = () => {
         </View>
         <View style={styles.content}>
           <Text style={styles.title}>
-            {isUrgent() 
-              ? "კონსულტაცია მალე!" 
-              : isToday 
+            {isUrgent()
+              ? "კონსულტაცია მალე!"
+              : isToday
                 ? "დღეს გაქვთ ჯავშანი"
                 : "გაქვთ ჯავშანი"}
           </Text>
           <View style={styles.infoRow}>
             <Ionicons name="medical" size={16} color="#FFFFFF" />
             <Text style={styles.doctorName}>
-              {appointment.doctorName || appointment.doctorId?.name || 'ექიმი'}
+              {appointment.doctorName || appointment.doctorId?.name || "ექიმი"}
             </Text>
           </View>
           <View style={styles.infoRow}>
@@ -289,10 +312,14 @@ const TodayAppointment = () => {
                   <View style={styles.detailContent}>
                     <Text style={styles.detailLabel}>ექიმი</Text>
                     <Text style={styles.detailValue}>
-                      {appointment.doctorName || appointment.doctorId?.name || 'ექიმი'}
+                      {appointment.doctorName ||
+                        appointment.doctorId?.name ||
+                        "ექიმი"}
                     </Text>
                     <Text style={styles.detailSubValue}>
-                      {appointment.doctorSpecialty || appointment.doctorId?.specialization || ''}
+                      {appointment.doctorSpecialty ||
+                        appointment.doctorId?.specialization ||
+                        ""}
                     </Text>
                   </View>
                 </View>
@@ -302,7 +329,8 @@ const TodayAppointment = () => {
                   <View style={styles.detailContent}>
                     <Text style={styles.detailLabel}>დრო</Text>
                     <Text style={styles.detailValue}>
-                      დანიშნულია {appointment.time || appointment.appointmentTime}-ზე
+                      დანიშნულია{" "}
+                      {appointment.time || appointment.appointmentTime}-ზე
                     </Text>
                   </View>
                 </View>
@@ -315,12 +343,13 @@ const TodayAppointment = () => {
                 </View>
               ) : isJoinButtonActive() && isVideoConsultation ? (
                 <TouchableOpacity
-                  style={[styles.joinCallButton, isUrgent() && styles.joinCallButtonUrgent]}
+                  style={[
+                    styles.joinCallButton,
+                    isUrgent() && styles.joinCallButtonUrgent,
+                  ]}
                   onPress={() => {
                     const appointmentId = String(
-                      appointment.id ||
-                        appointment._id ||
-                        "",
+                      appointment.id || appointment._id || "",
                     ).trim();
                     if (!appointmentId) {
                       return;
@@ -344,9 +373,7 @@ const TodayAppointment = () => {
                   }}
                 >
                   <Ionicons name="videocam" size={20} color="#FFFFFF" />
-                  <Text style={styles.joinCallText}>
-                    შესვლა კონსულტაციაზე
-                  </Text>
+                  <Text style={styles.joinCallText}>შესვლა კონსულტაციაზე</Text>
                   <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
                 </TouchableOpacity>
               ) : null}
@@ -542,4 +569,3 @@ const styles = StyleSheet.create({
 });
 
 export default TodayAppointment;
-

@@ -1415,7 +1415,9 @@ const Appointment = () => {
                             },
                           ]}
                         >
-                          {getStatusLabel(appointment.status)}
+                          {isAppointmentTimePassed(appointment)
+                            ? "ვიდეო დასრულებულია"
+                            : getStatusLabel(appointment.status)}
                         </Text>
                       </View>
                     </View>

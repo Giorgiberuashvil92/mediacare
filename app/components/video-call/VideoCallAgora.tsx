@@ -16,15 +16,17 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import RtcEngine, {
+import {
   AudioProfileType,
   AudioScenarioType,
   ChannelProfileType,
   ClientRoleType,
   IRtcEngine,
   RtcSurfaceView,
+  createAgoraRtcEngine,
 } from "react-native-agora";
 import { apiService } from "../../_services/api";
+import { setCallOverlayState } from "../../utils/callOverlayStore";
 
 /**
  * ვიდეო კონსულტაციის გვერდი - Agora Video SDK
@@ -42,9 +44,10 @@ export default function VideoCallScreen() {
   // Get parameters from navigation
   const appointmentId = (params.appointmentId ||
     params.consultationId) as string;
-  const userName = (params.patientName ||
-    params.doctorName ||
-    "User") as string;
+  const [remoteUserName, setRemoteUserName] = useState<string>(
+    (params.patientName || params.doctorName || "მეორე მონაწილე") as string,
+  );
+  const [localUserName, setLocalUserName] = useState<string>("მე");
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +64,7 @@ export default function VideoCallScreen() {
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [isFrontCamera, setIsFrontCamera] = useState(true); // true = front camera, false = back camera
+  const [isMiniMode, setIsMiniMode] = useState(false);
   const [connectionState, setConnectionState] =
     useState<string>("disconnected");
   const [channelClosed, setChannelClosed] = useState(false);
@@ -74,6 +78,80 @@ export default function VideoCallScreen() {
   );
   const loadAgoraTokenRef = useRef<(() => Promise<void>) | null>(null);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+  const wasVideoEnabledBeforeBackgroundRef = useRef<boolean>(isVideoEnabled);
+
+  useEffect(() => {
+    const resolveCallParticipantNames = async () => {
+      try {
+        if (!appointmentId) return;
+
+        const [currentUser, appointmentResponse] = await Promise.all([
+          apiService.getCurrentUser(),
+          apiService.getAppointmentById(appointmentId),
+        ]);
+
+        const appointment = appointmentResponse?.data || {};
+        const doctor = appointment.doctorId || {};
+        const patient = appointment.patientId || {};
+        const doctorId = String(doctor?._id || doctor?.id || appointment.doctorId || "");
+        const patientId = String(
+          patient?._id || patient?.id || appointment.patientId || "",
+        );
+        const doctorName =
+          typeof doctor?.name === "string" && doctor.name.trim()
+            ? doctor.name.trim()
+            : "";
+        const patientName =
+          typeof patient?.name === "string" && patient.name.trim()
+            ? patient.name.trim()
+            : "";
+        const myId = String(currentUser?.id || "");
+
+        if (myId && myId === doctorId) {
+          setLocalUserName(doctorName || "მე");
+          setRemoteUserName(patientName || "მეორე მონაწილე");
+          return;
+        }
+
+        if (myId && myId === patientId) {
+          setLocalUserName(patientName || "მე");
+          setRemoteUserName(doctorName || "მეორე მონაწილე");
+          return;
+        }
+
+        const fallbackRemote = (params.patientName ||
+          params.doctorName ||
+          doctorName ||
+          patientName ||
+          "მეორე მონაწილე") as string;
+        setRemoteUserName(fallbackRemote);
+      } catch (err) {
+        console.warn("Failed to resolve call participant names:", err);
+      }
+    };
+
+    resolveCallParticipantNames();
+  }, [appointmentId, params.doctorName, params.patientName]);
+
+  const recoverMediaAfterInterruption = useCallback(async () => {
+    if (!engineRef.current || !isJoined) return;
+
+    try {
+      await engineRef.current.enableAudio();
+      await engineRef.current.setEnableSpeakerphone(true);
+      await engineRef.current.muteLocalAudioStream(isMuted);
+      const shouldEnableVideo = wasVideoEnabledBeforeBackgroundRef.current;
+      await engineRef.current.enableLocalVideo(shouldEnableVideo);
+      await engineRef.current.muteLocalVideoStream(!shouldEnableVideo);
+      console.log("Media recovered after interruption");
+    } catch (err) {
+      console.error("Failed to recover media after interruption:", err);
+    }
+  }, [isJoined, isMuted]);
+
+  useEffect(() => {
+    wasVideoEnabledBeforeBackgroundRef.current = isVideoEnabled;
+  }, [isVideoEnabled]);
 
   // Channel-ის დახურვის შემოწმება
   const checkChannelStatus = useCallback(() => {
@@ -112,7 +190,7 @@ export default function VideoCallScreen() {
       expirationTime: number;
     }) => {
       try {
-        const engine = RtcEngine();
+        const engine = createAgoraRtcEngine();
         await engine.initialize({ appId: data.appId });
         engineRef.current = engine;
 
@@ -211,6 +289,13 @@ export default function VideoCallScreen() {
             setConnectionState(stateName);
 
             if (state === 1 || state === 5) {
+              if (appStateRef.current !== "active") {
+                console.log(
+                  "Ignoring disconnect while app inactive/background",
+                  appStateRef.current,
+                );
+                return;
+              }
               setChannelClosed(true);
               setIsJoined(false);
               Alert.alert(
@@ -251,6 +336,13 @@ export default function VideoCallScreen() {
         // Connection-ის დაკარგვის შემოწმება
         engine.addListener("onConnectionLost", () => {
           console.log("Connection lost");
+          if (appStateRef.current !== "active") {
+            console.log(
+              "Ignoring connection lost while app inactive/background",
+              appStateRef.current,
+            );
+            return;
+          }
           setChannelClosed(true);
           setIsJoined(false);
           Alert.alert(
@@ -399,10 +491,15 @@ export default function VideoCallScreen() {
         // App came to foreground (e.g., after rejecting incoming call)
         console.log("App came to foreground, ensuring audio is active");
         if (engineRef.current && isJoined) {
-          // Re-enable audio when app comes to foreground
-          // This handles the case when user rejects incoming call
-          engineRef.current.enableAudio();
-          engineRef.current.enableVideo();
+          wasVideoEnabledBeforeBackgroundRef.current = isVideoEnabled;
+          // Recover aggressively after interruption because iOS may drop audio session
+          recoverMediaAfterInterruption();
+          setTimeout(() => {
+            recoverMediaAfterInterruption();
+          }, 300);
+          setTimeout(() => {
+            recoverMediaAfterInterruption();
+          }, 1200);
         }
       } else if (
         appStateRef.current === "active" &&
@@ -415,9 +512,12 @@ export default function VideoCallScreen() {
         // Don't disconnect - keep audio running
         // This is like WhatsApp - call continues even when system call UI shows
         if (engineRef.current && isJoined) {
-          // Keep audio active - don't disable it
-          // The call should continue even when system shows incoming call
+          // Keep audio session warm; avoid route loss after incoming phone call UI
+          wasVideoEnabledBeforeBackgroundRef.current = isVideoEnabled;
           engineRef.current.enableAudio();
+          engineRef.current.enableLocalVideo(false);
+          engineRef.current.muteLocalVideoStream(true);
+          engineRef.current.setEnableSpeakerphone(true);
         }
       } else if (
         appStateRef.current === "active" &&
@@ -427,8 +527,11 @@ export default function VideoCallScreen() {
         console.log("App went to background, maintaining audio connection");
         // Don't disable audio - keep it running in background
         if (engineRef.current && isJoined) {
-          // Ensure audio continues in background
+          wasVideoEnabledBeforeBackgroundRef.current = isVideoEnabled;
           engineRef.current.enableAudio();
+          engineRef.current.enableLocalVideo(false);
+          engineRef.current.muteLocalVideoStream(true);
+          engineRef.current.setEnableSpeakerphone(true);
         }
       }
 
@@ -443,7 +546,7 @@ export default function VideoCallScreen() {
     return () => {
       subscription.remove();
     };
-  }, [isJoined]);
+  }, [isJoined, isVideoEnabled, recoverMediaAfterInterruption]);
 
   useEffect(() => {
     if (!appointmentId) {
@@ -455,6 +558,7 @@ export default function VideoCallScreen() {
     loadAgoraToken();
 
     return () => {
+      setCallOverlayState({ visible: false });
       // Cleanup on unmount
       if (tokenExpirationCheckRef.current) {
         clearTimeout(tokenExpirationCheckRef.current);
@@ -588,8 +692,10 @@ export default function VideoCallScreen() {
     if (!engineRef.current) return;
 
     try {
-      await engineRef.current.muteLocalVideoStream(!isVideoEnabled);
-      setIsVideoEnabled(!isVideoEnabled);
+      const nextEnabled = !isVideoEnabled;
+      await engineRef.current.enableLocalVideo(nextEnabled);
+      await engineRef.current.muteLocalVideoStream(!nextEnabled);
+      setIsVideoEnabled(nextEnabled);
     } catch (err) {
       console.error("Error toggling video:", err);
     }
@@ -607,6 +713,7 @@ export default function VideoCallScreen() {
   };
 
   const handleEndCall = async () => {
+    setCallOverlayState({ visible: false });
     const channelStatus = checkChannelStatus();
 
     if (channelStatus.isClosed) {
@@ -638,12 +745,26 @@ export default function VideoCallScreen() {
             } catch (err) {
               console.error("Error leaving channel:", err);
             }
+            setCallOverlayState({ visible: false });
             // Keep awake will be automatically deactivated when component unmounts
             router.back();
           },
         },
       ],
     );
+  };
+
+  const handleMinimizeCall = () => {
+    setCallOverlayState({
+      visible: true,
+      appointmentId,
+      remoteUserName,
+    });
+    router.push("/(tabs)");
+  };
+
+  const handleExpandCall = () => {
+    setIsMiniMode(false);
   };
 
   if (loading) {
@@ -680,12 +801,57 @@ export default function VideoCallScreen() {
     );
   }
 
+  if (isMiniMode) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.miniModeWrapper}>
+          <View style={styles.miniVideoCard}>
+            {remoteUid !== null && engineRef.current ? (
+              <RtcSurfaceView
+                canvas={{ uid: remoteUid }}
+                style={styles.miniRemoteVideo}
+              />
+            ) : (
+              <View style={styles.miniWaitingContainer}>
+                <ActivityIndicator size="small" color="#2563EB" />
+                <Text style={styles.miniWaitingText}>მოლოდინი...</Text>
+              </View>
+            )}
+
+            {engineRef.current && isVideoEnabled && (
+              <View style={styles.miniLocalVideoContainer}>
+                <RtcSurfaceView
+                  canvas={{ uid: 0 }}
+                  style={styles.miniLocalVideo}
+                  zOrderMediaOverlay={true}
+                />
+              </View>
+            )}
+
+            <View style={styles.miniActions}>
+              <TouchableOpacity
+                style={styles.miniActionButton}
+                onPress={handleExpandCall}
+              >
+                <Ionicons name="expand" size={16} color="#FFFFFF" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.miniActionButton, styles.miniEndButton]}
+                onPress={handleEndCall}
+              >
+                <Ionicons name="call" size={16} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.closeButton} onPress={handleEndCall}>
-          <Ionicons name="close" size={24} color="#FFFFFF" />
-        </TouchableOpacity>
+        <View style={styles.placeholder} />
         <View style={styles.headerInfo}>
           <Text style={styles.headerTitle}>ვიდეო კონსულტაცია</Text>
           {isJoined && !channelClosed && (
@@ -704,7 +870,12 @@ export default function VideoCallScreen() {
             </Text>
           )}
         </View>
-        <View style={styles.placeholder} />
+        <TouchableOpacity
+          style={styles.minimizeButton}
+          onPress={handleMinimizeCall}
+        >
+          <Ionicons name="remove" size={20} color="#FFFFFF" />
+        </TouchableOpacity>
       </View>
 
       <View style={styles.videoContainer}>
@@ -734,7 +905,7 @@ export default function VideoCallScreen() {
           <View style={styles.localVideoPlaceholderContainer}>
             <View style={styles.videoPlaceholder}>
               <Ionicons name="person" size={24} color="#9CA3AF" />
-              <Text style={styles.placeholderTextSmall}>{userName}</Text>
+              <Text style={styles.placeholderTextSmall}>{localUserName}</Text>
             </View>
           </View>
         )}
@@ -744,7 +915,7 @@ export default function VideoCallScreen() {
           <View style={styles.waitingContainer}>
             <ActivityIndicator size="large" color="#2563EB" />
             <Text style={styles.waitingText}>
-              მოლოდინი სხვა მონაწილის შემოსვლის...
+              {`${remoteUserName}-ს ველოდებით...`}
             </Text>
           </View>
         )}
@@ -884,6 +1055,75 @@ const styles = StyleSheet.create({
   },
   placeholder: {
     width: 32,
+  },
+  minimizeButton: {
+    width: 32,
+    height: 32,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  miniModeWrapper: {
+    flex: 1,
+    justifyContent: "flex-start",
+    alignItems: "flex-end",
+    paddingTop: 72,
+    paddingRight: 16,
+  },
+  miniVideoCard: {
+    width: 170,
+    height: 250,
+    borderRadius: 14,
+    overflow: "hidden",
+    backgroundColor: "#111827",
+    borderWidth: 1,
+    borderColor: "#374151",
+  },
+  miniRemoteVideo: {
+    width: "100%",
+    height: "100%",
+  },
+  miniWaitingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
+  },
+  miniWaitingText: {
+    fontSize: 11,
+    color: "#E5E7EB",
+    fontFamily: "Poppins-Medium",
+  },
+  miniLocalVideoContainer: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 52,
+    height: 72,
+    borderRadius: 8,
+    overflow: "hidden",
+    backgroundColor: "#1F2937",
+  },
+  miniLocalVideo: {
+    width: "100%",
+    height: "100%",
+  },
+  miniActions: {
+    position: "absolute",
+    right: 8,
+    bottom: 8,
+    flexDirection: "row",
+    gap: 8,
+  },
+  miniActionButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "rgba(31, 41, 55, 0.9)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  miniEndButton: {
+    backgroundColor: "#EF4444",
   },
   videoContainer: {
     flex: 1,

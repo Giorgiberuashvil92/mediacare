@@ -50,6 +50,14 @@ export class RegisterDto {
   @IsOptional()
   profileImage?: string;
 
+  @IsString()
+  @IsOptional()
+  citizenship?: string;
+
+  @IsString()
+  @IsOptional()
+  residency?: string;
+
   // Patient specific fields
   @IsOptional()
   @IsString()

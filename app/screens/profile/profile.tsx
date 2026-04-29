@@ -5,12 +5,11 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
-  Linking,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { apiService } from "../../_services/api";
@@ -20,7 +19,9 @@ import { showToast } from "../../utils/toast";
 export default function ProfileScreen() {
   const { user, logout, isAuthenticated } = useAuth();
   const [profileImage, setProfileImage] = useState<string | null>(null);
-  const [identificationDocumentUrl, setIdentificationDocumentUrl] = useState<string | null>(null);
+  const [identificationDocumentUrl, setIdentificationDocumentUrl] = useState<
+    string | null
+  >(null);
 
   const handleResetOnboarding = async () => {
     await AsyncStorage.removeItem("hasCompletedOnboarding");
@@ -35,15 +36,21 @@ export default function ProfileScreen() {
         const data = response.data;
         const imageUrl = data.profileImage;
         console.log("📸 Profile image URL:", imageUrl);
-        if (imageUrl && imageUrl.trim() !== '') {
+        if (imageUrl && imageUrl.trim() !== "") {
           setProfileImage(imageUrl);
         } else {
           setProfileImage(null);
         }
-        const idDoc = data.identificationDocument ?? (data as any).data?.identificationDocument;
+        const idDoc =
+          data.identificationDocument ??
+          (data as any).data?.identificationDocument;
         if (idDoc && String(idDoc).trim()) {
-          const base = apiService.getBaseURL?.() ?? "https://mediacare-production.up.railway.app";
-          const url = String(idDoc).startsWith("http") ? String(idDoc).trim() : `${base.replace(/\/$/, "")}/${String(idDoc).trim().replace(/^\//, "")}`;
+          const base =
+            apiService.getBaseURL?.() ??
+            "https://mediacare-production.up.railway.app";
+          const url = String(idDoc).startsWith("http")
+            ? String(idDoc).trim()
+            : `${base.replace(/\/$/, "")}/${String(idDoc).trim().replace(/^\//, "")}`;
           setIdentificationDocumentUrl(url);
         } else {
           setIdentificationDocumentUrl(null);
@@ -123,13 +130,13 @@ export default function ProfileScreen() {
             ) : (
               <Image
                 source={{
-                  uri: `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&size=200&background=06B6D4&color=fff`,
+                  uri: `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || "User")}&size=200&background=06B6D4&color=fff`,
                 }}
                 style={styles.profileImage}
                 contentFit="cover"
               />
             )}
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.addPhotoButton}
               onPress={() => router.push("/screens/profile/edit-profile")}
             >
@@ -141,7 +148,7 @@ export default function ProfileScreen() {
             <Text style={styles.userName}>
               {user ? user.name : "მომხმარებელი"}
             </Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.editButton}
               onPress={() => router.push("/screens/profile/edit-profile")}
             >
@@ -165,7 +172,7 @@ export default function ProfileScreen() {
         </View>
 
         {/* პირადობა/პასპორტი */}
-        {identificationDocumentUrl ? (
+        {/* {identificationDocumentUrl ? (
           <View style={styles.profileSection}>
             <TouchableOpacity
               style={styles.menuItem}
@@ -179,7 +186,7 @@ export default function ProfileScreen() {
             </TouchableOpacity>
             <View style={styles.separator} />
           </View>
-        ) : null}
+        ) : null} */}
 
         {/* Menu Options */}
         <View style={styles.menuSection}>
@@ -255,7 +262,12 @@ export default function ProfileScreen() {
 
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => router.push({ pathname: "/screens/profile/help-center", params: { tab: "faq" } } as any)}
+            onPress={() =>
+              router.push({
+                pathname: "/screens/profile/help-center",
+                params: { tab: "faq" },
+              } as any)
+            }
           >
             <View style={styles.menuIconContainer}>
               <Ionicons name="help-circle" size={20} color="#06B6D4" />
@@ -266,7 +278,12 @@ export default function ProfileScreen() {
 
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => router.push({ pathname: "/screens/profile/help-center", params: { tab: "contact" } } as any)}
+            onPress={() =>
+              router.push({
+                pathname: "/screens/profile/help-center",
+                params: { tab: "contact" },
+              } as any)
+            }
           >
             <View style={styles.menuIconContainer}>
               <Ionicons name="call-outline" size={20} color="#10B981" />
