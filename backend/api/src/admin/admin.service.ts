@@ -66,6 +66,14 @@ export class AdminService {
     // Get total count
     const total = await this.userModel.countDocuments(filter);
 
+    const doctorIdsForSchedule =
+      role === UserRole.DOCTOR || !role
+        ? users
+            .filter((u) => u.role === UserRole.DOCTOR)
+            .map((u) => (u._id as mongoose.Types.ObjectId).toString())
+        : [];
+    const doctorsWithSchedule =
+     await this.getDoctor
     // Format users
     const formattedUsers = users.map((user) => {
       // Handle MongoDB ObjectId conversion
@@ -77,6 +85,22 @@ export class AdminService {
           idString = String(user._id);
         }
       }
+      const hasSchedule =
+        user.role === UserRole.DOCTOR && doctorsWithSchedule.has(idString);
+
+      let doctorStatus = user.doctorStatus;
+      if (
+        us
+        er.role === UserRole.DOCTOR &&
+       
+      
+        user.approvalStatus === ApprovalStatus.APPROVED
+      ) {
+        doctorStatus = hasSchedule
+          ? DoctorStatus.ACTIVE
+          : DoctorStatus.AWAITING_SCHEDULE;
+      }
+
       return {
         id: idString,
         role: user.role,
@@ -107,7 +131,8 @@ export class AdminService {
           rating: user.rating || 0,
           reviewCount: user.reviewCount || 0,
           licenseDocument: user.licenseDocument,
-          doctorStatus: user.doctorStatus,
+          doctorStatus,
+          hasSchedule,
           isTopRated: user.isTopRated ?? false,
         }),
         // Identomat verification images (for all users who used Identomat)
@@ -117,6 +142,8 @@ export class AdminService {
         identomatFullData: user.identomatFullData,
       };
     });
+
+    await this.syncApprovedDoctorStatuses(formattedUsers, doctorsWithSchedule);
 
     return {
       success: true,
@@ -130,6 +157,75 @@ export class AdminService {
         },
       },
     };
+  }
+
+  /** Doctors with at least one future day that has time slots */
+  private async getDoctorIdsWithFutureSchedule(
+    doctorIds: string[],
+  ): Promise<Set<string>> {
+    if (doctorIds.length === 0) return new Set();
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const records = await this.availabilityModel
+      .find({
+        doctorId: {
+          $in: doctorIds.map((id) => new mongoose.Types.ObjectId(id)),
+        },
+        date: { $gte: today },
+        isAvailable: true,
+        timeSlots: { $exists: true, $ne: [] },
+        $expr: { $gt: [{ $size: '$timeSlots' }, 0] },
+      })
+      .select('doctorId')
+      .lean();return new Set(
+      records.map((r) => (r.doctorId as mongoose.Types.ObjectId).toString()),
+    );
+  }
+
+     
+     
+     
+     ;
+   
+  private async syncApprovedDoctorStatuses(
+    users: Array<{
+      id: string;
+      role: string;
+      approvalStatus?: string;
+      doctorStatus?: string;
+    }>,
+    doctorsWithSchedule: Set<string>,
+  ) {
+    const updates = users
+      .filter(
+        (u) =>
+          u.role === UserRole.DOCTOR &&
+          u.approvalStatus === ApprovalStatus.APPROVED,
+      )
+      .filter((u) => {
+        const expected = doctorsWithSchedule.has(u.id)
+          ? DoctorStatus.ACTIVE
+          : DoctorStatus.AWAITING_SCHEDULE;
+        return u.doctorStatus !== expected;
+      })
+      .map((u) => ({
+        updateOne: {
+          filter: { _id: new mongoose.Types.ObjectId(u.id) },
+          update: {
+            $set: {
+              doctorStatus: doctorsWithSchedule.has(u.id)
+                ? DoctorStatus.ACTIVE
+                : DoctorStatus.AWAITING_SCHEDULE,
+            },
+          },
+        },
+      }));
+
+    if (updates.length > 0) {
+      await this.userModel.bulkWrite(updates);
+    }
   }
 
   async getStats() {

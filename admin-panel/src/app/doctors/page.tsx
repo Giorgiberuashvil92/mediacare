@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
-import { apiService, User } from '@/lib/api';
-import { useEffect, useState } from 'react';
-import { AddDoctorForm } from './_components/add-doctor-form';
-import { AvailabilityManager } from './_components/availability-manager';
-import { DoctorDetailsModal } from './_components/doctor-details-modal';
-import { EditDoctorForm } from './_components/edit-doctor-form';
+import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
+import { apiService, User } from "@/lib/api";
+import { useEffect, useState } from "react";
+import { AddDoctorForm } from "./_components/add-doctor-form";
+import { AvailabilityManager } from "./_components/availability-manager";
+import { DoctorDetailsModal } from "./_components/doctor-details-modal";
+import { EditDoctorForm } from "./_components/edit-doctor-form";
 
 interface Doctor {
   id: string;
@@ -22,11 +22,11 @@ interface Doctor {
   degrees?: string;
   about?: string;
   dateOfBirth?: string;
-  gender?: 'male' | 'female' | 'other';
+  gender?: "male" | "female" | "other";
   licenseDocument?: string;
   isActive: boolean;
-  approvalStatus: 'pending' | 'approved' | 'rejected';
-  doctorStatus?: 'awaiting_schedule' | 'active';
+  approvalStatus: "pending" | "approved" | "rejected";
+  doctorStatus?: "awaiting_schedule" | "active";
   isTopRated?: boolean;
   minScheduleDate?: string;
 }
@@ -37,17 +37,18 @@ export default function DoctorsPage() {
   const [error, setError] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [statusFilter, setStatusFilter] = useState<
-    'pending' | 'approved' | 'rejected' | 'awaiting_schedule'
-  >('approved');
+    "pending" | "approved" | "rejected" | "awaiting_schedule"
+  >("approved");
   const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
   const [selectedDoctor, setSelectedDoctor] = useState<User | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
   const [showAvailabilityManager, setShowAvailabilityManager] = useState(false);
-  const [selectedDoctorForAvailability, setSelectedDoctorForAvailability] = useState<{
-    id: string;
-    name: string;
-  } | null>(null);
+  const [selectedDoctorForAvailability, setSelectedDoctorForAvailability] =
+    useState<{
+      id: string;
+      name: string;
+    } | null>(null);
 
   useEffect(() => {
     loadDoctors();
@@ -61,50 +62,38 @@ export default function DoctorsPage() {
       const response = await apiService.getUsers({
         page: 1,
         limit: 200,
-        role: 'doctor',
+        role: "doctor",
       });
 
       if (response.success) {
         const allDoctors = response.data?.users ?? [];
 
-        const normalizedDoctors = allDoctors.map((doctor) => {
-          let doctorStatus = doctor.doctorStatus;
-          if (
-            doctor.approvalStatus === 'approved' &&
-            !doctorStatus &&
-            doctor.isActive !== false
-          ) {
-            doctorStatus = 'active';
+        const filteredDoctors = allDoctors.filter((doctor) => {
+          if (statusFilter === "pending") {
+            return doctor.approvalStatus === "pending";
           }
-          return { ...doctor, doctorStatus };
-        });
-
-        const filteredDoctors = normalizedDoctors.filter((doctor) => {
-          if (statusFilter === 'pending') {
-            return doctor.approvalStatus === 'pending';
+          if (statusFilter === "rejected") {
+            return doctor.approvalStatus === "rejected";
           }
-          if (statusFilter === 'rejected') {
-            return doctor.approvalStatus === 'rejected';
-          }
-          if (statusFilter === 'awaiting_schedule') {
+          if (statusFilter === "awaiting_schedule") {
             return (
-              doctor.approvalStatus === 'approved' &&
-              doctor.doctorStatus === 'awaiting_schedule'
+              doctor.approvalStatus === "approved" &&
+              doctor.doctorStatus === "awaiting_schedule"
             );
           }
           return (
-            doctor.approvalStatus === 'approved' &&
-            (doctor.doctorStatus === 'active' || !doctor.doctorStatus)
+            doctor.approvalStatus === "approved" &&
+            doctor.doctorStatus === "active"
           );
         });
 
         const mappedDoctors: Doctor[] = filteredDoctors.map((doctor) => ({
           id: doctor.id,
-          name: doctor.name || '',
+          name: doctor.name || "",
           email: doctor.email,
           phone: doctor.phone,
           idNumber: doctor.idNumber,
-          specialization: doctor.specialization || '',
+          specialization: doctor.specialization || "",
           rating: doctor.rating || 0,
           reviewCount: doctor.reviewCount || 0,
           location: doctor.location,
@@ -115,20 +104,20 @@ export default function DoctorsPage() {
           gender: doctor.gender,
           licenseDocument: doctor.licenseDocument,
           isActive: doctor.isActive !== undefined ? doctor.isActive : false,
-          approvalStatus: (doctor.approvalStatus || 'pending') as
-            | 'pending'
-            | 'approved'
-            | 'rejected',
+          approvalStatus: (doctor.approvalStatus || "pending") as
+            | "pending"
+            | "approved"
+            | "rejected",
           doctorStatus: doctor.doctorStatus,
           isTopRated: doctor.isTopRated ?? false,
-          minScheduleDate: '',
+          minScheduleDate: "",
         }));
 
         setDoctors(mappedDoctors);
       }
     } catch (err: any) {
-      console.error('Error loading doctors:', err);
-      setError(err.message || 'ექიმების ჩატვირთვა ვერ მოხერხდა');
+      console.error("Error loading doctors:", err);
+      setError(err.message || "ექიმების ჩატვირთვა ვერ მოხერხდა");
     } finally {
       setLoading(false);
     }
@@ -154,7 +143,7 @@ export default function DoctorsPage() {
         setShowEditForm(true);
       }
     } catch (err: any) {
-      setError(err.message || 'ექიმის ჩატვირთვა ვერ მოხერხდა');
+      setError(err.message || "ექიმის ჩატვირთვა ვერ მოხერხდა");
     } finally {
       setLoading(false);
     }
@@ -169,10 +158,10 @@ export default function DoctorsPage() {
   const handleApproveDoctor = async (doctorId: string) => {
     try {
       setLoading(true);
-      await apiService.updateDoctorApproval(doctorId, 'approved', true);
+      await apiService.updateDoctorApproval(doctorId, "approved", true);
       loadDoctors();
     } catch (err: any) {
-      setError(err.message || 'ექიმის დამტკიცება ვერ მოხერხდა');
+      setError(err.message || "ექიმის დამტკიცება ვერ მოხერხდა");
     } finally {
       setLoading(false);
     }
@@ -181,16 +170,19 @@ export default function DoctorsPage() {
   const handleRejectDoctor = async (doctorId: string) => {
     try {
       setLoading(true);
-      await apiService.updateDoctorApproval(doctorId, 'rejected', false);
+      await apiService.updateDoctorApproval(doctorId, "rejected", false);
       loadDoctors();
     } catch (err: any) {
-      setError(err.message || 'ექიმის უარყოფა ვერ მოხერხდა');
+      setError(err.message || "ექიმის უარყოფა ვერ მოხერხდა");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleToggleTopRated = async (doctorId: string, currentValue: boolean) => {
+  const handleToggleTopRated = async (
+    doctorId: string,
+    currentValue: boolean,
+  ) => {
     try {
       setLoading(true);
       setError(null);
@@ -201,7 +193,7 @@ export default function DoctorsPage() {
         await loadDoctors();
       }
     } catch (err: any) {
-      setError(err.message || 'ტოპ ექიმის სტატუსის განახლება ვერ მოხერხდა');
+      setError(err.message || "ტოპ ექიმის სტატუსის განახლება ვერ მოხერხდა");
     } finally {
       setLoading(false);
     }
@@ -232,18 +224,21 @@ export default function DoctorsPage() {
 
           <div className="mb-4 flex flex-wrap gap-2">
             {[
-              { label: 'განხილვის მოლოდინში', value: 'pending' as const },
-              { label: 'გრაფიკის არჩევაში', value: 'awaiting_schedule' as const },
-              { label: 'დამტკიცებული (აქტიური)', value: 'approved' as const },
-              { label: 'უარყოფილი', value: 'rejected' as const },
+              { label: "განხილვის მოლოდინში", value: "pending" as const },
+              {
+                label: "გრაფიკის არჩევაში",
+                value: "awaiting_schedule" as const,
+              },
+              { label: "დამტკიცებული (აქტიური)", value: "approved" as const },
+              { label: "უარყოფილი", value: "rejected" as const },
             ].map((filter) => (
               <button
                 key={filter.value}
                 onClick={() => setStatusFilter(filter.value)}
                 className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
                   statusFilter === filter.value
-                    ? 'bg-primary text-white'
-                    : 'bg-light/60 text-dark dark:bg-dark-3 dark:text-dark-6'
+                    ? "bg-primary text-white"
+                    : "bg-light/60 text-dark dark:bg-dark-3 dark:text-dark-6"
                 }`}
               >
                 {filter.label}
@@ -270,186 +265,203 @@ export default function DoctorsPage() {
                   </div>
                 ) : (
                   doctors.map((doctor) => (
-                <div
-                  key={doctor.id}
-                  className="rounded-lg border border-stroke bg-white p-6 shadow-1 dark:border-dark-3 dark:bg-gray-dark"
-                >
-                  <div className="mb-4 flex items-start justify-between">
-                    <div>
-                      <h3 className="text-lg font-semibold text-dark dark:text-white">
-                        {doctor.name}
-                      </h3>
-                      <p className="text-sm text-dark-4 dark:text-dark-6">
-                        {doctor.specialization}
-                      </p>
-                    </div>
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                        doctor.isActive
-                          ? 'bg-green-500 text-white dark:bg-green-600'
-                          : 'bg-gray-400 text-white dark:bg-gray-600'
-                      }`}
+                    <div
+                      key={doctor.id}
+                      className="rounded-lg border border-stroke bg-white p-6 shadow-1 dark:border-dark-3 dark:bg-gray-dark"
                     >
-                      {doctor.isActive ? 'აქტიური' : 'არააქტიური'}
-                    </span>
-                  </div>
-
-                  <div className="space-y-2">
-                    {doctor.email && (
-                      <div className="flex items-center text-sm text-dark-4 dark:text-dark-6">
-                        <span className="mr-2">📧</span>
-                        {doctor.email}
-                      </div>
-                    )}
-                    {doctor.location && (
-                      <div className="flex items-center text-sm text-dark-4 dark:text-dark-6">
-                        <span className="mr-2">📍</span>
-                        {doctor.location}
-                      </div>
-                    )}
-                    {doctor.experience && (
-                      <div className="flex items-center text-sm text-dark-4 dark:text-dark-6">
-                        <span className="mr-2">💼</span>
-                        გამოცდილება: {doctor.experience}
-                      </div>
-                    )}
-                    {doctor.degrees && (
-                      <div className="flex items-center text-sm text-dark-4 dark:text-dark-6">
-                        <span className="mr-2">🎓</span>
-                        {doctor.degrees}
-                      </div>
-                    )}
-                    {doctor.phone && (
-                      <div className="flex items-center text-sm text-dark-4 dark:text-dark-6">
-                        <span className="mr-2">📞</span>
-                        {doctor.phone}
-                      </div>
-                    )}
-                    {doctor.idNumber && (
-                      <div className="flex items-center text-sm text-dark-4 dark:text-dark-6">
-                        <span className="mr-2">🆔</span>
-                        {doctor.idNumber}
-                      </div>
-                    )}
-                    <div className="flex items-center text-sm text-dark-4 dark:text-dark-6">
-                      <span className="mr-2">⭐</span>
-                      {doctor.rating.toFixed(1)} ({doctor.reviewCount} შეფასება)
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex items-center text-sm">
-                        <span className="mr-2 text-dark-4 dark:text-dark-6">📄</span>
-                        <span className="text-dark-4 dark:text-dark-6">დადასტურება:</span>
+                      <div className="mb-4 flex items-start justify-between">
+                        <div>
+                          <h3 className="text-lg font-semibold text-dark dark:text-white">
+                            {doctor.name}
+                          </h3>
+                          <p className="text-sm text-dark-4 dark:text-dark-6">
+                            {doctor.specialization}
+                          </p>
+                        </div>
                         <span
-                          className={`ml-2 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                            doctor.approvalStatus === 'approved'
-                              ? 'bg-green-500 text-white dark:bg-green-600'
-                              : doctor.approvalStatus === 'rejected'
-                              ? 'bg-red-500 text-white dark:bg-red-600'
-                              : 'bg-yellow-500 text-white dark:bg-yellow-600'
+                          className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                            doctor.isActive
+                              ? "bg-green-500 text-white dark:bg-green-600"
+                              : "bg-gray-400 text-white dark:bg-gray-600"
                           }`}
                         >
-                          {doctor.approvalStatus === 'pending'
-                            ? 'განხილვის მოლოდინში'
-                            : doctor.approvalStatus === 'approved'
-                            ? 'დამტკიცებული'
-                            : 'უარყოფილი'}
+                          {doctor.isActive ? "აქტიური" : "არააქტიური"}
                         </span>
                       </div>
-                      {doctor.doctorStatus && doctor.approvalStatus === 'approved' && (
-                        <div className="flex items-center text-sm">
-                          <span className="mr-2 text-dark-4 dark:text-dark-6">🗓️</span>
-                          <span className="text-dark-4 dark:text-dark-6">გრაფიკი:</span>
-                          <span
-                            className={`ml-2 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                              doctor.doctorStatus === 'active'
-                                ? 'bg-blue-500 text-white dark:bg-blue-600'
-                                : 'bg-orange-500 text-white dark:bg-orange-600'
-                            }`}
-                          >
-                            {doctor.doctorStatus === 'active'
-                              ? '✓ არჩეული (პაციენტებზე ჩანს)'
-                              : '⏳ არჩევაში (პაციენტებზე არ ჩანს)'}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
 
-                  <div className="mt-4 space-y-2">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleViewDoctor(doctor.id)}
-                        className="flex-1 rounded-lg border border-primary px-4 py-2 text-sm font-medium text-primary hover:bg-primary/10"
-                      >
-                        დეტალების ნახვა
-                      </button>
-                      <button
-                        onClick={() => handleEditDoctor(doctor.id)}
-                        className="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-opacity-90"
-                      >
-                        რედაქტირება
-                      </button>
-                    </div>
-                    {doctor.approvalStatus === 'pending' && (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleApproveDoctor(doctor.id)}
-                          disabled={loading}
-                          className="flex-1 rounded-lg bg-success px-4 py-2 text-sm font-medium text-white hover:bg-opacity-90 disabled:opacity-50"
-                        >
-                          დამტკიცება
-                        </button>
-                        <button
-                          onClick={() => handleRejectDoctor(doctor.id)}
-                          disabled={loading}
-                          className="flex-1 rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50"
-                        >
-                          უარყოფა
-                        </button>
+                      <div className="space-y-2">
+                        {doctor.email && (
+                          <div className="flex items-center text-sm text-dark-4 dark:text-dark-6">
+                            <span className="mr-2">📧</span>
+                            {doctor.email}
+                          </div>
+                        )}
+                        {doctor.location && (
+                          <div className="flex items-center text-sm text-dark-4 dark:text-dark-6">
+                            <span className="mr-2">📍</span>
+                            {doctor.location}
+                          </div>
+                        )}
+                        {doctor.experience && (
+                          <div className="flex items-center text-sm text-dark-4 dark:text-dark-6">
+                            <span className="mr-2">💼</span>
+                            გამოცდილება: {doctor.experience}
+                          </div>
+                        )}
+                        {doctor.degrees && (
+                          <div className="flex items-center text-sm text-dark-4 dark:text-dark-6">
+                            <span className="mr-2">🎓</span>
+                            {doctor.degrees}
+                          </div>
+                        )}
+                        {doctor.phone && (
+                          <div className="flex items-center text-sm text-dark-4 dark:text-dark-6">
+                            <span className="mr-2">📞</span>
+                            {doctor.phone}
+                          </div>
+                        )}
+                        {doctor.idNumber && (
+                          <div className="flex items-center text-sm text-dark-4 dark:text-dark-6">
+                            <span className="mr-2">🆔</span>
+                            {doctor.idNumber}
+                          </div>
+                        )}
+                        <div className="flex items-center text-sm text-dark-4 dark:text-dark-6">
+                          <span className="mr-2">⭐</span>
+                          {doctor.rating.toFixed(1)} ({doctor.reviewCount}{" "}
+                          შეფასება)
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex items-center text-sm">
+                            <span className="mr-2 text-dark-4 dark:text-dark-6">
+                              📄
+                            </span>
+                            <span className="text-dark-4 dark:text-dark-6">
+                              დადასტურება:
+                            </span>
+                            <span
+                              className={`ml-2 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                doctor.approvalStatus === "approved"
+                                  ? "bg-green-500 text-white dark:bg-green-600"
+                                  : doctor.approvalStatus === "rejected"
+                                    ? "bg-red-500 text-white dark:bg-red-600"
+                                    : "bg-yellow-500 text-white dark:bg-yellow-600"
+                              }`}
+                            >
+                              {doctor.approvalStatus === "pending"
+                                ? "განხილვის მოლოდინში"
+                                : doctor.approvalStatus === "approved"
+                                  ? "დამტკიცებული"
+                                  : "უარყოფილი"}
+                            </span>
+                          </div>
+                          {doctor.doctorStatus &&
+                            doctor.approvalStatus === "approved" && (
+                              <div className="flex items-center text-sm">
+                                <span className="mr-2 text-dark-4 dark:text-dark-6">
+                                  🗓️
+                                </span>
+                                <span className="text-dark-4 dark:text-dark-6">
+                                  გრაფიკი:
+                                </span>
+                                <span
+                                  className={`ml-2 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                    doctor.doctorStatus === "active"
+                                      ? "bg-blue-500 text-white dark:bg-blue-600"
+                                      : "bg-orange-500 text-white dark:bg-orange-600"
+                                  }`}
+                                >
+                                  {doctor.doctorStatus === "active"
+                                    ? "✓ არჩეული (პაციენტებზე ჩანს)"
+                                    : "⏳ არჩევაში (პაციენტებზე არ ჩანს)"}
+                                </span>
+                              </div>
+                            )}
+                        </div>
                       </div>
-                    )}
-                    {doctor.approvalStatus === 'rejected' && (
-                      <button
-                        onClick={() => handleApproveDoctor(doctor.id)}
-                        disabled={loading}
-                        className="w-full rounded-lg bg-success px-4 py-2 text-sm font-medium text-white hover:bg-opacity-90 disabled:opacity-50"
-                      >
-                        დამტკიცება
-                      </button>
-                    )}
-                    {doctor.approvalStatus === 'approved' && (
-                      <>
-                        <button
-                          onClick={() => handleToggleTopRated(doctor.id, doctor.isTopRated || false)}
-                          disabled={loading}
-                          className={`w-full rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 ${
-                            doctor.isTopRated
-                              ? 'bg-orange-500 hover:bg-orange-600'
-                              : 'bg-blue-500 hover:bg-blue-600'
-                          }`}
-                        >
-                          {doctor.isTopRated ? '⭐ ტოპ ექიმიდან ამოღება' : '⭐ ტოპ ექიმად დამატება'}
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSelectedDoctorForAvailability({
-                              id: doctor.id,
-                              name: doctor.name,
-                            });
-                            setShowAvailabilityManager(true);
-                          }}
-                          className="w-full rounded-lg bg-green-500 px-4 py-2 text-sm font-medium text-white hover:bg-green-600"
-                        >
-                          📅 ხელმისაწვდომობის მართვა
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
+
+                      <div className="mt-4 space-y-2">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleViewDoctor(doctor.id)}
+                            className="flex-1 rounded-lg border border-primary px-4 py-2 text-sm font-medium text-primary hover:bg-primary/10"
+                          >
+                            დეტალების ნახვა
+                          </button>
+                          <button
+                            onClick={() => handleEditDoctor(doctor.id)}
+                            className="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-opacity-90"
+                          >
+                            რედაქტირება
+                          </button>
+                        </div>
+                        {doctor.approvalStatus === "pending" && (
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleApproveDoctor(doctor.id)}
+                              disabled={loading}
+                              className="flex-1 rounded-lg bg-success px-4 py-2 text-sm font-medium text-white hover:bg-opacity-90 disabled:opacity-50"
+                            >
+                              დამტკიცება
+                            </button>
+                            <button
+                              onClick={() => handleRejectDoctor(doctor.id)}
+                              disabled={loading}
+                              className="flex-1 rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50"
+                            >
+                              უარყოფა
+                            </button>
+                          </div>
+                        )}
+                        {doctor.approvalStatus === "rejected" && (
+                          <button
+                            onClick={() => handleApproveDoctor(doctor.id)}
+                            disabled={loading}
+                            className="w-full rounded-lg bg-success px-4 py-2 text-sm font-medium text-white hover:bg-opacity-90 disabled:opacity-50"
+                          >
+                            დამტკიცება
+                          </button>
+                        )}
+                        {doctor.approvalStatus === "approved" && (
+                          <>
+                            <button
+                              onClick={() =>
+                                handleToggleTopRated(
+                                  doctor.id,
+                                  doctor.isTopRated || false,
+                                )
+                              }
+                              disabled={loading}
+                              className={`w-full rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 ${
+                                doctor.isTopRated
+                                  ? "bg-orange-500 hover:bg-orange-600"
+                                  : "bg-blue-500 hover:bg-blue-600"
+                              }`}
+                            >
+                              {doctor.isTopRated
+                                ? "⭐ ტოპ ექიმიდან ამოღება"
+                                : "⭐ ტოპ ექიმად დამატება"}
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedDoctorForAvailability({
+                                  id: doctor.id,
+                                  name: doctor.name,
+                                });
+                                setShowAvailabilityManager(true);
+                              }}
+                              className="w-full rounded-lg bg-green-500 px-4 py-2 text-sm font-medium text-white hover:bg-green-600"
+                            >
+                              📅 ხელმისაწვდომობის მართვა
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
                   ))
                 )}
               </div>
-          </div>
+            </div>
           </div>
         </>
       )}
@@ -495,4 +507,3 @@ export default function DoctorsPage() {
     </>
   );
 }
-

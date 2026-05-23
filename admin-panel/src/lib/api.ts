@@ -48,6 +48,7 @@ export interface User {
   reviewCount?: number;
   isTopRated?: boolean;
   doctorStatus?: "awaiting_schedule" | "active";
+  hasSchedule?: boolean;
   // Minimum working days doctor must have scheduled in the next 2 weeks (set by admin)
   minWorkingDaysRequired?: number;
   // Identomat verification images (for admin panel)
