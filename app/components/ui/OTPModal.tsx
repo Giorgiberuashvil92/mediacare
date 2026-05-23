@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 import { apiService } from "../../_services/api";
+import { useLanguage } from "../../contexts/LanguageContext";
 import { showToast } from "../../utils/toast";
 
 interface OTPModalProps {
@@ -25,6 +26,10 @@ interface OTPModalProps {
   showSkipButton?: boolean; // Show skip button (temporary for development)
   isLoginOTP?: boolean; // If true, use verifyLoginOTP instead of verifyPhoneCode
   loginEmail?: string; // Email for login OTP verification
+  autoSendOnOpen?: boolean; // Auto send OTP when modal opens
+  sendCodeRequest?: (
+    phone: string,
+  ) => Promise<{ success: boolean; message?: string; [key: string]: any }>;
 }
 
 export default function OTPModal({
@@ -33,12 +38,18 @@ export default function OTPModal({
   onClose,
   onVerified,
   onSkip,
-  title = "ტელეფონის ვერიფიკაცია",
-  subtitle = "გთხოვთ შეიყვანოთ 6-ნიშნა კოდი, რომელიც გამოგიგზავნეთ SMS-ით",
+  title,
+  subtitle,
   showSkipButton = false, // Default to false, set to true for development
   isLoginOTP = false, // Default to false for phone verification
   loginEmail, // Email for login OTP verification
+  autoSendOnOpen = true,
+  sendCodeRequest,
 }: OTPModalProps) {
+  const { t } = useLanguage();
+  const modalTitle = title ?? t("otp.title");
+  const modalSubtitle = subtitle ?? t("otp.subtitle");
+
   const [verificationCode, setVerificationCode] = useState("");
   const [sendingCode, setSendingCode] = useState(false);
   const [verifyingCode, setVerifyingCode] = useState(false);
@@ -50,14 +61,14 @@ export default function OTPModal({
 
   const handleSendCode = useCallback(async () => {
     if (!phone.trim()) {
-      showToast.error("გთხოვთ შეიყვანოთ ტელეფონის ნომერი", "შეცდომა");
+      showToast.error(t("otp.error.phoneRequired"), t("otp.error.default"));
       return;
     }
 
     // Validate phone number format (should be 9 digits starting with 5 for Georgian numbers)
     const cleanPhone = phone.trim().replace(/\s+/g, '').replace(/^\+995/, '').replace(/^0/, '');
     if (cleanPhone.length !== 9 || !cleanPhone.startsWith('5')) {
-      const errorMsg = "გთხოვთ შეიყვანოთ სწორი ტელეფონის ნომერი (9 ციფრი, 5-ით დაწყებული)";
+      const errorMsg = t("otp.error.phoneInvalid");
       console.error("❌ [OTPModal] Invalid phone number format:", {
         input: phone.trim(),
         cleaned: cleanPhone,
@@ -65,7 +76,7 @@ export default function OTPModal({
         startsWith5: cleanPhone.startsWith('5'),
       });
       setVerificationError(errorMsg);
-      showToast.error(errorMsg, "შეცდომა");
+      showToast.error(errorMsg, t("otp.error.default"));
       return;
     }
 
@@ -77,7 +88,9 @@ export default function OTPModal({
         cleaned: cleanPhone,
       });
       
-      const response = await apiService.sendPhoneVerificationCode(phone.trim());
+      const response = sendCodeRequest
+        ? await sendCodeRequest(phone.trim())
+        : await apiService.sendPhoneVerificationCode(phone.trim());
       
       console.log("📥 [OTPModal] OTP code response received:", {
         success: response.success,
@@ -97,41 +110,41 @@ export default function OTPModal({
           const devModeMessage = `DEV MODE: კოდი არ გაიგზავნა SMS-ით. კოდი: ${(response as any).code}`;
           console.warn("⚠️ [OTPModal] DEV MODE - SMS not sent:", devModeMessage);
           showToast.success(
-            `ვერიფიკაციის კოდი: ${(response as any).code} (DEV MODE)`,
-            "წარმატება"
+            `${t("otp.success.codeSent")}: ${(response as any).code} (DEV MODE)`,
+            t("otp.success.title"),
           );
         } else {
-          showToast.success("ვერიფიკაციის კოდი გაიგზავნა", "წარმატება");
+          showToast.success(t("otp.success.codeSent"), t("otp.success.title"));
         }
       } else {
-        throw new Error(response.message || "ვერ მოხერხდა კოდის გაგზავნა");
+        throw new Error(response.message || t("otp.error.sendCode"));
       }
     } catch (error) {
       const errorMessage =
         error instanceof Error
           ? error.message
-          : "ვერ მოხერხდა კოდის გაგზავნა";
+          : t("otp.error.sendCode");
       console.error("❌ [OTPModal] Failed to send OTP code:", {
         error: errorMessage,
         phone: phone.trim(),
         errorDetails: error,
       });
       setVerificationError(errorMessage);
-      showToast.error(errorMessage, "შეცდომა");
+      showToast.error(errorMessage, t("otp.error.default"));
     } finally {
       setSendingCode(false);
     }
-  }, [phone]);
+  }, [phone, sendCodeRequest, t]);
 
   useEffect(() => {
-    if (visible && phone.trim() && !codeSent && !sendingCode) {
+    if (autoSendOnOpen && visible && phone.trim() && !codeSent && !sendingCode) {
       // Auto-send code when modal opens (only once)
       handleSendCode();
     } else if (visible && !phone.trim()) {
       // If phone is not provided, close modal
       onClose();
     }
-  }, [visible, phone, handleSendCode, onClose, codeSent, sendingCode]);
+  }, [autoSendOnOpen, visible, phone, handleSendCode, onClose, codeSent, sendingCode]);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | null = null;
@@ -158,7 +171,7 @@ export default function OTPModal({
 
   const handleVerifyCode = useCallback(async () => {
     if (!verificationCode.trim() || verificationCode.length !== 6) {
-      showToast.error("გთხოვთ შეიყვანოთ 6-ნიშნა კოდი", "შეცდომა");
+      showToast.error(t("otp.error.codeRequired"), t("otp.error.default"));
       return;
     }
 
@@ -201,13 +214,13 @@ export default function OTPModal({
         if (response.success) {
           console.log("🎉 [OTPModal] Login OTP verification SUCCESSFUL - codes matched!");
           setHasVerified(true); // Mark as verified to prevent duplicate calls
-          showToast.success("ტელეფონი წარმატებით დადასტდა", "წარმატება");
+          showToast.success(t("otp.success.verified"), t("otp.success.title"));
           // Pass both code and authResponse to avoid duplicate verification in login.tsx
           onVerified(verificationCode.trim(), response);
           handleClose();
         } else {
           console.log("❌ [OTPModal] Login OTP verification FAILED - codes did not match");
-          throw new Error(response.message || "არასწორი ვერიფიკაციის კოდი");
+          throw new Error(response.message || t("otp.error.invalidCode"));
         }
       } else {
         // For phone verification, use verifyPhoneCode
@@ -227,26 +240,36 @@ export default function OTPModal({
       if (response.success && response.verified) {
           console.log("🎉 [OTPModal] Phone OTP verification SUCCESSFUL - codes matched!");
           setHasVerified(true); // Mark as verified to prevent duplicate calls
-        showToast.success("ტელეფონი წარმატებით დადასტდა", "წარმატება");
+        showToast.success(t("otp.success.verified"), t("otp.success.title"));
           // Pass both code and verification response for registration flow
           onVerified(verificationCode.trim(), response);
         handleClose();
       } else {
           console.log("❌ [OTPModal] Phone OTP verification FAILED - codes did not match");
-        throw new Error(response.message || "არასწორი ვერიფიკაციის კოდი");
+        throw new Error(response.message || t("otp.error.invalidCode"));
         }
       }
     } catch (error) {
       const errorMessage =
         error instanceof Error
           ? error.message
-          : "ვერიფიკაცია ვერ მოხერხდა";
+          : t("otp.error.verifyFailed");
       setVerificationError(errorMessage);
-      showToast.error(errorMessage, "შეცდომა");
+      showToast.error(errorMessage, t("otp.error.default"));
     } finally {
       setVerifyingCode(false);
     }
-  }, [verificationCode, verifyingCode, hasVerified, phone, onVerified, handleClose, isLoginOTP, loginEmail]);
+  }, [
+    verificationCode,
+    verifyingCode,
+    hasVerified,
+    phone,
+    onVerified,
+    handleClose,
+    isLoginOTP,
+    loginEmail,
+    t,
+  ]);
 
   return (
     <Modal
@@ -269,7 +292,7 @@ export default function OTPModal({
               >
                 <Ionicons name="close" size={24} color="#6B7280" />
               </TouchableOpacity>
-              <Text style={styles.title}>{title}</Text>
+              <Text style={styles.title}>{modalTitle}</Text>
               <View style={styles.placeholder} />
             </View>
 
@@ -280,7 +303,7 @@ export default function OTPModal({
             </View>
 
             {/* Subtitle */}
-            <Text style={styles.subtitle}>{subtitle}</Text>
+            <Text style={styles.subtitle}>{modalSubtitle}</Text>
 
             {/* OTP Input */}
             <View style={styles.inputContainer}>
@@ -322,13 +345,13 @@ export default function OTPModal({
               {verifyingCode ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
-                <Text style={styles.verifyButtonText}>დადასტურება</Text>
+                <Text style={styles.verifyButtonText}>{t("otp.verify")}</Text>
               )}
             </TouchableOpacity>
 
             {/* Resend Code */}
             <View style={styles.resendContainer}>
-              <Text style={styles.resendText}>კოდი არ მოგივიდათ?</Text>
+              <Text style={styles.resendText}>{t("otp.notReceived")}</Text>
               <TouchableOpacity
                 onPress={handleSendCode}
                 disabled={sendingCode || countdown > 0}
@@ -345,8 +368,11 @@ export default function OTPModal({
                     ]}
                   >
                     {countdown > 0
-                      ? `ხელახლა გაგზავნა (${countdown}წმ)`
-                      : "კოდის ხელახლა გაგზავნა"}
+                      ? t("otp.resendCountdown").replace(
+                          "{{seconds}}",
+                          String(countdown),
+                        )
+                      : t("otp.resendCode")}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -362,9 +388,7 @@ export default function OTPModal({
                   }
                 }}
               >
-                <Text style={styles.skipButtonText}>
-                  გამოტოვება (დროებით)
-                </Text>
+                <Text style={styles.skipButtonText}>{t("otp.skip")}</Text>
               </TouchableOpacity>
             )}
           </View>

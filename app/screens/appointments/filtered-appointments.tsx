@@ -1,5 +1,6 @@
 import { apiService } from "@/app/_services/api";
 import { useAuth } from "@/app/contexts/AuthContext";
+import { useLanguage } from "@/app/contexts/LanguageContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -15,6 +16,10 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  formatAppointmentDate,
+  formatAppointmentTime,
+} from "@/app/utils/appointmentDateTime";
 
 interface PatientAppointment {
   id: string;
@@ -106,6 +111,7 @@ export default function FilteredAppointmentsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ filterType: string }>();
   const { isAuthenticated, user } = useAuth();
+  const { t } = useLanguage();
   const [appointments, setAppointments] = useState<PatientAppointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -115,7 +121,9 @@ export default function FilteredAppointmentsScreen() {
 
   const filterType = params.filterType === "video" ? "video" : "home-visit";
   const title =
-    filterType === "video" ? "ვიდეო კონსულტაციები" : "ბინაზე გამოძახებები";
+    filterType === "video"
+      ? t("appointments.filtered.video.title")
+      : t("appointments.filtered.homeVisit.title");
 
   const loadAppointments = useCallback(async () => {
     try {
@@ -154,12 +162,12 @@ export default function FilteredAppointmentsScreen() {
       }
     } catch (err: any) {
       console.error("Error loading appointments:", err);
-      setError(err.message || "ჯავშნების ჩატვირთვა ვერ მოხერხდა");
+      setError(err.message || t("appointments.filtered.loadError"));
       setAppointments([]);
     } finally {
       setLoading(false);
     }
-  }, [filterType]);
+  }, [filterType, t]);
 
   useEffect(() => {
     if (isAuthenticated && user?.id) {
@@ -177,16 +185,6 @@ export default function FilteredAppointmentsScreen() {
 
     return () => clearInterval(interval);
   }, []);
-
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return "";
-    const date = new Date(dateStr);
-    return date.toLocaleDateString("ka-GE", {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-    });
-  };
 
   const isJoinButtonActive = (appointment: PatientAppointment) => {
     if (
@@ -319,33 +317,32 @@ export default function FilteredAppointmentsScreen() {
       <View style={styles.cardBody}>
         <View style={styles.dateTimeRow}>
           <View style={styles.dateTimeItem}>
-            <Ionicons
-              name="calendar-outline"
-              size={16}
-              color="#6B7280"
-              style={styles.icon}
-            />
-            <Text style={styles.dateTimeText}>{formatDate(item.date)}</Text>
+            <Ionicons name="calendar-outline" size={16} color="#6B7280" />
+            <Text style={styles.dateTimeText}>
+              {formatAppointmentDate(item.date)}
+            </Text>
           </View>
           <View style={styles.dateTimeItem}>
-            <Ionicons
-              name="time-outline"
-              size={16}
-              color="#6B7280"
-              style={styles.icon}
-            />
-            <Text style={styles.dateTimeText}>{item.time}</Text>
+            <Ionicons name="time-outline" size={16} color="#6B7280" />
+            <Text style={styles.dateTimeText}>
+              {formatAppointmentTime(item.time)}
+            </Text>
           </View>
         </View>
 
-        {item.type === "home-visit" && item.visitAddress && (
-          <View style={styles.addressRow}>
-            <Ionicons name="location-outline" size={16} color="#6B7280" />
-            <Text style={styles.addressText} numberOfLines={1}>
+        {item.type === "home-visit" && item.visitAddress ? (
+          <View style={styles.addressBlock}>
+            <View style={styles.addressLabelRow}>
+              <Ionicons name="location-outline" size={16} color="#6B7280" />
+              <Text style={styles.addressLabel}>
+                {t("appointments.address.label")}
+              </Text>
+            </View>
+            <Text style={styles.addressText} numberOfLines={2}>
               {item.visitAddress}
             </Text>
           </View>
-        )}
+        ) : null}
       </View>
 
       {item.type === "video" &&
@@ -356,7 +353,9 @@ export default function FilteredAppointmentsScreen() {
         (isConsultationTimePassed(item) ? (
           <View style={styles.timePassedContainer}>
             <Ionicons name="time-outline" size={20} color="#9CA3AF" />
-            <Text style={styles.timePassedText}>დრო უკვე გავიდა</Text>
+            <Text style={styles.timePassedText}>
+              {t("appointments.consultation.expired")}
+            </Text>
           </View>
         ) : (
           <TouchableOpacity
@@ -410,7 +409,7 @@ export default function FilteredAppointmentsScreen() {
                 !isJoinButtonActive(item) && { color: "#9CA3AF" },
               ]}
             >
-              შესვლა კონსულტაციაზე
+              {t("appointments.filtered.joinConsultation")}
             </Text>
             {isJoinButtonActive(item) && (
               <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
@@ -514,7 +513,9 @@ export default function FilteredAppointmentsScreen() {
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#06B6D4" />
-          <Text style={styles.loadingText}>ჯავშნების ჩატვირთვა...</Text>
+          <Text style={styles.loadingText}>
+            {t("appointments.filtered.loading")}
+          </Text>
         </View>
       ) : error ? (
         <View style={styles.errorContainer}>
@@ -524,7 +525,9 @@ export default function FilteredAppointmentsScreen() {
             style={styles.retryButton}
             onPress={loadAppointments}
           >
-            <Text style={styles.retryButtonText}>ხელახლა ცდა</Text>
+            <Text style={styles.retryButtonText}>
+              {t("appointments.filtered.retry")}
+            </Text>
           </TouchableOpacity>
         </View>
       ) : appointments.length === 0 ? (
@@ -536,10 +539,12 @@ export default function FilteredAppointmentsScreen() {
           />
           <Text style={styles.emptyTitle}>
             {filterType === "video"
-              ? "ვიდეო კონსულტაციები არ მოიძებნა"
-              : "ბინაზე გამოძახებები არ მოიძებნა"}
+              ? t("appointments.filtered.video.emptyTitle")
+              : t("appointments.filtered.homeVisit.emptyTitle")}
           </Text>
-          <Text style={styles.emptyText}>ამ ტიპის ჯავშნები ჯერ არ გაქვთ</Text>
+          <Text style={styles.emptyText}>
+            {t("appointments.filtered.emptySubtitle")}
+          </Text>
         </View>
       ) : (
         <FlatList
@@ -675,31 +680,38 @@ const styles = StyleSheet.create({
   dateTimeRow: {
     flexDirection: "row",
     gap: 16,
+    alignItems: "center",
   },
   dateTimeItem: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
   },
-  icon: {
-    marginRight: 0,
-  },
   dateTimeText: {
     fontSize: 14,
     fontFamily: "Poppins-Medium",
     color: "#1F2937",
+    flexShrink: 1,
   },
-  addressRow: {
+  addressBlock: {
+    gap: 4,
+    paddingTop: 4,
+  },
+  addressLabelRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    paddingTop: 4,
+  },
+  addressLabel: {
+    fontSize: 13,
+    fontFamily: "Poppins-SemiBold",
+    color: "#374151",
   },
   addressText: {
     fontSize: 13,
     fontFamily: "Poppins-Regular",
     color: "#6B7280",
-    flex: 1,
+    paddingLeft: 22,
   },
   feeRow: {
     flexDirection: "row",

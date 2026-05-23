@@ -9,6 +9,8 @@ export default function SpecializationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState('');
+  const [nameEn, setNameEn] = useState('');
+  const [nameRu, setNameRu] = useState('');
   const [description, setDescription] = useState('');
   const [symptoms, setSymptoms] = useState<string[]>([]);
   const [currentSymptom, setCurrentSymptom] = useState('');
@@ -58,17 +60,23 @@ export default function SpecializationsPage() {
       if (editingId) {
         await apiService.updateSpecialization(editingId, {
           name: name.trim(),
+          nameEn: nameEn.trim() || undefined,
+          nameRu: nameRu.trim() || undefined,
           description: description.trim() || undefined,
           symptoms: symptoms.length > 0 ? symptoms : undefined,
         });
       } else {
         await apiService.createSpecialization({
           name: name.trim(),
+          nameEn: nameEn.trim() || undefined,
+          nameRu: nameRu.trim() || undefined,
           description: description.trim() || undefined,
           symptoms: symptoms.length > 0 ? symptoms : undefined,
         });
       }
       setName('');
+      setNameEn('');
+      setNameRu('');
       setDescription('');
       setSymptoms([]);
       setCurrentSymptom('');
@@ -108,6 +116,8 @@ export default function SpecializationsPage() {
   const handleEdit = (spec: Specialization) => {
     setEditingId(spec._id);
     setName(spec.name);
+    setNameEn(spec.nameEn || '');
+    setNameRu(spec.nameRu || '');
     setDescription(spec.description || '');
     setSymptoms(spec.symptoms || []);
     setCurrentSymptom('');
@@ -116,6 +126,8 @@ export default function SpecializationsPage() {
   const handleCancelEdit = () => {
     setEditingId(null);
     setName('');
+    setNameEn('');
+    setNameRu('');
     setDescription('');
     setSymptoms([]);
     setCurrentSymptom('');
@@ -156,7 +168,7 @@ export default function SpecializationsPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="mb-2 block text-sm font-medium text-dark dark:text-dark-6">
-                დასახელება
+                დასახელება (ქართული) *
               </label>
               <input
                 type="text"
@@ -165,6 +177,32 @@ export default function SpecializationsPage() {
                 placeholder="მაგ. კარდიოლოგია"
                 className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 text-sm text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white"
                 required
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-dark dark:text-dark-6">
+                Name (English)
+              </label>
+              <input
+                type="text"
+                value={nameEn}
+                onChange={(e) => setNameEn(e.target.value)}
+                placeholder="e.g. Cardiology"
+                className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 text-sm text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-dark dark:text-dark-6">
+                Название (русский)
+              </label>
+              <input
+                type="text"
+                value={nameRu}
+                onChange={(e) => setNameRu(e.target.value)}
+                placeholder="напр. Кардиология"
+                className="w-full rounded-lg border border-stroke bg-transparent px-4 py-2.5 text-sm text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white"
               />
             </div>
 
@@ -273,6 +311,13 @@ export default function SpecializationsPage() {
                     <p className="text-base font-medium text-dark dark:text-white">
                       {spec.name}
                     </p>
+                    {(spec.nameEn || spec.nameRu) && (
+                      <p className="text-sm text-dark-4 dark:text-dark-6">
+                        {spec.nameEn && <span>EN: {spec.nameEn}</span>}
+                        {spec.nameEn && spec.nameRu && ' · '}
+                        {spec.nameRu && <span>RU: {spec.nameRu}</span>}
+                      </p>
+                    )}
                     {spec.description && (
                       <p className="text-sm text-dark-4 dark:text-dark-6">
                         {spec.description}

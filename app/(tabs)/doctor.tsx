@@ -1,9 +1,20 @@
 import { apiService } from "@/app/_services/api";
 import { useFavorites } from "@/app/contexts/FavoritesContext";
+import { useLanguage } from "@/app/contexts/LanguageContext";
+import {
+  getSpecializationDisplayName,
+  getSpecializationLabelByName,
+} from "@/app/utils/specializationLabel";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -23,18 +34,25 @@ const formatGel = (n: unknown): string | null => {
   return `${num} ₾`;
 };
 
-const buildFeeSummary = (doctor: any): string | null => {
+const buildFeeSummary = (
+  doctor: any,
+  t: (key: string) => string,
+): string | null => {
   const video = formatGel(doctor.videoConsultationFee);
   const home = formatGel(doctor.homeVisitFee);
   const base = formatGel(doctor.consultationFee);
   const parts: string[] = [];
-  if (video) parts.push(`ვიდეო ${video}`);
-  if (home) parts.push(`ბინაზე ${home}`);
+  if (video) parts.push(`${t("doctors.fee.video")} ${video}`);
+  if (home) parts.push(`${t("doctors.fee.homeVisit")} ${home}`);
   if (parts.length > 0) return parts.join(" · ");
   return base;
 };
 
-const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
+const mapDoctorFromAPI = (
+  doctor: any,
+  apiBaseUrl: string,
+  t: (key: string) => string,
+) => {
   let imageSource;
   if (doctor.profileImage) {
     if (doctor.profileImage.startsWith("http")) {
@@ -46,7 +64,7 @@ const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
     imageSource = require("@/assets/images/doctors/doctor1.png");
   }
 
-  const feeSummary = buildFeeSummary(doctor);
+  const feeSummary = buildFeeSummary(doctor, t);
   const baseFee = formatGel(doctor.consultationFee);
 
   return {
@@ -69,6 +87,7 @@ const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
 };
 
 const Doctor = () => {
+  const { t, language } = useLanguage();
   const router = useRouter();
   const { appointmentType, lockAppointmentType } = useLocalSearchParams<{
     appointmentType?: string;
@@ -79,7 +98,8 @@ const Doctor = () => {
   const hasUsedLockedNavigation = useRef(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFilter, setSelectedFilter] = useState<string>("all");
-  const [selectedAppointmentType, setSelectedAppointmentType] = useState<string>("all"); // 'all' | 'video' | 'home-visit' | 'both'
+  const [selectedAppointmentType, setSelectedAppointmentType] =
+    useState<string>("all"); // 'all' | 'video' | 'home-visit' | 'both'
   const { isFavorite, toggleFavorite } = useFavorites();
   const [selectedDoctor, setSelectedDoctor] = useState<any>(null);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
@@ -89,19 +109,30 @@ const Doctor = () => {
   const [specializations, setSpecializations] = useState<any[]>([]);
 
   // Filter options - will be populated from API
+  const appointmentTypeFilters = useMemo(
+    () => [
+      { id: "all", label: t("doctors.filter.all") },
+      { id: "video", label: t("doctors.filter.video") },
+      { id: "home-visit", label: t("doctors.filter.visit") },
+    ],
+    [t],
+  );
+
   const filterOptions = useMemo(() => {
-    const options = [{ id: "all", label: "ყველა" }];
+    const options = [{ id: "all", label: t("doctors.filter.all") }];
     if (specializations && specializations.length > 0) {
       const activeSpecializations = specializations
         .filter((spec) => spec.isActive !== false)
         .map((spec) => ({
           id: spec.name || spec._id,
-          label: spec.name || "უცნობი",
+          label: spec.name
+            ? getSpecializationDisplayName(spec, language)
+            : t("doctors.specialty.unknown"),
         }));
       options.push(...activeSpecializations);
     }
     return options;
-  }, [specializations]);
+  }, [specializations, t, language]);
 
   useEffect(() => {
     loadSpecializations();
@@ -137,12 +168,12 @@ const Doctor = () => {
       if (response.success) {
         const apiBaseUrl = apiService.getBaseURL();
         const mappedDoctors = response.data.doctors.map((doctor: any) =>
-          mapDoctorFromAPI(doctor, apiBaseUrl),
+          mapDoctorFromAPI(doctor, apiBaseUrl, t),
         );
         setDoctors(mappedDoctors);
       }
     } catch (err: any) {
-      setError(err.message || "ექიმების ჩატვირთვა ვერ მოხერხდა");
+      setError(err.message || t("doctors.loadError"));
       setDoctors([]);
     } finally {
       setLoading(false);
@@ -166,15 +197,15 @@ const Doctor = () => {
     if (selectedAppointmentType !== "all") {
       filtered = filtered.filter((doctor) => {
         const availabilityTypes = doctor.availabilityTypes || [];
-        const hasVideo = availabilityTypes.includes('video');
-        const hasHomeVisit = availabilityTypes.includes('home-visit');
-        
+        const hasVideo = availabilityTypes.includes("video");
+        const hasHomeVisit = availabilityTypes.includes("home-visit");
+
         switch (selectedAppointmentType) {
-          case 'video':
+          case "video":
             return hasVideo;
-          case 'home-visit':
+          case "home-visit":
             return hasHomeVisit;
-          case 'both':
+          case "both":
             return hasVideo && hasHomeVisit;
           default:
             return true;
@@ -184,11 +215,12 @@ const Doctor = () => {
 
     // Filter by search query
     if (searchQuery) {
-      filtered = filtered.filter((doctor) =>
-        doctor.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        doctor.specialization
-          ?.toLowerCase()
-          .includes(searchQuery.toLowerCase()),
+      filtered = filtered.filter(
+        (doctor) =>
+          doctor.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          doctor.specialization
+            ?.toLowerCase()
+            .includes(searchQuery.toLowerCase()),
       );
     }
 
@@ -258,21 +290,21 @@ const Doctor = () => {
 
       <View style={styles.doctorInfo}>
         <Text style={styles.doctorName}>{doctor.name}</Text>
-        <Text style={styles.doctorSpecialty}>{doctor.specialization}</Text>
+        <Text style={styles.doctorSpecialty}>
+          {getSpecializationLabelByName(
+            doctor.specialization,
+            specializations,
+            language,
+          )}
+        </Text>
         {doctor.degrees && (
-          <Text style={styles.doctorQualification}>
-            {doctor.degrees}
-          </Text>
+          <Text style={styles.doctorQualification}>{doctor.degrees}</Text>
         )}
         {doctor.about && (
-          <Text style={styles.doctorLanguages}>
-            {doctor.about}
-          </Text>
+          <Text style={styles.doctorLanguages}>{doctor.about}</Text>
         )}
         {doctor.location && (
-          <Text style={styles.doctorLocation}>
-            {doctor.location}
-          </Text>
+          <Text style={styles.doctorLocation}>{doctor.location}</Text>
         )}
         <View style={styles.ratingFeeRow}>
           <View style={styles.ratingRowCompact}>
@@ -282,10 +314,7 @@ const Doctor = () => {
             </Text>
           </View>
           {doctor.feeSummary ? (
-            <Text
-              style={styles.doctorFeeInline}
-              numberOfLines={2}
-            >
+            <Text style={styles.doctorFeeInline} numberOfLines={2}>
               {doctor.feeSummary}
             </Text>
           ) : (
@@ -312,7 +341,7 @@ const Doctor = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>ექიმები</Text>
+        <Text style={styles.headerTitle}>{t("doctors.title")}</Text>
       </View>
 
       {/* Search Bar */}
@@ -321,7 +350,7 @@ const Doctor = () => {
           <Ionicons name="search" size={20} color="#9CA3AF" />
           <TextInput
             style={styles.searchInput}
-            placeholder="ძებნა ექიმის სახელით..."
+            placeholder={t("doctors.search.placeholder")}
             placeholderTextColor="#9CA3AF"
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -332,17 +361,12 @@ const Doctor = () => {
             </TouchableOpacity>
           )}
         </View>
-
       </View>
 
       {/* Appointment Type Filter */}
       <View style={styles.filterContainer}>
         <FlatList
-          data={[
-            { id: "all", label: "ყველა" },
-            { id: "video", label: "ვიდეო" },
-            { id: "home-visit", label: "ბინაზე" },
-          ]}
+          data={appointmentTypeFilters}
           horizontal
           showsHorizontalScrollIndicator={false}
           keyExtractor={(item) => item.id}
@@ -359,10 +383,10 @@ const Doctor = () => {
                   item.id === "video"
                     ? "videocam"
                     : item.id === "home-visit"
-                    ? "home"
-                    : item.id === "both"
-                    ? "options"
-                    : "apps"
+                      ? "home"
+                      : item.id === "both"
+                        ? "options"
+                        : "apps"
                 }
                 size={16}
                 color={
@@ -372,7 +396,8 @@ const Doctor = () => {
               <Text
                 style={[
                   styles.filterChipText,
-                  selectedAppointmentType === item.id && styles.filterChipTextActive,
+                  selectedAppointmentType === item.id &&
+                    styles.filterChipTextActive,
                 ]}
               >
                 {item.label}
@@ -416,13 +441,13 @@ const Doctor = () => {
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#20BEB8" />
-          <Text style={styles.loadingText}>ექიმების ჩატვირთვა...</Text>
+          <Text style={styles.loadingText}>{t("doctors.loading")}</Text>
         </View>
       ) : error ? (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={loadDoctors}>
-            <Text style={styles.retryButtonText}>ხელახლა ცდა</Text>
+            <Text style={styles.retryButtonText}>{t("doctors.retry")}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -440,9 +465,11 @@ const Doctor = () => {
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <Ionicons name="medical-outline" size={64} color="#D1D5DB" />
-              <Text style={styles.emptyStateTitle}>ექიმები ვერ მოიძებნა</Text>
+              <Text style={styles.emptyStateTitle}>
+                {t("doctors.notFound.title")}
+              </Text>
               <Text style={styles.emptyStateText}>
-                სცადეთ განსხვავებული ფილტრები
+                {t("doctors.notFound.hint")}
               </Text>
             </View>
           }
@@ -472,9 +499,15 @@ const Doctor = () => {
                 </View>
 
                 <View style={styles.doctorInfoModal}>
-                  <Text style={styles.doctorNameModal}>{selectedDoctor.name}</Text>
+                  <Text style={styles.doctorNameModal}>
+                    {selectedDoctor.name}
+                  </Text>
                   <Text style={styles.doctorSpecialtyModal}>
-                    {selectedDoctor.specialization}
+                    {getSpecializationLabelByName(
+                      selectedDoctor.specialization,
+                      specializations,
+                      language,
+                    )}
                   </Text>
                   <Text style={styles.doctorQualificationModal}>
                     {selectedDoctor.degrees || ""}

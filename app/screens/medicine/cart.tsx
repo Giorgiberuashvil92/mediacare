@@ -43,15 +43,18 @@ const Cart = () => {
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Cart Items Count */}
-        <Text style={styles.itemsCount}>{getTotalItems()} პროდუქტი კალათაში</Text>
+        <Text style={styles.itemsCount}>
+          {getTotalItems()} პროდუქტი კალათაში
+        </Text>
 
         {/* Cart Items */}
         {cartItems.length === 0 ? (
           <View style={styles.emptyCart}>
             <Ionicons name="cart-outline" size={80} color="#CCCCCC" />
-            <Text style={styles.emptyCartText}>შენი კალათა ცარიელია</Text>
+            <Text style={styles.emptyCartText}>ფუნქცია მალე დაემატება</Text>
             <Text style={styles.emptyCartSubtext}>
-              დაამატე პროდუქტები დასაწყებად
+              მალე აქ შეძლებ ლაბორატორიული კვლევების გამოძახებას და
+              ინსტრუმენტული კვლევების მარტივად დაჯავშნას.
             </Text>
           </View>
         ) : (
@@ -81,12 +84,17 @@ const Cart = () => {
                 <View style={styles.productDetails}>
                   <Text style={styles.productName}>{item.name}</Text>
                   {item.clinic || item.clinicId ? (
-                    <Text style={styles.productWeight}>{item.clinic || "კვლევა"}</Text>
+                    <Text style={styles.productWeight}>
+                      {item.clinic || "კვლევა"}
+                    </Text>
                   ) : (
                     <Text style={styles.productWeight}>{item.weight}</Text>
                   )}
                   <Text style={styles.productPrice}>
-                    ${item.clinic || item.clinicId ? item.price : item.price * item.quantity}
+                    $
+                    {item.clinic || item.clinicId
+                      ? item.price
+                      : item.price * item.quantity}
                   </Text>
                 </View>
 
@@ -126,7 +134,9 @@ const Cart = () => {
         {/* Order Summary */}
         {cartItems.length > 0 && (
           <View style={styles.orderSummary}>
-            <Text style={styles.orderSummaryTitle}>შემდეგი რომელიც უნდა გავაგრძელოთ</Text>
+            <Text style={styles.orderSummaryTitle}>
+              შემდეგი რომელიც უნდა გავაგრძელოთ
+            </Text>
 
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>თანხა სრულად</Text>
@@ -217,17 +227,20 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
   },
   emptyCartText: {
-    fontSize: 18,
-    fontFamily: "Poppins-Bold",
+    fontSize: 20,
+    fontFamily: "Poppins-SemiBold",
     color: "#333333",
     marginTop: 16,
-    marginBottom: 8,
+    marginBottom: 10,
+    textAlign: "center",
   },
   emptyCartSubtext: {
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: "Poppins-Regular",
     color: "#666666",
     textAlign: "center",
+    lineHeight: 22,
+    paddingHorizontal: 16,
   },
   cartItems: {
     marginBottom: 30,

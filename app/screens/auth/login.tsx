@@ -1,7 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   KeyboardAvoidingView,
   Modal,
@@ -18,17 +19,21 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { apiService } from "../../_services/api";
 import OTPModal from "../../components/ui/OTPModal";
 import { useAuth } from "../../contexts/AuthContext";
-import { useLanguage } from "../../contexts/LanguageContext";
+import {
+  SupportedLanguage,
+  useLanguage,
+} from "../../contexts/LanguageContext";
 import { showToast } from "../../utils/toast";
 
 export default function LoginScreen() {
+  const REMEMBER_EMAIL_KEY = "remembered_login_email";
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
-  const [showPhoneLogin, setShowPhoneLogin] = useState(false);
+  const [showPhoneLogin] = useState(false);
   const [phone, setPhone] = useState("");
   const [showOTPModal, setShowOTPModal] = useState(false);
   const [pendingLoginEmail, setPendingLoginEmail] = useState<string>("");
@@ -36,16 +41,45 @@ export default function LoginScreen() {
   const { login: loginContext, completeLoginAfterOTP } = useAuth();
   const { language, setLanguage, t } = useLanguage();
 
-  const languages = [
-    { code: "ka" as const, labelKey: "common.language.georgian" },
-    { code: "en" as const, labelKey: "common.language.english" },
+  const languages: { code: SupportedLanguage; labelKey: string }[] = [
+    { code: "ka", labelKey: "common.language.georgian" },
+    { code: "en", labelKey: "common.language.english" },
+    { code: "ru", labelKey: "common.language.russian" },
   ];
 
   const selectedLanguageLabel =
     languages.find((lang) => lang.code === language)?.labelKey ??
     "common.language.georgian";
 
-  const handleSelectLanguage = async (code: "ka" | "en") => {
+  useEffect(() => {
+    const loadRememberedEmail = async () => {
+      try {
+        const savedEmail = await AsyncStorage.getItem(REMEMBER_EMAIL_KEY);
+        if (savedEmail) {
+          setEmail(savedEmail);
+          setRememberMe(true);
+        }
+      } catch (error) {
+        console.warn("Failed to load remembered email:", error);
+      }
+    };
+
+    loadRememberedEmail();
+  }, []);
+
+  const persistRememberedEmail = async (nextRememberMe: boolean, nextEmail: string) => {
+    try {
+      if (nextRememberMe && nextEmail.trim()) {
+        await AsyncStorage.setItem(REMEMBER_EMAIL_KEY, nextEmail.trim());
+      } else {
+        await AsyncStorage.removeItem(REMEMBER_EMAIL_KEY);
+      }
+    } catch (error) {
+      console.warn("Failed to persist remembered email:", error);
+    }
+  };
+
+  const handleSelectLanguage = async (code: SupportedLanguage) => {
     await setLanguage(code);
     setLanguageModalVisible(false);
   };
@@ -61,6 +95,7 @@ export default function LoginScreen() {
 
     try {
       setIsLoading(true);
+      await persistRememberedEmail(rememberMe, email);
       const authResponse = await loginContext({ email: email.trim(), password });
       
       // ALWAYS require OTP if user has a phone number (after logout, force OTP)
@@ -224,6 +259,7 @@ export default function LoginScreen() {
 
     try {
       setIsLoading(true);
+      await persistRememberedEmail(rememberMe, email);
       const authResponse = await loginContext({ email: email.trim(), password });
 
       if (authResponse.data.user.phone && authResponse.data.user.phone.trim()) {
@@ -282,35 +318,37 @@ export default function LoginScreen() {
             showsVerticalScrollIndicator={false}
           >
             <View style={styles.content}>
-              <View style={styles.languageSelectorContainer}>
-                <TouchableOpacity
-                  style={styles.languageButton}
-                  onPress={() => setLanguageModalVisible(true)}
-                >
-                  <Ionicons
-                    name="language-outline"
-                    size={18}
-                    color="#06B6D4"
-                    style={styles.languageButtonIcon}
-                  />
-                  <Text style={styles.languageButtonText}>
-                    {t(selectedLanguageLabel)}
-                  </Text>
-                  <Ionicons
-                    name="chevron-down"
-                    size={16}
-                    color="#06B6D4"
-                    style={styles.languageButtonChevron}
-                  />
-                </TouchableOpacity>
-              </View>
-              <View style={styles.logoContainer}>
-                <View style={styles.logo}>
-                  <Image
-                    source={require("../../../assets/images/logo/logo.png")}
-                    style={styles.logoImage}
-                    contentFit="contain"
-                  />
+              <View style={styles.topHeader}>
+                <View style={styles.logoContainer}>
+                  <View style={styles.logo}>
+                    <Image
+                      source={require("../../../assets/images/logo/logo.png")}
+                      style={styles.logoImage}
+                      contentFit="contain"
+                    />
+                  </View>
+                </View>
+                <View style={styles.languageSelectorContainer}>
+                  <TouchableOpacity
+                    style={styles.languageButton}
+                    onPress={() => setLanguageModalVisible(true)}
+                  >
+                    <Ionicons
+                      name="language-outline"
+                      size={18}
+                      color="#06B6D4"
+                      style={styles.languageButtonIcon}
+                    />
+                    <Text style={styles.languageButtonText}>
+                      {t(selectedLanguageLabel)}
+                    </Text>
+                    <Ionicons
+                      name="chevron-down"
+                      size={16}
+                      color="#06B6D4"
+                      style={styles.languageButtonChevron}
+                    />
+                  </TouchableOpacity>
                 </View>
               </View>
 
@@ -386,7 +424,13 @@ export default function LoginScreen() {
                 <View style={styles.optionsContainer}>
                   <TouchableOpacity
                     style={styles.checkboxContainer}
-                    onPress={() => setRememberMe(!rememberMe)}
+                    onPress={() => {
+                      const nextRememberMe = !rememberMe;
+                      setRememberMe(nextRememberMe);
+                      if (!nextRememberMe) {
+                        persistRememberedEmail(false, "");
+                      }
+                    }}
                   >
                     <View
                       style={[
@@ -565,8 +609,6 @@ export default function LoginScreen() {
         showSkipButton={true}
         isLoginOTP={true}
         loginEmail={pendingLoginEmail}
-        title="ტელეფონის ვერიფიკაცია"
-        subtitle="გთხოვთ შეიყვანოთ 6-ნიშნა კოდი, რომელიც გამოგიგზავნეთ SMS-ით"
       />
     </View>
   );
@@ -582,16 +624,23 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingTop: 30,
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: "center",
+    justifyContent: "flex-start",
+    paddingTop: 16,
+  },
+  topHeader: {
+    width: "100%",
+    marginBottom: 24,
   },
   languageSelectorContainer: {
-    alignItems: "flex-end",
-    marginBottom: 8,
+    position: "absolute",
+    top: 0,
+    right: 0,
+    zIndex: 1,
   },
   languageButton: {
     flexDirection: "row",
@@ -620,7 +669,8 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: "center",
-    marginBottom: 20,
+    width: "100%",
+    paddingTop: 8,
   },
   logo: {
     width: 80,
@@ -635,7 +685,7 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins-Bold",
     color: "#1F2937",
     textAlign: "center",
-    marginBottom: 16,
+    marginBottom: 24,
   },
   subtitle: {
     fontSize: 16,

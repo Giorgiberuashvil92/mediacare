@@ -1,3 +1,10 @@
+import {
+  formatMisDocumentSectionTitle,
+  misHisCalculationBestIndexInBody,
+  misHisForm100FirstIndexInBody,
+  type MisPrintFormDocument,
+} from "@/lib/mis-print-forms/html";
+import { loadMisPrintFormsFromApi } from "@/lib/mis-print-forms/load";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import * as DocumentPicker from "expo-document-picker";
@@ -15,7 +22,6 @@ import {
   Alert,
   Image,
   KeyboardAvoidingView,
-  Linking,
   Modal,
   Platform,
   RefreshControl,
@@ -35,13 +41,6 @@ import {
   getStatusLabel,
   hasForm100ForVisitCompletion,
 } from "../../assets/data/doctorDashboard";
-import {
-  formatMisDocumentSectionTitle,
-  misHisCalculationBestIndexInBody,
-  misHisForm100FirstIndexInBody,
-  type MisPrintFormDocument,
-} from "@/lib/mis-print-forms/html";
-import { loadMisPrintFormsFromApi } from "@/lib/mis-print-forms/load";
 import { apiService, Clinic, ShopProduct } from "../_services/api";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -108,9 +107,15 @@ export default function DoctorPatients() {
   >(null);
   const [misHisLoading, setMisHisLoading] = useState(false);
   const [misHisError, setMisHisError] = useState<string | null>(null);
-  const [misHisDocuments, setMisHisDocuments] = useState<MisPrintFormDocument[]>(
-    [],
-  );
+  const [misHisDocuments, setMisHisDocuments] = useState<
+    MisPrintFormDocument[]
+  >([]);
+  const [selectedDocumentPreview, setSelectedDocumentPreview] = useState<{
+    url: string;
+    name?: string;
+    type?: string;
+  } | null>(null);
+  const [downloadingPreview, setDownloadingPreview] = useState(false);
   const [statusActionLoading, setStatusActionLoading] = useState<string | null>(
     null,
   );
@@ -451,67 +456,32 @@ export default function DoctorPatients() {
     return `${base}/${normalized}`;
   };
 
-  const downloadAndOpenFile = async (fileUrl: string, fileName?: string) => {
-    try {
-      // Build full URL if needed
-      const fullUrl = fileUrl.startsWith("http")
-        ? fileUrl
-        : `${apiService.getBaseURL()}/${fileUrl}`;
-
-      // Try to download and share the file
-      try {
-        // Get file extension from URL or filename
-        const extension = fileName?.split(".").pop() || "pdf";
-        // Use cacheDirectory if available, otherwise fallback to a temp path
-        // @ts-ignore - FileSystem.cacheDirectory exists at runtime
-        const cacheDir = FileSystem.cacheDirectory || "";
-        const fileUri = `${cacheDir}${fileName || `file_${Date.now()}.${extension}`}`;
-
-        // Download file
-        const downloadResult = await FileSystem.downloadAsync(fullUrl, fileUri);
-
-        if (downloadResult.status === 200) {
-          // Check if sharing is available
-          const isAvailable = await Sharing.isAvailableAsync();
-
-          if (isAvailable) {
-            // Share/open the file
-            await Sharing.shareAsync(downloadResult.uri);
-            return;
-          }
-        }
-      } catch (downloadError) {
-        console.log("Download failed, falling back to URL:", downloadError);
-      }
-
-      // Fallback to opening URL if download fails or sharing is not available
-      Linking.openURL(fullUrl).catch(() =>
-        Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა"),
-      );
-    } catch (error: any) {
-      console.error("Error opening file:", error);
-      Alert.alert("შეცდომა", error?.message || "ფაილის გახსნა ვერ მოხერხდა");
-    }
-  };
-
   const openForm100File = (filePath?: string | null) => {
     const url = buildFileUrl(filePath);
     if (!url) {
       Alert.alert("ფაილი ვერ მოიძებნა");
       return;
     }
-    Linking.openURL(url).catch(() =>
-      Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა"),
-    );
+    setSelectedDocumentPreview({
+      url,
+      name: "ფორმა 100",
+      type: "application/pdf",
+    });
   };
 
   const hasMisFormsSource = (consultation?: Consultation | null): boolean => {
     const c = consultation as any;
     if (!c) return false;
-    if (typeof c.misGeneratedServiceId === "string" && c.misGeneratedServiceId.trim()) {
+    if (
+      typeof c.misGeneratedServiceId === "string" &&
+      c.misGeneratedServiceId.trim()
+    ) {
       return true;
     }
-    if (typeof c.misForm100AvailableAt === "string" && c.misForm100AvailableAt.trim()) {
+    if (
+      typeof c.misForm100AvailableAt === "string" &&
+      c.misForm100AvailableAt.trim()
+    ) {
       return true;
     }
     return c.misPrintFormsByService != null;
@@ -524,7 +494,10 @@ export default function DoctorPatients() {
     if (!selectedConsultation?.id) return;
     setOpeningMisDocKind(kind);
     try {
-      const misRes = await apiService.getMisPrintForms(selectedConsultation.id, true);
+      const misRes = await apiService.getMisPrintForms(
+        selectedConsultation.id,
+        true,
+      );
       if (!misRes.success || !misRes.data) {
         Alert.alert("შეცდომა", "HIS ფორმები ვერ ჩაიტვირთა");
         return;
@@ -559,17 +532,24 @@ export default function DoctorPatients() {
         return;
       }
 
-      const dl = await apiService.downloadMisPrintFormPdf(selectedConsultation.id, {
-        index: formIndex,
-        refetch: true,
-      });
+      const dl = await apiService.downloadMisPrintFormPdf(
+        selectedConsultation.id,
+        {
+          index: formIndex,
+          refetch: true,
+        },
+      );
       if (!dl.success || !dl.uri) {
         Alert.alert("შეცდომა", "PDF-ის ჩამოტვირთვა ვერ მოხერხდა");
         return;
       }
 
       if (action === "view") {
-        await Linking.openURL(dl.uri);
+        setSelectedDocumentPreview({
+          url: dl.uri,
+          name: kind === "form100" ? "ფორმა 100" : "კალკულაცია",
+          type: dl.contentType || "application/pdf",
+        });
         return;
       }
 
@@ -579,14 +559,78 @@ export default function DoctorPatients() {
           mimeType: dl.contentType || "application/pdf",
           dialogTitle: kind === "form100" ? "ფორმა 100" : "კალკულაცია",
         });
-      } else {
-        await Linking.openURL(dl.uri);
       }
     } catch (error: any) {
       console.error("[DoctorPatients] openHisPrintForm error:", error);
       Alert.alert("შეცდომა", error?.message || "ფორმის გახსნა ვერ მოხერხდა");
     } finally {
       setOpeningMisDocKind(null);
+    }
+  };
+
+  const isImagePreview = (doc?: {
+    url?: string;
+    type?: string;
+    name?: string;
+  }) => {
+    if (!doc?.url) return false;
+    const mime = (doc.type || "").toLowerCase();
+    if (mime.startsWith("image/")) return true;
+    const lower = doc.url.toLowerCase();
+    return (
+      lower.endsWith(".jpg") ||
+      lower.endsWith(".jpeg") ||
+      lower.endsWith(".png") ||
+      lower.endsWith(".webp") ||
+      lower.endsWith(".gif")
+    );
+  };
+
+  const handleDownloadPreview = async () => {
+    if (!selectedDocumentPreview || downloadingPreview) return;
+
+    try {
+      setDownloadingPreview(true);
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        Alert.alert("შენიშვნა", "გადმოწერა ამ მოწყობილობაზე მიუწვდომელია");
+        return;
+      }
+
+      const sourceUrl = selectedDocumentPreview.url;
+      if (sourceUrl.startsWith("file://")) {
+        await Sharing.shareAsync(sourceUrl, {
+          dialogTitle: "დოკუმენტის გადმოწერა",
+        });
+        return;
+      }
+
+      const cacheDir = (FileSystem as any).cacheDirectory || "";
+      const safeBaseName = (selectedDocumentPreview.name || "document")
+        .replace(/[^\w\-.]/g, "_")
+        .slice(0, 80);
+      const lowerUrl = sourceUrl.toLowerCase();
+      const extension = lowerUrl.endsWith(".pdf")
+        ? "pdf"
+        : isImagePreview(selectedDocumentPreview)
+          ? "jpg"
+          : "pdf";
+      const targetPath = `${cacheDir}${safeBaseName || `document_${Date.now()}`}.${extension}`;
+      const downloaded = await FileSystem.downloadAsync(sourceUrl, targetPath);
+      if (downloaded.status !== 200) {
+        throw new Error("ვერ მოხერხდა ფაილის გადმოწერა");
+      }
+
+      await Sharing.shareAsync(downloaded.uri, {
+        dialogTitle: "დოკუმენტის გადმოწერა",
+        mimeType: extension === "pdf" ? "application/pdf" : "image/jpeg",
+        UTI: extension === "pdf" ? "com.adobe.pdf" : "public.jpeg",
+      });
+    } catch (error) {
+      console.error("[DoctorPatients] Failed to download preview:", error);
+      Alert.alert("შეცდომა", "გადმოწერა ვერ მოხერხდა");
+    } finally {
+      setDownloadingPreview(false);
     }
   };
 
@@ -956,7 +1000,10 @@ export default function DoctorPatients() {
     /** სიიდან არჩეულ ჯავშანს ხშირად არ აქვს `misForm100AvailableAt` — შენახვამდე ერთი HIS GET ასინქრონებს ბაზას და სტეითს. */
     let consultationForForm100Check: Consultation = selectedConsultation;
     try {
-      const misRes = await apiService.getMisPrintForms(selectedConsultation.id, true);
+      const misRes = await apiService.getMisPrintForms(
+        selectedConsultation.id,
+        true,
+      );
       if (misRes.success && misRes.data) {
         const at = misRes.data.misForm100AvailableAt;
         if (at !== undefined) {
@@ -1921,7 +1968,22 @@ export default function DoctorPatients() {
                                       const url = doc.url.startsWith("http")
                                         ? doc.url
                                         : `${apiService.getBaseURL()}/${doc.url}`;
-                                      downloadAndOpenFile(url, doc.name);
+                                      const lower = url.toLowerCase();
+                                      const inferredType = lower.endsWith(
+                                        ".pdf",
+                                      )
+                                        ? "application/pdf"
+                                        : lower.endsWith(".jpg") ||
+                                            lower.endsWith(".jpeg")
+                                          ? "image/jpeg"
+                                          : lower.endsWith(".png")
+                                            ? "image/png"
+                                            : doc.type;
+                                      setSelectedDocumentPreview({
+                                        url,
+                                        name: doc.name,
+                                        type: inferredType,
+                                      });
                                     }}
                                   >
                                     <Ionicons
@@ -2318,13 +2380,11 @@ export default function DoctorPatients() {
                               <TouchableOpacity
                                 style={styles.viewResultPill}
                                 onPress={() => {
-                                  Linking.openURL(test.resultFile.url).catch(
-                                    () =>
-                                      Alert.alert(
-                                        "შეცდომა",
-                                        "ფაილის გახსნა ვერ მოხერხდა",
-                                      ),
-                                  );
+                                  setSelectedDocumentPreview({
+                                    url: test.resultFile.url,
+                                    name: test.resultFile?.name,
+                                    type: test.resultFile?.type,
+                                  });
                                 }}
                               >
                                 <Ionicons
@@ -2390,7 +2450,8 @@ export default function DoctorPatients() {
                       <Text style={styles.viewFileButtonText}>
                         {openingMisDocKind === "form100"
                           ? "იტვირთება..."
-                          : selectedConsultation.form100?.fileName || "ფორმა 100"}
+                          : selectedConsultation.form100?.fileName ||
+                            "ფორმა 100"}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -2433,6 +2494,65 @@ export default function DoctorPatients() {
               >
                 <Text style={styles.modalButtonText}>დახურვა</Text>
               </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={!!selectedDocumentPreview}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedDocumentPreview(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.documentPreviewModalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {selectedDocumentPreview?.name || "დოკუმენტის ნახვა"}
+              </Text>
+              <View style={styles.previewHeaderActions}>
+                <TouchableOpacity
+                  onPress={handleDownloadPreview}
+                  style={styles.downloadButton}
+                  disabled={downloadingPreview}
+                >
+                  {downloadingPreview ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Ionicons
+                        name="download-outline"
+                        size={16}
+                        color="#FFFFFF"
+                      />
+                      <Text style={styles.downloadButtonText}>გადმოწერა</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setSelectedDocumentPreview(null)}
+                  style={styles.closeButton}
+                >
+                  <Ionicons name="close" size={24} color="#6B7280" />
+                </TouchableOpacity>
+              </View>
+            </View>
+            <View style={styles.documentPreviewBody}>
+              {selectedDocumentPreview &&
+              isImagePreview(selectedDocumentPreview) ? (
+                <Image
+                  source={{ uri: selectedDocumentPreview.url }}
+                  style={styles.documentPreviewImage}
+                  resizeMode="contain"
+                />
+              ) : selectedDocumentPreview ? (
+                <WebView
+                  source={{ uri: selectedDocumentPreview.url }}
+                  style={styles.documentPreviewWebView}
+                  startInLoadingState
+                />
+              ) : null}
             </View>
           </View>
         </View>
@@ -2491,7 +2611,7 @@ export default function DoctorPatients() {
                   />
                 </View>
 
-                {(((selectedConsultation as any)?.isFollowUp === true) ||
+                {((selectedConsultation as any)?.isFollowUp === true ||
                   hasMisFormsSource(selectedConsultation)) && (
                   <View style={styles.misFormsWrap}>
                     <Text style={styles.misFormsTitle}>
@@ -2500,11 +2620,15 @@ export default function DoctorPatients() {
                     {misHisLoading ? (
                       <View style={styles.misFormsLoadingBox}>
                         <ActivityIndicator color="#06B6D4" />
-                        <Text style={styles.misFormsHint}>იტვირთება HIS-იდან...</Text>
+                        <Text style={styles.misFormsHint}>
+                          იტვირთება HIS-იდან...
+                        </Text>
                       </View>
                     ) : misHisError && misHisDocuments.length === 0 ? (
                       <View style={styles.misFormsLoadingBox}>
-                        <Text style={styles.misFormsErrorText}>{misHisError}</Text>
+                        <Text style={styles.misFormsErrorText}>
+                          {misHisError}
+                        </Text>
                         <TouchableOpacity
                           style={styles.misFormsReloadBtn}
                           onPress={() =>
@@ -2513,13 +2637,17 @@ export default function DoctorPatients() {
                           }
                         >
                           <Ionicons name="refresh" size={18} color="#0369A1" />
-                          <Text style={styles.misFormsReloadBtnText}>ხელახლა</Text>
+                          <Text style={styles.misFormsReloadBtnText}>
+                            ხელახლა
+                          </Text>
                         </TouchableOpacity>
                       </View>
                     ) : (
                       <>
                         {misHisError ? (
-                          <Text style={styles.misFormsStaleHint}>{misHisError}</Text>
+                          <Text style={styles.misFormsStaleHint}>
+                            {misHisError}
+                          </Text>
                         ) : null}
                         {misHisDocuments.length > 0 ? (
                           <View>
@@ -2541,7 +2669,9 @@ export default function DoctorPatients() {
                                   ]}
                                 >
                                   <View style={styles.misFormDocCardHeader}>
-                                    <View style={styles.misFormDocHeaderTextCol}>
+                                    <View
+                                      style={styles.misFormDocHeaderTextCol}
+                                    >
                                       <Text style={styles.misFormDocHeading}>
                                         {section.heading}
                                       </Text>
@@ -2552,7 +2682,9 @@ export default function DoctorPatients() {
                                       ) : null}
                                     </View>
                                     <View style={styles.misFormDocIndexBadge}>
-                                      <Text style={styles.misFormDocIndexBadgeText}>
+                                      <Text
+                                        style={styles.misFormDocIndexBadgeText}
+                                      >
                                         {idx + 1}/{total}
                                       </Text>
                                     </View>
@@ -2571,7 +2703,8 @@ export default function DoctorPatients() {
                                     <TouchableOpacity
                                       style={[
                                         styles.misPdfActionBtn,
-                                        openingMisDocKind && styles.misPdfActionBtnDisabled,
+                                        openingMisDocKind &&
+                                          styles.misPdfActionBtnDisabled,
                                       ]}
                                       disabled={!!openingMisDocKind}
                                       onPress={() =>
@@ -2584,7 +2717,10 @@ export default function DoctorPatients() {
                                       }
                                     >
                                       {openingMisDocKind ? (
-                                        <ActivityIndicator size="small" color="#0369A1" />
+                                        <ActivityIndicator
+                                          size="small"
+                                          color="#0369A1"
+                                        />
                                       ) : (
                                         <Ionicons
                                           name="document-text-outline"
@@ -2592,13 +2728,16 @@ export default function DoctorPatients() {
                                           color="#0369A1"
                                         />
                                       )}
-                                      <Text style={styles.misPdfActionBtnText}>PDF ნახვა</Text>
+                                      <Text style={styles.misPdfActionBtnText}>
+                                        PDF ნახვა
+                                      </Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity
                                       style={[
                                         styles.misPdfActionBtn,
                                         styles.misPdfActionBtnPrimary,
-                                        openingMisDocKind && styles.misPdfActionBtnDisabled,
+                                        openingMisDocKind &&
+                                          styles.misPdfActionBtnDisabled,
                                       ]}
                                       disabled={!!openingMisDocKind}
                                       onPress={() =>
@@ -2615,7 +2754,11 @@ export default function DoctorPatients() {
                                         size={16}
                                         color="#FFFFFF"
                                       />
-                                      <Text style={styles.misPdfActionBtnTextPrimary}>
+                                      <Text
+                                        style={
+                                          styles.misPdfActionBtnTextPrimary
+                                        }
+                                      >
                                         PDF გაზიარება
                                       </Text>
                                     </TouchableOpacity>
@@ -3873,6 +4016,24 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     maxHeight: "90%",
   },
+  documentPreviewModalContent: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    height: "88%",
+  },
+  documentPreviewBody: {
+    flex: 1,
+    backgroundColor: "#F8FAFC",
+  },
+  documentPreviewImage: {
+    width: "100%",
+    height: "100%",
+  },
+  documentPreviewWebView: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+  },
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -3886,6 +4047,25 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontFamily: "Poppins-Bold",
     color: "#1F2937",
+  },
+  previewHeaderActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  downloadButton: {
+    height: 34,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: "#06B6D4",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  downloadButtonText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontFamily: "Poppins-SemiBold",
   },
   closeButton: {
     width: 32,

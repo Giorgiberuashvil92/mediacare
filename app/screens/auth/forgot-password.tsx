@@ -20,6 +20,7 @@ import { useLanguage } from "../../contexts/LanguageContext";
 import { showToast } from "../../utils/toast";
 
 export default function ForgotPasswordScreen() {
+  const { t } = useLanguage();
   const [phone, setPhone] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [codeSent, setCodeSent] = useState(false);
@@ -29,18 +30,22 @@ export default function ForgotPasswordScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const { t } = useLanguage();
-
   const handleSendCode = async () => {
     if (!phone.trim()) {
-      showToast.error("გთხოვთ შეიყვანოთ ტელეფონის ნომერი", "შეცდომა");
+      showToast.error(
+        t("auth.forgotPassword.validation.phoneRequired"),
+        t("auth.forgotPassword.error.default"),
+      );
       return;
     }
 
     // Validate phone number format (should be 9 digits starting with 5 for Georgian numbers)
     const cleanPhone = phone.trim().replace(/\s+/g, '').replace(/^\+995/, '').replace(/^0/, '');
     if (cleanPhone.length !== 9 || !cleanPhone.startsWith('5')) {
-      showToast.error("გთხოვთ შეიყვანოთ სწორი ტელეფონის ნომერი (9 ციფრი, 5-ით დაწყებული)", "შეცდომა");
+      showToast.error(
+        t("auth.forgotPassword.validation.phoneInvalid"),
+        t("auth.forgotPassword.error.default"),
+      );
       return;
     }
 
@@ -51,16 +56,21 @@ export default function ForgotPasswordScreen() {
       if (response.success) {
         setCodeSent(true);
         setShowOTPModal(true);
-        showToast.success("ვერიფიკაციის კოდი გაიგზავნა SMS-ით", "წარმატება");
+        showToast.success(
+          t("auth.forgotPassword.success.codeSent"),
+          t("auth.forgotPassword.success.title"),
+        );
       } else {
-        throw new Error(response.message || "ვერ მოხერხდა კოდის გაგზავნა");
+        throw new Error(
+          response.message || t("auth.forgotPassword.error.sendCode"),
+        );
       }
     } catch (error) {
       const errorMessage =
         error instanceof Error
           ? error.message
-          : "ვერ მოხერხდა კოდის გაგზავნა";
-      showToast.error(errorMessage, "შეცდომა");
+          : t("auth.forgotPassword.error.sendCode");
+      showToast.error(errorMessage, t("auth.forgotPassword.error.default"));
     } finally {
       setIsLoading(false);
     }
@@ -74,17 +84,26 @@ export default function ForgotPasswordScreen() {
 
   const handleResetPassword = async () => {
     if (!newPassword.trim()) {
-      showToast.error("გთხოვთ შეიყვანოთ ახალი პაროლი", "შეცდომა");
+      showToast.error(
+        t("auth.forgotPassword.validation.passwordRequired"),
+        t("auth.forgotPassword.error.default"),
+      );
       return;
     }
 
     if (newPassword.length < 6) {
-      showToast.error("პაროლი უნდა იყოს მინიმუმ 6 სიმბოლო", "შეცდომა");
+      showToast.error(
+        t("auth.forgotPassword.validation.passwordLength"),
+        t("auth.forgotPassword.error.default"),
+      );
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      showToast.error("პაროლები არ ემთხვევა", "შეცდომა");
+      showToast.error(
+        t("auth.forgotPassword.validation.passwordMismatch"),
+        t("auth.forgotPassword.error.default"),
+      );
       return;
     }
 
@@ -96,17 +115,22 @@ export default function ForgotPasswordScreen() {
       });
 
       if (response.success) {
-        showToast.success("პაროლი წარმატებით შეიცვალა", "წარმატება");
+        showToast.success(
+          t("auth.forgotPassword.success.passwordChanged"),
+          t("auth.forgotPassword.success.title"),
+        );
         router.replace("/screens/auth/login");
       } else {
-        throw new Error(response.message || "ვერ მოხერხდა პაროლის შეცვლა");
+        throw new Error(
+          response.message || t("auth.forgotPassword.error.reset"),
+        );
       }
     } catch (error) {
       const errorMessage =
         error instanceof Error
           ? error.message
-          : "ვერ მოხერხდა პაროლის შეცვლა";
-      showToast.error(errorMessage, "შეცდომა");
+          : t("auth.forgotPassword.error.reset");
+      showToast.error(errorMessage, t("auth.forgotPassword.error.default"));
     } finally {
       setIsLoading(false);
     }
@@ -148,12 +172,14 @@ export default function ForgotPasswordScreen() {
 
               {/* Title */}
               <Text style={styles.title}>
-                {codeSent ? "პაროლის აღდგენა" : "პაროლის დაგავიწყება?"}
+                {codeSent
+                  ? t("auth.forgotPassword.titleReset")
+                  : t("auth.forgotPassword.title")}
               </Text>
               <Text style={styles.subtitle}>
                 {codeSent
-                  ? "შეიყვანეთ ახალი პაროლი"
-                  : "შეიყვანეთ თქვენი ტელეფონის ნომერი და ჩვენ გამოგიგზავნით ვერიფიკაციის კოდს SMS-ით"}
+                  ? t("auth.forgotPassword.subtitleReset")
+                  : t("auth.forgotPassword.subtitle")}
               </Text>
 
               {/* Form */}
@@ -162,7 +188,9 @@ export default function ForgotPasswordScreen() {
                   <>
                     {/* Phone Input */}
                     <View style={styles.inputContainer}>
-                      <Text style={styles.label}>ტელეფონის ნომერი</Text>
+                      <Text style={styles.label}>
+                        {t("auth.forgotPassword.phone.label")}
+                      </Text>
                       <View style={styles.inputWrapper}>
                         <Ionicons
                           name="call-outline"
@@ -172,7 +200,7 @@ export default function ForgotPasswordScreen() {
                         />
                         <TextInput
                           style={styles.input}
-                          placeholder="555123456"
+                          placeholder={t("auth.forgotPassword.phone.placeholder")}
                           placeholderTextColor="#9CA3AF"
                           value={phone}
                           onChangeText={setPhone}
@@ -195,7 +223,9 @@ export default function ForgotPasswordScreen() {
                       disabled={isLoading}
                     >
                       <Text style={styles.submitButtonText}>
-                        {isLoading ? "იგზავნება..." : "კოდის გაგზავნა"}
+                        {isLoading
+                          ? t("auth.forgotPassword.sending")
+                          : t("auth.forgotPassword.sendCode")}
                       </Text>
                     </TouchableOpacity>
                   </>
@@ -203,7 +233,9 @@ export default function ForgotPasswordScreen() {
                   <>
                     {/* New Password Input */}
                     <View style={styles.inputContainer}>
-                      <Text style={styles.label}>ახალი პაროლი</Text>
+                      <Text style={styles.label}>
+                        {t("auth.forgotPassword.newPassword.label")}
+                      </Text>
                       <View style={styles.inputWrapper}>
                         <Ionicons
                           name="lock-closed-outline"
@@ -236,7 +268,9 @@ export default function ForgotPasswordScreen() {
 
                     {/* Confirm Password Input */}
                     <View style={styles.inputContainer}>
-                      <Text style={styles.label}>დაადასტურეთ პაროლი</Text>
+                      <Text style={styles.label}>
+                        {t("auth.forgotPassword.confirmPassword.label")}
+                      </Text>
                       <View style={styles.inputWrapper}>
                         <Ionicons
                           name="lock-closed-outline"
@@ -277,7 +311,9 @@ export default function ForgotPasswordScreen() {
                       disabled={isLoading}
                     >
                       <Text style={styles.submitButtonText}>
-                        {isLoading ? "იცვლება..." : "პაროლის შეცვლა"}
+                        {isLoading
+                          ? t("auth.forgotPassword.resetting")
+                          : t("auth.forgotPassword.resetButton")}
                       </Text>
                     </TouchableOpacity>
 
@@ -290,7 +326,7 @@ export default function ForgotPasswordScreen() {
                   onPress={() => router.replace("/screens/auth/login")}
                 >
                   <Text style={styles.backToLoginText}>
-                    უკან ლოგინზე
+                    {t("auth.forgotPassword.backToLogin")}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -303,6 +339,8 @@ export default function ForgotPasswordScreen() {
       <OTPModal
         visible={showOTPModal}
         phone={phone}
+        autoSendOnOpen={false}
+        sendCodeRequest={(rawPhone) => apiService.forgotPassword(rawPhone)}
         onClose={() => {
           setShowOTPModal(false);
           if (!codeSent) {
@@ -310,8 +348,6 @@ export default function ForgotPasswordScreen() {
           }
         }}
         onVerified={handleOTPVerified}
-        title="ტელეფონის ვერიფიკაცია"
-        subtitle="გთხოვთ შეიყვანოთ 6-ნიშნა კოდი, რომელიც გამოგიგზავნეთ SMS-ით"
       />
     </View>
   );
@@ -327,7 +363,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingTop: 20,
   },
   scrollContent: {

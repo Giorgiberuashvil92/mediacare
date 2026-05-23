@@ -17,7 +17,6 @@ import {
   Alert,
   Image,
   KeyboardAvoidingView,
-  Linking,
   Modal,
   Platform,
   RefreshControl,
@@ -253,6 +252,12 @@ export default function DoctorAppointments() {
   const [misPdfLoading, setMisPdfLoading] = useState(false);
   const [showMisCompletePreviewModal, setShowMisCompletePreviewModal] =
     useState(false);
+  const [selectedDocumentPreview, setSelectedDocumentPreview] = useState<{
+    url: string;
+    name?: string;
+    type?: string;
+  } | null>(null);
+  const [downloadingPreview, setDownloadingPreview] = useState(false);
   const [pendingCompleteConsultation, setPendingCompleteConsultation] =
     useState<Consultation | null>(null);
 
@@ -695,40 +700,22 @@ export default function DoctorAppointments() {
 
   const downloadAndOpenFile = async (fileUrl: string, fileName?: string) => {
     try {
-      // Build full URL if needed
       const fullUrl = fileUrl.startsWith("http")
         ? fileUrl
         : `${apiService.getBaseURL()}/${fileUrl}`;
-
-      // Try to download and share the file
-      try {
-        // Get file extension from URL or filename
-        const extension = fileName?.split(".").pop() || "pdf";
-        // Use cacheDirectory if available, otherwise fallback to a temp path
-        const cacheDir = (FileSystem as any).cacheDirectory || "";
-        const fileUri = `${cacheDir}${fileName || `file_${Date.now()}.${extension}`}`;
-
-        // Download file
-        const downloadResult = await FileSystem.downloadAsync(fullUrl, fileUri);
-
-        if (downloadResult.status === 200) {
-          // Check if sharing is available
-          const isAvailable = await Sharing.isAvailableAsync();
-
-          if (isAvailable) {
-            // Share/open the file
-            await Sharing.shareAsync(downloadResult.uri);
-            return;
-          }
-        }
-      } catch (downloadError) {
-        console.log("Download failed, falling back to URL:", downloadError);
-      }
-
-      // Fallback to opening URL if download fails or sharing is not available
-      Linking.openURL(fullUrl).catch(() =>
-        Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა"),
-      );
+      const lower = fullUrl.toLowerCase();
+      const inferredType = lower.endsWith(".pdf")
+        ? "application/pdf"
+        : lower.endsWith(".jpg") || lower.endsWith(".jpeg")
+          ? "image/jpeg"
+          : lower.endsWith(".png")
+            ? "image/png"
+            : undefined;
+      setSelectedDocumentPreview({
+        url: fullUrl,
+        name: fileName,
+        type: inferredType,
+      });
     } catch (error: any) {
       console.error("Error opening file:", error);
       Alert.alert("შეცდომა", error?.message || "ფაილის გახსნა ვერ მოხერხდა");
@@ -741,9 +728,86 @@ export default function DoctorAppointments() {
       Alert.alert("ფაილი ვერ მოიძებნა");
       return;
     }
-    Linking.openURL(url).catch(() =>
-      Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა"),
+    setSelectedDocumentPreview({
+      url,
+      name: "ფორმა 100",
+      type: "application/pdf",
+    });
+  };
+
+  const openDocumentPreview = (fileUrl?: string, fileName?: string, fileType?: string) => {
+    const resolvedUrl = buildFileUrl(fileUrl);
+    if (!resolvedUrl) {
+      Alert.alert("ფაილი ვერ მოიძებნა");
+      return;
+    }
+    setSelectedDocumentPreview({
+      url: resolvedUrl,
+      name: fileName,
+      type: fileType,
+    });
+  };
+
+  const isImagePreview = (file?: { url?: string; type?: string; name?: string }) => {
+    if (!file?.url) return false;
+    const mime = (file.type || "").toLowerCase();
+    if (mime.startsWith("image/")) return true;
+    const lower = file.url.toLowerCase();
+    return (
+      lower.endsWith(".jpg") ||
+      lower.endsWith(".jpeg") ||
+      lower.endsWith(".png") ||
+      lower.endsWith(".webp") ||
+      lower.endsWith(".gif")
     );
+  };
+
+  const handleDownloadPreview = async () => {
+    if (!selectedDocumentPreview || downloadingPreview) return;
+
+    try {
+      setDownloadingPreview(true);
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        Alert.alert("შენიშვნა", "გადმოწერა ამ მოწყობილობაზე მიუწვდომელია");
+        return;
+      }
+
+      const sourceUrl = selectedDocumentPreview.url;
+      if (sourceUrl.startsWith("file://")) {
+        await Sharing.shareAsync(sourceUrl, {
+          dialogTitle: "დოკუმენტის გადმოწერა",
+        });
+        return;
+      }
+
+      const cacheDir = (FileSystem as any).cacheDirectory || "";
+      const safeBaseName = (selectedDocumentPreview.name || "document")
+        .replace(/[^\w\-.]/g, "_")
+        .slice(0, 80);
+      const lowerUrl = sourceUrl.toLowerCase();
+      const extension = lowerUrl.endsWith(".pdf")
+        ? "pdf"
+        : isImagePreview(selectedDocumentPreview)
+          ? "jpg"
+          : "pdf";
+      const targetPath = `${cacheDir}${safeBaseName || `document_${Date.now()}`}.${extension}`;
+      const downloaded = await FileSystem.downloadAsync(sourceUrl, targetPath);
+      if (downloaded.status !== 200) {
+        throw new Error("ვერ მოხერხდა ფაილის გადმოწერა");
+      }
+
+      await Sharing.shareAsync(downloaded.uri, {
+        dialogTitle: "დოკუმენტის გადმოწერა",
+        mimeType: extension === "pdf" ? "application/pdf" : "image/jpeg",
+        UTI: extension === "pdf" ? "com.adobe.pdf" : "public.jpeg",
+      });
+    } catch (error) {
+      console.error("[DoctorAppointments] Failed to download preview:", error);
+      Alert.alert("შეცდომა", "გადმოწერა ვერ მოხერხდა");
+    } finally {
+      setDownloadingPreview(false);
+    }
   };
 
   const handlePickForm100File = async () => {
@@ -3018,12 +3082,10 @@ export default function DoctorAppointments() {
                               <TouchableOpacity
                                 style={styles.viewResultPill}
                                 onPress={() => {
-                                  Linking.openURL(test.resultFile.url).catch(
-                                    () =>
-                                      Alert.alert(
-                                        "შეცდომა",
-                                        "ფაილის გახსნა ვერ მოხერხდა",
-                                      ),
+                                  openDocumentPreview(
+                                    test.resultFile?.url,
+                                    test.resultFile?.name,
+                                    test.resultFile?.type,
                                   );
                                 }}
                               >
@@ -3081,12 +3143,10 @@ export default function DoctorAppointments() {
                                 <TouchableOpacity
                                   style={styles.viewResultPill}
                                   onPress={() => {
-                                    Linking.openURL(test.resultFile.url).catch(
-                                      () =>
-                                        Alert.alert(
-                                          "შეცდომა",
-                                          "ფაილის გახსნა ვერ მოხერხდა",
-                                        ),
+                                    openDocumentPreview(
+                                      test.resultFile?.url,
+                                      test.resultFile?.name,
+                                      test.resultFile?.type,
                                     );
                                   }}
                                 >
@@ -4385,6 +4445,62 @@ export default function DoctorAppointments() {
         </View>
       </Modal>
 
+      <Modal
+        visible={!!selectedDocumentPreview}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedDocumentPreview(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.documentPreviewModalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {selectedDocumentPreview?.name || "დოკუმენტის ნახვა"}
+              </Text>
+              <View style={styles.previewHeaderActions}>
+                <TouchableOpacity
+                  onPress={handleDownloadPreview}
+                  style={styles.downloadButton}
+                  disabled={downloadingPreview}
+                >
+                  {downloadingPreview ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Ionicons name="download-outline" size={16} color="#FFFFFF" />
+                      <Text style={styles.downloadButtonText}>გადმოწერა</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={() => setSelectedDocumentPreview(null)}
+                >
+                  <Ionicons name="close" size={24} color="#6B7280" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.documentPreviewBody}>
+              {selectedDocumentPreview &&
+              isImagePreview(selectedDocumentPreview) ? (
+                <Image
+                  source={{ uri: selectedDocumentPreview.url }}
+                  style={styles.documentPreviewImage}
+                  resizeMode="contain"
+                />
+              ) : selectedDocumentPreview ? (
+                <WebView
+                  source={{ uri: selectedDocumentPreview.url }}
+                  style={styles.documentPreviewWebView}
+                  startInLoadingState
+                />
+              ) : null}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Success Modal */}
       <Modal
         visible={showSuccessModal && !showFollowUpScheduleModal}
@@ -5067,6 +5183,43 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: "90%",
+  },
+  documentPreviewModalContent: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    height: "88%",
+  },
+  documentPreviewBody: {
+    flex: 1,
+    backgroundColor: "#F8FAFC",
+  },
+  documentPreviewImage: {
+    width: "100%",
+    height: "100%",
+  },
+  documentPreviewWebView: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+  },
+  previewHeaderActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  downloadButton: {
+    height: 34,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: "#06B6D4",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  downloadButtonText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontFamily: "Poppins-SemiBold",
   },
   modalHeader: {
     flexDirection: "row",

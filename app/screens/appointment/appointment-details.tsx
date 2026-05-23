@@ -15,6 +15,10 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  formatAppointmentDate,
+  formatAppointmentTime,
+} from "@/app/utils/appointmentDateTime";
 
 // Helper function to map backend doctor to app format
 const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
@@ -277,26 +281,6 @@ const AppointmentDetails = () => {
     appointment?.consultationFee || doctor.consultationFee;
   const totalAmount = appointment?.totalAmount || consultationFee * 1.05;
 
-  // Format the date for display
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const months = [
-      "იანვარი",
-      "თებერვალი",
-      "მარტი",
-      "აპრილი",
-      "მაისი",
-      "ივნისი",
-      "ივლისი",
-      "აგვისტო",
-      "სექტემბერი",
-      "ოქტომბერი",
-      "ნოემბერი",
-      "დეკემბერი",
-    ];
-    return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
-  };
-
   const handleBackToHome = () => {
     router.replace("/(tabs)");
   };
@@ -369,13 +353,15 @@ const AppointmentDetails = () => {
               <Ionicons name="calendar-outline" size={20} color="#20BEB8" />
               <Text style={styles.detailLabel}>თარიღი</Text>
               <Text style={styles.detailValue}>
-                {formatDate(appointmentDate as string)}
+                {formatAppointmentDate(appointmentDate as string)}
               </Text>
             </View>
             <View style={styles.detailRow}>
               <Ionicons name="time-outline" size={20} color="#20BEB8" />
               <Text style={styles.detailLabel}>დრო</Text>
-              <Text style={styles.detailValue}>{appointmentTime}</Text>
+              <Text style={styles.detailValue}>
+                {formatAppointmentTime(appointmentTime as string)}
+              </Text>
             </View>
             <View style={styles.detailRow}>
               <Ionicons name="person-outline" size={20} color="#20BEB8" />

@@ -14,6 +14,16 @@ export class UpdateSpecializationDto {
 
   @IsString()
   @IsOptional()
+  @MaxLength(100)
+  nameEn?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(100)
+  nameRu?: string;
+
+  @IsString()
+  @IsOptional()
   @MaxLength(500)
   description?: string;
 

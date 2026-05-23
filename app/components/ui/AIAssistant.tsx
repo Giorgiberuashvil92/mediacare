@@ -1,6 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useState } from "react";
+import { useLanguage } from "../../contexts/LanguageContext";
 import {
   Modal,
   ScrollView,
@@ -19,6 +20,7 @@ import Svg, {
 } from "react-native-svg";
 
 export default function AIAssistant() {
+  const { t } = useLanguage();
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showNewChatModal, setShowNewChatModal] = useState(false);
   const [newChatName, setNewChatName] = useState("");
@@ -51,9 +53,9 @@ export default function AIAssistant() {
         <View style={styles.card}>
           <View style={styles.cardContent}>
             <View style={styles.textContainer}>
-              <Text style={styles.title}>AI ასისტენტი</Text>
+              <Text style={styles.title}>{t("home.aiAssistant.title")}</Text>
               <Text style={styles.description}>
-                იკითხე ჯანმრთელობის ნებისმიერ საკითხზე
+                {t("home.aiAssistant.description")}
               </Text>
             </View>
             <View style={styles.iconContainer}>

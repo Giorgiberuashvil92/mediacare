@@ -1,5 +1,4 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Image } from "expo-image";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -12,24 +11,26 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { apiService, Specialization } from "../../_services/api";
+import { useLanguage } from "../../contexts/LanguageContext";
+import { getSpecializationDisplayName } from "../../utils/specializationLabel";
 
-// Icon mapping for specializations
-const getIconForSpecialization = (name: string) => {
-  const iconMap: Record<string, any> = {
-    ნევროლოგია: require("../../../assets/images/icons/brain1.png"),
-    კარდიოლოგია: require("../../../assets/images/icons/cardiology.png"),
-    გინეკოლოგია: require("../../../assets/images/icons/pregnant.png"),
-    პედიატრია: require("../../../assets/images/icons/baby.png"),
-    ალერგოლოგია: require("../../../assets/images/icons/allergy.png"),
-    სტომატოლოგია: require("../../../assets/images/icons/dendist.png"),
-    უროლოგია: require("../../../assets/images/icons/urology.png"),
-    გასტროენტეროლოგია: require("../../../assets/images/icons/gastrology.png"),
-    დერმატოლოგია: require("../../../assets/images/icons/cardiology.png"),
-    ორთოპედია: require("../../../assets/images/icons/brain1.png"),
-    ოფთალმოლოგია: require("../../../assets/images/icons/allergy.png"),
-    ფსიქოლოგია: require("../../../assets/images/icons/phycatry.png"),
-  };
-  return iconMap[name] || require("../../../assets/images/icons/brain1.png");
+const getIconForSpecialization = (
+  name: string,
+): keyof typeof Ionicons.glyphMap => {
+  const normalized = name.toLowerCase();
+  if (normalized.includes("ნევრო")) return "pulse";
+  if (normalized.includes("კარდიო")) return "heart";
+  if (normalized.includes("გინეკო")) return "female";
+  if (normalized.includes("პედიატ")) return "happy";
+  if (normalized.includes("ალერგ")) return "flower";
+  if (normalized.includes("სტომატ")) return "medical";
+  if (normalized.includes("უროლოგ")) return "water";
+  if (normalized.includes("გასტრო")) return "nutrition";
+  if (normalized.includes("დერმატ")) return "body";
+  if (normalized.includes("ორთოპ")) return "walk";
+  if (normalized.includes("ოფთალ")) return "eye";
+  if (normalized.includes("ფსიქ")) return "chatbubbles";
+  return "medkit";
 };
 
 // Background color mapping
@@ -52,6 +53,7 @@ const getBgColorForSpecialization = (name: string) => {
 };
 
 const DepartmentsScreen = () => {
+  const { t, language } = useLanguage();
   const [specializations, setSpecializations] = useState<Specialization[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -90,28 +92,20 @@ const DepartmentsScreen = () => {
         >
           <Ionicons name="arrow-back" size={24} color="#333333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>სპეციალიზაციები</Text>
+        <Text style={styles.headerTitle}>{t("doctors.specialty.title")}</Text>
         <View style={styles.placeholder} />
       </View>
-      <Text
-        style={{
-          padding: 24,
-          fontSize: 16,
-          fontFamily: "Poppins-SemiBold",
-          color: "#333333",
-        }}
-      >
-        სპეციალიზაციები
-      </Text>
       <ScrollView style={styles.content}>
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#06B6D4" />
-            <Text style={styles.loadingText}>იტვირთება...</Text>
+            <Text style={styles.loadingText}>
+              {t("doctors.specialty.loading")}
+            </Text>
           </View>
         ) : specializations.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>სპეციალიზაციები არ მოიძებნა</Text>
+            <Text style={styles.emptyText}>{t("doctors.specialty.empty")}</Text>
           </View>
         ) : (
           <View style={styles.grid}>
@@ -127,12 +121,15 @@ const DepartmentsScreen = () => {
                     { backgroundColor: getBgColorForSpecialization(spec.name) },
                   ]}
                 >
-                  <Image
-                    source={getIconForSpecialization(spec.name)}
-                    style={{ width: 48, height: 48 }}
+                  <Ionicons
+                    name={getIconForSpecialization(spec.name)}
+                    size={42}
+                    color="#0F172A"
                   />
                 </View>
-                <Text style={styles.departmentName}>{spec.name}</Text>
+                <Text style={styles.departmentName}>
+                  {getSpecializationDisplayName(spec, language)}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>

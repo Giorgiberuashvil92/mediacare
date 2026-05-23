@@ -1,5 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -25,8 +26,8 @@ const SLIDER_WIDTH = SCREEN_WIDTH - 32; // 16px padding on each side
 const PROMOTIONAL_BANNERS = [
   {
     id: 1,
-    title: "სპეციალური შეთავაზება",
-    subtitle: "მიიღეთ 15% ფასდაკლება პირველ ვიზიტზე",
+    title: "ინსტრუმენტული კვლევები",
+    subtitle: "მალე შეგეძლებათ დაჯავშნოთ ვიზიტი შენთვის სასურველ კლინიკაში",
     colors: ["#20BEB8", "#0EA5E9"],
     icon: "medical",
   },
@@ -40,7 +41,7 @@ const PROMOTIONAL_BANNERS = [
   {
     id: 3,
     title: "ლაბორატორიული კვლევები",
-    subtitle: "სპეციალური ფასები ყველა ანალიზზე",
+    subtitle: "მალე შესაძლებელი იქნება გამოიძახო ნებისმიერ მისამართზე ",
     colors: ["#8B5CF6", "#7C3AED"],
     icon: "flask",
   },
@@ -67,6 +68,23 @@ export default function HomeScreen() {
   const viewabilityConfig = useRef({
     itemVisiblePercentThreshold: 50,
   }).current;
+
+  const handlePromoDetailsPress = (bannerId: number) => {
+    if (bannerId === 1) {
+      router.push({
+        pathname: "/(tabs)/lab",
+        params: { tab: "immunological" },
+      });
+      return;
+    }
+    if (bannerId === 3) {
+      router.push({
+        pathname: "/(tabs)/lab",
+        params: { tab: "laboratory" },
+      });
+      return;
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -98,36 +116,41 @@ export default function HomeScreen() {
               data={PROMOTIONAL_BANNERS}
               renderItem={({ item }) => (
                 <View style={styles.slideContainer}>
-                  <LinearGradient
-                    colors={item.colors as [string, string]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.promoCard}
+                  <TouchableOpacity
+                    activeOpacity={0.9}
+                    onPress={() => handlePromoDetailsPress(item.id)}
                   >
-                    <View style={styles.promoContent}>
-                      <View style={styles.promoTextContainer}>
-                        <Text style={styles.promoTitle}>{item.title}</Text>
-                        <Text style={styles.promoSubtitle}>
-                          {item.subtitle}
-                        </Text>
-                        <TouchableOpacity style={styles.promoButton}>
-                          <Text style={styles.promoButtonText}>დეტალები</Text>
+                    <LinearGradient
+                      colors={item.colors as [string, string]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.promoCard}
+                    >
+                      <View style={styles.promoContent}>
+                        <View style={styles.promoTextContainer}>
+                          <Text style={styles.promoTitle}>{item.title}</Text>
+                          <Text style={styles.promoSubtitle}>
+                            {item.subtitle}
+                          </Text>
+                          <View style={styles.promoButton}>
+                            <Text style={styles.promoButtonText}>დეტალები</Text>
+                            <Ionicons
+                              name="arrow-forward"
+                              size={16}
+                              color="#FFFFFF"
+                            />
+                          </View>
+                        </View>
+                        <View style={styles.promoIconContainer}>
                           <Ionicons
-                            name="arrow-forward"
-                            size={16}
-                            color="#FFFFFF"
+                            name={item.icon as any}
+                            size={64}
+                            color="rgba(255, 255, 255, 0.3)"
                           />
-                        </TouchableOpacity>
+                        </View>
                       </View>
-                      <View style={styles.promoIconContainer}>
-                        <Ionicons
-                          name={item.icon as any}
-                          size={64}
-                          color="rgba(255, 255, 255, 0.3)"
-                        />
-                      </View>
-                    </View>
-                  </LinearGradient>
+                    </LinearGradient>
+                  </TouchableOpacity>
                 </View>
               )}
               keyExtractor={(item) => item.id.toString()}
@@ -187,6 +210,7 @@ const styles = StyleSheet.create({
   promoCard: {
     borderRadius: 16,
     overflow: "hidden",
+    height: 170,
     shadowColor: "#20BEB8",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -215,24 +239,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     padding: 20,
-    minHeight: 140,
+    height: "100%",
   },
   promoTextContainer: {
     flex: 1,
     paddingRight: 12,
   },
   promoTitle: {
-    fontSize: 22,
+    fontSize: 18,
     fontFamily: "Poppins-Bold",
     color: "#FFFFFF",
-    marginBottom: 8,
+    marginBottom: 6,
   },
   promoSubtitle: {
-    fontSize: 15,
+    fontSize: 13,
     fontFamily: "Poppins-Regular",
     color: "rgba(255, 255, 255, 0.9)",
-    marginBottom: 16,
-    lineHeight: 22,
+    marginBottom: 12,
+    lineHeight: 18,
   },
   promoButton: {
     flexDirection: "row",
@@ -245,7 +269,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   promoButtonText: {
-    fontSize: 15,
+    fontSize: 13,
     fontFamily: "Poppins-SemiBold",
     color: "#FFFFFF",
   },

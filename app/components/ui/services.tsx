@@ -1,15 +1,15 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useLanguage } from "../../contexts/LanguageContext";
 
-const QUICK_SERVICES = [
+const QUICK_SERVICE_CONFIG = [
   {
     id: "video",
-    title: "ვიდეო კონსულტაცია",
-    description: "ონლაინ ექიმთან კავშირი",
+    titleKey: "home.services.video.title",
     icon: "videocam",
     gradient: ["#06B6D4", "#0891B2"],
     onPress: () =>
@@ -20,8 +20,7 @@ const QUICK_SERVICES = [
   },
   {
     id: "home-visit",
-    title: "ბინაზე გამოძახება",
-    description: "ექიმი შენს მისამართზე",
+    titleKey: "home.services.homeVisit.title",
     icon: "home",
     gradient: ["#F59E0B", "#D97706"],
     onPress: () =>
@@ -32,17 +31,27 @@ const QUICK_SERVICES = [
   },
   {
     id: "lab",
-    title: "ლაბორატორია",
-    description: "ანალიზები და კვლევები",
+    titleKey: "home.services.lab.title",
     icon: "flask",
     gradient: ["#8B5CF6", "#7C3AED"],
     onPress: () => router.push("/(tabs)/lab"),
   },
-];
+] as const;
 
 const Services = () => {
+  const { t } = useLanguage();
   const [pharmacyModalVisible, setPharmacyModalVisible] = useState(false);
   const insets = useSafeAreaInsets();
+
+  const quickServices = useMemo(
+    () =>
+      QUICK_SERVICE_CONFIG.map((service) => ({
+        ...service,
+        title: t(service.titleKey),
+      })),
+    [t],
+  );
+
   const handlePress = (serviceId: string, onPress: () => void) => {
     if (serviceId === "pharmacy") {
       setPharmacyModalVisible(true);
@@ -54,10 +63,10 @@ const Services = () => {
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom + 16 }]}>
       <View style={styles.headerRow}>
-        <Text style={styles.title}>სწრაფი სერვისები</Text>
+        <Text style={styles.title}>{t("home.services.title")}</Text>
       </View>
       <View style={styles.grid}>
-        {QUICK_SERVICES.map((service) => (
+        {quickServices.map((service) => (
           <TouchableOpacity
             key={service.id}
             onPress={() => handlePress(service.id, service.onPress)}
@@ -75,16 +84,13 @@ const Services = () => {
             >
               <View style={styles.iconContainer}>
                 <Ionicons
-                  name={service.icon as any}
+                  name={service.icon as keyof typeof Ionicons.glyphMap}
                   size={26}
                   color="#FFFFFF"
                 />
               </View>
-              <Text style={styles.serviceTitle} numberOfLines={1}>
+              <Text style={styles.serviceTitle} numberOfLines={2}>
                 {service.title}
-              </Text>
-              <Text style={styles.serviceDescription} numberOfLines={1}>
-                {service.description}
               </Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -160,7 +166,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     alignItems: "center",
     justifyContent: "center",
-    height: 120,
+    minHeight: 120,
   },
   iconContainer: {
     width: 48,
@@ -172,17 +178,11 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   serviceTitle: {
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: "Poppins-SemiBold",
     color: "#FFFFFF",
     textAlign: "center",
-    marginBottom: 2,
-  },
-  serviceDescription: {
-    fontSize: 10,
-    fontFamily: "Poppins-Regular",
-    color: "rgba(255, 255, 255, 0.8)",
-    textAlign: "center",
+    lineHeight: 16,
   },
   modalOverlay: {
     flex: 1,

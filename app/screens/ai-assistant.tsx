@@ -4,7 +4,13 @@ import * as Clipboard from "expo-clipboard";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -25,7 +31,6 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
-import Toast from "react-native-toast-message";
 import Svg, {
   ClipPath,
   Defs,
@@ -35,6 +40,7 @@ import Svg, {
   Stop,
   LinearGradient as SvgLinearGradient,
 } from "react-native-svg";
+import Toast from "react-native-toast-message";
 import {
   AIMessage,
   AIMessageFeedbackProblem,
@@ -43,6 +49,7 @@ import {
 } from "../_services/api";
 import AIAssistantBannerGraphic from "../components/ui/AIAssistantBannerGraphic";
 import { useAuth } from "../contexts/AuthContext";
+import { useLanguage } from "../contexts/LanguageContext";
 
 function MessageLikeIcon({
   size = 20,
@@ -143,10 +150,7 @@ function MessageTypingDots() {
       {[0, 1, 2].map((i) => (
         <View
           key={i}
-          style={[
-            styles.typingDot,
-            { opacity: phase === i ? 1 : 0.3 },
-          ]}
+          style={[styles.typingDot, { opacity: phase === i ? 1 : 0.3 }]}
         />
       ))}
     </View>
@@ -223,24 +227,11 @@ function apiProblemToUi(
   return rev[p] ?? "none";
 }
 
-const SUGGESTED_PROMPTS = [
-  {
-    id: 1,
-    text: "ლაბორატორიული ანალიზის შედეგებს აგიხსნი მარტივად",
-  },
-  {
-    id: 2,
-    text: "აღწერე რაც გაწუხებს და გეტყვი რას შეიძლება უკავშირდებოდეს",
-  },
-  {
-    id: 3,
-    text: "მკითხე კონკრეტულ დაავადებაზე და აგიხსნი გასაგებად",
-  },
-  {
-    id: 4,
-    text: "ატვირთე ფოტო (დოკუმენტი, გამონაყარი, დაზიანება) და შევაფასებ",
-  },
-];
+const SUGGESTED_PROMPT_KEYS = [
+  { id: "medcompass", key: "aiAssistant.prompt.medcompass" },
+  { id: "healthCheck", key: "aiAssistant.prompt.healthCheck" },
+  { id: "disease", key: "aiAssistant.prompt.disease" },
+] as const;
 
 interface SelectedImageType {
   uri: string;
@@ -251,7 +242,17 @@ interface SelectedImageType {
 
 export default function AIAssistantScreen() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const insets = useSafeAreaInsets();
+
+  const suggestedPrompts = useMemo(
+    () =>
+      SUGGESTED_PROMPT_KEYS.map((prompt) => ({
+        id: prompt.id,
+        text: t(prompt.key),
+      })),
+    [t],
+  );
   const [inputText, setInputText] = useState("");
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showMediaModal, setShowMediaModal] = useState(false);
@@ -442,17 +443,14 @@ export default function AIAssistantScreen() {
       rating: "dislike" as const,
       problem: apiProblem ?? null,
       details: detailsTrim || null,
-      created_at:
-        prevMessage?.feedback?.created_at ?? new Date().toISOString(),
+      created_at: prevMessage?.feedback?.created_at ?? new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
 
     if (prevMessage) {
       setMessages((prevList) =>
         prevList.map((m) =>
-          m.id === messageId
-            ? { ...m, feedback: optimisticFeedback }
-            : m,
+          m.id === messageId ? { ...m, feedback: optimisticFeedback } : m,
         ),
       );
     }
@@ -482,10 +480,7 @@ export default function AIAssistantScreen() {
           prevList.map((m) => (m.id === messageId ? prevMessage : m)),
         );
       }
-      Alert.alert(
-        "შეცდომა",
-        err?.message || "შეფასების შენახვა ვერ მოხერხდა",
-      );
+      Alert.alert("შეცდომა", err?.message || "შეფასების შენახვა ვერ მოხერხდა");
     } finally {
       negFeedbackSubmittingRef.current = false;
       setIsSubmittingNegFeedback(false);
@@ -767,10 +762,7 @@ export default function AIAssistantScreen() {
           scrollViewRef.current?.scrollToEnd({ animated: true });
         }, 100);
       } else {
-        Alert.alert(
-          "შეცდომა",
-          "შეტყობინების გაგზავნა ვერ მოხერხდა",
-        );
+        Alert.alert("შეცდომა", "შეტყობინების გაგზავნა ვერ მოხერხდა");
       }
     } catch (error: any) {
       console.error("Send message error:", error);
@@ -868,8 +860,10 @@ export default function AIAssistantScreen() {
               </Svg>
             </View>
             <View style={styles.headerTextContainer}>
-              <Text style={styles.headerTitle}>AI ასისტენტი</Text>
-              <Text style={styles.headerSubtitle}>Powered By Hapttic</Text>
+              <Text style={styles.headerTitle}>{t("aiAssistant.title")}</Text>
+              <Text style={styles.headerSubtitle}>
+                {t("aiAssistant.poweredBy")}
+              </Text>
             </View>
           </View>
 
@@ -971,11 +965,11 @@ export default function AIAssistantScreen() {
           {/* AI Assistant Banner */}
           <View style={styles.bannerContainer}>
             <View style={styles.bannerCard}>
-              <AIAssistantBannerGraphic width={140} height={140} />
+              <AIAssistantBannerGraphic width={96} height={96} />
             </View>
-            <Text style={styles.bannerTitle}>AI ასისტენტი</Text>
+            <Text style={styles.bannerTitle}>{t("aiAssistant.title")}</Text>
             <Text style={styles.bannerDescription}>
-              ჰკითხე ჯანმრთელობის შესახებ ნებისმიერ საკითხზე
+              {t("aiAssistant.bannerDescription")}
             </Text>
           </View>
 
@@ -998,169 +992,111 @@ export default function AIAssistantScreen() {
                 const copyClipId = `ma-copy-${message.id}`;
 
                 return (
-                <View key={message.id}>
-                  <View
-                    style={[
-                      styles.messageBubble,
-                      message.role === "user"
-                        ? styles.userMessage
-                        : styles.assistantMessage,
-                    ]}
-                  >
-                    {message.image_url && (
-                      <Image
-                        source={{ uri: message.image_url }}
-                        style={styles.messageImage}
-                      />
-                    )}
-                    <Text
+                  <View key={message.id}>
+                    <View
                       style={[
-                        styles.messageText,
+                        styles.messageBubble,
                         message.role === "user"
-                          ? styles.userMessageText
-                          : styles.assistantMessageText,
+                          ? styles.userMessage
+                          : styles.assistantMessage,
                       ]}
                     >
-                      {message.content}
-                    </Text>
-                    {Boolean(message.content?.trim()) && (
-                      <View style={styles.messageActionsRow}>
-                        <TouchableOpacity
-                          style={styles.messageActionButton}
-                          onPress={() =>
-                            handleCopyMessage(message.content)
-                          }
-                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                          accessibilityLabel="კოპირება"
-                        >
-                          <MessageCopyIcon
-                            size={22}
-                            color={messageActionIdle}
-                            clipId={copyClipId}
-                          />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={styles.messageActionButton}
-                          onPress={() => {
-                            handleLikePress(message);
-                          }}
-                          disabled={
-                            message.role === "assistant" &&
-                            !!likeBusyById[message.id]
-                          }
-                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                          accessibilityLabel="მოწონება"
-                        >
-                          <MessageLikeIcon
-                            size={22}
-                            color={
-                              message.role === "assistant"
-                                ? message.feedback?.rating === "like"
-                                  ? messageActionActive
-                                  : messageActionIdle
-                                : userMessageLikes[message.id]
-                                  ? messageActionActive
-                                  : messageActionIdle
-                            }
-                          />
-                        </TouchableOpacity>
-                        {message.role === "assistant" ? (
+                      {message.image_url && (
+                        <Image
+                          source={{ uri: message.image_url }}
+                          style={styles.messageImage}
+                        />
+                      )}
+                      <Text
+                        style={[
+                          styles.messageText,
+                          message.role === "user"
+                            ? styles.userMessageText
+                            : styles.assistantMessageText,
+                        ]}
+                      >
+                        {message.content}
+                      </Text>
+                      {Boolean(message.content?.trim()) && (
+                        <View style={styles.messageActionsRow}>
                           <TouchableOpacity
                             style={styles.messageActionButton}
-                            onPress={() =>
-                              openNegFeedbackModal(message.id)
+                            onPress={() => handleCopyMessage(message.content)}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            accessibilityLabel="კოპირება"
+                          >
+                            <MessageCopyIcon
+                              size={22}
+                              color={messageActionIdle}
+                              clipId={copyClipId}
+                            />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.messageActionButton}
+                            onPress={() => {
+                              handleLikePress(message);
+                            }}
+                            disabled={
+                              message.role === "assistant" &&
+                              !!likeBusyById[message.id]
                             }
                             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                            accessibilityLabel="არ მომწონს"
+                            accessibilityLabel="მოწონება"
                           >
-                            <MessageDislikeIcon
+                            <MessageLikeIcon
                               size={22}
                               color={
-                                message.feedback?.rating === "dislike" ||
-                                negFeedbackMessageId === message.id
-                                  ? messageActionActive
-                                  : messageActionIdle
+                                message.role === "assistant"
+                                  ? message.feedback?.rating === "like"
+                                    ? messageActionActive
+                                    : messageActionIdle
+                                  : userMessageLikes[message.id]
+                                    ? messageActionActive
+                                    : messageActionIdle
                               }
                             />
                           </TouchableOpacity>
-                        ) : null}
-                      </View>
-                    )}
-                    <Text style={styles.messageTime}>
-                      {new Date(message.created_at).toLocaleTimeString(
-                        "ka-GE",
-                        {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        },
-                      )}
-                    </Text>
-                  </View>
-
-                  {/* Doctor Recommendations from AI Response */}
-                  {message.role === "assistant" &&
-                    message.metadata?.doctors &&
-                    message.metadata.doctors.length > 0 && (
-                      <View style={styles.doctorRecommendationsContainer}>
-                        {message.metadata.doctors.map(
-                          (doctor: any, index: number) => (
+                          {message.role === "assistant" ? (
                             <TouchableOpacity
-                              key={doctor.id || index}
-                              style={styles.doctorRecommendationCard}
-                              onPress={() => {
-                                if (doctor.id) {
-                                  router.push({
-                                    pathname: "/screens/doctors/doctor/[id]",
-                                    params: { id: doctor.id },
-                                  });
-                                }
-                              }}
+                              style={styles.messageActionButton}
+                              onPress={() => openNegFeedbackModal(message.id)}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              accessibilityLabel="არ მომწონს"
                             >
-                              {doctor.image && (
-                                <Image
-                                  source={{ uri: doctor.image }}
-                                  style={styles.doctorRecommendationImage}
-                                />
-                              )}
-                              <View style={styles.doctorRecommendationInfo}>
-                                <Text style={styles.doctorRecommendationName}>
-                                  {doctor.name || "ექიმი"}
-                                </Text>
-                                {doctor.specialization && (
-                                  <Text
-                                    style={styles.doctorRecommendationSpecialty}
-                                  >
-                                    {doctor.specialization}
-                                  </Text>
-                                )}
-                                {doctor.rating && (
-                                  <View
-                                    style={styles.doctorRecommendationRating}
-                                  >
-                                    <Ionicons
-                                      name="star"
-                                      size={14}
-                                      color="#F59E0B"
-                                    />
-                                    <Text
-                                      style={
-                                        styles.doctorRecommendationRatingText
-                                      }
-                                    >
-                                      {doctor.rating}
-                                      {doctor.reviewCount &&
-                                        ` (${doctor.reviewCount})`}
-                                    </Text>
-                                  </View>
-                                )}
-                                {doctor.consultationFee && (
-                                  <Text style={styles.doctorRecommendationFee}>
-                                    {doctor.consultationFee}
-                                  </Text>
-                                )}
-                              </View>
+                              <MessageDislikeIcon
+                                size={22}
+                                color={
+                                  message.feedback?.rating === "dislike" ||
+                                  negFeedbackMessageId === message.id
+                                    ? messageActionActive
+                                    : messageActionIdle
+                                }
+                              />
+                            </TouchableOpacity>
+                          ) : null}
+                        </View>
+                      )}
+                      <Text style={styles.messageTime}>
+                        {new Date(message.created_at).toLocaleTimeString(
+                          "ka-GE",
+                          {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          },
+                        )}
+                      </Text>
+                    </View>
+
+                    {/* Doctor Recommendations from AI Response */}
+                    {message.role === "assistant" &&
+                      message.metadata?.doctors &&
+                      message.metadata.doctors.length > 0 && (
+                        <View style={styles.doctorRecommendationsContainer}>
+                          {message.metadata.doctors.map(
+                            (doctor: any, index: number) => (
                               <TouchableOpacity
-                                style={styles.doctorRecommendationButton}
+                                key={doctor.id || index}
+                                style={styles.doctorRecommendationCard}
                                 onPress={() => {
                                   if (doctor.id) {
                                     router.push({
@@ -1170,26 +1106,85 @@ export default function AIAssistantScreen() {
                                   }
                                 }}
                               >
-                                <Text
-                                  style={styles.doctorRecommendationButtonText}
+                                {doctor.image && (
+                                  <Image
+                                    source={{ uri: doctor.image }}
+                                    style={styles.doctorRecommendationImage}
+                                  />
+                                )}
+                                <View style={styles.doctorRecommendationInfo}>
+                                  <Text style={styles.doctorRecommendationName}>
+                                    {doctor.name || "ექიმი"}
+                                  </Text>
+                                  {doctor.specialization && (
+                                    <Text
+                                      style={
+                                        styles.doctorRecommendationSpecialty
+                                      }
+                                    >
+                                      {doctor.specialization}
+                                    </Text>
+                                  )}
+                                  {doctor.rating && (
+                                    <View
+                                      style={styles.doctorRecommendationRating}
+                                    >
+                                      <Ionicons
+                                        name="star"
+                                        size={14}
+                                        color="#F59E0B"
+                                      />
+                                      <Text
+                                        style={
+                                          styles.doctorRecommendationRatingText
+                                        }
+                                      >
+                                        {doctor.rating}
+                                        {doctor.reviewCount &&
+                                          ` (${doctor.reviewCount})`}
+                                      </Text>
+                                    </View>
+                                  )}
+                                  {doctor.consultationFee && (
+                                    <Text
+                                      style={styles.doctorRecommendationFee}
+                                    >
+                                      {doctor.consultationFee}
+                                    </Text>
+                                  )}
+                                </View>
+                                <TouchableOpacity
+                                  style={styles.doctorRecommendationButton}
+                                  onPress={() => {
+                                    if (doctor.id) {
+                                      router.push({
+                                        pathname:
+                                          "/screens/doctors/doctor/[id]",
+                                        params: { id: doctor.id },
+                                      });
+                                    }
+                                  }}
                                 >
-                                  ჩაეწერე
-                                </Text>
+                                  <Text
+                                    style={
+                                      styles.doctorRecommendationButtonText
+                                    }
+                                  >
+                                    ჩაეწერე
+                                  </Text>
+                                </TouchableOpacity>
                               </TouchableOpacity>
-                            </TouchableOpacity>
-                          ),
-                        )}
-                      </View>
-                    )}
-                </View>
+                            ),
+                          )}
+                        </View>
+                      )}
+                  </View>
                 );
               })}
 
               {pendingSend && (
                 <View key="pending-user-out">
-                  <View
-                    style={[styles.messageBubble, styles.userMessage]}
-                  >
+                  <View style={[styles.messageBubble, styles.userMessage]}>
                     {pendingSend.imageUri ? (
                       <Image
                         source={{ uri: pendingSend.imageUri }}
@@ -1198,10 +1193,7 @@ export default function AIAssistantScreen() {
                     ) : null}
                     {pendingSend.content.trim() ? (
                       <Text
-                        style={[
-                          styles.messageText,
-                          styles.userMessageText,
-                        ]}
+                        style={[styles.messageText, styles.userMessageText]}
                       >
                         {pendingSend.content}
                       </Text>
@@ -1219,18 +1211,12 @@ export default function AIAssistantScreen() {
                   ]}
                 >
                   <Text
-                    style={[
-                      styles.messageText,
-                      styles.assistantTypingTitle,
-                    ]}
+                    style={[styles.messageText, styles.assistantTypingTitle]}
                   >
                     დამელოდე ⌛
                   </Text>
                   <Text
-                    style={[
-                      styles.messageText,
-                      styles.assistantTypingSubtitle,
-                    ]}
+                    style={[styles.messageText, styles.assistantTypingSubtitle]}
                   >
                     სრული პასუხისთვის დრო მჭირდება - რამდენიმე წამში გიპასუხებ.
                   </Text>
@@ -1243,14 +1229,19 @@ export default function AIAssistantScreen() {
               {/* Suggested Prompts */}
               <View style={styles.promptsSection}>
                 <View style={styles.promptsContainer}>
-                  {SUGGESTED_PROMPTS.map((prompt) => (
+                  {suggestedPrompts.map((prompt) => (
                     <TouchableOpacity
                       key={prompt.id}
                       style={styles.promptCard}
                       activeOpacity={0.7}
                       onPress={() => handlePromptSelect(prompt.text)}
                     >
-                      <Ionicons name="list-outline" size={20} color="#6B7280" />
+                      <Ionicons
+                        name="list-outline"
+                        size={18}
+                        color="#6B7280"
+                        style={styles.promptIcon}
+                      />
                       <Text style={styles.promptText}>{prompt.text}</Text>
                     </TouchableOpacity>
                   ))}
@@ -1262,57 +1253,62 @@ export default function AIAssistantScreen() {
 
         {/* Input Field — დამალულია უკუკავშირის მოდალისას, რომ კლავიატურამ ქვედა ზოლი არ აიწიოს */}
         {negFeedbackMessageId === null ? (
-          <View style={styles.inputContainer}>
-            <TouchableOpacity
-              style={styles.inputIconButton}
-              onPress={() => setShowMediaModal(true)}
-            >
-              <Ionicons name="add-circle-outline" size={24} color="#6B7280" />
-            </TouchableOpacity>
-            <View style={styles.inputWrapper}>
-              {selectedImage && (
-                <View style={styles.inputImagePreview}>
-                  <Image
-                    source={{ uri: selectedImage.uri }}
-                    style={styles.inputPreviewImage}
-                  />
-                  <TouchableOpacity
-                    style={styles.inputRemoveImageButton}
-                    onPress={() => setSelectedImage(null)}
-                  >
-                    <Ionicons name="close-circle" size={20} color="#FFFFFF" />
-                  </TouchableOpacity>
-                </View>
-              )}
-              <TextInput
-                style={[styles.input, selectedImage && styles.inputWithImage]}
-                placeholder="ჰკითხე ჯანმრთელობაზე"
-                placeholderTextColor="#9CA3AF"
-                value={inputText}
-                onChangeText={setInputText}
-                multiline
-              />
-            </View>
-            <TouchableOpacity style={styles.inputIconButton}>
-              <Ionicons name="mic-outline" size={24} color="#6B7280" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.sendButton}
-              disabled={(!inputText.trim() && !selectedImage) || isSending}
-              onPress={() => handleSendMessage()}
-            >
-              {isSending ? (
-                <ActivityIndicator size="small" color="#6366F1" />
-              ) : (
-                <Ionicons
-                  name="send"
-                  size={20}
-                  color={
-                    inputText.trim() || selectedImage ? "#6366F1" : "#9CA3AF"
-                  }
+          <View style={styles.inputSection}>
+            <View style={styles.inputContainer}>
+              <TouchableOpacity
+                style={styles.inputIconButton}
+                onPress={() => setShowMediaModal(true)}
+              >
+                <Ionicons name="add-circle-outline" size={24} color="#6B7280" />
+              </TouchableOpacity>
+              <View style={styles.inputWrapper}>
+                {selectedImage && (
+                  <View style={styles.inputImagePreview}>
+                    <Image
+                      source={{ uri: selectedImage.uri }}
+                      style={styles.inputPreviewImage}
+                    />
+                    <TouchableOpacity
+                      style={styles.inputRemoveImageButton}
+                      onPress={() => setSelectedImage(null)}
+                    >
+                      <Ionicons name="close-circle" size={20} color="#FFFFFF" />
+                    </TouchableOpacity>
+                  </View>
+                )}
+                <TextInput
+                  style={[styles.input, selectedImage && styles.inputWithImage]}
+                  placeholder={t("aiAssistant.inputPlaceholder")}
+                  placeholderTextColor="#9CA3AF"
+                  value={inputText}
+                  onChangeText={setInputText}
+                  multiline
                 />
-              )}
-            </TouchableOpacity>
+              </View>
+              <TouchableOpacity style={styles.inputIconButton}>
+                <Ionicons name="mic-outline" size={24} color="#6B7280" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.sendButton}
+                disabled={(!inputText.trim() && !selectedImage) || isSending}
+                onPress={() => handleSendMessage()}
+              >
+                {isSending ? (
+                  <ActivityIndicator size="small" color="#6366F1" />
+                ) : (
+                  <Ionicons
+                    name="send"
+                    size={20}
+                    color={
+                      inputText.trim() || selectedImage ? "#6366F1" : "#9CA3AF"
+                    }
+                  />
+                )}
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.aiDisclaimer}>
+              {t("aiAssistant.disclaimer")}
+            </Text>
           </View>
         ) : null}
       </KeyboardAvoidingView>
@@ -1490,9 +1486,11 @@ export default function AIAssistantScreen() {
                   </Svg>
                 </View>
                 <View>
-                  <Text style={styles.modalHeaderTitle}>AI ასისტენტი</Text>
+                  <Text style={styles.modalHeaderTitle}>
+                    {t("aiAssistant.title")}
+                  </Text>
                   <Text style={styles.modalHeaderSubtitle}>
-                    Powered By Hapttic
+                    {t("aiAssistant.poweredBy")}
                   </Text>
                 </View>
               </View>
@@ -1603,9 +1601,7 @@ export default function AIAssistantScreen() {
 
                 <TouchableOpacity
                   style={styles.negFeedbackProblemRow}
-                  onPress={() =>
-                    setNegFeedbackPickerOpen((open) => !open)
-                  }
+                  onPress={() => setNegFeedbackPickerOpen((open) => !open)}
                   activeOpacity={0.75}
                 >
                   <Text style={styles.negFeedbackProblemLabel}>პრობლემა</Text>
@@ -1616,11 +1612,7 @@ export default function AIAssistantScreen() {
                     >
                       {negFeedbackLabelFor(negFeedbackProblem)}
                     </Text>
-                    <Ionicons
-                      name="swap-vertical"
-                      size={18}
-                      color="#6B7280"
-                    />
+                    <Ionicons name="swap-vertical" size={18} color="#6B7280" />
                   </View>
                 </TouchableOpacity>
 
@@ -1756,12 +1748,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 14,
     fontFamily: "Poppins-Bold",
     color: "#1F2937",
   },
   headerSubtitle: {
-    fontSize: 12,
+    fontSize: 10,
     fontFamily: "Poppins-Regular",
     color: "#6B7280",
     marginTop: 2,
@@ -1866,30 +1858,32 @@ const styles = StyleSheet.create({
   bannerContainer: {
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingVertical: 24,
+    paddingVertical: 16,
   },
   bannerCard: {
-    width: 120,
-    height: 120,
+    width: 96,
+    height: 96,
     backgroundColor: "transparent",
     borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 12,
   },
   bannerTitle: {
-    fontSize: 18,
+    fontSize: 15,
     fontFamily: "Poppins-Bold",
     color: "#1F2937",
-    marginBottom: 8,
+    marginBottom: 6,
     textAlign: "center",
+    paddingHorizontal: 8,
   },
   bannerDescription: {
-    fontSize: 16,
+    fontSize: 12,
     fontFamily: "Poppins-Regular",
     color: "#6B7280",
     textAlign: "center",
-    lineHeight: 24,
+    lineHeight: 17,
+    paddingHorizontal: 12,
   },
   promptsSection: {
     paddingHorizontal: 16,
@@ -1906,28 +1900,44 @@ const styles = StyleSheet.create({
   },
   promptCard: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     backgroundColor: "#FFFFFF",
     borderRadius: 12,
-    padding: 16,
-    gap: 12,
+    padding: 12,
+    gap: 10,
+  },
+  promptIcon: {
+    marginTop: 1,
   },
   promptText: {
     flex: 1,
-    fontSize: 14,
+    flexShrink: 1,
+    fontSize: 12,
     fontFamily: "Poppins-Regular",
     color: "#374151",
-    lineHeight: 22,
+    lineHeight: 17,
+  },
+  inputSection: {
+    borderTopWidth: 1,
+    borderTopColor: "#F3F4F6",
+    backgroundColor: "#FFFFFF",
+    paddingBottom: 8,
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "flex-end",
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#F3F4F6",
-    backgroundColor: "#FFFFFF",
+    paddingTop: 12,
     gap: 8,
+  },
+  aiDisclaimer: {
+    fontSize: 10,
+    fontFamily: "Poppins-Regular",
+    color: "#9CA3AF",
+    textAlign: "center",
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    lineHeight: 14,
   },
   inputWrapper: {
     flex: 1,
@@ -1935,9 +1945,9 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: "#F9FAFB",
     borderRadius: 24,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 15,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 13,
     fontFamily: "Poppins-Regular",
     color: "#1F2937",
     maxHeight: 100,

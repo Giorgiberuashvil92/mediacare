@@ -5,15 +5,14 @@ import {
   misHisForm100FirstIndexInBody,
   parseMisPrintFormDocuments,
 } from "@/lib/mis-print-forms/html";
-import { runMisPrintFormsPdfAction } from "@/lib/mis-print-forms/pdf";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import * as FileSystem from "expo-file-system/legacy";
 import { useFocusEffect, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Linking,
   Modal,
   RefreshControl,
   ScrollView,
@@ -23,6 +22,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { WebView } from "react-native-webview";
 import { apiService } from "../_services/api";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -165,6 +165,12 @@ const History = () => {
   const [loadingDocVisitId, setLoadingDocVisitId] = useState<string | null>(
     null,
   );
+  const [selectedDocumentPreview, setSelectedDocumentPreview] = useState<{
+    url?: string;
+    html?: string;
+    name?: string;
+  } | null>(null);
+  const [downloadingPreview, setDownloadingPreview] = useState(false);
   const loadedVisitDocIdsRef = useRef<Set<string>>(new Set());
   const inFlightDocVisitIdsRef = useRef<Set<string>>(new Set());
 
@@ -199,6 +205,88 @@ const History = () => {
       runMisPrintFormsSync();
     }, [runMisPrintFormsSync]),
   );
+
+  const openDocumentPreview = (url?: string, name?: string) => {
+    if (!url) {
+      Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა");
+      return;
+    }
+    setSelectedDocumentPreview({ url, name });
+  };
+
+  const openHtmlAsPdfPreview = async (html: string, name: string) => {
+    const trimmed = (html || "").trim();
+    if (!trimmed) {
+      Alert.alert("შეცდომა", "ფაილის გახსნა ვერ მოხერხდა");
+      return;
+    }
+
+    const wrappedHtml = /<html[\s>]/i.test(trimmed)
+      ? trimmed
+      : `<!DOCTYPE html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/></head><body>${trimmed}</body></html>`;
+
+    setSelectedDocumentPreview({
+      html: wrappedHtml,
+      name,
+    });
+  };
+
+  const handleDownloadPreview = async () => {
+    if (!selectedDocumentPreview || downloadingPreview) return;
+
+    try {
+      setDownloadingPreview(true);
+      const shareAvailable = await Sharing.isAvailableAsync();
+      if (!shareAvailable) {
+        Alert.alert("შენიშვნა", "გადმოწერა ამ მოწყობილობაზე მიუწვდომელია");
+        return;
+      }
+
+      const cacheDir = (FileSystem as any).cacheDirectory || "";
+      const safeName = (selectedDocumentPreview.name || "document")
+        .replace(/[^\w\-.]/g, "_")
+        .slice(0, 80);
+
+      if (selectedDocumentPreview.url) {
+        const src = selectedDocumentPreview.url;
+        if (src.startsWith("file://")) {
+          await Sharing.shareAsync(src, {
+            dialogTitle: "დოკუმენტის გადმოწერა",
+          });
+          return;
+        }
+
+        const targetPath = `${cacheDir}${safeName || `document_${Date.now()}`}.pdf`;
+        const downloaded = await FileSystem.downloadAsync(src, targetPath);
+        if (downloaded.status !== 200) {
+          throw new Error("ვერ მოხერხდა ფაილის გადმოწერა");
+        }
+
+        await Sharing.shareAsync(downloaded.uri, {
+          dialogTitle: "დოკუმენტის გადმოწერა",
+          mimeType: "application/pdf",
+          UTI: "com.adobe.pdf",
+        });
+        return;
+      }
+
+      if (selectedDocumentPreview.html) {
+        const htmlPath = `${cacheDir}${safeName || `document_${Date.now()}`}.html`;
+        await FileSystem.writeAsStringAsync(htmlPath, selectedDocumentPreview.html, {
+          encoding: FileSystem.EncodingType.UTF8,
+        });
+        await Sharing.shareAsync(htmlPath, {
+          dialogTitle: "დოკუმენტის გადმოწერა",
+          mimeType: "text/html",
+        });
+      }
+    } catch (error) {
+      console.error("[History] Failed to download preview:", error);
+      Alert.alert("შეცდომა", "გადმოწერა ვერ მოხერხდა");
+    } finally {
+      setDownloadingPreview(false);
+    }
+  };
 
   const loadPastAppointments = async () => {
     try {
@@ -453,9 +541,7 @@ const History = () => {
     if (visit.form100?.pdfUrl?.trim()) {
       try {
         const url = visit.form100.pdfUrl.trim();
-        const canOpen = await Linking.canOpenURL(url);
-        if (canOpen) await Linking.openURL(url);
-        else Alert.alert("შეცდომა", "PDF ფაილის გახსნა ვერ მოხერხდა");
+        openDocumentPreview(url, "ფორმა 100");
       } catch (e) {
         console.error("Error opening Form 100:", e);
         Alert.alert("შეცდომა", "PDF ფაილის გახსნა ვერ მოხერხდა");
@@ -498,12 +584,7 @@ const History = () => {
         }
 
         if (htmlForPdf) {
-          await runMisPrintFormsPdfAction({
-            appointmentId: id,
-            action: "download",
-            htmlForPdf,
-            shareDialogTitle: "ფორმა 100",
-          });
+          await openHtmlAsPdfPreview(htmlForPdf, "ფორმა 100");
           return;
         }
       }
@@ -537,15 +618,7 @@ const History = () => {
         refetch: true,
       });
       if (dl.success && dl.uri) {
-        const canShare = await Sharing.isAvailableAsync();
-        if (canShare) {
-          await Sharing.shareAsync(dl.uri, {
-            mimeType: dl.contentType || "application/pdf",
-            dialogTitle: "ფორმა 100",
-          });
-        } else {
-          await Linking.openURL(dl.uri);
-        }
+        openDocumentPreview(dl.uri, "ფორმა 100");
       } else {
         Alert.alert("შეცდომა", "PDF-ის ჩამოტვირთვა ვერ მოხერხდა");
       }
@@ -599,12 +672,7 @@ const History = () => {
         }
 
         if (htmlForPdf) {
-          await runMisPrintFormsPdfAction({
-            appointmentId: id,
-            action: "download",
-            htmlForPdf,
-            shareDialogTitle: "კალკულაცია",
-          });
+          await openHtmlAsPdfPreview(htmlForPdf, "კალკულაცია");
           return;
         }
       }
@@ -1107,12 +1175,7 @@ const History = () => {
                                   style={styles.uploadedDocItem}
                                   onPress={() => {
                                     if (url) {
-                                      Linking.openURL(url).catch(() =>
-                                        Alert.alert(
-                                          "შეცდომა",
-                                          "ფაილის გახსნა ვერ მოხერხდა",
-                                        ),
-                                      );
+                                      openDocumentPreview(url, doc.name);
                                     }
                                   }}
                                   disabled={!url}
@@ -1208,20 +1271,14 @@ const History = () => {
 
                                           if (isPdf) {
                                             const googleDocsUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=false`;
-                                            Linking.openURL(
+                                            openDocumentPreview(
                                               googleDocsUrl,
-                                            ).catch(() =>
-                                              Alert.alert(
-                                                "შეცდომა",
-                                                "ფაილის გახსნა ვერ მოხერხდა",
-                                              ),
+                                              test.resultFile?.name,
                                             );
                                           } else {
-                                            Linking.openURL(url).catch(() =>
-                                              Alert.alert(
-                                                "შეცდომა",
-                                                "ფაილის გახსნა ვერ მოხერხდა",
-                                              ),
+                                            openDocumentPreview(
+                                              url,
+                                              test.resultFile?.name,
                                             );
                                           }
                                         }
@@ -1296,20 +1353,14 @@ const History = () => {
 
                                           if (isPdf) {
                                             const googleDocsUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=false`;
-                                            Linking.openURL(
+                                            openDocumentPreview(
                                               googleDocsUrl,
-                                            ).catch(() =>
-                                              Alert.alert(
-                                                "შეცდომა",
-                                                "ფაილის გახსნა ვერ მოხერხდა",
-                                              ),
+                                              test.resultFile?.name,
                                             );
                                           } else {
-                                            Linking.openURL(url).catch(() =>
-                                              Alert.alert(
-                                                "შეცდომა",
-                                                "ფაილის გახსნა ვერ მოხერხდა",
-                                              ),
+                                            openDocumentPreview(
+                                              url,
+                                              test.resultFile?.name,
                                             );
                                           }
                                         }
@@ -1355,6 +1406,59 @@ const History = () => {
           )}
         </View>
       </ScrollView>
+
+      {/* Diagnosis Modal */}
+      <Modal
+        visible={!!selectedDocumentPreview}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setSelectedDocumentPreview(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.documentPreviewModalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {selectedDocumentPreview?.name || "დოკუმენტის ნახვა"}
+              </Text>
+              <View style={styles.previewHeaderActions}>
+                <TouchableOpacity
+                  onPress={handleDownloadPreview}
+                  style={styles.downloadButton}
+                  disabled={downloadingPreview}
+                >
+                  {downloadingPreview ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Ionicons name="download-outline" size={16} color="#FFFFFF" />
+                      <Text style={styles.downloadButtonText}>გადმოწერა</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setSelectedDocumentPreview(null)}
+                  style={styles.closeButton}
+                >
+                  <Ionicons name="close" size={24} color="#6B7280" />
+                </TouchableOpacity>
+              </View>
+            </View>
+            <View style={styles.documentPreviewBody}>
+              {selectedDocumentPreview ? (
+                <WebView
+                  source={
+                    selectedDocumentPreview.html
+                      ? { html: selectedDocumentPreview.html }
+                      : { uri: selectedDocumentPreview.url || "" }
+                  }
+                  style={styles.documentPreviewWebView}
+                  startInLoadingState
+                />
+              ) : null}
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Diagnosis Modal */}
       <Modal
@@ -2183,6 +2287,20 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     maxHeight: "90%",
   },
+  documentPreviewModalContent: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    height: "88%",
+  },
+  documentPreviewBody: {
+    flex: 1,
+    backgroundColor: "#F8FAFC",
+  },
+  documentPreviewWebView: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+  },
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -2191,6 +2309,25 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: "#E5E7EB",
+  },
+  previewHeaderActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  downloadButton: {
+    height: 34,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: "#06B6D4",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  downloadButtonText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontFamily: "Poppins-SemiBold",
   },
   modalTitle: {
     fontSize: 20,

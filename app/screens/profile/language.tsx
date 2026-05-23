@@ -1,6 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
-import React, { useState } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -9,59 +8,47 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SupportedLanguage,
+  useLanguage,
+} from "../../contexts/LanguageContext";
 
-interface Language {
-  id: string;
-  name: string;
-  nativeName: string;
-}
+const LANGUAGES: { code: SupportedLanguage; labelKey: string }[] = [
+  { code: "ka", labelKey: "common.language.georgian" },
+  { code: "en", labelKey: "common.language.english" },
+  { code: "ru", labelKey: "common.language.russian" },
+];
 
 const LanguageScreen = () => {
-  const [selectedLanguage, setSelectedLanguage] = useState("english");
+  const { language, setLanguage, t } = useLanguage();
 
-  const languages: Language[] = [
-    { id: "georgian", name: "Georgian", nativeName: "ქართული" },
-    { id: "russian", name: "Russian", nativeName: "Русский" },
-    { id: "english", name: "English", nativeName: "English" },
-  ];
-
-  const handleLanguageSelect = (languageId: string) => {
-    setSelectedLanguage(languageId);
-  };
-
-  const handleBack = () => {
-    router.back();
+  const handleLanguageSelect = async (code: SupportedLanguage) => {
+    await setLanguage(code);
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={20} color="#1F2937" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Language</Text>
+        <Text style={styles.headerTitle}>{t("profile.language.title")}</Text>
         <View style={styles.placeholder} />
       </View>
 
-      {/* Content */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Languages List */}
         <View style={styles.languagesContainer}>
-          {languages.map((language) => (
+          {LANGUAGES.map((item) => (
             <TouchableOpacity
-              key={language.id}
+              key={item.code}
               style={styles.languageItem}
-              onPress={() => handleLanguageSelect(language.id)}
+              onPress={() => handleLanguageSelect(item.code)}
             >
               <View style={styles.languageInfo}>
-                <Text style={styles.languageName}>{language.name}</Text>
-                <Text style={styles.languageNativeName}>
-                  {language.nativeName}
-                </Text>
+                <Text style={styles.languageNativeName}>{t(item.labelKey)}</Text>
               </View>
               <View style={styles.radioButton}>
-                {selectedLanguage === language.id && (
+                {language === item.code && (
                   <View style={styles.radioButtonSelected} />
                 )}
               </View>
@@ -127,16 +114,10 @@ const styles = StyleSheet.create({
   languageInfo: {
     flex: 1,
   },
-  languageName: {
+  languageNativeName: {
     fontSize: 16,
     fontFamily: "Poppins-SemiBold",
     color: "#1F2937",
-    marginBottom: 2,
-  },
-  languageNativeName: {
-    fontSize: 14,
-    fontFamily: "Poppins-Regular",
-    color: "#6B7280",
   },
   radioButton: {
     width: 20,

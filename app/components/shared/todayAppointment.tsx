@@ -4,6 +4,11 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useAuth } from "../../contexts/AuthContext";
+import { useLanguage } from "../../contexts/LanguageContext";
+import {
+  formatAppointmentDate,
+  formatAppointmentTime,
+} from "../../utils/appointmentDateTime";
 
 interface PatientAppointment {
   id: string;
@@ -30,6 +35,7 @@ interface PatientAppointment {
 const TodayAppointment = () => {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
+  const { t } = useLanguage();
   const [showModal, setShowModal] = useState(false);
   const [todayAppointments, setTodayAppointments] = useState<
     PatientAppointment[]
@@ -277,9 +283,19 @@ const TodayAppointment = () => {
             </Text>
           </View>
           <View style={styles.infoRow}>
+            <Ionicons name="calendar-outline" size={16} color="#FFFFFF" />
+            <Text style={styles.time}>
+              {formatAppointmentDate(
+                appointment.formattedDate || appointment.date || "",
+              )}
+            </Text>
+          </View>
+          <View style={styles.infoRow}>
             <Ionicons name="time-outline" size={16} color="#FFFFFF" />
             <Text style={styles.time}>
-              {appointment.time || appointment.appointmentTime}
+              {formatAppointmentTime(
+                appointment.time || appointment.appointmentTime || "",
+              )}
             </Text>
           </View>
         </View>
@@ -325,12 +341,25 @@ const TodayAppointment = () => {
                 </View>
 
                 <View style={styles.detailRow}>
+                  <Ionicons name="calendar-outline" size={20} color="#8B5CF6" />
+                  <View style={styles.detailContent}>
+                    <Text style={styles.detailLabel}>თარიღი</Text>
+                    <Text style={styles.detailValue}>
+                      {formatAppointmentDate(
+                        appointment.formattedDate || appointment.date || "",
+                      )}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.detailRow}>
                   <Ionicons name="time-outline" size={20} color="#8B5CF6" />
                   <View style={styles.detailContent}>
                     <Text style={styles.detailLabel}>დრო</Text>
                     <Text style={styles.detailValue}>
-                      დანიშნულია{" "}
-                      {appointment.time || appointment.appointmentTime}-ზე
+                      {formatAppointmentTime(
+                        appointment.time || appointment.appointmentTime || "",
+                      )}
                     </Text>
                   </View>
                 </View>
@@ -339,7 +368,9 @@ const TodayAppointment = () => {
               {isConsultationTimePassed() ? (
                 <View style={styles.timePassedContainer}>
                   <Ionicons name="time-outline" size={20} color="#9CA3AF" />
-                  <Text style={styles.timePassedText}>დრო უკვე გავიდა</Text>
+                  <Text style={styles.timePassedText}>
+                    {t("appointments.consultation.expired")}
+                  </Text>
                 </View>
               ) : isJoinButtonActive() && isVideoConsultation ? (
                 <TouchableOpacity

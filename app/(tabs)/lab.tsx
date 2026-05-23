@@ -1,7 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -32,6 +32,7 @@ const fallbackOverview: MedicineShopOverview = {
 };
 
 const Lab = () => {
+  const params = useLocalSearchParams<{ tab?: string }>();
   const [overview, setOverview] = useState<MedicineShopOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,6 +46,18 @@ const Lab = () => {
   useEffect(() => {
     loadOverview();
   }, []);
+
+  useEffect(() => {
+    if (params.tab === "laboratory") {
+      setActiveTab("laboratory");
+      setSelectedCategory(null);
+      return;
+    }
+    if (params.tab === "immunological") {
+      setActiveTab("immunological");
+      setSelectedCategory(null);
+    }
+  }, [params.tab]);
 
   // უკან ღილაკზე კლავიატურის დახურვა (Android)
   useEffect(() => {
@@ -137,7 +150,7 @@ const Lab = () => {
       >
         <View style={styles.headerContent}>
           <View>
-            <Text style={styles.headerTitle}>ლაბორატორია</Text>
+            <Text style={styles.headerTitle}>დიაგნოსტიკური კვლევები </Text>
             <Text style={styles.headerSubtitle}>
               ანალიზები და ლაბორატორიული ტესტები
             </Text>
@@ -150,6 +163,13 @@ const Lab = () => {
 
       <TouchableWithoutFeedback onPress={dismissKeyboard} accessible={false}>
         <View style={styles.mainContent}>
+          <View style={styles.centralBanner}>
+            <Text style={styles.centralBannerText}>
+              {activeTab === "laboratory"
+                ? "ეს ფუნქცია მალე დაემატება — შეძლებ ლაბორატორიული კვლევის სახლში გამოძახებას"
+                : "ეს ფუნქცია მალე დაემატება — შეძლებ ინსტრუმენტული კვლევის კლინიკაში დაჯავშნას"}
+            </Text>
+          </View>
           {/* Tabs */}
           <View style={styles.tabsContainer}>
             <TouchableOpacity
@@ -187,7 +207,7 @@ const Lab = () => {
                   activeTab === "immunological" && styles.tabTextActive,
                 ]}
               >
-                იმუნოლოგიური
+                ინსტრუმენტული
               </Text>
             </TouchableOpacity>
           </View>
@@ -314,20 +334,7 @@ const ProductCard = ({ product }: { product: ShopProduct }) => {
     <TouchableOpacity
       style={styles.productCard}
       activeOpacity={0.9}
-      onPress={() =>
-        router.push({
-          pathname: "/screens/lab/product/[id]",
-          params: {
-            id: product.id,
-            name: product.name || "",
-            description: product.description || "",
-            price: product.price?.toString() || "0",
-            discountPercent: product.discountPercent?.toString() || "",
-            imageUrl: product.imageUrl || "",
-            category: product.category || "",
-          },
-        })
-      }
+      onPress={() => {}}
     >
       <View style={styles.productImageContainer}>
         {Boolean(product.imageUrl) && !imageError ? (
@@ -356,7 +363,7 @@ const ProductCard = ({ product }: { product: ShopProduct }) => {
           {String(product.name || "")}
         </Text>
         {Boolean(product.description) && (
-          <Text style={styles.productDescription} numberOfLines={2}>
+          <Text style={styles.productDescription} numberOfLines={1}>
             {String(product.description || "")}
           </Text>
         )}
@@ -376,24 +383,6 @@ const ProductCard = ({ product }: { product: ShopProduct }) => {
               </Text>
             )}
           </View>
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={() =>
-              router.push({
-                pathname: "/screens/lab/select-clinic",
-                params: {
-                  productId: product.id,
-                  productName: product.name || "",
-                  productPrice: product.price?.toString() || "0",
-                  productImage: product.imageUrl || "",
-                  productDescription: product.description || "",
-                },
-              })
-            }
-            activeOpacity={0.8}
-          >
-            <Ionicons name="add" size={20} color="#FFFFFF" />
-          </TouchableOpacity>
         </View>
       </View>
     </TouchableOpacity>
@@ -407,6 +396,26 @@ const styles = StyleSheet.create({
   },
   mainContent: {
     flex: 1,
+  },
+  centralBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    marginHorizontal: 20,
+    marginTop: 12,
+    marginBottom: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: "#0891B2",
+    borderRadius: 14,
+  },
+  centralBannerText: {
+    fontSize: 12,
+    lineHeight: 16,
+    color: "#FFFFFF",
+    fontFamily: "Poppins-SemiBold",
+    textAlign: "center",
   },
   loadingContainer: {
     flex: 1,
@@ -430,7 +439,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: "700",
     color: "#FFFFFF",
     fontFamily: "Poppins-Bold",
@@ -587,19 +596,22 @@ const styles = StyleSheet.create({
   },
   productCard: {
     width: "100%",
+    flexDirection: "row",
     backgroundColor: "#FFFFFF",
-    borderRadius: 20,
+    borderRadius: 16,
     overflow: "hidden",
-    marginBottom: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 5,
+    elevation: 2,
   },
   productImageContainer: {
-    width: "100%",
-    height: 140,
+    width: 92,
+    height: 92,
     backgroundColor: "#F1F5F9",
     position: "relative",
   },
@@ -616,12 +628,12 @@ const styles = StyleSheet.create({
   },
   discountBadge: {
     position: "absolute",
-    top: 8,
-    right: 8,
+    top: 6,
+    right: 6,
     backgroundColor: "#EF4444",
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
   },
   discountText: {
     color: "#FFFFFF",
@@ -630,30 +642,33 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins-Bold",
   },
   productContent: {
-    padding: 12,
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    justifyContent: "space-between",
   },
   productName: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "600",
     color: "#1F2937",
     fontFamily: "Poppins-SemiBold",
-    marginBottom: 6,
-    minHeight: 40,
+    marginBottom: 4,
+    minHeight: 20,
   },
   productDescription: {
-    fontSize: 12,
+    fontSize: 11,
     color: "#64748B",
     fontFamily: "Poppins-Regular",
-    marginBottom: 12,
-    lineHeight: 16,
+    marginBottom: 8,
+    lineHeight: 14,
   },
   productFooter: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-end",
+    alignItems: "center",
   },
   productPrice: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "700",
     color: "#06B6D4",
     fontFamily: "Poppins-Bold",
@@ -664,19 +679,6 @@ const styles = StyleSheet.create({
     textDecorationLine: "line-through",
     fontFamily: "Poppins-Regular",
     marginTop: 2,
-  },
-  addButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#06B6D4",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#06B6D4",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
   },
 });
 

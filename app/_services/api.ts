@@ -179,6 +179,8 @@ export interface AuthResponse {
 export interface Specialization {
   _id: string;
   name: string;
+  nameEn?: string;
+  nameRu?: string;
   description?: string;
   isActive: boolean;
   symptoms?: string[];

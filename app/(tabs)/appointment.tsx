@@ -2,13 +2,15 @@ import { apiService } from "@/app/_services/api";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system/legacy";
 import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import * as Sharing from "expo-sharing";
 import { useEffect, useState } from "react";
+import { WebView } from "react-native-webview";
 import {
   ActivityIndicator,
   Alert,
-  Linking,
   Modal,
   RefreshControl,
   ScrollView,
@@ -19,6 +21,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../contexts/AuthContext";
+import { useLanguage } from "../contexts/LanguageContext";
 
 interface PatientAppointment {
   id: string;
@@ -233,6 +236,7 @@ const mapAppointmentFromAPI = (
 };
 
 const Appointment = () => {
+  const { t } = useLanguage();
   const router = useRouter();
   const params = useLocalSearchParams<{ filterType?: string }>();
   const { isAuthenticated, user } = useAuth();
@@ -304,11 +308,80 @@ const Appointment = () => {
   // Modal for "consultation time not yet" message
   const [showConsultationTimeModal, setShowConsultationTimeModal] =
     useState(false);
+  const [selectedDocumentPreview, setSelectedDocumentPreview] = useState<{
+    url: string;
+    name?: string;
+    type?: string;
+  } | null>(null);
+  const [downloadingPreview, setDownloadingPreview] = useState(false);
 
   // Cancel states
   const [cancellingAppointmentId, setCancellingAppointmentId] = useState<
     string | null
   >(null);
+
+  const isImageDocument = (doc?: { url?: string; type?: string; name?: string }) => {
+    if (!doc?.url) return false;
+    const byMime = (doc.type || "").toLowerCase();
+    if (byMime.startsWith("image/")) return true;
+    const lowerUrl = doc.url.toLowerCase();
+    return (
+      lowerUrl.endsWith(".jpg") ||
+      lowerUrl.endsWith(".jpeg") ||
+      lowerUrl.endsWith(".png") ||
+      lowerUrl.endsWith(".webp") ||
+      lowerUrl.endsWith(".gif")
+    );
+  };
+
+  const handleDownloadPreview = async () => {
+    if (!selectedDocumentPreview || downloadingPreview) return;
+
+    try {
+      setDownloadingPreview(true);
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        Alert.alert("შენიშვნა", "გადმოწერა ამ მოწყობილობაზე მიუწვდომელია");
+        return;
+      }
+
+      const sourceUrl = selectedDocumentPreview.url;
+      const cacheDir = (FileSystem as any).cacheDirectory || "";
+      const safeBaseName = (selectedDocumentPreview.name || "document")
+        .replace(/[^\w\-.]/g, "_")
+        .slice(0, 80);
+      const lowerUrl = sourceUrl.toLowerCase();
+      const extension = lowerUrl.endsWith(".pdf")
+        ? "pdf"
+        : isImageDocument(selectedDocumentPreview)
+          ? "jpg"
+          : "pdf";
+      const targetPath = `${cacheDir}${safeBaseName || `document_${Date.now()}`}.${extension}`;
+
+      if (sourceUrl.startsWith("file://")) {
+        await Sharing.shareAsync(sourceUrl, {
+          dialogTitle: "დოკუმენტის გადმოწერა",
+        });
+        return;
+      }
+
+      const downloaded = await FileSystem.downloadAsync(sourceUrl, targetPath);
+      if (downloaded.status !== 200) {
+        throw new Error("ვერ მოხერხდა ფაილის გადმოწერა");
+      }
+
+      await Sharing.shareAsync(downloaded.uri, {
+        dialogTitle: "დოკუმენტის გადმოწერა",
+        mimeType: extension === "pdf" ? "application/pdf" : "image/jpeg",
+        UTI: extension === "pdf" ? "com.adobe.pdf" : "public.jpeg",
+      });
+    } catch (error) {
+      console.error("[Appointment] Failed to download preview:", error);
+      Alert.alert("შეცდომა", "გადმოწერა ვერ მოხერხდა");
+    } finally {
+      setDownloadingPreview(false);
+    }
+  };
 
   // Load appointments from API
   useEffect(() => {
@@ -1231,13 +1304,7 @@ const Appointment = () => {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerContent}>
-            <Text style={styles.title}>ჩემი ჯავშნები</Text>
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => router.push("/screens/doctors/doctors-list")}
-            >
-              <Ionicons name="add" size={24} color="#FFFFFF" />
-            </TouchableOpacity>
+            <Text style={styles.title}>{t("appointments.tab.title")}</Text>
           </View>
         </View>
 
@@ -1263,7 +1330,7 @@ const Appointment = () => {
                 filterType === "video" && styles.typeFilterTextActive,
               ]}
             >
-              ვიდეო
+              {t("appointments.tab.filter.video")}
             </Text>
           </TouchableOpacity>
 
@@ -1287,7 +1354,7 @@ const Appointment = () => {
                 filterType === "home-visit" && styles.typeFilterTextActive,
               ]}
             >
-              ბინაზე
+              {t("appointments.tab.filter.visit")}
             </Text>
           </TouchableOpacity>
         </View>
@@ -1320,7 +1387,7 @@ const Appointment = () => {
                 filterStatus === "scheduled" && styles.statLabelActive,
               ]}
             >
-              მიმდინარე
+              {t("appointments.tab.status.current")}
             </Text>
           </TouchableOpacity>
         </View>
@@ -1347,9 +1414,11 @@ const Appointment = () => {
           {filteredAppointments.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="calendar-outline" size={64} color="#D1D5DB" />
-              <Text style={styles.emptyStateTitle}>ჯავშნები ვერ მოიძებნა</Text>
+              <Text style={styles.emptyStateTitle}>
+                {t("appointments.tab.notFound.title")}
+              </Text>
               <Text style={styles.emptyStateText}>
-                სცადეთ განსხვავებული ფილტრები
+                {t("appointments.tab.notFound.hint")}
               </Text>
             </View>
           ) : (
@@ -1573,7 +1642,13 @@ const Appointment = () => {
                                 key={doc.url || idx}
                                 style={styles.uploadedDocItem}
                                 onPress={() => {
-                                  if (doc.url) Linking.openURL(doc.url);
+                                  if (doc.url) {
+                                    setSelectedDocumentPreview({
+                                      url: doc.url,
+                                      name: doc.name,
+                                      type: doc.type,
+                                    });
+                                  }
                                 }}
                               >
                                 <Ionicons
@@ -1901,7 +1976,13 @@ const Appointment = () => {
                             key={doc.url || idx}
                             style={styles.uploadedDocItem}
                             onPress={() => {
-                              if (doc.url) Linking.openURL(doc.url);
+                              if (doc.url) {
+                                setSelectedDocumentPreview({
+                                  url: doc.url,
+                                  name: doc.name,
+                                  type: doc.type,
+                                });
+                              }
                             }}
                           >
                             <Ionicons
@@ -2373,6 +2454,62 @@ const Appointment = () => {
                   გასაგებია
                 </Text>
               </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={!!selectedDocumentPreview}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setSelectedDocumentPreview(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.documentPreviewModalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {selectedDocumentPreview?.name || "დოკუმენტის ნახვა"}
+              </Text>
+              <View style={styles.previewHeaderActions}>
+                <TouchableOpacity
+                  onPress={handleDownloadPreview}
+                  style={styles.downloadButton}
+                  disabled={downloadingPreview}
+                >
+                  {downloadingPreview ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Ionicons name="download-outline" size={16} color="#FFFFFF" />
+                      <Text style={styles.downloadButtonText}>გადმოწერა</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setSelectedDocumentPreview(null)}
+                  style={styles.closeButton}
+                >
+                  <Ionicons name="close" size={24} color="#6B7280" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.documentPreviewBody}>
+              {selectedDocumentPreview &&
+              isImageDocument(selectedDocumentPreview) ? (
+                <Image
+                  source={{ uri: selectedDocumentPreview.url }}
+                  style={styles.documentPreviewImage}
+                  contentFit="contain"
+                />
+              ) : selectedDocumentPreview ? (
+                <WebView
+                  source={{ uri: selectedDocumentPreview.url }}
+                  style={styles.documentPreviewWebView}
+                  startInLoadingState
+                />
+              ) : null}
             </View>
           </View>
         </View>
@@ -3003,6 +3140,43 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: "80%",
+  },
+  documentPreviewModalContent: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    height: "88%",
+  },
+  documentPreviewBody: {
+    flex: 1,
+    backgroundColor: "#F8FAFC",
+  },
+  documentPreviewImage: {
+    width: "100%",
+    height: "100%",
+  },
+  documentPreviewWebView: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+  },
+  previewHeaderActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  downloadButton: {
+    height: 34,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: "#06B6D4",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  downloadButtonText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontFamily: "Poppins-SemiBold",
   },
   modalHeader: {
     flexDirection: "row",

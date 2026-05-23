@@ -5,8 +5,15 @@ export type SpecializationDocument = Specialization & Document;
 
 @Schema({ timestamps: true })
 export class Specialization {
+  /** Georgian — canonical key for doctor.specialization matching */
   @Prop({ required: true, unique: true, trim: true })
   name: string;
+
+  @Prop({ trim: true })
+  nameEn?: string;
+
+  @Prop({ trim: true })
+  nameRu?: string;
 
   @Prop()
   description?: string;

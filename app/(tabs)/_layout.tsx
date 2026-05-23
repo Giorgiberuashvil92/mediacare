@@ -5,6 +5,7 @@ import { Tabs, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import FloatingAIAssistant from "../components/ui/FloatingAIAssistant";
+import { useLanguage } from "../contexts/LanguageContext";
 import {
   CallOverlayState,
   getCallOverlayState,
@@ -13,6 +14,7 @@ import {
 
 export default function TabLayout() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [callOverlay, setCallOverlay] = useState<CallOverlayState>(
     getCallOverlayState(),
   );
@@ -44,7 +46,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="index"
           options={{
-            title: "მთავარი",
+            title: t("tabs.home"),
             headerShown: false,
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="home" size={size} color={color} />
@@ -55,7 +57,7 @@ export default function TabLayout() {
           name="doctor"
           options={{
             headerShown: false,
-            title: "ექიმები",
+            title: t("tabs.doctors"),
             tabBarIcon: ({ color, size }) => (
               <FontAwesome6 name="user-doctor" size={size} color={color} />
             ),
@@ -64,7 +66,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="lab"
           options={{
-            title: "კვლევები",
+            title: t("tabs.lab"),
             headerShown: false,
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="flask-outline" size={size} color={color} />
@@ -74,7 +76,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="appointment"
           options={{
-            title: "ჯავშნები",
+            title: t("tabs.appointments"),
             headerShown: false,
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="calendar-outline" size={size} color={color} />
@@ -84,7 +86,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="ai-assistant"
           options={{
-            title: "AI ასისტენტი",
+            title: t("tabs.aiAssistant"),
             headerShown: false,
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="chatbubbles" size={size} color={color} />
@@ -94,7 +96,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="history"
           options={{
-            title: "ისტორია",
+            title: t("tabs.history"),
             headerShown: false,
             tabBarIcon: ({ color, size }) => (
               <AntDesign name="calendar" size={size} color={color} />
@@ -104,7 +106,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="settings"
           options={{
-            title: "პარამეტრები",
+            title: t("tabs.settings"),
             headerShown: false,
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="settings-outline" size={size} color={color} />

@@ -1111,7 +1111,7 @@ const styles = StyleSheet.create<any>({
   // Quick Actions
   quickActionsSection: {
     paddingHorizontal: 20,
-    marginBottom: 24,
+    marginBottom: 10,
   },
   quickActionsTitle: {
     fontSize: 18,

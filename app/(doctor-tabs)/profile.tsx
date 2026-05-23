@@ -38,18 +38,6 @@ export default function DoctorProfile() {
 
     const missingFields: string[] = [];
 
-    if (!doctorProfile.about || doctorProfile.about.trim() === "") {
-      missingFields.push("შესახებ");
-    }
-    if (!doctorProfile.specialization) {
-      missingFields.push("სპეციალიზაცია");
-    }
-    if (!doctorProfile.experience) {
-      missingFields.push("გამოცდილება");
-    }
-    if (!doctorProfile.videoConsultationFee) {
-      missingFields.push("ვიდეო კონსულტაციის ფასი");
-    }
     if (!doctorProfile.profileImage) {
       missingFields.push("პროფილის ფოტო");
     }

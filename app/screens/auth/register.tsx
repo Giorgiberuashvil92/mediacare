@@ -98,7 +98,7 @@ export default function RegisterScreen() {
   const [nationality, setNationality] = useState<
     "georgian" | "non-georgian" | null
   >(null);
-  const [showPassportInfoModal, setShowPassportInfoModal] = useState(false);
+  const [showScanInfoModal, setShowScanInfoModal] = useState(false);
 
   const [showIdentomatModal, setShowIdentomatModal] = useState(false);
   const [identomatUrl, setIdentomatUrl] = useState<string>("");
@@ -108,9 +108,7 @@ export default function RegisterScreen() {
     useState<string>("");
   const [identomatLoading, setIdentomatLoading] = useState(false);
 
-  const nameInputRef = useRef<TextInput>(null);
   const emailInputRef = useRef<TextInput>(null);
-  const idNumberInputRef = useRef<TextInput>(null);
   const phoneInputRef = useRef<TextInput>(null);
   const degreesInputRef = useRef<TextInput>(null);
   const experienceInputRef = useRef<TextInput>(null);
@@ -157,6 +155,15 @@ export default function RegisterScreen() {
     };
 
     loadSpecializations();
+  }, [selectedRole]);
+
+  useEffect(() => {
+    if (selectedRole === "doctor") {
+      setNationality(null);
+      setIsIdentomatVerified(false);
+      setIdentomatData(null);
+      setIdNumber("");
+    }
   }, [selectedRole]);
 
   const onDateChange = (event: any, selectedDate?: Date) => {
@@ -895,17 +902,26 @@ export default function RegisterScreen() {
     if (selectedRole === "doctor") {
       if (!degrees.trim()) {
         console.log("❌ [Register] Degrees validation failed for doctor");
-        showToast.error("გთხოვთ შეიყვანოთ ხარისხი", "შეცდომა");
+        showToast.error(
+          t("auth.register.validation.degrees"),
+          t("auth.register.error.default"),
+        );
         return;
       }
       if (!experience.trim()) {
         console.log("❌ [Register] Experience validation failed for doctor");
-        showToast.error("გთხოვთ შეიყვანოთ გამოცდილება", "შეცდომა");
+        showToast.error(
+          t("auth.register.validation.experience"),
+          t("auth.register.error.default"),
+        );
         return;
       }
       if (!location.trim()) {
         console.log("❌ [Register] Location validation failed for doctor");
-        showToast.error("გთხოვთ შეიყვანოთ მდებარეობა", "შეცდომა");
+        showToast.error(
+          t("auth.register.validation.location"),
+          t("auth.register.error.default"),
+        );
         return;
       }
       if (!dateOfBirth.trim()) {
@@ -1133,7 +1149,7 @@ export default function RegisterScreen() {
       );
 
       if (!resultResponse.ok) {
-        throw new Error("IDENTOMAT შედეგის მიღება ვერ მოხერხდა");
+        throw new Error(t("identomat.error.resultFailed"));
       }
 
       const resultData = await resultResponse.json();
@@ -1579,8 +1595,8 @@ export default function RegisterScreen() {
         });
 
         showToast.success(
-          "IDENTOMAT-ით იდენტიფიკაცია წარმატებით დასრულდა",
-          "წარმატება",
+          t("identomat.success.completed"),
+          t("auth.forgotPassword.success.title"),
         );
 
         // Close modal after short delay
@@ -1590,15 +1606,16 @@ export default function RegisterScreen() {
           setIdentomatSessionToken("");
         }, 1500);
       } else {
-        throw new Error("IDENTOMAT-ის შედეგში ID ნომერი ვერ მოიძებნა");
+        throw new Error(t("identomat.error.idNotFound"));
       }
     } catch (error) {
       console.error("❌ [IDENTOMAT] Error getting result:", error);
       Alert.alert(
-        "შეცდომა",
+        t("identomat.error.title"),
         error instanceof Error
           ? error.message
-          : "IDENTOMAT-ის შედეგის მიღება ვერ მოხერხდა",
+          : t("identomat.error.resultFailed"),
+        [{ text: t("common.actions.ok") }],
       );
     } finally {
       setIdentomatLoading(false);
@@ -1606,6 +1623,124 @@ export default function RegisterScreen() {
   };
 
   const isDoctor = selectedRole === "doctor";
+
+  const profileKey = (suffix: string) =>
+    t(
+      isDoctor ? `doctor.profile.${suffix}` : `auth.register.profile.${suffix}`,
+    );
+
+  const renderRegistrationHeader = () => {
+    if (isDoctor) {
+      return (
+        <>
+          <Text style={styles.title}>{t("auth.register.title.doctor")}</Text>
+          <Text style={[styles.subtitle, styles.subtitleStandalone]}>
+            {t("auth.register.subtitle.doctor")}
+          </Text>
+        </>
+      );
+    }
+
+    if (nationality === "non-georgian") {
+      return (
+        <>
+          <Text style={styles.title}>
+            {t("auth.register.title.foreignPatient")}
+          </Text>
+        </>
+      );
+    }
+
+    return (
+      <>
+        <Text style={styles.title}>{t("auth.register.title.patient")}</Text>
+        <Text style={styles.subtitle}>
+          {t("auth.register.subtitle.patient")}
+        </Text>
+        <Text style={styles.subtitleDescription}>
+          {t("auth.register.subtitle.patientDescription")}
+        </Text>
+      </>
+    );
+  };
+
+  const renderProfileImageSection = () => (
+    <View style={styles.inputContainer}>
+      <Text style={styles.label}>{profileKey("label")}</Text>
+      <View style={styles.profileUploadCard}>
+        <TouchableOpacity
+          style={styles.profileAvatarButton}
+          onPress={handleProfileImagePick}
+          disabled={uploadingProfileImage}
+          activeOpacity={0.85}
+        >
+          <View style={styles.profileAvatarWrapper}>
+            <View
+              style={[
+                styles.profileAvatarRing,
+                profileImage && styles.profileAvatarRingFilled,
+              ]}
+            >
+              {profileImage?.uri ? (
+                <Image
+                  source={{ uri: profileImage.uri }}
+                  style={styles.profileAvatarImage}
+                  contentFit="cover"
+                />
+              ) : (
+                <View style={styles.profileAvatarEmpty}>
+                  <Ionicons name="person" size={40} color="#94A3B8" />
+                  <Text style={styles.profileAvatarPlaceholder}>
+                    {profileKey("placeholder")}
+                  </Text>
+                </View>
+              )}
+            </View>
+            <View style={styles.profileAvatarBadge}>
+              {uploadingProfileImage ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Ionicons name="camera" size={18} color="#FFFFFF" />
+              )}
+            </View>
+          </View>
+        </TouchableOpacity>
+
+        {uploadingProfileImage ? (
+          <Text style={styles.profileUploadStatus}>
+            {profileKey("uploading")}
+          </Text>
+        ) : (
+          <TouchableOpacity
+            onPress={handleProfileImagePick}
+            disabled={uploadingProfileImage}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.profileUploadAction}>
+              {profileImage ? profileKey("change") : profileKey("upload")}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {profileImage?.name && !uploadingProfileImage ? (
+          <Text style={styles.profileFileName} numberOfLines={1}>
+            {profileImage.name}
+          </Text>
+        ) : null}
+
+        <Text style={styles.profileHint}>{profileKey("hint")}</Text>
+
+        {profileImage && !uploadingProfileImage ? (
+          <TouchableOpacity
+            onPress={() => setProfileImage(null)}
+            hitSlop={{ top: 8, bottom: 8, left: 12, right: 12 }}
+          >
+            <Text style={styles.profileRemoveText}>{profileKey("remove")}</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+    </View>
+  );
 
   return (
     <View style={styles.container}>
@@ -1623,1258 +1758,1107 @@ export default function RegisterScreen() {
             keyboardShouldPersistTaps="handled"
           >
             <View style={styles.content}>
-              {/* Logo */}
-              <View style={styles.logoContainer}>
-                <View style={styles.logo}>
-                  <Image
-                    source={require("../../../assets/images/logo/logo.png")}
-                    style={styles.logoImage}
-                    contentFit="contain"
-                  />
-                </View>
-              </View>
-            </View>
-
-            {/* Title */}
-            <Text style={styles.title}>
-              {isDoctor
-                ? t("auth.register.title.doctor")
-                : t("auth.register.title.patient")}
-            </Text>
-            <Text style={styles.subtitle}>
-              {isDoctor
-                ? t("auth.register.subtitle.doctor")
-                : t("auth.register.subtitle.patient")}
-            </Text>
-
-            {/* Role Switcher */}
-
-            {/* Nationality Selection - Only for patients */}
-            {!isDoctor && nationality === null && (
-              <View style={styles.form}>
-                <View style={styles.inputContainer}>
-                  <Text style={styles.label}>
-                    {t("auth.register.nationality.label")}
-                  </Text>
-                  <View style={styles.nationalityContainer}>
-                    <TouchableOpacity
-                      style={[
-                        styles.nationalityOption,
-                        nationality === "georgian" &&
-                          styles.nationalityOptionSelected,
-                      ]}
-                      onPress={() => setNationality("georgian")}
-                    >
-                      <Ionicons
-                        name="flag-outline"
-                        size={24}
-                        color={
-                          nationality === "georgian" ? "#06B6D4" : "#6B7280"
-                        }
-                      />
-                      <Text
-                        style={[
-                          styles.nationalityText,
-                          nationality === "georgian" &&
-                            styles.nationalityTextSelected,
-                        ]}
-                      >
-                        {t("auth.register.nationality.georgian")}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.nationalityOption,
-                        nationality === "non-georgian" &&
-                          styles.nationalityOptionSelected,
-                      ]}
-                      onPress={() => setNationality("non-georgian")}
-                    >
-                      <Ionicons
-                        name="globe-outline"
-                        size={24}
-                        color={
-                          nationality === "non-georgian" ? "#06B6D4" : "#6B7280"
-                        }
-                      />
-                      <Text
-                        style={[
-                          styles.nationalityText,
-                          nationality === "non-georgian" &&
-                            styles.nationalityTextSelected,
-                        ]}
-                      >
-                        {t("auth.register.nationality.nonGeorgian")}
-                      </Text>
-                    </TouchableOpacity>
+              <View style={styles.topHeader}>
+                <View style={styles.logoContainer}>
+                  <View style={styles.logo}>
+                    <Image
+                      source={require("../../../assets/images/logo/logo.png")}
+                      style={styles.logoImage}
+                      contentFit="contain"
+                    />
                   </View>
                 </View>
-              </View>
-            )}
 
-            {/* Form */}
-            {((!isDoctor && nationality !== null) || isDoctor) && (
-              <View style={styles.form}>
-                {/* ID Number Input */}
-                <View style={styles.inputContainer}>
-                  <View style={styles.labelRow}>
+                {renderRegistrationHeader()}
+              </View>
+
+              {/* Role Switcher */}
+
+              {/* Nationality Selection - Only for patients */}
+              {!isDoctor && nationality === null && (
+                <View style={styles.form}>
+                  <View style={styles.inputContainer}>
                     <Text style={styles.label}>
-                      {!isDoctor && nationality === "non-georgian"
-                        ? t("auth.register.idNumber.label.passport")
-                        : t("auth.register.idNumber.label")}{" "}
-                      *
+                      {t("auth.register.nationality.label")}
                     </Text>
-                    {!isDoctor && nationality === "non-georgian" && (
+                    <View style={styles.nationalityContainer}>
                       <TouchableOpacity
-                        onPress={() => setShowPassportInfoModal(true)}
-                        style={styles.infoButton}
+                        style={[
+                          styles.nationalityOption,
+                          nationality === "georgian" &&
+                            styles.nationalityOptionSelected,
+                        ]}
+                        onPress={() => setNationality("georgian")}
                       >
                         <Ionicons
-                          name="information-circle"
-                          size={20}
-                          color="#06B6D4"
+                          name="flag-outline"
+                          size={24}
+                          color={
+                            nationality === "georgian" ? "#06B6D4" : "#6B7280"
+                          }
                         />
+                        <View style={styles.nationalityTextBlock}>
+                          <Text
+                            style={[
+                              styles.nationalityText,
+                              nationality === "georgian" &&
+                                styles.nationalityTextSelected,
+                            ]}
+                          >
+                            {t("auth.register.nationality.georgian")}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.nationalityTextSub,
+                              nationality === "georgian" &&
+                                styles.nationalityTextSubSelected,
+                            ]}
+                          >
+                            {t("auth.register.nationality.georgianSub")}
+                          </Text>
+                        </View>
                       </TouchableOpacity>
-                    )}
+                      <TouchableOpacity
+                        style={[
+                          styles.nationalityOption,
+                          nationality === "non-georgian" &&
+                            styles.nationalityOptionSelected,
+                        ]}
+                        onPress={() => setNationality("non-georgian")}
+                      >
+                        <Ionicons
+                          name="globe-outline"
+                          size={24}
+                          color={
+                            nationality === "non-georgian"
+                              ? "#06B6D4"
+                              : "#6B7280"
+                          }
+                        />
+                        <View style={styles.nationalityTextBlock}>
+                          <Text
+                            style={[
+                              styles.nationalityText,
+                              nationality === "non-georgian" &&
+                                styles.nationalityTextSelected,
+                            ]}
+                          >
+                            {t("auth.register.nationality.nonGeorgian")}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.nationalityTextSub,
+                              nationality === "non-georgian" &&
+                                styles.nationalityTextSubSelected,
+                            ]}
+                          >
+                            {t("auth.register.nationality.nonGeorgianSub")}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                  {((!isDoctor && nationality !== null) || isDoctor) && (
-                    <TouchableOpacity
-                      style={[
-                        styles.identomatButton,
-                        styles.identomatButtonFull,
-                        identomatLoading && styles.identomatButtonDisabled,
-                      ]}
-                      onPress={async () => {
-                        if (identomatLoading) return;
+                </View>
+              )}
 
-                        try {
-                          setIdentomatLoading(true);
+              {/* Form */}
+              {((!isDoctor && nationality !== null) || isDoctor) && (
+                <View style={styles.form}>
+                  {/* Identomat — doctor & patient flows differ below */}
+                  <View style={styles.inputContainer}>
+                    <View style={styles.labelRow}>
+                      <Text style={styles.label}>
+                        {isDoctor
+                          ? t("auth.register.scanId.label")
+                          : nationality === "non-georgian"
+                            ? t("auth.register.scanId.label.passport")
+                            : t("auth.register.scanId.label")}{" "}
+                        *
+                      </Text>
+                      {!isDoctor && (
+                        <TouchableOpacity
+                          onPress={() => setShowScanInfoModal(true)}
+                          style={styles.infoButton}
+                        >
+                          <Ionicons
+                            name="information-circle"
+                            size={20}
+                            color="#06B6D4"
+                          />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                    {((!isDoctor && nationality !== null) || isDoctor) && (
+                      <TouchableOpacity
+                        style={[
+                          styles.identomatButton,
+                          styles.identomatButtonFull,
+                          identomatLoading && styles.identomatButtonDisabled,
+                        ]}
+                        onPress={async () => {
+                          if (identomatLoading) return;
 
-                          const COMPANY_KEY =
-                            "699c6dc7915fc8ed730c5034_0c1c01bb7b27253e3abe4d2ab9c573ff0ca5931f";
-                          const beginResponse = await fetch(
-                            "https://widget.identomat.com/external-api/begin/",
-                            {
-                              method: "POST",
-                              headers: {
-                                "Content-Type": "application/json",
-                              },
-                              body: JSON.stringify({
-                                company_key: COMPANY_KEY,
-                                flags: {
-                                  skip_agreement: true,
-                                  skip_document: false,
-                                  skip_face: false,
-                                  language: isDoctor
-                                    ? "ka"
-                                    : nationality === "georgian"
-                                      ? "ka"
-                                      : "en",
+                          try {
+                            setIdentomatLoading(true);
+
+                            const COMPANY_KEY =
+                              "699c6dc7915fc8ed730c5034_0c1c01bb7b27253e3abe4d2ab9c573ff0ca5931f";
+                            const beginResponse = await fetch(
+                              "https://widget.identomat.com/external-api/begin/",
+                              {
+                                method: "POST",
+                                headers: {
+                                  "Content-Type": "application/json",
                                 },
-                                steps: [
-                                  {
-                                    type: "face",
-                                    key: "face",
+                                body: JSON.stringify({
+                                  company_key: COMPANY_KEY,
+                                  flags: {
+                                    skip_agreement: true,
+                                    skip_document: false,
+                                    skip_face: false,
+                                    language: isDoctor
+                                      ? "ka"
+                                      : nationality === "georgian"
+                                        ? "ka"
+                                        : "en",
                                   },
-                                  {
-                                    type: "document",
-                                    key: "document",
-                                  },
-                                ],
-                              }),
-                            },
-                          );
-
-                          console.log(
-                            "📨 [IDENTOMAT] Begin response status:",
-                            beginResponse.status,
-                            beginResponse.statusText,
-                          );
-
-                          if (!beginResponse.ok) {
-                            const errorText = await beginResponse.text();
-                            console.error(
-                              "❌ [IDENTOMAT] Begin error response:",
-                              errorText,
+                                  steps: [
+                                    {
+                                      type: "face",
+                                      key: "face",
+                                    },
+                                    {
+                                      type: "document",
+                                      key: "document",
+                                    },
+                                  ],
+                                }),
+                              },
                             );
-                            throw new Error(
-                              `IDENTOMAT session-ის დაწყება ვერ მოხერხდა: ${beginResponse.status} ${beginResponse.statusText}`,
+
+                            console.log(
+                              "📨 [IDENTOMAT] Begin response status:",
+                              beginResponse.status,
+                              beginResponse.statusText,
                             );
-                          }
 
-                          const beginData = await beginResponse.json();
-                          console.log(
-                            "✅ [IDENTOMAT] Begin response data:",
-                            beginData,
-                          );
-                          console.log(
-                            "✅ [IDENTOMAT] Response type:",
-                            typeof beginData,
-                          );
+                            if (!beginResponse.ok) {
+                              const errorText = await beginResponse.text();
+                              console.error(
+                                "❌ [IDENTOMAT] Begin error response:",
+                                errorText,
+                              );
+                              throw new Error(
+                                `IDENTOMAT session-ის დაწყება ვერ მოხერხდა: ${beginResponse.status} ${beginResponse.statusText}`,
+                              );
+                            }
 
-                          // API returns session token directly as a string, not as an object
-                          let sessionToken: string;
-
-                          if (typeof beginData === "string") {
-                            // Response is a string (session token directly)
-                            sessionToken = beginData;
-                          } else if (
-                            typeof beginData === "object" &&
-                            beginData !== null
-                          ) {
-                            // Response is an object, try different possible field names
-                            sessionToken =
-                              beginData.session_token ||
-                              beginData.sessionToken ||
-                              beginData.token ||
-                              beginData.data?.session_token ||
-                              beginData.data?.token ||
-                              "";
-                          } else {
-                            throw new Error(
-                              `Unexpected response type: ${typeof beginData}`,
-                            );
-                          }
-
-                          if (!sessionToken || sessionToken.trim() === "") {
-                            console.error(
-                              "❌ [IDENTOMAT] No session token in response. Response:",
+                            const beginData = await beginResponse.json();
+                            console.log(
+                              "✅ [IDENTOMAT] Begin response data:",
                               beginData,
                             );
-                            throw new Error(
-                              `Session token-ის მიღება ვერ მოხერხდა. Response: ${JSON.stringify(beginData)}`,
+                            console.log(
+                              "✅ [IDENTOMAT] Response type:",
+                              typeof beginData,
                             );
+
+                            // API returns session token directly as a string, not as an object
+                            let sessionToken: string;
+
+                            if (typeof beginData === "string") {
+                              // Response is a string (session token directly)
+                              sessionToken = beginData;
+                            } else if (
+                              typeof beginData === "object" &&
+                              beginData !== null
+                            ) {
+                              // Response is an object, try different possible field names
+                              sessionToken =
+                                beginData.session_token ||
+                                beginData.sessionToken ||
+                                beginData.token ||
+                                beginData.data?.session_token ||
+                                beginData.data?.token ||
+                                "";
+                            } else {
+                              throw new Error(
+                                `Unexpected response type: ${typeof beginData}`,
+                              );
+                            }
+
+                            if (!sessionToken || sessionToken.trim() === "") {
+                              console.error(
+                                "❌ [IDENTOMAT] No session token in response. Response:",
+                                beginData,
+                              );
+                              throw new Error(
+                                `Session token-ის მიღება ვერ მოხერხდა. Response: ${JSON.stringify(beginData)}`,
+                              );
+                            }
+
+                            console.log(
+                              "✅ [IDENTOMAT] Session token received:",
+                              sessionToken.substring(0, 20) + "...",
+                            );
+
+                            setIdentomatSessionToken(sessionToken);
+
+                            // Step 2: Open WebView with session token
+                            const widgetUrl = `https://widget.identomat.com/?session_token=${sessionToken}`;
+                            setIdentomatUrl(widgetUrl);
+                            setShowIdentomatModal(true);
+                          } catch (error) {
+                            console.error(
+                              "❌ [IDENTOMAT] Error starting session:",
+                              error,
+                            );
+                            Alert.alert(
+                              "შეცდომა",
+                              error instanceof Error
+                                ? error.message
+                                : "IDENTOMAT-ის იდენტიფიკაცია ვერ მოხერხდა",
+                            );
+                          } finally {
+                            setIdentomatLoading(false);
                           }
+                        }}
+                        disabled={identomatLoading}
+                      >
+                        {identomatLoading ? (
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                          <>
+                            <Ionicons
+                              name="finger-print-outline"
+                              size={20}
+                              color="#FFFFFF"
+                            />
+                            <Text style={styles.identomatButtonText}>
+                              IDENTOMAT
+                            </Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    )}
+                    {(isDoctor ||
+                      (!isDoctor && nationality === "georgian")) && (
+                      <>
+                        <Text style={styles.subLabel}>
+                          {t("auth.register.idNumber.label")}
+                        </Text>
+                        <View style={styles.idNumberRow}>
+                          <View
+                            style={[
+                              styles.inputWrapper,
+                              styles.idNumberInputWrapper,
+                            ]}
+                          >
+                            <Ionicons
+                              name="card-outline"
+                              size={20}
+                              color="#9CA3AF"
+                              style={styles.inputIcon}
+                            />
+                            <Text
+                              style={[
+                                styles.input,
+                                !idNumber && styles.inputPlaceholder,
+                              ]}
+                            >
+                              {idNumber ||
+                                t("auth.register.idNumber.placeholder")}
+                            </Text>
+                          </View>
+                        </View>
+                      </>
+                    )}
+                    {isIdentomatVerified && (
+                      <View style={styles.identomatSuccessContainer}>
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={16}
+                          color="#10B981"
+                        />
+                        <Text style={styles.identomatSuccessText}>
+                          {t("identomat.success.verified")}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
 
-                          console.log(
-                            "✅ [IDENTOMAT] Session token received:",
-                            sessionToken.substring(0, 20) + "...",
-                          );
+                  {/* Name Input */}
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.label}>
+                      {t("auth.register.name.label")} *
+                    </Text>
+                    <View style={styles.inputWrapper}>
+                      <Ionicons
+                        name="person-outline"
+                        size={20}
+                        color="#9CA3AF"
+                        style={styles.inputIcon}
+                      />
+                      <Text
+                        style={[styles.input, !name && styles.inputPlaceholder]}
+                      >
+                        {name || t("auth.register.name.placeholder")}
+                      </Text>
+                    </View>
+                  </View>
 
-                          setIdentomatSessionToken(sessionToken);
-
-                          // Step 2: Open WebView with session token
-                          const widgetUrl = `https://widget.identomat.com/?session_token=${sessionToken}`;
-                          setIdentomatUrl(widgetUrl);
-                          setShowIdentomatModal(true);
-                        } catch (error) {
-                          console.error(
-                            "❌ [IDENTOMAT] Error starting session:",
-                            error,
-                          );
-                          Alert.alert(
-                            "შეცდომა",
-                            error instanceof Error
-                              ? error.message
-                              : "IDENTOMAT-ის იდენტიფიკაცია ვერ მოხერხდა",
-                          );
-                        } finally {
-                          setIdentomatLoading(false);
-                        }
-                      }}
-                      disabled={identomatLoading}
-                    >
-                      {identomatLoading ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
-                      ) : (
-                        <>
-                          <Ionicons
-                            name="finger-print-outline"
-                            size={20}
-                            color="#FFFFFF"
-                          />
-                          <Text style={styles.identomatButtonText}>
-                            IDENTOMAT
-                          </Text>
-                        </>
-                      )}
+                  {/* Date of Birth */}
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.label}>
+                      {isDoctor
+                        ? t("doctor.dob.label")
+                        : t("auth.register.dob.label")}{" "}
+                      *
+                    </Text>
+                    <TouchableOpacity style={styles.inputWrapper} disabled>
+                      <Ionicons
+                        name="calendar-outline"
+                        size={20}
+                        color="#9CA3AF"
+                        style={styles.inputIcon}
+                      />
+                      <Text
+                        style={[
+                          styles.input,
+                          !dateOfBirth && styles.inputPlaceholder,
+                        ]}
+                      >
+                        {dateOfBirth ||
+                          (isDoctor
+                            ? t("doctor.dob.placeholder")
+                            : t("auth.register.dob.placeholder"))}
+                      </Text>
                     </TouchableOpacity>
-                  )}
-                  <View style={styles.idNumberRow}>
+                  </View>
+
+                  {/* Email Input */}
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.label}>
+                      {t("auth.register.email.label")} *
+                    </Text>
                     <TouchableOpacity
                       activeOpacity={1}
-                      style={[styles.inputWrapper, styles.idNumberInputWrapper]}
-                      onPress={() => idNumberInputRef.current?.focus()}
+                      style={styles.inputWrapper}
+                      onPress={() => emailInputRef.current?.focus()}
                     >
                       <Ionicons
-                        name="card-outline"
+                        name="mail-outline"
                         size={20}
                         color="#9CA3AF"
                         style={styles.inputIcon}
                       />
                       <TextInput
-                        ref={idNumberInputRef}
+                        ref={emailInputRef}
                         style={styles.input}
-                        placeholder={
-                          !isDoctor && nationality === "non-georgian"
-                            ? t("auth.register.idNumber.placeholder.passport")
-                            : t("auth.register.idNumber.placeholder")
-                        }
+                        placeholder={t("auth.register.email.placeholder")}
                         placeholderTextColor="#9CA3AF"
-                        value={idNumber}
-                        onChangeText={setIdNumber}
+                        value={email}
+                        onChangeText={setEmail}
+                        textContentType="none"
+                        autoComplete="off"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        keyboardType="email-address"
+                      />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Phone Input */}
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.label}>
+                      {t("auth.register.phone.label")} *
+                    </Text>
+                    <TouchableOpacity
+                      activeOpacity={1}
+                      style={styles.inputWrapper}
+                      onPress={() => phoneInputRef.current?.focus()}
+                    >
+                      <Ionicons
+                        name="call-outline"
+                        size={20}
+                        color="#9CA3AF"
+                        style={styles.inputIcon}
+                      />
+                      <TextInput
+                        ref={phoneInputRef}
+                        style={styles.input}
+                        placeholder={t("auth.register.phone.placeholder")}
+                        placeholderTextColor="#9CA3AF"
+                        value={phone}
+                        onChangeText={setPhone}
+                        textContentType="none"
+                        autoComplete="off"
+                        autoCorrect={false}
+                        keyboardType="phone-pad"
+                      />
+                    </TouchableOpacity>
+
+                    {/* Phone Verification Button */}
+                    {!isPhoneVerified && phone.trim() && (
+                      <TouchableOpacity
+                        style={styles.verifyPhoneButton}
+                        onPress={() => setShowOTPModal(true)}
+                      >
+                        <Ionicons
+                          name="shield-checkmark-outline"
+                          size={20}
+                          color="#06B6D4"
+                        />
+                        <Text style={styles.verifyPhoneButtonText}>
+                          ტელეფონის ვერიფიკაცია
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+
+                    {/* Verified Status */}
+                    {isPhoneVerified && (
+                      <View style={styles.verifiedContainer}>
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={20}
+                          color="#10B981"
+                        />
+                        <Text style={styles.verifiedText}>
+                          ტელეფონი დადასტურებულია
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Patient specific fields */}
+                  {!isDoctor && (
+                    <>
+                      {/* Gender Selection */}
+                      <View style={styles.inputContainer}>
+                        <Text style={styles.label}>
+                          {t("doctor.gender.label")} *
+                        </Text>
+                        <View style={styles.genderContainer}>
+                          <TouchableOpacity
+                            style={[
+                              styles.genderOption,
+                              gender === "male" && styles.genderOptionSelected,
+                            ]}
+                            onPress={() => setGender("male")}
+                          >
+                            <Ionicons
+                              name="male"
+                              size={20}
+                              color={gender === "male" ? "#06B6D4" : "#6B7280"}
+                            />
+                            <Text
+                              style={[
+                                styles.genderText,
+                                gender === "male" && styles.genderTextSelected,
+                              ]}
+                            >
+                              {t("doctor.gender.male")}
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[
+                              styles.genderOption,
+                              gender === "female" &&
+                                styles.genderOptionSelected,
+                            ]}
+                            onPress={() => setGender("female")}
+                          >
+                            <Ionicons
+                              name="female"
+                              size={20}
+                              color={
+                                gender === "female" ? "#06B6D4" : "#6B7280"
+                              }
+                            />
+                            <Text
+                              style={[
+                                styles.genderText,
+                                gender === "female" &&
+                                  styles.genderTextSelected,
+                              ]}
+                            >
+                              {t("doctor.gender.female")}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+
+                      {/* Address Input */}
+                      <View style={styles.inputContainer}>
+                        <Text style={styles.label}>
+                          {t("auth.register.address.label")} *
+                        </Text>
+                        <TouchableOpacity
+                          activeOpacity={1}
+                          style={styles.inputWrapper}
+                          onPress={() => addressInputRef.current?.focus()}
+                        >
+                          <Ionicons
+                            name="location-outline"
+                            size={20}
+                            color="#9CA3AF"
+                            style={styles.inputIcon}
+                          />
+                          <TextInput
+                            ref={addressInputRef}
+                            style={styles.input}
+                            placeholder={t("auth.register.address.placeholder")}
+                            placeholderTextColor="#9CA3AF"
+                            value={address}
+                            onChangeText={setAddress}
+                            textContentType="none"
+                            autoComplete="off"
+                            autoCorrect={false}
+                            keyboardType="default"
+                          />
+                        </TouchableOpacity>
+                      </View>
+
+                      {renderProfileImageSection()}
+                    </>
+                  )}
+
+                  {isDoctor && (
+                    <>
+                      <View style={styles.inputContainer}>
+                        <Text style={styles.label}>
+                          {t("doctor.specialization.label")} *
+                        </Text>
+                        {loadingSpecializations ? (
+                          <View style={styles.specializationsLoading}>
+                            <ActivityIndicator size="small" color="#06B6D4" />
+                            <Text style={styles.specializationsLoadingText}>
+                              {t("doctor.specialization.loading")}
+                            </Text>
+                          </View>
+                        ) : specializations.length > 0 ? (
+                          <>
+                            <TouchableOpacity
+                              style={styles.multiSelectButton}
+                              onPress={() =>
+                                setSpecializationModalVisible(true)
+                              }
+                            >
+                              <Ionicons
+                                name="medical-outline"
+                                size={20}
+                                color="#06B6D4"
+                                style={styles.multiSelectIcon}
+                              />
+                              <View style={styles.multiSelectTextContainer}>
+                                <Text style={styles.multiSelectLabel}>
+                                  {t("doctor.specialization.selectPlaceholder")}
+                                </Text>
+                                <Text
+                                  style={[
+                                    styles.multiSelectValue,
+                                    selectedSpecializations.length === 0 &&
+                                      styles.multiSelectPlaceholder,
+                                  ]}
+                                  numberOfLines={1}
+                                >
+                                  {selectedSpecializations.length > 0
+                                    ? selectedSpecializations.join(", ")
+                                    : t(
+                                        "doctor.specialization.selectPlaceholder",
+                                      )}
+                                </Text>
+                              </View>
+                              <Ionicons
+                                name="chevron-down"
+                                size={18}
+                                color="#9CA3AF"
+                              />
+                            </TouchableOpacity>
+                            <Text style={styles.multiSelectHelper}>
+                              {t("doctor.specialization.helper")}
+                            </Text>
+                          </>
+                        ) : (
+                          <Text style={styles.specializationsEmpty}>
+                            {t("doctor.specialization.empty")}
+                          </Text>
+                        )}
+                      </View>
+
+                      {/* Degrees Input */}
+                      <View style={styles.inputContainer}>
+                        <Text style={styles.label}>
+                          {t("doctor.degrees.label")} *
+                        </Text>
+                        <TouchableOpacity
+                          activeOpacity={1}
+                          style={styles.inputWrapper}
+                          onPress={() => degreesInputRef.current?.focus()}
+                        >
+                          <Ionicons
+                            name="school-outline"
+                            size={20}
+                            color="#9CA3AF"
+                            style={styles.inputIcon}
+                          />
+                          <TextInput
+                            ref={degreesInputRef}
+                            style={styles.input}
+                            placeholder={t("doctor.degrees.placeholder")}
+                            placeholderTextColor="#9CA3AF"
+                            value={degrees}
+                            onChangeText={setDegrees}
+                            textContentType="none"
+                            autoComplete="off"
+                            autoCorrect={false}
+                            keyboardType="default"
+                          />
+                        </TouchableOpacity>
+                      </View>
+
+                      {/* Experience Input */}
+                      <View style={styles.inputContainer}>
+                        <Text style={styles.label}>
+                          {t("doctor.experience.label")} *
+                        </Text>
+                        <TouchableOpacity
+                          activeOpacity={1}
+                          style={styles.inputWrapper}
+                          onPress={() => experienceInputRef.current?.focus()}
+                        >
+                          <Ionicons
+                            name="briefcase-outline"
+                            size={20}
+                            color="#9CA3AF"
+                            style={styles.inputIcon}
+                          />
+                          <TextInput
+                            ref={experienceInputRef}
+                            style={styles.input}
+                            placeholder={t("doctor.experience.placeholder")}
+                            placeholderTextColor="#9CA3AF"
+                            value={experience}
+                            onChangeText={setExperience}
+                            textContentType="none"
+                            autoComplete="off"
+                            autoCorrect={false}
+                            keyboardType="default"
+                          />
+                        </TouchableOpacity>
+                      </View>
+
+                      {/* Location Input */}
+                      <View style={styles.inputContainer}>
+                        <Text style={styles.label}>
+                          {t("doctor.location.label")} *
+                        </Text>
+                        <TouchableOpacity
+                          activeOpacity={1}
+                          style={styles.inputWrapper}
+                          onPress={() => locationInputRef.current?.focus()}
+                        >
+                          <Ionicons
+                            name="location-outline"
+                            size={20}
+                            color="#9CA3AF"
+                            style={styles.inputIcon}
+                          />
+                          <TextInput
+                            ref={locationInputRef}
+                            style={styles.input}
+                            placeholder={t("doctor.location.placeholder")}
+                            placeholderTextColor="#9CA3AF"
+                            value={location}
+                            onChangeText={setLocation}
+                            textContentType="none"
+                            autoComplete="off"
+                            autoCorrect={false}
+                            keyboardType="default"
+                          />
+                        </TouchableOpacity>
+                      </View>
+
+                      {/* Gender Selection */}
+                      <View style={styles.inputContainer}>
+                        <Text style={styles.label}>
+                          {t("doctor.gender.label")} *
+                        </Text>
+                        <View style={styles.genderContainer}>
+                          <TouchableOpacity
+                            style={[
+                              styles.genderOption,
+                              gender === "male" && styles.genderOptionSelected,
+                            ]}
+                            onPress={() => setGender("male")}
+                          >
+                            <Ionicons
+                              name="male"
+                              size={20}
+                              color={gender === "male" ? "#06B6D4" : "#6B7280"}
+                            />
+                            <Text
+                              style={[
+                                styles.genderText,
+                                gender === "male" && styles.genderTextSelected,
+                              ]}
+                            >
+                              {t("doctor.gender.male")}
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[
+                              styles.genderOption,
+                              gender === "female" &&
+                                styles.genderOptionSelected,
+                            ]}
+                            onPress={() => setGender("female")}
+                          >
+                            <Ionicons
+                              name="female"
+                              size={20}
+                              color={
+                                gender === "female" ? "#06B6D4" : "#6B7280"
+                              }
+                            />
+                            <Text
+                              style={[
+                                styles.genderText,
+                                gender === "female" &&
+                                  styles.genderTextSelected,
+                              ]}
+                            >
+                              {t("doctor.gender.female")}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+
+                      {/* Working Language Input */}
+                      <View style={styles.inputContainer}>
+                        <Text style={styles.label}>
+                          {t("doctor.workingLanguage.label")} *
+                        </Text>
+                        <TouchableOpacity
+                          activeOpacity={1}
+                          style={styles.inputWrapper}
+                          onPress={() => aboutInputRef.current?.focus()}
+                        >
+                          <Ionicons
+                            name="language-outline"
+                            size={20}
+                            color="#9CA3AF"
+                            style={styles.inputIcon}
+                          />
+                          <TextInput
+                            ref={aboutInputRef}
+                            style={styles.input}
+                            placeholder={t(
+                              "doctor.workingLanguage.placeholder",
+                            )}
+                            placeholderTextColor="#9CA3AF"
+                            value={about}
+                            onChangeText={setAbout}
+                            textContentType="none"
+                            autoComplete="off"
+                            autoCorrect={false}
+                            keyboardType="default"
+                          />
+                        </TouchableOpacity>
+                      </View>
+
+                      {/* License Document */}
+                      <View style={styles.inputContainer}>
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 8,
+                            marginBottom: 8,
+                          }}
+                        >
+                          <Text style={styles.label}>
+                            {t("doctor.license.label")}
+                          </Text>
+                          <TouchableOpacity
+                            onPress={() => setShowLicenseInfoModal(true)}
+                            style={{ padding: 4 }}
+                          >
+                            <Ionicons
+                              name="information-circle-outline"
+                              size={20}
+                              color="#06B6D4"
+                            />
+                          </TouchableOpacity>
+                        </View>
+                        <TouchableOpacity
+                          style={[
+                            styles.filePickerButton,
+                            licenseDocument && styles.filePickerButtonActive,
+                          ]}
+                          onPress={handleFilePick}
+                          disabled={uploadingFile}
+                        >
+                          <Ionicons
+                            name={
+                              licenseDocument
+                                ? "checkmark-circle"
+                                : "cloud-upload-outline"
+                            }
+                            size={20}
+                            color={licenseDocument ? "#10B981" : "#9CA3AF"}
+                            style={styles.inputIcon}
+                          />
+                          {uploadingFile ? (
+                            <View style={styles.uploadingContainer}>
+                              <ActivityIndicator size="small" color="#06B6D4" />
+                              <Text style={styles.uploadingText}>
+                                {t("doctor.license.uploading")}
+                              </Text>
+                            </View>
+                          ) : (
+                            <Text
+                              style={[
+                                styles.filePickerText,
+                                licenseDocument && styles.filePickerTextActive,
+                              ]}
+                            >
+                              {licenseDocument
+                                ? licenseDocument.name
+                                : t("doctor.license.placeholder")}
+                            </Text>
+                          )}
+                          <Ionicons
+                            name="document-attach-outline"
+                            size={20}
+                            color="#9CA3AF"
+                          />
+                        </TouchableOpacity>
+                        {licenseDocument && (
+                          <Text style={styles.fileHelper}>
+                            {t("doctor.license.success")}
+                          </Text>
+                        )}
+                      </View>
+
+                      {renderProfileImageSection()}
+                    </>
+                  )}
+
+                  {/* Password Input */}
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.label}>
+                      {t("auth.register.password.label")} *
+                    </Text>
+                    <TouchableOpacity
+                      activeOpacity={1}
+                      style={styles.inputWrapper}
+                      onPress={() => passwordInputRef.current?.focus()}
+                    >
+                      <Ionicons
+                        name="lock-closed-outline"
+                        size={20}
+                        color="#9CA3AF"
+                        style={styles.inputIcon}
+                      />
+                      <TextInput
+                        ref={passwordInputRef}
+                        style={styles.input}
+                        secureTextEntry={!showPassword}
+                        placeholder={t("auth.register.password.placeholder")}
+                        placeholderTextColor="#9CA3AF"
+                        value={password}
+                        onChangeText={setPassword}
                         textContentType="none"
                         autoComplete="off"
                         autoCorrect={false}
                         keyboardType="default"
-                        editable={false}
                       />
-                    </TouchableOpacity>
-                  </View>
-                  {isIdentomatVerified && (
-                    <View style={styles.identomatSuccessContainer}>
-                      <Ionicons
-                        name="checkmark-circle"
-                        size={16}
-                        color="#10B981"
-                      />
-                      <Text style={styles.identomatSuccessText}>
-                        IDENTOMAT-ით დადასტურებული
-                      </Text>
-                    </View>
-                  )}
-
-                  {/* Skip IDENTOMAT Button (Temporary for development) */}
-                  {!isIdentomatVerified &&
-                    !isDoctor &&
-                    nationality === "georgian" && (
                       <TouchableOpacity
-                        style={styles.skipIdentomatButton}
-                        onPress={() => {
-                          // Skip IDENTOMAT verification (temporary)
-                          const placeholderIdNumber =
-                            idNumber.trim() || "00000000000";
-                          setIsIdentomatVerified(true);
-                          // Set idNumber in state so validation passes
-                          setIdNumber(placeholderIdNumber);
-                          setIdentomatData({
-                            idNumber: placeholderIdNumber,
-                            firstName: name?.split(" ")[0] || "Skipped",
-                            lastName:
-                              name?.split(" ").slice(1).join(" ") || "User",
-                            dateOfBirth: dateOfBirth || "2000-01-01",
-                            fullData: {
-                              message: "Identomat skipped for development",
-                            },
-                          });
-                          showToast.info(
-                            "IDENTOMAT-ის იდენტიფიკაცია გამოტოვებულია (დროებით)",
-                            "ინფორმაცია",
-                          );
-                        }}
-                      >
-                        <Text style={styles.skipIdentomatButtonText}>
-                          გამოტოვება (დროებით)
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                </View>
-
-                {/* Name Input */}
-                <View style={styles.inputContainer}>
-                  <Text style={styles.label}>
-                    {t("auth.register.name.label")} *
-                  </Text>
-                  <TouchableOpacity
-                    activeOpacity={1}
-                    style={styles.inputWrapper}
-                  >
-                    <Ionicons
-                      name="person-outline"
-                      size={20}
-                      color="#9CA3AF"
-                      style={styles.inputIcon}
-                    />
-                    <TextInput
-                      ref={nameInputRef}
-                      style={styles.input}
-                      placeholder={t("auth.register.name.placeholder")}
-                      placeholderTextColor="#9CA3AF"
-                      value={name}
-                      onChangeText={setName}
-                      textContentType="none"
-                      autoComplete="off"
-                      autoCorrect={false}
-                      keyboardType="default"
-                      editable={false}
-                    />
-                  </TouchableOpacity>
-                </View>
-
-                {/* Date of Birth */}
-                <View style={styles.inputContainer}>
-                  <Text style={styles.label}>
-                    {isDoctor ? t("doctor.dob.label") : "დაბადების თარიღი"} *
-                  </Text>
-                  <TouchableOpacity style={styles.inputWrapper} disabled>
-                    <Ionicons
-                      name="calendar-outline"
-                      size={20}
-                      color="#9CA3AF"
-                      style={styles.inputIcon}
-                    />
-                    <Text
-                      style={[
-                        styles.input,
-                        !dateOfBirth && styles.inputPlaceholder,
-                      ]}
-                    >
-                      {dateOfBirth ||
-                        (isDoctor ? t("doctor.dob.placeholder") : "აირჩიეთ თარიღი")}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Email Input */}
-                <View style={styles.inputContainer}>
-                  <Text style={styles.label}>
-                    {t("auth.register.email.label")} *
-                  </Text>
-                  <TouchableOpacity
-                    activeOpacity={1}
-                    style={styles.inputWrapper}
-                    onPress={() => emailInputRef.current?.focus()}
-                  >
-                    <Ionicons
-                      name="mail-outline"
-                      size={20}
-                      color="#9CA3AF"
-                      style={styles.inputIcon}
-                    />
-                    <TextInput
-                      ref={emailInputRef}
-                      style={styles.input}
-                      placeholder={t("auth.register.email.placeholder")}
-                      placeholderTextColor="#9CA3AF"
-                      value={email}
-                      onChangeText={setEmail}
-                      textContentType="none"
-                      autoComplete="off"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      keyboardType="email-address"
-                    />
-                  </TouchableOpacity>
-                </View>
-
-                {/* Phone Input */}
-                <View style={styles.inputContainer}>
-                  <Text style={styles.label}>
-                    {t("auth.register.phone.label")} *
-                  </Text>
-                  <TouchableOpacity
-                    activeOpacity={1}
-                    style={styles.inputWrapper}
-                    onPress={() => phoneInputRef.current?.focus()}
-                  >
-                    <Ionicons
-                      name="call-outline"
-                      size={20}
-                      color="#9CA3AF"
-                      style={styles.inputIcon}
-                    />
-                    <TextInput
-                      ref={phoneInputRef}
-                      style={styles.input}
-                      placeholder={t("auth.register.phone.placeholder")}
-                      placeholderTextColor="#9CA3AF"
-                      value={phone}
-                      onChangeText={setPhone}
-                      textContentType="none"
-                      autoComplete="off"
-                      autoCorrect={false}
-                      keyboardType="phone-pad"
-                    />
-                  </TouchableOpacity>
-
-                  {/* Phone Verification Button */}
-                  {!isPhoneVerified && phone.trim() && (
-                    <TouchableOpacity
-                      style={styles.verifyPhoneButton}
-                      onPress={() => setShowOTPModal(true)}
-                    >
-                      <Ionicons
-                        name="shield-checkmark-outline"
-                        size={20}
-                        color="#06B6D4"
-                      />
-                      <Text style={styles.verifyPhoneButtonText}>
-                        ტელეფონის ვერიფიკაცია
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-
-                  {/* Verified Status */}
-                  {isPhoneVerified && (
-                    <View style={styles.verifiedContainer}>
-                      <Ionicons
-                        name="checkmark-circle"
-                        size={20}
-                        color="#10B981"
-                      />
-                      <Text style={styles.verifiedText}>
-                        ტელეფონი დადასტურებულია
-                      </Text>
-                    </View>
-                  )}
-                </View>
-
-                {/* Patient specific fields */}
-                {!isDoctor && (
-                  <>
-                    {/* Gender Selection */}
-                    <View style={styles.inputContainer}>
-                      <Text style={styles.label}>სქესი *</Text>
-                      <View style={styles.genderContainer}>
-                        <TouchableOpacity
-                          style={[
-                            styles.genderOption,
-                            gender === "male" && styles.genderOptionSelected,
-                          ]}
-                          onPress={() => setGender("male")}
-                        >
-                          <Ionicons
-                            name="male"
-                            size={20}
-                            color={gender === "male" ? "#06B6D4" : "#6B7280"}
-                          />
-                          <Text
-                            style={[
-                              styles.genderText,
-                              gender === "male" && styles.genderTextSelected,
-                            ]}
-                          >
-                            კაცი
-                          </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[
-                            styles.genderOption,
-                            gender === "female" && styles.genderOptionSelected,
-                          ]}
-                          onPress={() => setGender("female")}
-                        >
-                          <Ionicons
-                            name="female"
-                            size={20}
-                            color={gender === "female" ? "#06B6D4" : "#6B7280"}
-                          />
-                          <Text
-                            style={[
-                              styles.genderText,
-                              gender === "female" && styles.genderTextSelected,
-                            ]}
-                          >
-                            ქალი
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-
-                    {/* Address Input */}
-                    <View style={styles.inputContainer}>
-                      <Text style={styles.label}>მისამართი *</Text>
-                      <TouchableOpacity
-                        activeOpacity={1}
-                        style={styles.inputWrapper}
-                        onPress={() => addressInputRef.current?.focus()}
-                      >
-                        <Ionicons
-                          name="location-outline"
-                          size={20}
-                          color="#9CA3AF"
-                          style={styles.inputIcon}
-                        />
-                        <TextInput
-                          ref={addressInputRef}
-                          style={styles.input}
-                          placeholder="შეიყვანეთ მისამართი"
-                          placeholderTextColor="#9CA3AF"
-                          value={address}
-                          onChangeText={setAddress}
-                          textContentType="none"
-                          autoComplete="off"
-                          autoCorrect={false}
-                          keyboardType="default"
-                        />
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Profile Image */}
-                    <View style={styles.inputContainer}>
-                      <Text style={styles.label}>პროფილის სურათი</Text>
-                      <View style={styles.profileCard}>
-                        <View style={styles.profilePreview}>
-                          {profileImage?.uri ? (
-                            <Image
-                              source={{ uri: profileImage.uri }}
-                              style={styles.profilePreviewImage}
-                              contentFit="cover"
-                            />
-                          ) : (
-                            <View style={styles.profilePlaceholder}>
-                              <Ionicons
-                                name="person-circle-outline"
-                                size={36}
-                                color="#9CA3AF"
-                              />
-                              <Text style={styles.profilePlaceholderText}>
-                                პროფილის ფოტო
-                              </Text>
-                            </View>
-                          )}
-                        </View>
-
-                        <View style={styles.profileActions}>
-                          <TouchableOpacity
-                            style={[
-                              styles.filePickerButton,
-                              profileImage && styles.filePickerButtonActive,
-                            ]}
-                            onPress={handleProfileImagePick}
-                            disabled={uploadingProfileImage}
-                          >
-                            <Ionicons
-                              name={
-                                profileImage
-                                  ? "checkmark-circle"
-                                  : "cloud-upload-outline"
-                              }
-                              size={20}
-                              color={profileImage ? "#10B981" : "#9CA3AF"}
-                              style={styles.inputIcon}
-                            />
-                            {uploadingProfileImage ? (
-                              <View style={styles.uploadingContainer}>
-                                <ActivityIndicator
-                                  size="small"
-                                  color="#06B6D4"
-                                />
-                                <Text style={styles.uploadingText}>
-                                  სურათი იტვირთება...
-                                </Text>
-                              </View>
-                            ) : (
-                              <Text
-                                style={[
-                                  styles.filePickerText,
-                                  profileImage && styles.filePickerTextActive,
-                                ]}
-                              >
-                                {profileImage
-                                  ? profileImage.name
-                                  : "აირჩიე პროფილის სურათი"}
-                              </Text>
-                            )}
-                            <Ionicons
-                              name="image-outline"
-                              size={20}
-                              color="#9CA3AF"
-                            />
-                          </TouchableOpacity>
-                          <Text style={styles.profileHint}>
-                            დაშვებულია JPG/PNG/WebP • მაქს 5MB
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-                  </>
-                )}
-
-                {/* Doctor specific fields */}
-                {isDoctor && (
-                  <>
-                    <View style={styles.inputContainer}>
-                      <Text style={styles.label}>
-                        {t("doctor.specialization.label")} *
-                      </Text>
-                      {loadingSpecializations ? (
-                        <View style={styles.specializationsLoading}>
-                          <ActivityIndicator size="small" color="#06B6D4" />
-                          <Text style={styles.specializationsLoadingText}>
-                            {t("doctor.specialization.loading")}
-                          </Text>
-                        </View>
-                      ) : specializations.length > 0 ? (
-                        <>
-                          <TouchableOpacity
-                            style={styles.multiSelectButton}
-                            onPress={() => setSpecializationModalVisible(true)}
-                          >
-                            <Ionicons
-                              name="medical-outline"
-                              size={20}
-                              color="#06B6D4"
-                              style={styles.multiSelectIcon}
-                            />
-                            <View style={styles.multiSelectTextContainer}>
-                              <Text style={styles.multiSelectLabel}>
-                                {t("doctor.specialization.selectPlaceholder")}
-                              </Text>
-                              <Text
-                                style={[
-                                  styles.multiSelectValue,
-                                  selectedSpecializations.length === 0 &&
-                                    styles.multiSelectPlaceholder,
-                                ]}
-                                numberOfLines={1}
-                              >
-                                {selectedSpecializations.length > 0
-                                  ? selectedSpecializations.join(", ")
-                                  : t("doctor.specialization.valuePlaceholder")}
-                              </Text>
-                            </View>
-                            <Ionicons
-                              name="chevron-down"
-                              size={18}
-                              color="#9CA3AF"
-                            />
-                          </TouchableOpacity>
-                          <Text style={styles.multiSelectHelper}>
-                            {t("doctor.specialization.helper")}
-                          </Text>
-                        </>
-                      ) : (
-                        <Text style={styles.specializationsEmpty}>
-                          {t("doctor.specialization.empty")}
-                        </Text>
-                      )}
-                    </View>
-
-                    {/* Degrees Input */}
-                    <View style={styles.inputContainer}>
-                      <Text style={styles.label}>
-                        {t("doctor.degrees.label")} *
-                      </Text>
-                      <TouchableOpacity
-                        activeOpacity={1}
-                        style={styles.inputWrapper}
-                        onPress={() => degreesInputRef.current?.focus()}
-                      >
-                        <Ionicons
-                          name="school-outline"
-                          size={20}
-                          color="#9CA3AF"
-                          style={styles.inputIcon}
-                        />
-                        <TextInput
-                          ref={degreesInputRef}
-                          style={styles.input}
-                          placeholder={t("doctor.degrees.placeholder")}
-                          placeholderTextColor="#9CA3AF"
-                          value={degrees}
-                          onChangeText={setDegrees}
-                          textContentType="none"
-                          autoComplete="off"
-                          autoCorrect={false}
-                          keyboardType="default"
-                        />
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Experience Input */}
-                    <View style={styles.inputContainer}>
-                      <Text style={styles.label}>
-                        {t("doctor.experience.label")} *
-                      </Text>
-                      <TouchableOpacity
-                        activeOpacity={1}
-                        style={styles.inputWrapper}
-                        onPress={() => experienceInputRef.current?.focus()}
-                      >
-                        <Ionicons
-                          name="briefcase-outline"
-                          size={20}
-                          color="#9CA3AF"
-                          style={styles.inputIcon}
-                        />
-                        <TextInput
-                          ref={experienceInputRef}
-                          style={styles.input}
-                          placeholder={t("doctor.experience.placeholder")}
-                          placeholderTextColor="#9CA3AF"
-                          value={experience}
-                          onChangeText={setExperience}
-                          textContentType="none"
-                          autoComplete="off"
-                          autoCorrect={false}
-                          keyboardType="default"
-                        />
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Location Input */}
-                    <View style={styles.inputContainer}>
-                      <Text style={styles.label}>
-                        {t("doctor.location.label")} *
-                      </Text>
-                      <TouchableOpacity
-                        activeOpacity={1}
-                        style={styles.inputWrapper}
-                        onPress={() => locationInputRef.current?.focus()}
-                      >
-                        <Ionicons
-                          name="location-outline"
-                          size={20}
-                          color="#9CA3AF"
-                          style={styles.inputIcon}
-                        />
-                        <TextInput
-                          ref={locationInputRef}
-                          style={styles.input}
-                          placeholder={t("doctor.location.placeholder")}
-                          placeholderTextColor="#9CA3AF"
-                          value={location}
-                          onChangeText={setLocation}
-                          textContentType="none"
-                          autoComplete="off"
-                          autoCorrect={false}
-                          keyboardType="default"
-                        />
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Gender Selection */}
-                    <View style={styles.inputContainer}>
-                      <Text style={styles.label}>
-                        {t("doctor.gender.label")} *
-                      </Text>
-                      <View style={styles.genderContainer}>
-                        <TouchableOpacity
-                          style={[
-                            styles.genderOption,
-                            gender === "male" && styles.genderOptionSelected,
-                          ]}
-                          onPress={() => setGender("male")}
-                        >
-                          <Ionicons
-                            name="male"
-                            size={20}
-                            color={gender === "male" ? "#06B6D4" : "#6B7280"}
-                          />
-                          <Text
-                            style={[
-                              styles.genderText,
-                              gender === "male" && styles.genderTextSelected,
-                            ]}
-                          >
-                            {t("doctor.gender.male")}
-                          </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[
-                            styles.genderOption,
-                            gender === "female" && styles.genderOptionSelected,
-                          ]}
-                          onPress={() => setGender("female")}
-                        >
-                          <Ionicons
-                            name="female"
-                            size={20}
-                            color={gender === "female" ? "#06B6D4" : "#6B7280"}
-                          />
-                          <Text
-                            style={[
-                              styles.genderText,
-                              gender === "female" && styles.genderTextSelected,
-                            ]}
-                          >
-                            {t("doctor.gender.female")}
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-
-                    {/* Working Language Input */}
-                    <View style={styles.inputContainer}>
-                      <Text style={styles.label}>
-                        {t("doctor.workingLanguage.label")} *
-                      </Text>
-                      <TouchableOpacity
-                        activeOpacity={1}
-                        style={styles.inputWrapper}
-                        onPress={() => aboutInputRef.current?.focus()}
-                      >
-                        <Ionicons
-                          name="language-outline"
-                          size={20}
-                          color="#9CA3AF"
-                          style={styles.inputIcon}
-                        />
-                        <TextInput
-                          ref={aboutInputRef}
-                          style={styles.input}
-                          placeholder={t("doctor.workingLanguage.placeholder")}
-                          placeholderTextColor="#9CA3AF"
-                          value={about}
-                          onChangeText={setAbout}
-                          textContentType="none"
-                          autoComplete="off"
-                          autoCorrect={false}
-                          keyboardType="default"
-                        />
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* License Document */}
-                    <View style={styles.inputContainer}>
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          gap: 8,
-                          marginBottom: 8,
-                        }}
-                      >
-                        <Text style={styles.label}>
-                          {t("doctor.license.label")}
-                        </Text>
-                        <TouchableOpacity
-                          onPress={() => setShowLicenseInfoModal(true)}
-                          style={{ padding: 4 }}
-                        >
-                          <Ionicons
-                            name="information-circle-outline"
-                            size={20}
-                            color="#06B6D4"
-                          />
-                        </TouchableOpacity>
-                      </View>
-                      <TouchableOpacity
-                        style={[
-                          styles.filePickerButton,
-                          licenseDocument && styles.filePickerButtonActive,
-                        ]}
-                        onPress={handleFilePick}
-                        disabled={uploadingFile}
+                        onPress={() => setShowPassword(!showPassword)}
+                        style={styles.eyeIcon}
                       >
                         <Ionicons
                           name={
-                            licenseDocument
-                              ? "checkmark-circle"
-                              : "cloud-upload-outline"
+                            showPassword ? "eye-off-outline" : "eye-outline"
                           }
-                          size={20}
-                          color={licenseDocument ? "#10B981" : "#9CA3AF"}
-                          style={styles.inputIcon}
-                        />
-                        {uploadingFile ? (
-                          <View style={styles.uploadingContainer}>
-                            <ActivityIndicator size="small" color="#06B6D4" />
-                            <Text style={styles.uploadingText}>
-                              {t("doctor.license.uploading")}
-                            </Text>
-                          </View>
-                        ) : (
-                          <Text
-                            style={[
-                              styles.filePickerText,
-                              licenseDocument && styles.filePickerTextActive,
-                            ]}
-                          >
-                            {licenseDocument
-                              ? licenseDocument.name
-                              : t("doctor.license.placeholder")}
-                          </Text>
-                        )}
-                        <Ionicons
-                          name="document-attach-outline"
                           size={20}
                           color="#9CA3AF"
                         />
                       </TouchableOpacity>
-                      {licenseDocument && (
-                        <Text style={styles.fileHelper}>
-                          {t("doctor.license.success")}
-                        </Text>
-                      )}
-                    </View>
+                    </TouchableOpacity>
+                  </View>
 
-                    {/* Profile Image (optional for doctors) */}
-                    <View style={styles.inputContainer}>
-                      <Text style={styles.label}>პროფილის სურათი</Text>
-                      <View style={styles.profileCard}>
-                        <View style={styles.profilePreview}>
-                          {profileImage?.uri ? (
-                            <Image
-                              source={{ uri: profileImage.uri }}
-                              style={styles.profilePreviewImage}
-                              contentFit="cover"
-                            />
-                          ) : (
-                            <View style={styles.profilePlaceholder}>
-                              <Ionicons
-                                name="person-circle-outline"
-                                size={36}
-                                color="#9CA3AF"
-                              />
-                              <Text style={styles.profilePlaceholderText}>
-                                პროფილის ფოტო
-                              </Text>
-                            </View>
-                          )}
-                        </View>
+                  {/* Confirm Password Input */}
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.label}>
+                      {t("auth.register.confirmPassword.label")} *
+                    </Text>
+                    <TouchableOpacity
+                      activeOpacity={1}
+                      style={styles.inputWrapper}
+                      onPress={() => confirmPasswordInputRef.current?.focus()}
+                    >
+                      <Ionicons
+                        name="lock-closed-outline"
+                        size={20}
+                        color="#9CA3AF"
+                        style={styles.inputIcon}
+                      />
+                      <TextInput
+                        ref={confirmPasswordInputRef}
+                        style={styles.input}
+                        secureTextEntry={!showPassword}
+                        placeholder={t(
+                          "auth.register.confirmPassword.placeholder",
+                        )}
+                        placeholderTextColor="#9CA3AF"
+                        value={confirmPassword}
+                        onChangeText={setConfirmPassword}
+                        textContentType="none"
+                        autoComplete="off"
+                        autoCorrect={false}
+                        keyboardType="default"
+                      />
+                      <TouchableOpacity
+                        onPress={() => setShowPassword(!showPassword)}
+                        style={styles.eyeIcon}
+                      >
+                        <Ionicons
+                          name={
+                            showPassword ? "eye-off-outline" : "eye-outline"
+                          }
+                          size={20}
+                          color="#9CA3AF"
+                        />
+                      </TouchableOpacity>
+                    </TouchableOpacity>
+                  </View>
 
-                        <View style={styles.profileActions}>
-                          <TouchableOpacity
-                            style={[
-                              styles.filePickerButton,
-                              profileImage && styles.filePickerButtonActive,
-                            ]}
-                            onPress={handleProfileImagePick}
-                            disabled={uploadingProfileImage}
-                          >
-                            <Ionicons
-                              name={
-                                profileImage
-                                  ? "checkmark-circle"
-                                  : "cloud-upload-outline"
-                              }
-                              size={20}
-                              color={profileImage ? "#10B981" : "#9CA3AF"}
-                              style={styles.inputIcon}
-                            />
-                            {uploadingProfileImage ? (
-                              <View style={styles.uploadingContainer}>
-                                <ActivityIndicator
-                                  size="small"
-                                  color="#06B6D4"
-                                />
-                                <Text style={styles.uploadingText}>
-                                  სურათი იტვირთება...
-                                </Text>
-                              </View>
-                            ) : (
-                              <Text
-                                style={[
-                                  styles.filePickerText,
-                                  profileImage && styles.filePickerTextActive,
-                                ]}
-                              >
-                                {profileImage
-                                  ? profileImage.name
-                                  : "აირჩიე პროფილის სურათი"}
-                              </Text>
-                            )}
-                            <Ionicons
-                              name="image-outline"
-                              size={20}
-                              color="#9CA3AF"
-                            />
-                          </TouchableOpacity>
-                          <Text style={styles.profileHint}>
-                            დაშვებულია JPG/PNG/WebP • მაქს 5MB
-                          </Text>
-                        </View>
+                  {/* Terms of Service / Privacy Policy notice + checkbox */}
+                  <View style={styles.tosInlineContainer}>
+                    <Text style={styles.tosInlineText}>
+                      {t("auth.register.tos.inlineText") + " "}
+                      <Text
+                        style={styles.tosInlineLink}
+                        onPress={() => setTosModalVisible(true)}
+                      >
+                        {t("auth.register.tos.readMore")}
+                      </Text>
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.tosCheckboxRow}
+                      onPress={() => {
+                        const next = !hasAcceptedTos;
+                        setHasAcceptedTos(next);
+                        if (next) {
+                          setTosModalVisible(true);
+                        }
+                      }}
+                    >
+                      <View
+                        style={[
+                          styles.tosCheckbox,
+                          hasAcceptedTos && styles.tosCheckboxChecked,
+                        ]}
+                      >
+                        {hasAcceptedTos && (
+                          <Ionicons
+                            name="checkmark"
+                            size={16}
+                            color="#FFFFFF"
+                          />
+                        )}
                       </View>
-                    </View>
-                  </>
-                )}
-
-                {/* Password Input */}
-                <View style={styles.inputContainer}>
-                  <Text style={styles.label}>
-                    {t("auth.register.password.label")} *
-                  </Text>
-                  <TouchableOpacity
-                    activeOpacity={1}
-                    style={styles.inputWrapper}
-                    onPress={() => passwordInputRef.current?.focus()}
-                  >
-                    <Ionicons
-                      name="lock-closed-outline"
-                      size={20}
-                      color="#9CA3AF"
-                      style={styles.inputIcon}
-                    />
-                    <TextInput
-                      ref={passwordInputRef}
-                      style={styles.input}
-                      secureTextEntry={!showPassword}
-                      placeholder={t("auth.register.password.placeholder")}
-                      placeholderTextColor="#9CA3AF"
-                      value={password}
-                      onChangeText={setPassword}
-                      textContentType="none"
-                      autoComplete="off"
-                      autoCorrect={false}
-                      keyboardType="default"
-                    />
-                    <TouchableOpacity
-                      onPress={() => setShowPassword(!showPassword)}
-                      style={styles.eyeIcon}
-                    >
-                      <Ionicons
-                        name={showPassword ? "eye-off-outline" : "eye-outline"}
-                        size={20}
-                        color="#9CA3AF"
-                      />
+                      <Text style={styles.tosCheckboxLabel}>
+                        {t("auth.register.tos.checkboxLabel")}
+                      </Text>
                     </TouchableOpacity>
-                  </TouchableOpacity>
-                </View>
+                  </View>
 
-                {/* Confirm Password Input */}
-                <View style={styles.inputContainer}>
-                  <Text style={styles.label}>
-                    {t("auth.register.confirmPassword.label")} *
-                  </Text>
+                  {/* Signup Button */}
                   <TouchableOpacity
-                    activeOpacity={1}
-                    style={styles.inputWrapper}
-                    onPress={() => confirmPasswordInputRef.current?.focus()}
+                    style={[
+                      styles.signupButton,
+                      isLoading && styles.signupButtonDisabled,
+                    ]}
+                    onPress={handleSignup}
+                    disabled={isLoading}
                   >
-                    <Ionicons
-                      name="lock-closed-outline"
-                      size={20}
-                      color="#9CA3AF"
-                      style={styles.inputIcon}
-                    />
-                    <TextInput
-                      ref={confirmPasswordInputRef}
-                      style={styles.input}
-                      secureTextEntry={!showPassword}
-                      placeholder={t(
-                        "auth.register.confirmPassword.placeholder",
-                      )}
-                      placeholderTextColor="#9CA3AF"
-                      value={confirmPassword}
-                      onChangeText={setConfirmPassword}
-                      textContentType="none"
-                      autoComplete="off"
-                      autoCorrect={false}
-                      keyboardType="default"
-                    />
-                    <TouchableOpacity
-                      onPress={() => setShowPassword(!showPassword)}
-                      style={styles.eyeIcon}
-                    >
-                      <Ionicons
-                        name={showPassword ? "eye-off-outline" : "eye-outline"}
-                        size={20}
-                        color="#9CA3AF"
-                      />
+                    <Text style={styles.signupButtonText}>
+                      {isLoading
+                        ? t("auth.register.submitting")
+                        : t("auth.register.submit")}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* Signin Link */}
+                  <View style={styles.signinContainer}>
+                    <Text style={styles.signinText}>
+                      {t("auth.register.signin.question")}
+                    </Text>
+                    <TouchableOpacity onPress={handleSignin}>
+                      <Text style={styles.signinLink}>
+                        {t("auth.register.signin.action")}
+                      </Text>
                     </TouchableOpacity>
-                  </TouchableOpacity>
+                  </View>
                 </View>
-
-                {/* Terms of Service / Privacy Policy notice + checkbox */}
-                <View style={styles.tosInlineContainer}>
-                  <Text style={styles.tosInlineText}>
-                    {t("auth.register.tos.inlineText") + " "}
-                    <Text
-                      style={styles.tosInlineLink}
-                      onPress={() => setTosModalVisible(true)}
-                    >
-                      {t("auth.register.tos.readMore")}
-                    </Text>
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.tosCheckboxRow}
-                    onPress={() => {
-                      const next = !hasAcceptedTos;
-                      setHasAcceptedTos(next);
-                      if (next) {
-                        setTosModalVisible(true);
-                      }
-                    }}
-                  >
-                    <View
-                      style={[
-                        styles.tosCheckbox,
-                        hasAcceptedTos && styles.tosCheckboxChecked,
-                      ]}
-                    >
-                      {hasAcceptedTos && (
-                        <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                      )}
-                    </View>
-                    <Text style={styles.tosCheckboxLabel}>
-                      {t("auth.register.tos.checkboxLabel")}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Signup Button */}
-                <TouchableOpacity
-                  style={[
-                    styles.signupButton,
-                    isLoading && styles.signupButtonDisabled,
-                  ]}
-                  onPress={handleSignup}
-                  disabled={isLoading}
-                >
-                  <Text style={styles.signupButtonText}>
-                    {isLoading
-                      ? t("auth.register.submitting")
-                      : t("auth.register.submit")}
-                  </Text>
-                </TouchableOpacity>
-
-                {/* Signin Link */}
-                <View style={styles.signinContainer}>
-                  <Text style={styles.signinText}>
-                    {t("auth.register.signin.question")}
-                  </Text>
-                  <TouchableOpacity onPress={handleSignin}>
-                    <Text style={styles.signinLink}>
-                      {t("auth.register.signin.action")}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
+              )}
+            </View>
           </ScrollView>
         </SafeAreaView>
       </KeyboardAvoidingView>
 
-      {/* Passport Info Modal - Only for non-Georgian patients */}
-      {!isDoctor && (
-        <Modal
-          visible={showPassportInfoModal}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowPassportInfoModal(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContainer}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>
-                  {t("auth.register.passportInfo.title")}
+      {/* Scan / Identomat info modal */}
+      <Modal
+        visible={showScanInfoModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowScanInfoModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {t("auth.register.scanInfo.title")}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setShowScanInfoModal(false)}
+                style={styles.modalCloseButton}
+              >
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.modalContent}>
+              <View style={styles.passportInfoContainer}>
+                <Ionicons
+                  name="information-circle"
+                  size={32}
+                  color="#06B6D4"
+                  style={styles.passportInfoIcon}
+                />
+                <Text style={styles.passportInfoText}>
+                  {t("auth.register.scanInfo.dataProtected")}
                 </Text>
-                <TouchableOpacity
-                  onPress={() => setShowPassportInfoModal(false)}
-                  style={styles.modalCloseButton}
-                >
-                  <Ionicons name="close" size={24} color="#6B7280" />
-                </TouchableOpacity>
-              </View>
-              <View style={styles.modalContent}>
-                <View style={styles.passportInfoContainer}>
-                  <Ionicons
-                    name="information-circle"
-                    size={32}
-                    color="#06B6D4"
-                    style={styles.passportInfoIcon}
-                  />
-                  <Text style={styles.passportInfoText}>
-                    {t("auth.register.passportInfo.message")}
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.modalFooter}>
-                <TouchableOpacity
-                  onPress={() => setShowPassportInfoModal(false)}
-                  style={styles.modalPrimaryButton}
-                >
-                  <Text style={styles.modalPrimaryButtonText}>
-                    {t("auth.register.passportInfo.ok")}
-                  </Text>
-                </TouchableOpacity>
+                <Text style={styles.passportInfoSubText}>
+                  {t("auth.register.scanInfo.scanRequirement")}
+                </Text>
               </View>
             </View>
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                onPress={() => setShowScanInfoModal(false)}
+                style={styles.modalPrimaryButton}
+              >
+                <Text style={styles.modalPrimaryButtonText}>
+                  {t("auth.register.scanInfo.ok")}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </Modal>
-      )}
+        </View>
+      </Modal>
 
       {/* Terms of Service / Privacy Policy modal */}
       <Modal
@@ -3056,52 +3040,20 @@ export default function RegisterScreen() {
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                სამედიცინო ლიცენზიის ატვირთვის ინფორმაცია
+                {t("doctor.license.info.title")}
               </Text>
             </View>
             <ScrollView style={styles.modalList}>
-              <View
-                style={{
-                  backgroundColor: "#FEF3C7",
-                  borderRadius: 8,
-                  padding: 16,
-                  marginBottom: 16,
-                }}
-              >
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "flex-start",
-                    gap: 12,
-                  }}
-                >
-                  <Ionicons name="warning-outline" size={24} color="#D97706" />
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      style={{
-                        fontSize: 14,
-                        fontFamily: "Poppins-SemiBold",
-                        color: "#92400E",
-                        marginBottom: 8,
-                      }}
-                    >
-                      მნიშვნელოვანი ინფორმაცია
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: 13,
-                        fontFamily: "Poppins-Regular",
-                        color: "#78350F",
-                        lineHeight: 20,
-                      }}
-                    >
-                      ლიცენზია იტვირთება მხოლოდ ერთხელ. გთხოვთ, ყურადღებით
-                      შეამოწმოთ არჩეული ფაილი სანამ ატვირთვას დააწყებთ. შეცდომის
-                      შემთხვევაში ლიცენზიის შეცვლა შესაძლებელი იქნება მხოლოდ
-                      ადმინისტრატორის მხარდაჭერით.
-                    </Text>
-                  </View>
-                </View>
+              <View style={styles.passportInfoContainer}>
+                <Ionicons
+                  name="information-circle"
+                  size={32}
+                  color="#06B6D4"
+                  style={styles.passportInfoIcon}
+                />
+                <Text style={styles.passportInfoText}>
+                  {t("doctor.license.info.message")}
+                </Text>
               </View>
             </ScrollView>
             <View
@@ -3117,7 +3069,9 @@ export default function RegisterScreen() {
                 onPress={() => setShowLicenseInfoModal(false)}
                 style={styles.modalPrimaryButton}
               >
-                <Text style={styles.modalPrimaryButtonText}>გასაგებია</Text>
+                <Text style={styles.modalPrimaryButtonText}>
+                  {t("doctor.license.info.ok")}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -3286,8 +3240,6 @@ export default function RegisterScreen() {
         phone={phone}
         onClose={() => setShowOTPModal(false)}
         onVerified={handleOTPVerified}
-        title="ტელეფონის ვერიფიკაცია"
-        subtitle="გთხოვთ შეიყვანოთ 6-ნიშნა კოდი, რომელიც გამოგიგზავნეთ SMS-ით"
       />
     </View>
   );
@@ -3297,7 +3249,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FFFFFF",
-    paddingHorizontal: 24,
   },
   safeArea: {
     flex: 1,
@@ -3307,15 +3258,22 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 32,
+    paddingTop: 16,
   },
   content: {
-    paddingHorizontal: 24,
-    paddingTop: 30,
+    paddingHorizontal: 20,
+    paddingTop: 8,
     paddingBottom: 40,
+  },
+  topHeader: {
+    width: "100%",
+    alignItems: "center",
+    marginBottom: 8,
   },
   logoContainer: {
     alignItems: "center",
-    marginBottom: 20,
+    width: "100%",
+    marginBottom: 16,
   },
   logo: {
     width: 80,
@@ -3337,7 +3295,27 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins-Regular",
     color: "#6B7280",
     textAlign: "center",
-    marginBottom: 20,
+    marginBottom: 8,
+    paddingHorizontal: 8,
+  },
+  subtitleDescription: {
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#9CA3AF",
+    textAlign: "center",
+    marginBottom: 24,
+    paddingHorizontal: 12,
+    lineHeight: 20,
+  },
+  subtitleStandalone: {
+    marginBottom: 24,
+  },
+  subLabel: {
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#374151",
+    marginBottom: 8,
+    marginTop: 4,
   },
   roleSwitcher: {
     flexDirection: "row",
@@ -3395,12 +3373,12 @@ const styles = StyleSheet.create({
   },
   nationalityContainer: {
     flexDirection: "row",
-    gap: 12,
+    gap: 10,
     marginTop: 8,
   },
   nationalityOption: {
     flex: 1,
-    flexDirection: "row",
+    flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
@@ -3408,21 +3386,36 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#E5E7EB",
     borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    minHeight: 88,
   },
   nationalityOptionSelected: {
     borderColor: "#06B6D4",
     backgroundColor: "#F0FDFA",
   },
   nationalityText: {
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: "Poppins-Medium",
     color: "#6B7280",
+    textAlign: "center",
   },
   nationalityTextSelected: {
     color: "#06B6D4",
     fontFamily: "Poppins-SemiBold",
+  },
+  nationalityTextBlock: {
+    alignItems: "center",
+    gap: 2,
+  },
+  nationalityTextSub: {
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: "#9CA3AF",
+    textAlign: "center",
+  },
+  nationalityTextSubSelected: {
+    color: "#06B6D4",
   },
   inputWrapper: {
     flexDirection: "row",
@@ -3442,6 +3435,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Poppins-Regular",
     color: "#1F2937",
+    textAlign: "left",
+    letterSpacing: 0,
   },
   multiSelectButton: {
     flexDirection: "row",
@@ -3623,49 +3618,104 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginLeft: 4,
   },
-  profileCard: {
-    flexDirection: "row",
-    gap: 12,
-    padding: 12,
+  profileUploadCard: {
+    alignItems: "center",
+    paddingVertical: 20,
+    paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 14,
+    borderColor: "#E2E8F0",
+    borderRadius: 16,
     backgroundColor: "#F8FAFC",
+    gap: 8,
   },
-  profilePreview: {
-    width: 72,
-    height: 72,
-    borderRadius: 12,
+  profileAvatarButton: {
+    marginBottom: 4,
+  },
+  profileAvatarWrapper: {
+    width: 104,
+    height: 104,
+    position: "relative",
+  },
+  profileAvatarRing: {
+    width: 104,
+    height: 104,
+    borderRadius: 52,
+    borderWidth: 2,
+    borderColor: "#E2E8F0",
+    borderStyle: "dashed",
+    backgroundColor: "#FFFFFF",
     overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    backgroundColor: "#FFF",
     alignItems: "center",
     justifyContent: "center",
   },
-  profilePreviewImage: {
+  profileAvatarRingFilled: {
+    borderStyle: "solid",
+    borderColor: "#06B6D4",
+  },
+  profileAvatarImage: {
     width: "100%",
     height: "100%",
   },
-  profilePlaceholder: {
+  profileAvatarEmpty: {
+    width: "100%",
+    height: "100%",
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "#F1F5F9",
     gap: 4,
+    paddingHorizontal: 8,
   },
-  profilePlaceholderText: {
-    fontSize: 12,
-    fontFamily: "Poppins-Regular",
-    color: "#9CA3AF",
+  profileAvatarPlaceholder: {
+    fontSize: 11,
+    fontFamily: "Poppins-Medium",
+    color: "#94A3B8",
+    textAlign: "center",
   },
-  profileActions: {
-    flex: 1,
-    gap: 8,
+  profileAvatarBadge: {
+    position: "absolute",
+    right: 4,
+    bottom: 4,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#06B6D4",
+    alignItems: "center",
     justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+  },
+  profileUploadAction: {
+    fontSize: 15,
+    fontFamily: "Poppins-SemiBold",
+    color: "#06B6D4",
+    textAlign: "center",
+  },
+  profileUploadStatus: {
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#06B6D4",
+    textAlign: "center",
+  },
+  profileFileName: {
+    fontSize: 13,
+    fontFamily: "Poppins-Regular",
+    color: "#64748B",
+    textAlign: "center",
+    maxWidth: "100%",
+    paddingHorizontal: 8,
   },
   profileHint: {
     fontSize: 12,
     fontFamily: "Poppins-Regular",
-    color: "#6B7280",
+    color: "#94A3B8",
+    textAlign: "center",
+    marginTop: 2,
+  },
+  profileRemoveText: {
+    fontSize: 13,
+    fontFamily: "Poppins-Medium",
+    color: "#EF4444",
+    marginTop: 4,
   },
   specializationsLoading: {
     marginTop: 8,
@@ -3733,6 +3783,14 @@ const styles = StyleSheet.create({
   },
   passportInfoIcon: {
     marginBottom: 16,
+  },
+  passportInfoSubText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+    textAlign: "center",
+    lineHeight: 22,
+    marginTop: 12,
   },
   passportInfoText: {
     fontSize: 16,
