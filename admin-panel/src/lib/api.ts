@@ -47,6 +47,7 @@ export interface User {
   rating?: number;
   reviewCount?: number;
   isTopRated?: boolean;
+  doctorStatus?: "awaiting_schedule" | "active";
   // Minimum working days doctor must have scheduled in the next 2 weeks (set by admin)
   minWorkingDaysRequired?: number;
   // Identomat verification images (for admin panel)
@@ -185,7 +186,7 @@ class ApiService {
 
     // Use static token in dev mode if available (curl .../auth/dev-token → put in dev-token.ts)
     const tokenToUse =
-      DISABLE_AUTH && ADMIN_DEV_TOKEN ? ADMIN_DEV_TOKEN : this.token;
+      this.token || (DISABLE_AUTH && ADMIN_DEV_TOKEN ? ADMIN_DEV_TOKEN : null);
 
     if (tokenToUse) {
       headers["Authorization"] = `Bearer ${tokenToUse}`;
@@ -435,6 +436,7 @@ class ApiService {
     location?: string;
     search?: string;
     status?: "pending" | "approved" | "rejected" | "all" | "awaiting_schedule";
+    forAdmin?: boolean;
   }): Promise<ApiResponse<{ doctors: any[]; pagination: any }>> {
     const queryParams = new URLSearchParams();
     if (params?.page) queryParams.append("page", params.page.toString());
@@ -444,6 +446,7 @@ class ApiService {
     if (params?.location) queryParams.append("location", params.location);
     if (params?.search) queryParams.append("search", params.search);
     if (params?.status) queryParams.append("status", params.status);
+    if (params?.forAdmin) queryParams.append("forAdmin", "true");
 
     const response = await fetch(
       `${this.baseURL}/doctors?${queryParams.toString()}`,

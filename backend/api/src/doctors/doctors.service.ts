@@ -244,6 +244,7 @@ export class DoctorsService {
       page = 1,
       limit = 10,
       status = DoctorStatusFilter.APPROVED,
+      forAdmin = false,
     } = query;
 
     console.log('🔍 [DoctorsService] getAllDoctors called with:', {
@@ -365,10 +366,11 @@ export class DoctorsService {
     let availableDoctors = doctors;
 
     if (
-      status === DoctorStatusFilter.APPROVED ||
-      status === DoctorStatusFilter.ALL
+      !forAdmin &&
+      (status === DoctorStatusFilter.APPROVED ||
+        status === DoctorStatusFilter.ALL)
     ) {
-      // Only filter by availability for approved doctors or when showing all
+      // Only filter by availability for patient-facing lists
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 

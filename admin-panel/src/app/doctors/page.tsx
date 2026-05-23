@@ -36,7 +36,9 @@ export default function DoctorsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<'pending' | 'approved' | 'rejected' | 'awaiting_schedule'>('pending');
+  const [statusFilter, setStatusFilter] = useState<
+    'pending' | 'approved' | 'rejected' | 'awaiting_schedule'
+  >('approved');
   const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
   const [selectedDoctor, setSelectedDoctor] = useState<User | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -54,66 +56,78 @@ export default function DoctorsPage() {
   const loadDoctors = async () => {
     try {
       setLoading(true);
-      // approved ფილტრში უნდა გამოჩნდნენ მხოლოდ აქტიური (doctorStatus=active) ექიმები,
-      // ხოლო გრაფიკის გარეშე ექიმები უნდა გადავიდნენ awaiting_schedule ფილტრში.
-      const apiStatus = statusFilter;
-      console.log('🔍 Loading doctors with status filter:', statusFilter, 'apiStatus:', apiStatus);
-      const response = await apiService.getDoctors({
+      setError(null);
+
+      const response = await apiService.getUsers({
         page: 1,
-        limit: 50,
-        status: apiStatus,
+        limit: 200,
+        role: 'doctor',
       });
-      console.log('📥 Doctors API response:', response);
+
       if (response.success) {
-        const filteredDoctors = (response.data.doctors || []).filter((doctor: any) => {
-          if (statusFilter === 'pending') return doctor.approvalStatus === 'pending';
-          if (statusFilter === 'rejected') return doctor.approvalStatus === 'rejected';
+        const allDoctors = response.data?.users ?? [];
+
+        const normalizedDoctors = allDoctors.map((doctor) => {
+          let doctorStatus = doctor.doctorStatus;
+          if (
+            doctor.approvalStatus === 'approved' &&
+            !doctorStatus &&
+            doctor.isActive !== false
+          ) {
+            doctorStatus = 'active';
+          }
+          return { ...doctor, doctorStatus };
+        });
+
+        const filteredDoctors = normalizedDoctors.filter((doctor) => {
+          if (statusFilter === 'pending') {
+            return doctor.approvalStatus === 'pending';
+          }
+          if (statusFilter === 'rejected') {
+            return doctor.approvalStatus === 'rejected';
+          }
           if (statusFilter === 'awaiting_schedule') {
             return (
               doctor.approvalStatus === 'approved' &&
               doctor.doctorStatus === 'awaiting_schedule'
             );
           }
-          // approved: მხოლოდ აქტიური ექიმები
           return (
             doctor.approvalStatus === 'approved' &&
-            doctor.doctorStatus === 'active'
+            (doctor.doctorStatus === 'active' || !doctor.doctorStatus)
           );
         });
 
-        // Map all fields from backend response
-        const mappedDoctors = filteredDoctors.map((doctor: any) => {
-          const mapped: Doctor = {
-            id: doctor.id,
-            name: doctor.name || '',
-            email: doctor.email,
-            phone: doctor.phone,
-            idNumber: doctor.idNumber,
-            specialization: doctor.specialization || '',
-            rating: doctor.rating || 0,
-            reviewCount: doctor.reviewCount || 0,
-            location: doctor.location,
-            experience: doctor.experience,
-            degrees: doctor.degrees,
-            about: doctor.about,
-            dateOfBirth: doctor.dateOfBirth,
-            gender: doctor.gender,
-            licenseDocument: doctor.licenseDocument,
-            isActive: doctor.isActive !== undefined ? doctor.isActive : false,
-            approvalStatus: (doctor.approvalStatus || 'pending') as 'pending' | 'approved' | 'rejected',
-            doctorStatus: doctor.doctorStatus as 'awaiting_schedule' | 'active' | undefined,
-            isTopRated: doctor.isTopRated ?? false,
-            minScheduleDate: doctor.minScheduleDate ? doctor.minScheduleDate.split('T')[0] : '',
-          };
-          return mapped;
-        });
-        console.log('✅ Mapped doctors:', mappedDoctors);
+        const mappedDoctors: Doctor[] = filteredDoctors.map((doctor) => ({
+          id: doctor.id,
+          name: doctor.name || '',
+          email: doctor.email,
+          phone: doctor.phone,
+          idNumber: doctor.idNumber,
+          specialization: doctor.specialization || '',
+          rating: doctor.rating || 0,
+          reviewCount: doctor.reviewCount || 0,
+          location: doctor.location,
+          experience: doctor.experience,
+          degrees: doctor.degrees,
+          about: doctor.about,
+          dateOfBirth: doctor.dateOfBirth,
+          gender: doctor.gender,
+          licenseDocument: doctor.licenseDocument,
+          isActive: doctor.isActive !== undefined ? doctor.isActive : false,
+          approvalStatus: (doctor.approvalStatus || 'pending') as
+            | 'pending'
+            | 'approved'
+            | 'rejected',
+          doctorStatus: doctor.doctorStatus,
+          isTopRated: doctor.isTopRated ?? false,
+          minScheduleDate: '',
+        }));
+
         setDoctors(mappedDoctors);
-      } else {
-        console.log('❌ API response not successful:', response);
       }
     } catch (err: any) {
-      console.error('❌ Error loading doctors:', err);
+      console.error('Error loading doctors:', err);
       setError(err.message || 'ექიმების ჩატვირთვა ვერ მოხერხდა');
     } finally {
       setLoading(false);
@@ -193,14 +207,6 @@ export default function DoctorsPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center p-10">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-      </div>
-    );
-  }
-
   return (
     <>
       <Breadcrumb pageName="ექიმები" />
@@ -254,7 +260,11 @@ export default function DoctorsPage() {
               )}
 
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {doctors.length === 0 ? (
+                {loading ? (
+                  <div className="col-span-full flex justify-center p-10">
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+                  </div>
+                ) : doctors.length === 0 ? (
                   <div className="col-span-full p-8 text-center text-dark-4">
                     ექიმები არ მოიძებნა
                   </div>

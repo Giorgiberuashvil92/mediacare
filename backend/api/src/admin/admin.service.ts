@@ -107,6 +107,8 @@ export class AdminService {
           rating: user.rating || 0,
           reviewCount: user.reviewCount || 0,
           licenseDocument: user.licenseDocument,
+          doctorStatus: user.doctorStatus,
+          isTopRated: user.isTopRated ?? false,
         }),
         // Identomat verification images (for all users who used Identomat)
         identomatFaceImage: user.identomatFaceImage,

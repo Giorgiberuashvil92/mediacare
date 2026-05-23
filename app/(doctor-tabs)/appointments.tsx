@@ -38,6 +38,11 @@ import {
 } from "../../assets/data/doctorDashboard";
 import { apiService, Clinic, ShopProduct } from "../_services/api";
 import { useAuth } from "../contexts/AuthContext";
+import { useLanguage } from "../contexts/LanguageContext";
+import {
+  formatAppointmentDateLong,
+  formatAppointmentTime,
+} from "../utils/appointmentDateTime";
 
 interface Medication {
   name: string;
@@ -88,6 +93,9 @@ function truncateFileName(name: string | undefined, maxLen = 22): string {
 }
 
 export default function DoctorAppointments() {
+  const { t, language } = useLanguage();
+  const formatDisplayDate = (dateStr: string) =>
+    formatAppointmentDateLong(dateStr, language);
   const router = useRouter();
   const { user } = useAuth();
   const params = useLocalSearchParams<{
@@ -1221,13 +1229,18 @@ export default function DoctorAppointments() {
         setShowRescheduleModal(false);
         setRescheduleReason("");
         await fetchConsultations();
-        Alert.alert("წარმატება", "გადაჯავშნის მოთხოვნა გაიგზავნა პაციენტთან");
       } else {
-        Alert.alert("შეცდომა", response.message || "გადაჯავშნა ვერ მოხერხდა");
+        Alert.alert(
+          t("appointments.common.error"),
+          response.message || t("appointments.reschedule.failed"),
+        );
       }
     } catch (err: any) {
       console.error("Reschedule error:", err);
-      Alert.alert("შეცდომა", err.message || "გადაჯავშნა ვერ მოხერხდა");
+      Alert.alert(
+        t("appointments.common.error"),
+        err.message || t("appointments.reschedule.failed"),
+      );
     } finally {
       setRescheduleLoading(false);
     }
@@ -1246,79 +1259,51 @@ export default function DoctorAppointments() {
           await openDetails(selectedConsultation);
         }
 
-        // Show success message with new date/time from response
-        let message =
-          "გადაჯავშნა დამტკიცდა და ჯავშანი ავტომატურად გადაიჯავშნა ახალ თარიღზე";
-        const payload = response.data as
-          | {
-              appointmentDate?: string | Date;
-              appointmentTime?: string;
-            }
-          | undefined;
-        if (payload?.appointmentDate && payload?.appointmentTime) {
-          const raw =
-            typeof payload.appointmentDate === "string"
-              ? payload.appointmentDate
-              : payload.appointmentDate.toISOString();
-          const ymd = raw.includes("T") ? raw.split("T")[0] : raw.slice(0, 10);
-          const parts = ymd.split("-").map(Number);
-          const formattedDate =
-            parts.length === 3 && !parts.some((n) => Number.isNaN(n))
-              ? new Date(parts[0], parts[1] - 1, parts[2]).toLocaleDateString(
-                  "ka-GE",
-                  {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  },
-                )
-              : new Date(raw).toLocaleDateString("ka-GE", {
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                });
-          message = `გადაჯავშნა დამტკიცდა\n\nახალი თარიღი: ${formattedDate} ${payload.appointmentTime}`;
-        }
-
-        Alert.alert("წარმატება", message);
       } else {
-        Alert.alert("შეცდომა", response.message || "დამტკიცება ვერ მოხერხდა");
+        Alert.alert(
+          t("appointments.common.error"),
+          response.message || t("appointments.reschedule.approveFailed"),
+        );
       }
     } catch (err: any) {
       console.error("Approve reschedule error:", err);
-      Alert.alert("შეცდომა", err.message || "დამტკიცება ვერ მოხერხდა");
+      Alert.alert(
+        t("appointments.common.error"),
+        err.message || t("appointments.reschedule.approveFailed"),
+      );
     }
   };
 
   // Handle reject reschedule request (when patient requested)
   const handleRejectReschedule = async (appointmentId: string) => {
     Alert.alert(
-      "გადაჯავშნის უარყოფა",
-      "დარწმუნებული ხართ რომ გსურთ გადაჯავშნის მოთხოვნის უარყოფა?",
+      t("appointments.reschedule.rejectConfirmTitle"),
+      t("appointments.reschedule.rejectConfirmMessage"),
       [
-        { text: "გაუქმება", style: "cancel" },
+        { text: t("appointments.common.cancel"), style: "cancel" },
         {
-          text: "უარყოფა",
+          text: t("appointments.reschedule.reject"),
           style: "destructive",
           onPress: async () => {
             try {
               const response = await apiService.rejectReschedule(appointmentId);
               if (response.success) {
                 await fetchConsultations();
-                // Reload details if modal is open
                 if (selectedConsultation?.id === appointmentId) {
                   await openDetails(selectedConsultation);
                 }
-                Alert.alert("წარმატება", "გადაჯავშნის მოთხოვნა უარყოფილია");
               } else {
                 Alert.alert(
-                  "შეცდომა",
-                  response.message || "უარყოფა ვერ მოხერხდა",
+                  t("appointments.common.error"),
+                  response.message || t("appointments.reschedule.rejectFailed"),
                 );
               }
             } catch (err: any) {
               console.error("Reject reschedule error:", err);
-              Alert.alert("შეცდომა", err.message || "უარყოფა ვერ მოხერხდა");
+              Alert.alert(
+                t("appointments.common.error"),
+                err.message || t("appointments.reschedule.rejectFailed"),
+              );
             }
           },
         },
@@ -1915,7 +1900,7 @@ export default function DoctorAppointments() {
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.title}>მიმდინარე კონსულტაციები</Text>
+            <Text style={styles.title}>{t("appointments.doctor.listTitle")}</Text>
             <Text style={styles.subtitle}>ყველა დანიშვნა და კონსულტაცია</Text>
           </View>
         </View>
@@ -2023,7 +2008,7 @@ export default function DoctorAppointments() {
                   filterType === "video" && styles.typeFilterTextActive,
                 ]}
               >
-                ვიდეო
+                {t("appointments.tab.filter.video")}
               </Text>
             </TouchableOpacity>
 
@@ -2045,7 +2030,7 @@ export default function DoctorAppointments() {
                   filterType === "home-visit" && styles.typeFilterTextActive,
                 ]}
               >
-                ბინაზე
+                {t("appointments.tab.filter.visit")}
               </Text>
             </TouchableOpacity>
           </View>
@@ -2063,10 +2048,10 @@ export default function DoctorAppointments() {
             <View style={styles.emptyState}>
               <Ionicons name="calendar-outline" size={64} color="#D1D5DB" />
               <Text style={styles.emptyStateTitle}>
-                კონსულტაციები ვერ მოიძებნა
+                {t("appointments.tab.notFound.title")}
               </Text>
               <Text style={styles.emptyStateText}>
-                სცადეთ განსხვავებული ფილტრები
+                {t("appointments.tab.notFound.hint")}
               </Text>
             </View>
           ) : (
@@ -2614,15 +2599,20 @@ export default function DoctorAppointments() {
                             color="#8B5CF6"
                           />
                           <Text style={styles.rescheduleRequestTitleInline}>
-                            პაციენტმა მოითხოვა გადაჯავშნა
+                            {t("appointments.reschedule.patientRequestTitle")}
                           </Text>
                         </View>
                         <Text style={styles.rescheduleRequestTextInline}>
-                          {consultation.rescheduleRequest.requestedDate}{" "}
-                          {consultation.rescheduleRequest.requestedTime}
+                          {formatDisplayDate(
+                            consultation.rescheduleRequest.requestedDate || "",
+                          )}{" "}
+                          {formatAppointmentTime(
+                            consultation.rescheduleRequest.requestedTime || "",
+                          )}
                         </Text>
                         {consultation.rescheduleRequest.reason && (
                           <Text style={styles.rescheduleRequestReasonInline}>
+                            {t("appointments.reschedule.comment")}:{" "}
                             {consultation.rescheduleRequest.reason}
                           </Text>
                         )}
@@ -2642,7 +2632,7 @@ export default function DoctorAppointments() {
                               color="#10B981"
                             />
                             <Text style={styles.approveButtonTextInline}>
-                              დამტკიცება
+                              {t("appointments.reschedule.approve")}
                             </Text>
                           </TouchableOpacity>
                           <TouchableOpacity
@@ -2660,7 +2650,7 @@ export default function DoctorAppointments() {
                               color="#EF4444"
                             />
                             <Text style={styles.rejectButtonTextInline}>
-                              უარყოფა
+                              {t("appointments.reschedule.reject")}
                             </Text>
                           </TouchableOpacity>
                         </View>
@@ -2747,7 +2737,7 @@ export default function DoctorAppointments() {
                             color="#8B5CF6"
                           />
                           <Text style={styles.statusActionTextReschedule}>
-                            გადაჯავშნა
+                            {t("appointments.reschedule.rescheduleShort")}
                           </Text>
                         </TouchableOpacity>
                       )}
@@ -3286,17 +3276,23 @@ export default function DoctorAppointments() {
                           color="#8B5CF6"
                         />
                         <Text style={styles.rescheduleRequestTitle}>
-                          პაციენტმა მოითხოვა გადაჯავშნა
+                          {t("appointments.reschedule.patientRequestTitle")}
                         </Text>
                       </View>
                       <Text style={styles.rescheduleRequestText}>
-                        ახალი თარიღი:{" "}
-                        {selectedConsultation.rescheduleRequest.requestedDate}{" "}
-                        {selectedConsultation.rescheduleRequest.requestedTime}
+                        {t("appointments.reschedule.newDate")}:{" "}
+                        {formatDisplayDate(
+                          selectedConsultation.rescheduleRequest.requestedDate ||
+                            "",
+                        )}{" "}
+                        {formatAppointmentTime(
+                          selectedConsultation.rescheduleRequest.requestedTime ||
+                            "",
+                        )}
                       </Text>
                       {selectedConsultation.rescheduleRequest.reason && (
                         <Text style={styles.rescheduleRequestReason}>
-                          მიზეზი:{" "}
+                          {t("appointments.reschedule.comment")}:{" "}
                           {selectedConsultation.rescheduleRequest.reason}
                         </Text>
                       )}
@@ -3313,7 +3309,7 @@ export default function DoctorAppointments() {
                             color="#10B981"
                           />
                           <Text style={styles.approveButtonText}>
-                            დამტკიცება
+                            {t("appointments.reschedule.approve")}
                           </Text>
                         </TouchableOpacity>
                         <TouchableOpacity
@@ -3327,7 +3323,9 @@ export default function DoctorAppointments() {
                             size={18}
                             color="#EF4444"
                           />
-                          <Text style={styles.rejectButtonText}>უარყოფა</Text>
+                          <Text style={styles.rejectButtonText}>
+                            {t("appointments.reschedule.reject")}
+                          </Text>
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -3345,16 +3343,25 @@ export default function DoctorAppointments() {
                           color="#8B5CF6"
                         />
                         <Text style={styles.rescheduleRequestTitle}>
-                          გადაჯავშნის მოთხოვნა გაიგზავნა
+                          {t("appointments.reschedule.sent")}
                         </Text>
                       </View>
-                      <Text style={styles.rescheduleRequestText}>
-                        ახალი თარიღი:{" "}
-                        {selectedConsultation.rescheduleRequest.requestedDate}{" "}
-                        {selectedConsultation.rescheduleRequest.requestedTime}
-                      </Text>
+                      {selectedConsultation.rescheduleRequest.requestedDate &&
+                        selectedConsultation.rescheduleRequest.requestedTime && (
+                          <Text style={styles.rescheduleRequestText}>
+                            {t("appointments.reschedule.newDate")}:{" "}
+                            {formatDisplayDate(
+                              selectedConsultation.rescheduleRequest
+                                .requestedDate,
+                            )}{" "}
+                            {formatAppointmentTime(
+                              selectedConsultation.rescheduleRequest
+                                .requestedTime,
+                            )}
+                          </Text>
+                        )}
                       <Text style={styles.rescheduleRequestStatus}>
-                        პაციენტის პასუხის მოლოდინში...
+                        {t("appointments.reschedule.waitingPatient")}
                       </Text>
                     </View>
                   )}
@@ -3377,7 +3384,7 @@ export default function DoctorAppointments() {
                           color="#8B5CF6"
                         />
                         <Text style={styles.rescheduleButtonText}>
-                          გადაჯავშნის მოთხოვნა
+                          {t("appointments.reschedule.requestButton")}
                         </Text>
                       </TouchableOpacity>
                     </View>
@@ -3772,7 +3779,7 @@ export default function DoctorAppointments() {
                             {appointmentData.followUpDate &&
                             appointmentData.followUpTime
                               ? `${appointmentData.followUpDate} • ${appointmentData.followUpTime}`
-                              : "აირჩიე თარიღი და დრო"}
+                              : t("appointments.reschedule.modal.selectDateTime")}
                           </Text>
                           {loadingFollowUpAvailability && (
                             <ActivityIndicator size="small" color="#06B6D4" />
@@ -4541,7 +4548,9 @@ export default function DoctorAppointments() {
         <View style={styles.followUpModalOverlay}>
           <View style={styles.followUpScheduleModalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>აირჩიე თარიღი და დრო</Text>
+              <Text style={styles.modalTitle}>
+                {t("appointments.reschedule.modal.selectDateTime")}
+              </Text>
               <TouchableOpacity
                 onPress={() => setShowFollowUpScheduleModal(false)}
                 style={styles.closeButton}
@@ -4656,7 +4665,9 @@ export default function DoctorAppointments() {
         >
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>გადაჯავშნის მოთხოვნა</Text>
+              <Text style={styles.modalTitle}>
+                {t("appointments.reschedule.requestTitle")}
+              </Text>
               <TouchableOpacity
                 onPress={() => setShowRescheduleModal(false)}
                 style={styles.closeButton}
@@ -4667,15 +4678,17 @@ export default function DoctorAppointments() {
 
             <ScrollView style={styles.modalBody}>
               <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>მიზეზი (არასავალდებულო)</Text>
+                <Text style={styles.detailLabel}>
+                  {t("appointments.reschedule.reasonOptional")}
+                </Text>
                 <Text
                   style={{ fontSize: 13, color: "#6B7280", marginBottom: 12 }}
                 >
-                  პაციენტი თავად აირჩევს ახალ თარიღს და დროს
+                  {t("appointments.reschedule.patientPicksSlot")}
                 </Text>
                 <TextInput
                   style={styles.reasonInput}
-                  placeholder="მიუთითეთ გადაჯავშნის მიზეზი..."
+                  placeholder={t("appointments.reschedule.reasonPlaceholder")}
                   placeholderTextColor="#9CA3AF"
                   value={rescheduleReason}
                   onChangeText={setRescheduleReason}
@@ -4690,7 +4703,9 @@ export default function DoctorAppointments() {
                 style={styles.modalButton}
                 onPress={() => setShowRescheduleModal(false)}
               >
-                <Text style={styles.modalButtonText}>გაუქმება</Text>
+                <Text style={styles.modalButtonText}>
+                  {t("appointments.common.cancel")}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[
@@ -4704,7 +4719,7 @@ export default function DoctorAppointments() {
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
                   <Text style={styles.rescheduleSubmitButtonText}>
-                    მოთხოვნის გაგზავნა
+                    {t("appointments.reschedule.sendRequest")}
                   </Text>
                 )}
               </TouchableOpacity>

@@ -22,6 +22,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
+import {
+  formatAppointmentDateLong,
+  formatAppointmentTime,
+} from "../utils/appointmentDateTime";
 
 interface PatientAppointment {
   id: string;
@@ -236,7 +240,29 @@ const mapAppointmentFromAPI = (
 };
 
 const Appointment = () => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+
+  const formatDisplayDate = (dateStr: string) =>
+    formatAppointmentDateLong(dateStr, language);
+
+  const getConsultationTypeLabelLocalized = (
+    type: string,
+    isFollowUp?: boolean,
+  ) => {
+    if (isFollowUp === true) return "განმეორებითი";
+    switch (type) {
+      case "video":
+        return t("appointments.tab.filter.video");
+      case "home-visit":
+        return t("appointments.tab.filter.visit");
+      case "consultation":
+        return "კონსულტაცია";
+      case "emergency":
+        return "სასწრაფო";
+      default:
+        return type;
+    }
+  };
   const router = useRouter();
   const params = useLocalSearchParams<{ filterType?: string }>();
   const { isAuthenticated, user } = useAuth();
@@ -1086,13 +1112,18 @@ const Appointment = () => {
         setSelectedRescheduleTime(null);
         // Reload appointments to get updated data
         await loadAppointments();
-        Alert.alert("წარმატება", "გადაჯავშნის მოთხოვნა გაიგზავნა ექიმთან");
       } else {
-        Alert.alert("შეცდომა", response.message || "გადაჯავშნა ვერ მოხერხდა");
+        Alert.alert(
+          t("appointments.common.error"),
+          response.message || t("appointments.reschedule.failed"),
+        );
       }
     } catch (err: any) {
       console.error("Reschedule error:", err);
-      Alert.alert("შეცდომა", err.message || "გადაჯავშნა ვერ მოხერხდა");
+      Alert.alert(
+        t("appointments.common.error"),
+        err.message || t("appointments.reschedule.failed"),
+      );
     } finally {
       setRescheduleLoading(false);
     }
@@ -1144,7 +1175,10 @@ const Appointment = () => {
         }
       } catch (err) {
         console.error("Failed to load availability:", err);
-        Alert.alert("შეცდომა", "ხელმისაწვდომი დროების ჩატვირთვა ვერ მოხერხდა");
+        Alert.alert(
+          t("appointments.common.error"),
+          t("appointments.reschedule.loadSlotsFailed"),
+        );
       } finally {
         setLoadingAvailability(false);
       }
@@ -1158,13 +1192,18 @@ const Appointment = () => {
       const response = await apiService.approveReschedule(appointmentId);
       if (response.success) {
         await loadAppointments();
-        Alert.alert("წარმატება", "გადაჯავშნა დამტკიცდა");
       } else {
-        Alert.alert("შეცდომა", response.message || "დამტკიცება ვერ მოხერხდა");
+        Alert.alert(
+          t("appointments.common.error"),
+          response.message || t("appointments.reschedule.approveFailed"),
+        );
       }
     } catch (err: any) {
       console.error("Approve reschedule error:", err);
-      Alert.alert("შეცდომა", err.message || "დამტკიცება ვერ მოხერხდა");
+      Alert.alert(
+        t("appointments.common.error"),
+        err.message || t("appointments.reschedule.approveFailed"),
+      );
     }
   };
 
@@ -1175,7 +1214,10 @@ const Appointment = () => {
       !approveRescheduleDate ||
       !approveRescheduleTime
     ) {
-      Alert.alert("შეცდომა", "გთხოვთ აირჩიოთ თარიღი და დრო");
+      Alert.alert(
+        t("appointments.common.error"),
+        t("appointments.reschedule.selectDateTimeError"),
+      );
       return;
     }
 
@@ -1192,13 +1234,18 @@ const Appointment = () => {
         setApproveRescheduleDate(null);
         setApproveRescheduleTime(null);
         await loadAppointments();
-        Alert.alert("წარმატება", "გადაჯავშნა დამტკიცდა");
       } else {
-        Alert.alert("შეცდომა", response.message || "დამტკიცება ვერ მოხერხდა");
+        Alert.alert(
+          t("appointments.common.error"),
+          response.message || t("appointments.reschedule.approveFailed"),
+        );
       }
     } catch (err: any) {
       console.error("Approve reschedule error:", err);
-      Alert.alert("შეცდომა", err.message || "დამტკიცება ვერ მოხერხდა");
+      Alert.alert(
+        t("appointments.common.error"),
+        err.message || t("appointments.reschedule.approveFailed"),
+      );
     } finally {
       setApproveRescheduleLoading(false);
     }
@@ -1207,28 +1254,30 @@ const Appointment = () => {
   // Handle reject reschedule request
   const handleRejectReschedule = async (appointmentId: string) => {
     Alert.alert(
-      "გადაჯავშნის უარყოფა",
-      "დარწმუნებული ხართ რომ გსურთ გადაჯავშნის მოთხოვნის უარყოფა?",
+      t("appointments.reschedule.rejectConfirmTitle"),
+      t("appointments.reschedule.rejectConfirmMessage"),
       [
-        { text: "გაუქმება", style: "cancel" },
+        { text: t("appointments.common.cancel"), style: "cancel" },
         {
-          text: "უარყოფა",
+          text: t("appointments.reschedule.reject"),
           style: "destructive",
           onPress: async () => {
             try {
               const response = await apiService.rejectReschedule(appointmentId);
               if (response.success) {
                 await loadAppointments();
-                Alert.alert("წარმატება", "გადაჯავშნის მოთხოვნა უარყოფილია");
               } else {
                 Alert.alert(
-                  "შეცდომა",
-                  response.message || "უარყოფა ვერ მოხერხდა",
+                  t("appointments.common.error"),
+                  response.message || t("appointments.reschedule.rejectFailed"),
                 );
               }
             } catch (err: any) {
               console.error("Reject reschedule error:", err);
-              Alert.alert("შეცდომა", err.message || "უარყოფა ვერ მოხერხდა");
+              Alert.alert(
+                t("appointments.common.error"),
+                err.message || t("appointments.reschedule.rejectFailed"),
+              );
             }
           },
         },
@@ -1398,7 +1447,7 @@ const Appointment = () => {
         <View style={styles.listSection}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>
-              {filteredAppointments.length} ჯავშანი
+              {t("appointments.tab.currentListTitle")}
             </Text>
             {/* <TouchableOpacity style={styles.sortButton}>
               <Ionicons name="funnel-outline" size={18} color="#6B7280" />
@@ -1455,7 +1504,7 @@ const Appointment = () => {
                           </View>
                           <Text style={styles.doctorSpecialty}>
                             {appointment.doctorSpecialty} •{" "}
-                            {getConsultationTypeLabel(
+                            {getConsultationTypeLabelLocalized(
                               appointment.type,
                               appointment.isFollowUp,
                             )}
@@ -1513,7 +1562,9 @@ const Appointment = () => {
                           size={16}
                           color="#6B7280"
                         />
-                        <Text style={styles.infoText}>{appointment.date}</Text>
+                        <Text style={styles.infoText}>
+                          {formatDisplayDate(appointment.date)}
+                        </Text>
                       </View>
                       <View style={styles.infoRow}>
                         <Ionicons
@@ -1521,7 +1572,9 @@ const Appointment = () => {
                           size={16}
                           color="#6B7280"
                         />
-                        <Text style={styles.infoText}>{appointment.time}</Text>
+                        <Text style={styles.infoText}>
+                          {formatAppointmentTime(appointment.time)}
+                        </Text>
                       </View>
                       {appointment.diagnosis && (
                         <View style={styles.diagnosisRow}>
@@ -1756,24 +1809,29 @@ const Appointment = () => {
                             color="#8B5CF6"
                           />
                           <Text style={styles.rescheduleRequestTitle}>
-                            ექიმმა მოითხოვა გადაჯავშნა
+                            {t("appointments.reschedule.doctorRequestTitle")}
                           </Text>
                         </View>
                         {appointment.rescheduleRequest.requestedDate &&
                         appointment.rescheduleRequest.requestedTime ? (
                           <Text style={styles.rescheduleRequestText}>
-                            ახალი თარიღი:{" "}
-                            {appointment.rescheduleRequest.requestedDate}{" "}
-                            {appointment.rescheduleRequest.requestedTime}
+                            {t("appointments.reschedule.newDate")}:{" "}
+                            {formatDisplayDate(
+                              appointment.rescheduleRequest.requestedDate,
+                            )}{" "}
+                            {formatAppointmentTime(
+                              appointment.rescheduleRequest.requestedTime,
+                            )}
                           </Text>
                         ) : (
                           <Text style={styles.rescheduleRequestText}>
-                            გთხოვთ აირჩიოთ ახალი თარიღი და დრო
+                            {t("appointments.reschedule.selectDateTimeHint")}
                           </Text>
                         )}
                         {appointment.rescheduleRequest.reason && (
                           <Text style={styles.rescheduleRequestReason}>
-                            მიზეზი: {appointment.rescheduleRequest.reason}
+                            {t("appointments.reschedule.comment")}:{" "}
+                            {appointment.rescheduleRequest.reason}
                           </Text>
                         )}
                         <View style={styles.rescheduleRequestActions}>
@@ -1792,7 +1850,7 @@ const Appointment = () => {
                               color="#10B981"
                             />
                             <Text style={styles.approveButtonText}>
-                              დამტკიცება
+                              {t("appointments.reschedule.approve")}
                             </Text>
                           </TouchableOpacity>
                           <TouchableOpacity
@@ -1806,7 +1864,9 @@ const Appointment = () => {
                               size={18}
                               color="#EF4444"
                             />
-                            <Text style={styles.rejectButtonText}>უარყოფა</Text>
+                            <Text style={styles.rejectButtonText}>
+                              {t("appointments.reschedule.reject")}
+                            </Text>
                           </TouchableOpacity>
                         </View>
                       </View>
@@ -1824,16 +1884,20 @@ const Appointment = () => {
                             color="#8B5CF6"
                           />
                           <Text style={styles.rescheduleRequestTitle}>
-                            გადაჯავშნის მოთხოვნა გაიგზავნა
+                            {t("appointments.reschedule.sent")}
                           </Text>
                         </View>
                         <Text style={styles.rescheduleRequestText}>
-                          ახალი თარიღი:{" "}
-                          {appointment.rescheduleRequest.requestedDate}{" "}
-                          {appointment.rescheduleRequest.requestedTime}
+                          {t("appointments.reschedule.newDate")}:{" "}
+                          {formatDisplayDate(
+                            appointment.rescheduleRequest.requestedDate || "",
+                          )}{" "}
+                          {formatAppointmentTime(
+                            appointment.rescheduleRequest.requestedTime || "",
+                          )}
                         </Text>
                         <Text style={styles.rescheduleRequestStatus}>
-                          ექიმის პასუხის მოლოდინში...
+                          {t("appointments.reschedule.waitingDoctor")}
                         </Text>
                       </View>
                     )}
@@ -2140,7 +2204,9 @@ const Appointment = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>გადაჯავშნა</Text>
+              <Text style={styles.modalTitle}>
+                {t("appointments.reschedule.modal.title")}
+              </Text>
               <TouchableOpacity
                 onPress={() => setShowRescheduleModal(false)}
                 style={styles.closeButton}
@@ -2154,21 +2220,23 @@ const Appointment = () => {
                 <View style={styles.loadingContainer}>
                   <ActivityIndicator size="large" color="#06B6D4" />
                   <Text style={styles.loadingText}>
-                    თავისუფალი დროების ჩატვირთვა...
+                    {t("appointments.reschedule.loadingSlots")}
                   </Text>
                 </View>
               ) : availableSlots.length === 0 ? (
                 <View style={styles.emptyContainer}>
                   <Ionicons name="calendar-outline" size={48} color="#9CA3AF" />
                   <Text style={styles.emptyText}>
-                    თავისუფალი დრო არ მოიძებნა
+                    {t("appointments.reschedule.noSlots")}
                   </Text>
                 </View>
               ) : (
                 <>
                   {/* Date Selection */}
                   <View style={styles.detailSection}>
-                    <Text style={styles.detailLabel}>აირჩიეთ თარიღი</Text>
+                    <Text style={styles.detailLabel}>
+                      {t("appointments.reschedule.modal.selectDate")}
+                    </Text>
                     <ScrollView
                       horizontal
                       showsHorizontalScrollIndicator={false}
@@ -2194,11 +2262,7 @@ const Appointment = () => {
                                 styles.dateChipTextSelected,
                             ]}
                           >
-                            {new Date(date).toLocaleDateString("ka-GE", {
-                              weekday: "short",
-                              day: "numeric",
-                              month: "short",
-                            })}
+                            {formatDisplayDate(date)}
                           </Text>
                         </TouchableOpacity>
                       ))}
@@ -2208,7 +2272,9 @@ const Appointment = () => {
                   {/* Time Selection */}
                   {selectedRescheduleDate && (
                     <View style={styles.detailSection}>
-                      <Text style={styles.detailLabel}>აირჩიეთ დრო</Text>
+                      <Text style={styles.detailLabel}>
+                        {t("appointments.reschedule.modal.selectTime")}
+                      </Text>
                       <View style={styles.timeGrid}>
                         {timesForSelectedDate.map((time) => (
                           <TouchableOpacity
@@ -2227,7 +2293,7 @@ const Appointment = () => {
                                   styles.timeChipTextSelected,
                               ]}
                             >
-                              {time}
+                              {formatAppointmentTime(time)}
                             </Text>
                           </TouchableOpacity>
                         ))}
@@ -2262,7 +2328,7 @@ const Appointment = () => {
                       styles.rescheduleButtonText,
                     ]}
                   >
-                    დადასტურება
+                    {t("appointments.reschedule.confirm")}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -2281,7 +2347,9 @@ const Appointment = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>აირჩიეთ თარიღი და დრო</Text>
+              <Text style={styles.modalTitle}>
+                {t("appointments.reschedule.modal.selectDateTime")}
+              </Text>
               <TouchableOpacity
                 onPress={() => setShowApproveRescheduleModal(false)}
                 style={styles.closeButton}
@@ -2295,14 +2363,16 @@ const Appointment = () => {
                 <View style={styles.loadingContainer}>
                   <ActivityIndicator size="large" color="#06B6D4" />
                   <Text style={styles.loadingText}>
-                    ხელმისაწვდომი დროების ჩატვირთვა...
+                    {t("appointments.reschedule.loadingSlots")}
                   </Text>
                 </View>
               ) : (
                 <>
                   {/* Date Selection */}
                   <View style={styles.detailSection}>
-                    <Text style={styles.detailLabel}>აირჩიეთ თარიღი</Text>
+                    <Text style={styles.detailLabel}>
+                      {t("appointments.reschedule.modal.selectDate")}
+                    </Text>
                     <ScrollView
                       horizontal
                       showsHorizontalScrollIndicator={false}
@@ -2330,11 +2400,7 @@ const Appointment = () => {
                                 styles.dateChipTextSelected,
                             ]}
                           >
-                            {new Date(date).toLocaleDateString("ka-GE", {
-                              weekday: "short",
-                              day: "numeric",
-                              month: "short",
-                            })}
+                            {formatDisplayDate(date)}
                           </Text>
                         </TouchableOpacity>
                       ))}
@@ -2344,7 +2410,9 @@ const Appointment = () => {
                   {/* Time Selection */}
                   {approveRescheduleDate && (
                     <View style={styles.detailSection}>
-                      <Text style={styles.detailLabel}>აირჩიეთ დრო</Text>
+                      <Text style={styles.detailLabel}>
+                        {t("appointments.reschedule.modal.selectTime")}
+                      </Text>
                       <View style={styles.timeGrid}>
                         {availableSlots
                           .filter((s) => s.date === approveRescheduleDate)
@@ -2367,7 +2435,7 @@ const Appointment = () => {
                                     styles.timeChipTextSelected,
                                 ]}
                               >
-                                {slot.time}
+                                {formatAppointmentTime(slot.time)}
                               </Text>
                             </TouchableOpacity>
                           ))}
@@ -2383,7 +2451,9 @@ const Appointment = () => {
                 style={styles.modalButton}
                 onPress={() => setShowApproveRescheduleModal(false)}
               >
-                <Text style={styles.modalButtonText}>გაუქმება</Text>
+                <Text style={styles.modalButtonText}>
+                  {t("appointments.common.cancel")}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[
@@ -2410,7 +2480,7 @@ const Appointment = () => {
                       styles.rescheduleButtonText,
                     ]}
                   >
-                    დამტკიცება
+                    {t("appointments.reschedule.approve")}
                   </Text>
                 )}
               </TouchableOpacity>

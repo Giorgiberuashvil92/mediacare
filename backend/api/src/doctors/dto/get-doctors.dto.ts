@@ -1,5 +1,12 @@
 import { Transform, Type } from 'class-transformer';
-import { IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 
 export enum DoctorStatusFilter {
   PENDING = 'pending',
@@ -56,4 +63,9 @@ export class GetDoctorsDto {
       'status must be one of the following values: pending, awaiting_schedule, approved, rejected, all',
   })
   status?: DoctorStatusFilter;
+
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  forAdmin?: boolean;
 }
