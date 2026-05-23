@@ -73,7 +73,8 @@ export class AdminService {
             .map((u) => (u._id as mongoose.Types.ObjectId).toString())
         : [];
     const doctorsWithSchedule =
-     await this.getDoctor
+      await this.getDoctorIdsWithFutureSchedule(doctorIdsForSchedule);
+
     // Format users
     const formattedUsers = users.map((user) => {
       // Handle MongoDB ObjectId conversion
@@ -90,10 +91,7 @@ export class AdminService {
 
       let doctorStatus = user.doctorStatus;
       if (
-        us
-        er.role === UserRole.DOCTOR &&
-       
-      
+        user.role === UserRole.DOCTOR &&
         user.approvalStatus === ApprovalStatus.APPROVED
       ) {
         doctorStatus = hasSchedule
@@ -179,16 +177,13 @@ export class AdminService {
         $expr: { $gt: [{ $size: '$timeSlots' }, 0] },
       })
       .select('doctorId')
-      .lean();return new Set(
+      .lean();
+
+    return new Set(
       records.map((r) => (r.doctorId as mongoose.Types.ObjectId).toString()),
     );
   }
 
-     
-     
-     
-     ;
-   
   private async syncApprovedDoctorStatuses(
     users: Array<{
       id: string;
