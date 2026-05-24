@@ -14,6 +14,8 @@ const CATEGORY_TYPES: ShopEntityType[] = ['laboratory', 'equipment'];
 
 const defaultCategoryForm = {
   name: '',
+  nameEn: '',
+  nameRu: '',
   type: 'laboratory' as ShopEntityType,
   description: '',
   imageUrl: '',
@@ -24,6 +26,8 @@ const defaultCategoryForm = {
 
 const defaultProductForm = {
   name: '',
+  nameEn: '',
+  nameRu: '',
   icdCode: '',
   icdCode2: '',
   uniqueCode: '',
@@ -125,6 +129,8 @@ export default function MedicineShopPage() {
 
       const payload = {
         name: categoryForm.name,
+        nameEn: categoryForm.nameEn.trim() || undefined,
+        nameRu: categoryForm.nameRu.trim() || undefined,
         type: categoryForm.type,
         description: categoryForm.description || undefined,
         imageUrl: categoryForm.imageUrl || undefined,
@@ -157,6 +163,8 @@ export default function MedicineShopPage() {
 
       const payload = {
         name: productForm.name,
+        nameEn: productForm.nameEn.trim() || undefined,
+        nameRu: productForm.nameRu.trim() || undefined,
         icdCode: productForm.icdCode || undefined,
         icdCode2: productForm.icdCode2 || undefined,
         uniqueCode: productForm.uniqueCode || undefined,
@@ -197,6 +205,8 @@ export default function MedicineShopPage() {
     setEditingCategoryId(category.id);
     setCategoryForm({
       name: category.name,
+      nameEn: category.nameEn || '',
+      nameRu: category.nameRu || '',
       type: category.type,
       description: category.description || '',
       imageUrl: category.imageUrl || '',
@@ -210,6 +220,8 @@ export default function MedicineShopPage() {
     setEditingProductId(product.id);
     setProductForm({
       name: product.name,
+      nameEn: product.nameEn || '',
+      nameRu: product.nameRu || '',
       icdCode: product.icdCode || '',
       icdCode2: product.icdCode2 || '',
       uniqueCode: product.uniqueCode || '',
@@ -479,13 +491,34 @@ export default function MedicineShopPage() {
                     </h4>
                     <form onSubmit={handleCategorySubmit} className="grid gap-4 md:grid-cols-2">
                       <div>
-                        <label className={labelClass}>კატეგორიის სახელი *</label>
+                        <label className={labelClass}>დასახელება (ქართული) *</label>
                         <input
                           type="text"
                           required
                           value={categoryForm.name}
                           onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
                           className={inputClass}
+                          placeholder="მაგ. ბიოქიმია"
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Name (English)</label>
+                        <input
+                          type="text"
+                          value={categoryForm.nameEn}
+                          onChange={(e) => setCategoryForm({ ...categoryForm, nameEn: e.target.value })}
+                          className={inputClass}
+                          placeholder="e.g. Biochemistry"
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Название (русский)</label>
+                        <input
+                          type="text"
+                          value={categoryForm.nameRu}
+                          onChange={(e) => setCategoryForm({ ...categoryForm, nameRu: e.target.value })}
+                          className={inputClass}
+                          placeholder="напр. Биохимия"
                         />
                       </div>
                       <div>
@@ -628,6 +661,13 @@ export default function MedicineShopPage() {
                           >
                             <td className="p-3">
                               <div className="font-medium">{category.name}</div>
+                              {(category.nameEn || category.nameRu) && (
+                                <div className="text-xs text-dark-4">
+                                  {category.nameEn && <span>EN: {category.nameEn}</span>}
+                                  {category.nameEn && category.nameRu && ' · '}
+                                  {category.nameRu && <span>RU: {category.nameRu}</span>}
+                                </div>
+                              )}
                               {category.description && (
                                 <div className="text-xs text-dark-4">{category.description}</div>
                               )}
@@ -722,13 +762,34 @@ export default function MedicineShopPage() {
                         </div>
                         <div className="grid gap-4 md:grid-cols-2">
                           <div>
-                            <label className={labelClass}>პროდუქტის სახელი *</label>
+                            <label className={labelClass}>დასახელება (ქართული) *</label>
                             <input
                               type="text"
                               required
                               value={productForm.name}
                               onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
                               className={inputClass}
+                              placeholder="მაგ. სისხის ანალიზი"
+                            />
+                          </div>
+                          <div>
+                            <label className={labelClass}>Name (English)</label>
+                            <input
+                              type="text"
+                              value={productForm.nameEn}
+                              onChange={(e) => setProductForm({ ...productForm, nameEn: e.target.value })}
+                              className={inputClass}
+                              placeholder="e.g. Blood test"
+                            />
+                          </div>
+                          <div>
+                            <label className={labelClass}>Название (русский)</label>
+                            <input
+                              type="text"
+                              value={productForm.nameRu}
+                              onChange={(e) => setProductForm({ ...productForm, nameRu: e.target.value })}
+                              className={inputClass}
+                              placeholder="напр. Анализ крови"
                             />
                           </div>
                           <div>
@@ -1025,6 +1086,13 @@ export default function MedicineShopPage() {
                             >
                               <td className="p-3">
                                 <div className="font-medium">{product.name}</div>
+                                {(product.nameEn || product.nameRu) && (
+                                  <div className="text-xs text-dark-4">
+                                    {product.nameEn && <span>EN: {product.nameEn}</span>}
+                                    {product.nameEn && product.nameRu && ' · '}
+                                    {product.nameRu && <span>RU: {product.nameRu}</span>}
+                                  </div>
+                                )}
                                 {product.description && (
                                   <div className="text-xs text-dark-4 line-clamp-1">{product.description}</div>
                                 )}

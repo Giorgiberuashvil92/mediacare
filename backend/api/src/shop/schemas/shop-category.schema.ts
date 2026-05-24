@@ -11,6 +11,12 @@ export class ShopCategory {
   @Prop({ required: true, trim: true })
   name: string;
 
+  @Prop({ trim: true })
+  nameEn?: string;
+
+  @Prop({ trim: true })
+  nameRu?: string;
+
   @Prop({ required: true, unique: true, lowercase: true })
   slug: string;
 

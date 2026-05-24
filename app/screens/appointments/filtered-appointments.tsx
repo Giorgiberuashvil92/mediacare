@@ -1,6 +1,10 @@
 import { apiService } from "@/app/_services/api";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { useLanguage } from "@/app/contexts/LanguageContext";
+import {
+  formatAppointmentDate,
+  formatAppointmentTime,
+} from "@/app/utils/appointmentDateTime";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -16,10 +20,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import {
-  formatAppointmentDate,
-  formatAppointmentTime,
-} from "@/app/utils/appointmentDateTime";
 
 interface PatientAppointment {
   id: string;
@@ -54,7 +54,7 @@ const mapAppointmentFromAPI = (
 
   return {
     id: appointment._id?.toString() || appointment.id?.toString() || "",
-    doctorName: appointment.doctorId?.name || "უცნობი ექიმი",
+    doctorName: appointment.doctorId?.name || "",
     doctorSpecialty: appointment.doctorId?.specialization || "",
     date: appointment.appointmentDate
       ? new Date(appointment.appointmentDate).toISOString().split("T")[0]
@@ -112,6 +112,8 @@ export default function FilteredAppointmentsScreen() {
   const params = useLocalSearchParams<{ filterType: string }>();
   const { isAuthenticated, user } = useAuth();
   const { t } = useLanguage();
+  const formatTimeCount = (count: number, unitKey: string) =>
+    `${count} ${t(unitKey)}`;
   const [appointments, setAppointments] = useState<PatientAppointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -170,12 +172,12 @@ export default function FilteredAppointmentsScreen() {
   }, [filterType, t]);
 
   useEffect(() => {
-    if (isAuthenticated && user?.id) {
+    if (isAuthenticated && user?.id && user.role === "patient") {
       loadAppointments();
     } else {
       setLoading(false);
     }
-  }, [isAuthenticated, user?.id, loadAppointments]);
+  }, [isAuthenticated, user?.id, user?.role, loadAppointments]);
 
   // Update current time every minute for countdown
   useEffect(() => {
@@ -269,13 +271,13 @@ export default function FilteredAppointmentsScreen() {
     const days = Math.floor(hours / 24);
 
     if (days > 0) {
-      return `${days} დღე ${hours % 24} საათი`;
+      return `${formatTimeCount(days, "appointments.time.day")} ${formatTimeCount(hours % 24, "appointments.time.hour")}`;
     } else if (hours > 0) {
-      return `${hours} საათი ${minutes} წუთი`;
+      return `${formatTimeCount(hours, "appointments.time.hour")} ${formatTimeCount(minutes, "appointments.time.minute")}`;
     } else if (minutes > 0) {
-      return `${minutes} წუთი`;
+      return formatTimeCount(minutes, "appointments.time.minute");
     } else {
-      return "ნაკლები წუთი";
+      return t("appointments.time.lessThanMinute");
     }
   };
 
@@ -296,21 +298,11 @@ export default function FilteredAppointmentsScreen() {
         <View style={styles.doctorInfo}>
           <Image source={item.doctorImage} style={styles.doctorImage} />
           <View style={styles.doctorDetails}>
-            <Text style={styles.doctorName}>{item.doctorName}</Text>
+            <Text style={styles.doctorName}>
+              {item.doctorName || t("history.unknownDoctor")}
+            </Text>
             <Text style={styles.doctorSpecialty}>{item.doctorSpecialty}</Text>
           </View>
-        </View>
-        <View
-          style={[
-            styles.statusBadge,
-            { backgroundColor: `${getStatusColor(item.status)}15` },
-          ]}
-        >
-          <Text
-            style={[styles.statusText, { color: getStatusColor(item.status) }]}
-          >
-            {getStatusLabel(item.status)}
-          </Text>
         </View>
       </View>
 
@@ -432,15 +424,15 @@ export default function FilteredAppointmentsScreen() {
             onPress={async (e) => {
               e.stopPropagation();
               Alert.alert(
-                "დასრულება",
-                "დარწმუნებული ხართ, რომ ბინაზე კონსულტაცია დასრულდა?",
+                t("appointments.filtered.complete"),
+                t("appointments.filtered.completeHomeVisitConfirm"),
                 [
                   {
-                    text: "გაუქმება",
+                    text: t("appointments.common.cancel"),
                     style: "cancel",
                   },
                   {
-                    text: "დასრულება",
+                    text: t("appointments.filtered.complete"),
                     style: "default",
                     onPress: async () => {
                       try {
@@ -449,21 +441,23 @@ export default function FilteredAppointmentsScreen() {
                         );
                         if (response.success) {
                           Alert.alert(
-                            "წარმატება",
-                            "ბინაზე კონსულტაცია მონიშნულია როგორც ჩატარებული",
+                            t("appointments.common.success"),
+                            t("appointments.filtered.completeHomeVisitSuccess"),
                           );
                           await loadAppointments();
                         } else {
                           Alert.alert(
-                            "შეცდომა",
-                            response.message || "ოპერაცია ვერ მოხერხდა",
+                            t("appointments.common.error"),
+                            response.message ||
+                              t("doctor.appointments.operationFailed"),
                           );
                         }
                       } catch (err: any) {
                         console.error("❌ Complete home visit error:", err);
                         const errorMessage =
-                          err.message || "ოპერაცია ვერ მოხერხდა";
-                        Alert.alert("შეცდომა", errorMessage);
+                          err.message ||
+                          t("doctor.appointments.operationFailed");
+                        Alert.alert(t("appointments.common.error"), errorMessage);
                       }
                     },
                   },
@@ -487,7 +481,9 @@ export default function FilteredAppointmentsScreen() {
                   styles.completeHomeVisitButtonTextDisabled,
               ]}
             >
-              {item.homeVisitCompletedAt ? "უკვე დასრულებულია" : "დასრულება"}
+              {item.homeVisitCompletedAt
+                ? t("appointments.filtered.alreadyCompleted")
+                : t("appointments.filtered.complete")}
             </Text>
             {!item.homeVisitCompletedAt && (
               <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
@@ -569,16 +565,19 @@ export default function FilteredAppointmentsScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Ionicons name="time-outline" size={48} color="#F59E0B" />
-              <Text style={styles.modalTitle}>კონსულტაციის დრო არ მოვიდა</Text>
+              <Text style={styles.modalTitle}>
+                {t("appointments.consultation.notYetTitle")}
+              </Text>
               <Text style={styles.modalText}>
-                ვერ შეხვალ ჯერ კონსულტაციის დრო არაა. გთხოვთ დაელოდოთ
-                კონსულტაციის დროს.
+                {t("appointments.consultation.notYetMessage")}
               </Text>
               <TouchableOpacity
                 style={styles.modalButton}
                 onPress={() => setShowConsultationTimeModal(false)}
               >
-                <Text style={styles.modalButtonText}>კარგი</Text>
+                <Text style={styles.modalButtonText}>
+                  {t("doctor.patients.ok")}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>

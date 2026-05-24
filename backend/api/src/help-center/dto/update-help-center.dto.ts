@@ -16,6 +16,22 @@ export class FAQItemDto {
   @IsString()
   answer: string;
 
+  @IsString()
+  @IsOptional()
+  questionEn?: string;
+
+  @IsString()
+  @IsOptional()
+  answerEn?: string;
+
+  @IsString()
+  @IsOptional()
+  questionRu?: string;
+
+  @IsString()
+  @IsOptional()
+  answerRu?: string;
+
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;

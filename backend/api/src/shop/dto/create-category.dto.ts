@@ -15,6 +15,16 @@ export class CreateCategoryDto {
   @MaxLength(120)
   name: string;
 
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  nameEn?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  nameRu?: string;
+
   @IsEnum(ShopCategoryType)
   type: ShopCategoryType;
 

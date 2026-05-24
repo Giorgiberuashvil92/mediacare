@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { apiService } from "../_services/api";
 import { useAuth } from "../contexts/AuthContext";
+import { useLanguage } from "../contexts/LanguageContext";
 
 // 24-საათიანი სლოტები (საათობრივი ინტერვალით)
 const AVAILABLE_HOURS = Array.from(
@@ -23,6 +24,20 @@ const AVAILABLE_HOURS = Array.from(
 
 export default function DoctorSchedule() {
   const { user, refreshUser } = useAuth();
+  const { t, language } = useLanguage();
+
+  const dateLocale =
+    language === "ka" ? "ka-GE" : language === "ru" ? "ru-RU" : "en-US";
+
+  const weekdayKeys = [
+    "sunday",
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+  ] as const;
 
   // ორი ცალკე განრიგი და თარიღები: ვიდეო და ბინაზე ვიზიტები
   const [videoSchedules, setVideoSchedules] = useState<{
@@ -704,7 +719,7 @@ export default function DoctorSchedule() {
 
     return {
       currentMonth: {
-        name: today.toLocaleDateString("ka-GE", {
+        name: today.toLocaleDateString(dateLocale, {
           month: "long",
           year: "numeric",
         }),
@@ -712,7 +727,7 @@ export default function DoctorSchedule() {
       },
       nextMonth: {
         name: new Date(nextYear, nextMonthValue, 1).toLocaleDateString(
-          "ka-GE",
+          dateLocale,
           {
             month: "long",
             year: "numeric",
@@ -725,18 +740,8 @@ export default function DoctorSchedule() {
 
   const calendar = generateCalendarByMonths();
 
-  const getDayName = (date: Date) => {
-    const days = [
-      "კვირა",
-      "ორშაბათი",
-      "სამშაბათი",
-      "ოთხშაბათი",
-      "ხუთშაბათი",
-      "პარასკევი",
-      "შაბათი",
-    ];
-    return days[date.getDay()];
-  };
+  const getDayName = (date: Date) =>
+    t(`doctor.schedule.weekday.${weekdayKeys[date.getDay()]}`);
 
   // Avoid timezone shift: build YYYY-MM-DD from local date parts
   const formatDate = (date: Date) => {
@@ -788,8 +793,8 @@ export default function DoctorSchedule() {
   const toggleDateSelectionVideo = (date: Date) => {
     if (!isDoctorActive) {
       Alert.alert(
-        "შეზღუდვა",
-        "გრაფიკის ჩანიშვნა შესაძლებელია მხოლოდ active სტატუსის ექიმებისთვის. გთხოვთ დაელოდოთ ადმინისტრატორის დამტკიცებას.",
+        t("doctor.schedule.restrictionTitle"),
+        t("doctor.schedule.restrictionSchedule"),
       );
       return;
     }
@@ -810,8 +815,8 @@ export default function DoctorSchedule() {
   const toggleDateSelectionHomeVisit = (date: Date) => {
     if (!isDoctorActive) {
       Alert.alert(
-        "შეზღუდვა",
-        "გრაფიკის ჩანიშვნა შესაძლებელია მხოლოდ active სტატუსის ექიმებისთვის. გთხოვთ დაელოდოთ ადმინისტრატორის დამტკიცებას.",
+        t("doctor.schedule.restrictionTitle"),
+        t("doctor.schedule.restrictionSchedule"),
       );
       return;
     }
@@ -840,8 +845,8 @@ export default function DoctorSchedule() {
   const openTimeSelector = (date: Date) => {
     if (!isDoctorActive) {
       Alert.alert(
-        "შეზღუდვა",
-        "გრაფიკის ჩანიშვნა შესაძლებელია მხოლოდ active სტატუსის ექიმებისთვის. გთხოვთ დაელოდოთ ადმინისტრატორის დამტკიცებას.",
+        t("doctor.schedule.restrictionTitle"),
+        t("doctor.schedule.restrictionSchedule"),
       );
       return;
     }
@@ -929,8 +934,8 @@ export default function DoctorSchedule() {
 
     if (!isDoctorActive) {
       Alert.alert(
-        "შეზღუდვა",
-        "გრაფიკის ჩანიშვნა შესაძლებელია მხოლოდ active სტატუსის ექიმებისთვის. გთხოვთ დაელოდოთ ადმინისტრატორის დამტკიცებას.",
+        t("doctor.schedule.restrictionTitle"),
+        t("doctor.schedule.restrictionSchedule"),
       );
       return;
     }
@@ -947,8 +952,8 @@ export default function DoctorSchedule() {
 
     if (allBookedSlotsForDate.includes(time)) {
       Alert.alert(
-        "დაჯავშნილი საათი",
-        "ეს საათი უკვე დაჯავშნილია (ვიდეო ან ბინაზე ვიზიტი) და ვერ შეიცვლება. გთხოვთ აირჩიოთ სხვა საათი.",
+        t("doctor.schedule.bookedSlotTitle"),
+        t("doctor.schedule.bookedSlotMessage"),
       );
       return;
     }
@@ -960,8 +965,8 @@ export default function DoctorSchedule() {
       // საათის წაშლა - შემოწმება: დარჩენილია თუ არა 24 საათი ან მეტი
       if (!canDeleteSlotVideo(currentEditDate, time)) {
         Alert.alert(
-          "საათის წაშლა შეუძლებელია",
-          "საათის წაშლა შესაძლებელია მხოლოდ 24 საათით ადრე. ამ საათამდე 24 საათზე ნაკლები დარჩენილია.",
+          t("doctor.schedule.deleteSlotTitle"),
+          t("doctor.schedule.deleteSlotMessage"),
         );
         return;
       }
@@ -971,8 +976,8 @@ export default function DoctorSchedule() {
       const otherModeSlots = homeVisitSchedules[currentEditDate] || [];
       if (otherModeSlots.includes(time)) {
         Alert.alert(
-          "საათი დაკავებულია",
-          "ეს საათი უკვე არჩეულია ბინაზე ვიზიტისთვის. ექიმს არ შეუძლია ერთდროულად იყოს ორ ადგილას. გთხოვთ აირჩიოთ სხვა საათი.",
+          t("doctor.schedule.slotOccupiedTitle"),
+          t("doctor.schedule.slotOccupiedHome"),
         );
         return;
       }
@@ -980,8 +985,8 @@ export default function DoctorSchedule() {
       // შემოწმება: დარჩენილია თუ არა მინიმუმ 2 საათი
       if (!canAddSlotVideo(currentEditDate, time)) {
         Alert.alert(
-          "საათის დამატება შეუძლებელია",
-          "ვიდეო კონსულტაციის საათის დამატება შესაძლებელია მინიმუმ 2 საათით ადრე. ამ საათამდე 2 საათზე ნაკლები დარჩენილია.",
+          t("doctor.schedule.addSlotTitle"),
+          t("doctor.schedule.addSlotVideoMessage"),
         );
         return;
       }
@@ -1018,8 +1023,8 @@ export default function DoctorSchedule() {
 
     if (!isDoctorActive) {
       Alert.alert(
-        "შეზღუდვა",
-        "გრაფიკის ჩანიშვნა შესაძლებელია მხოლოდ active სტატუსის ექიმებისთვის. გთხოვთ დაელოდოთ ადმინისტრატორის დამტკიცებას.",
+        t("doctor.schedule.restrictionTitle"),
+        t("doctor.schedule.restrictionSchedule"),
       );
       return;
     }
@@ -1036,8 +1041,8 @@ export default function DoctorSchedule() {
 
     if (allBookedSlotsForDate.includes(time)) {
       Alert.alert(
-        "დაჯავშნილი საათი",
-        "ეს საათი უკვე დაჯავშნილია (ვიდეო ან ბინაზე ვიზიტი) და ვერ შეიცვლება. გთხოვთ აირჩიოთ სხვა საათი.",
+        t("doctor.schedule.bookedSlotTitle"),
+        t("doctor.schedule.bookedSlotMessage"),
       );
       return;
     }
@@ -1049,8 +1054,8 @@ export default function DoctorSchedule() {
       // საათის წაშლა - შემოწმება: დარჩენილია თუ არა 24 საათი ან მეტი
       if (!canDeleteSlotHomeVisit(currentEditDate, time)) {
         Alert.alert(
-          "საათის წაშლა შეუძლებელია",
-          "საათის წაშლა შესაძლებელია მხოლოდ 24 საათით ადრე. ამ საათამდე 24 საათზე ნაკლები დარჩენილია.",
+          t("doctor.schedule.deleteSlotTitle"),
+          t("doctor.schedule.deleteSlotMessage"),
         );
         return;
       }
@@ -1060,8 +1065,8 @@ export default function DoctorSchedule() {
       const otherModeSlots = videoSchedules[currentEditDate] || [];
       if (otherModeSlots.includes(time)) {
         Alert.alert(
-          "საათი დაკავებულია",
-          "ეს საათი უკვე არჩეულია ვიდეო კონსულტაციისთვის. ექიმს არ შეუძლია ერთდროულად იყოს ორ ადგილას. გთხოვთ აირჩიოთ სხვა საათი.",
+          t("doctor.schedule.slotOccupiedTitle"),
+          t("doctor.schedule.slotOccupiedVideo"),
         );
         return;
       }
@@ -1069,8 +1074,8 @@ export default function DoctorSchedule() {
       // შემოწმება: დარჩენილია თუ არა მინიმუმ 2 საათი (ბინაზე ვიზიტი მხოლოდ 2 საათით ადრე)
       if (!canAddSlotHomeVisit(currentEditDate, time)) {
         Alert.alert(
-          "საათის დამატება შეუძლებელია",
-          "ბინაზე ვიზიტის საათის დამატება შესაძლებელია მინიმუმ 2 საათით ადრე. ამ საათამდე 2 საათზე ნაკლები დარჩენილია.",
+          t("doctor.schedule.addSlotTitle"),
+          t("doctor.schedule.addSlotHomeMessage"),
         );
         return;
       }
@@ -1178,8 +1183,8 @@ export default function DoctorSchedule() {
       } catch (error: any) {
         console.error("Error clearing schedule:", error);
         Alert.alert(
-          "შეცდომა",
-          error?.message || "გრაფიკის გასუფთავება ვერ მოხერხდა",
+          t("doctor.schedule.errorTitle"),
+          error?.message || t("doctor.schedule.clearFailed"),
         );
         // Reload availability from backend to restore the correct state
         await loadAvailability();
@@ -1246,8 +1251,8 @@ export default function DoctorSchedule() {
       } catch (error: any) {
         console.error("Error clearing schedule:", error);
         Alert.alert(
-          "შეცდომა",
-          error?.message || "გრაფიკის გასუფთავება ვერ მოხერხდა",
+          t("doctor.schedule.errorTitle"),
+          error?.message || t("doctor.schedule.clearFailed"),
         );
         // Reload availability from backend to restore the correct state
         await loadAvailability();
@@ -1259,8 +1264,8 @@ export default function DoctorSchedule() {
   const saveScheduleVideo = async () => {
     if (!isDoctorActive) {
       Alert.alert(
-        "შეზღუდვა",
-        "გრაფიკის შენახვა შესაძლებელია მხოლოდ active სტატუსის ექიმებისთვის. გთხოვთ დაელოდოთ ადმინისტრატორის დამტკიცებას.",
+        t("doctor.schedule.restrictionTitle"),
+        t("doctor.schedule.restrictionSave"),
       );
       return;
     }
@@ -1285,8 +1290,8 @@ export default function DoctorSchedule() {
       // თუ allDates ცარიელია, მაშინ არც ადრე და არც ახლა არ გაქვს სქედული -> არაფრის შენახვა არ გვჭირდება.
       if (allDates.length === 0) {
         Alert.alert(
-          "შეცდომა",
-          "გთხოვთ აირჩიოთ მინიმუმ ერთი დრო, სანამ განრიგს შეინახავთ",
+          t("doctor.schedule.errorTitle"),
+          t("doctor.schedule.selectTimeBeforeSave"),
         );
         return;
       }
@@ -1353,8 +1358,8 @@ export default function DoctorSchedule() {
             getWorkingDaysCountInNext14Days(availabilityData);
           if (workingDaysCount < minRequired) {
             Alert.alert(
-              "სავალდებულო დღეები",
-              `მომავალი 2 კვირის განმავლობაში სავალდებულოა მინიმუმ ${minRequired} სამუშაო დღე. ახლა არჩეული გაქვთ ${workingDaysCount}. გთხოვთ დაამატოთ გრაფიკი სხვა დღეებზეც, სანამ შეინახავთ.`,
+              t("doctor.schedule.requiredDaysTitle"),
+              `${t("doctor.schedule.requiredDaysPrefix")} ${minRequired} ${t("doctor.schedule.requiredDaysUnit")}. ${t("doctor.schedule.requiredDaysSelected")} ${workingDaysCount}. ${t("doctor.schedule.requiredDaysSuffix")}`,
             );
             setIsSaving(false);
             return;
@@ -1413,16 +1418,15 @@ export default function DoctorSchedule() {
         }, 2000);
       } else {
         Alert.alert(
-          "შეცდომა",
-          response.message || "განრიგის შენახვა ვერ მოხერხდა",
+          t("doctor.schedule.errorTitle"),
+          response.message || t("doctor.schedule.saveFailed"),
         );
       }
     } catch (error: any) {
       console.error("Error saving schedule:", error);
       Alert.alert(
-        "შეცდომა",
-        error.message ||
-          "განრიგის შენახვა ვერ მოხერხდა. გთხოვთ სცადოთ თავიდან.",
+        t("doctor.schedule.errorTitle"),
+        error.message || t("doctor.schedule.saveFailedRetry"),
       );
       // Reload availability from backend to restore the correct state
       await loadAvailability();
@@ -1435,8 +1439,8 @@ export default function DoctorSchedule() {
   const saveScheduleHomeVisit = async () => {
     if (!isDoctorActive) {
       Alert.alert(
-        "შეზღუდვა",
-        "გრაფიკის შენახვა შესაძლებელია მხოლოდ active სტატუსის ექიმებისთვის. გთხოვთ დაელოდოთ ადმინისტრატორის დამტკიცებას.",
+        t("doctor.schedule.restrictionTitle"),
+        t("doctor.schedule.restrictionSave"),
       );
       return;
     }
@@ -1455,8 +1459,8 @@ export default function DoctorSchedule() {
       // თუ allDates ცარიელია, მაშინ არც ადრე და არც ახლა არ გაქვს სქედული -> არაფრის შენახვა არ გვჭირდება.
       if (allDates.length === 0) {
         Alert.alert(
-          "შეცდომა",
-          "გთხოვთ აირჩიოთ მინიმუმ ერთი დრო, სანამ განრიგს შეინახავთ",
+          t("doctor.schedule.errorTitle"),
+          t("doctor.schedule.selectTimeBeforeSave"),
         );
         return;
       }
@@ -1523,8 +1527,8 @@ export default function DoctorSchedule() {
             getWorkingDaysCountInNext14Days(availabilityData);
           if (workingDaysCount < minRequired) {
             Alert.alert(
-              "სავალდებულო დღეები",
-              `მომავალი 2 კვირის განმავლობაში სავალდებულოა მინიმუმ ${minRequired} სამუშაო დღე. ახლა არჩეული გაქვთ ${workingDaysCount}. გთხოვთ დაამატოთ გრაფიკი სხვა დღეებზეც, სანამ შეინახავთ.`,
+              t("doctor.schedule.requiredDaysTitle"),
+              `${t("doctor.schedule.requiredDaysPrefix")} ${minRequired} ${t("doctor.schedule.requiredDaysUnit")}. ${t("doctor.schedule.requiredDaysSelected")} ${workingDaysCount}. ${t("doctor.schedule.requiredDaysSuffix")}`,
             );
             setIsSaving(false);
             return;
@@ -1576,16 +1580,15 @@ export default function DoctorSchedule() {
         }, 2000);
       } else {
         Alert.alert(
-          "შეცდომა",
-          response.message || "განრიგის შენახვა ვერ მოხერხდა",
+          t("doctor.schedule.errorTitle"),
+          response.message || t("doctor.schedule.saveFailed"),
         );
       }
     } catch (error: any) {
       console.error("Error saving schedule:", error);
       Alert.alert(
-        "შეცდომა",
-        error.message ||
-          "განრიგის შენახვა ვერ მოხერხდა. გთხოვთ სცადოთ თავიდან.",
+        t("doctor.schedule.errorTitle"),
+        error.message || t("doctor.schedule.saveFailedRetry"),
       );
       // Reload availability from backend to restore the correct state
       await loadAvailability();
@@ -1659,7 +1662,7 @@ export default function DoctorSchedule() {
           style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
         >
           <Text style={{ fontSize: 16, color: "#6B7280" }}>
-            განრიგის ჩატვირთვა...
+            {t("doctor.schedule.loading")}
           </Text>
         </View>
       </SafeAreaView>
@@ -1682,10 +1685,8 @@ export default function DoctorSchedule() {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerCard}>
-            <Text style={styles.title}>განრიგის დაგეგმვა</Text>
-            <Text style={styles.subtitle}>
-              აირჩიეთ რომელ დღეებში და საათებში გინდათ მუშაობა
-            </Text>
+            <Text style={styles.title}>{t("doctor.schedule.title")}</Text>
+            <Text style={styles.subtitle}>{t("doctor.schedule.subtitle")}</Text>
 
             {/* Warning message if doctor is not active */}
             {!isDoctorActive && (
@@ -1693,22 +1694,14 @@ export default function DoctorSchedule() {
                 <Ionicons name="alert-circle" size={20} color="#EF4444" />
                 <View style={styles.warningContent}>
                   <Text style={styles.warningTitle}>
-                    გრაფიკის ჩანიშვნა შეზღუდულია
+                    {t("doctor.schedule.warningTitle")}
                   </Text>
                   <Text style={styles.warningText}>
-                    გრაფიკის ჩანიშვნა შესაძლებელია მხოლოდ active სტატუსის
-                    ექიმებისთვის. გთხოვთ დაელოდოთ ადმინისტრატორის დამტკიცებას.
+                    {t("doctor.schedule.warningText")}
                   </Text>
                 </View>
               </View>
             )}
-            <View style={styles.modePill}>
-              <Text style={styles.modePillText}>
-                {mode === "video"
-                  ? "ვიდეო კონსულტაციის გრაფიკი"
-                  : "ბინაზე ვიზიტების გრაფიკი"}
-              </Text>
-            </View>
 
             {/* Mode selector cards */}
             <View style={styles.modeRow}>
@@ -1727,9 +1720,8 @@ export default function DoctorSchedule() {
                     color={mode === "video" ? "#0EA5E9" : "#2563EB"}
                   />
                 </View>
-                <Text style={styles.modeTitle}>ვიდეო კონსულტაციები</Text>
-                <Text style={styles.modeSubtitleCard}>
-                  ონლაინ ვიზიტებისთვის ხელმისაწვდომი დროები
+                <Text style={styles.modeTitle}>
+                  {t("doctor.schedule.videoConsultation")}
                 </Text>
               </TouchableOpacity>
 
@@ -1748,9 +1740,8 @@ export default function DoctorSchedule() {
                     color={mode === "home-visit" ? "#22C55E" : "#16A34A"}
                   />
                 </View>
-                <Text style={styles.modeTitle}>ბინაზე ვიზიტები</Text>
-                <Text style={styles.modeSubtitleCard}>
-                  პაციენტის მისამართზე წასვლის დღეები
+                <Text style={styles.modeTitle}>
+                  {t("doctor.schedule.homeVisit")}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -1763,10 +1754,11 @@ export default function DoctorSchedule() {
             <Ionicons name="information-circle" size={24} color="#06B6D4" />
           </View>
           <View style={styles.instructionContent}>
-            <Text style={styles.instructionTitle}>როგორ გამოვიყენოთ?</Text>
+            <Text style={styles.instructionTitle}>
+              {t("doctor.schedule.howToUse")}
+            </Text>
             <Text style={styles.instructionText}>
-              1. აირჩიეთ დღეები კალენდარიდან{"\n"}2. თითოეულ დღეს დააჭირეთ
-              საათების შესარჩევად{"\n"}3. შეინახეთ თქვენი განრიგი
+              {t("doctor.schedule.instructionText")}
             </Text>
           </View>
         </View>
@@ -1776,7 +1768,7 @@ export default function DoctorSchedule() {
           <View style={styles.summaryCard}>
             <View style={styles.summaryHeader}>
               <Text style={styles.summaryTitle}>
-                არჩეული დღეები:{" "}
+                {t("doctor.schedule.selectedDays")}{" "}
                 {(() => {
                   const currentSelected = getCurrentModeSelectedDates();
                   console.log("📅 არჩეული დღეები:", {
@@ -1787,19 +1779,6 @@ export default function DoctorSchedule() {
                   return currentSelected.length;
                 })()}
               </Text>
-            </View>
-            <View style={styles.summaryStats}>
-              <View style={styles.statItem}>
-                <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-                <Text style={styles.statText}>
-                  {
-                    Object.values(getCurrentModeSchedules()).filter(
-                      (slots) => slots.length > 0,
-                    ).length
-                  }{" "}
-                  კონფიგურირებული
-                </Text>
-              </View>
             </View>
           </View>
         )}
@@ -1815,7 +1794,8 @@ export default function DoctorSchedule() {
               </Text>
               <View style={styles.monthBadge}>
                 <Text style={styles.monthBadgeText}>
-                  {calendar.currentMonth.days.length} დღე
+                  {calendar.currentMonth.days.length}{" "}
+                  {t("doctor.schedule.dayUnit")}
                 </Text>
               </View>
             </View>
@@ -1869,7 +1849,7 @@ export default function DoctorSchedule() {
                     >
                       {today && (
                         <View style={styles.todayBadge}>
-                          <Text style={styles.todayBadgeText}>დღეს</Text>
+                          <Text style={styles.todayBadgeText}>{t("doctor.schedule.today")}</Text>
                         </View>
                       )}
                       <Text
@@ -1906,7 +1886,7 @@ export default function DoctorSchedule() {
                           color="#FFFFFF"
                         />
                         <Text style={styles.bookedSlotsIndicatorText}>
-                          {bookedCount} დაჯავშნილი
+                          {bookedCount} {t("doctor.schedule.booked")}
                         </Text>
                       </View>
                     )}
@@ -1925,9 +1905,7 @@ export default function DoctorSchedule() {
                           color="#FFFFFF"
                         />
                         <Text style={styles.configureButtonText}>
-                          {hasSchedule
-                            ? `${currentSchedules[dateStr].length} საათი`
-                            : "საათის არჩევა"}
+                          {t("doctor.schedule.timeSelection")}
                         </Text>
                       </TouchableOpacity>
                     )}
@@ -1946,7 +1924,8 @@ export default function DoctorSchedule() {
                 style={[styles.monthBadge, { backgroundColor: "#10B98120" }]}
               >
                 <Text style={[styles.monthBadgeText, { color: "#10B981" }]}>
-                  {calendar.nextMonth.days.length} დღე
+                  {calendar.nextMonth.days.length}{" "}
+                  {t("doctor.schedule.dayUnit")}
                 </Text>
               </View>
             </View>
@@ -2032,7 +2011,7 @@ export default function DoctorSchedule() {
                           color="#FFFFFF"
                         />
                         <Text style={styles.bookedSlotsIndicatorText}>
-                          {bookedCount} დაჯავშნილი
+                          {bookedCount} {t("doctor.schedule.booked")}
                         </Text>
                       </View>
                     )}
@@ -2051,9 +2030,7 @@ export default function DoctorSchedule() {
                           color="#FFFFFF"
                         />
                         <Text style={styles.configureButtonText}>
-                          {hasSchedule
-                            ? `${currentSchedules[dateStr].length} საათი`
-                            : "საათის არჩევა"}
+                          {t("doctor.schedule.timeSelection")}
                         </Text>
                       </TouchableOpacity>
                     )}
@@ -2082,9 +2059,9 @@ export default function DoctorSchedule() {
                 <Ionicons name="hourglass" size={28} color="#FFFFFF" />
               </View>
               <View style={styles.floatingButtonTextContainer}>
-                <Text style={styles.floatingButtonText}>შენახვა...</Text>
+                <Text style={styles.floatingButtonText}>{t("doctor.schedule.saving")}</Text>
                 <Text style={styles.floatingButtonSubtext}>
-                  გთხოვთ დაელოდოთ
+                  {t("doctor.schedule.pleaseWait")}
                 </Text>
               </View>
             </View>
@@ -2094,14 +2071,17 @@ export default function DoctorSchedule() {
                 <Ionicons name="save-outline" size={24} color="#FFFFFF" />
               </View>
               <View style={styles.floatingButtonTextContainer}>
-                <Text style={styles.floatingButtonText}>განრიგის შენახვა</Text>
+                <Text style={styles.floatingButtonText}>
+                  {t("doctor.schedule.saveSchedule")}
+                </Text>
                 <Text style={styles.floatingButtonSubtext}>
-                  {getCurrentModeSelectedDates().length} დღე •{" "}
+                  {getCurrentModeSelectedDates().length}{" "}
+                  {t("doctor.schedule.dayUnit")} •{" "}
                   {Object.values(getCurrentModeSchedules()).reduce(
                     (sum, slots) => sum + slots.length,
                     0,
                   )}{" "}
-                  საათი
+                  {t("doctor.schedule.hourUnit")}
                 </Text>
               </View>
               <Ionicons
@@ -2121,8 +2101,8 @@ export default function DoctorSchedule() {
             <View style={styles.successIconContainer}>
               <Ionicons name="checkmark-circle" size={48} color="#10B981" />
             </View>
-            <Text style={styles.successTitle}>წარმატებით შეინახა!</Text>
-            <Text style={styles.successSubtitle}>თქვენი განრიგი განახლდა</Text>
+            <Text style={styles.successTitle}>{t("doctor.schedule.saveSuccessTitle")}</Text>
+            <Text style={styles.successSubtitle}>{t("doctor.schedule.saveSuccessSubtitle")}</Text>
           </View>
         </View>
       )}
@@ -2137,7 +2117,7 @@ export default function DoctorSchedule() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>საათების არჩევა</Text>
+              <Text style={styles.modalTitle}>{t("doctor.schedule.timeSelection")}</Text>
               <TouchableOpacity
                 style={styles.closeButton}
                 onPress={() => setShowTimeModal(false)}
@@ -2150,7 +2130,7 @@ export default function DoctorSchedule() {
               <View style={styles.modalDateInfo}>
                 <Ionicons name="calendar" size={20} color="#06B6D4" />
                 <Text style={styles.modalDateText}>
-                  {new Date(currentEditDate).toLocaleDateString("ka-GE", {
+                  {new Date(currentEditDate).toLocaleDateString(dateLocale, {
                     weekday: "long",
                     year: "numeric",
                     month: "long",
@@ -2166,7 +2146,7 @@ export default function DoctorSchedule() {
                   style={[styles.timeLegendDot, { backgroundColor: "#22C55E" }]}
                 />
                 <Text style={styles.timeLegendText}>
-                  მწვანე — თქვენი არჩეული (პაციენტისთვის ხელმისაწვდომი)
+                  {t("doctor.schedule.legendGreen")}
                 </Text>
               </View>
               <View style={styles.timeLegendItem}>
@@ -2174,7 +2154,7 @@ export default function DoctorSchedule() {
                   style={[styles.timeLegendDot, { backgroundColor: "#DC2626" }]}
                 />
                 <Text style={styles.timeLegendText}>
-                  წითელი — პაციენტის დაჯავშნილი
+                  {t("doctor.schedule.legendRed")}
                 </Text>
               </View>
               <View style={styles.timeLegendItem}>
@@ -2189,10 +2169,9 @@ export default function DoctorSchedule() {
                   ]}
                 />
                 <Text style={styles.timeLegendText}>
-                  ყვითელი — წარსული დრო ან ვადა გაუვიდა (ვერ აირჩევა)
-                </Text>
-                <Text style={styles.timeLegendText}>
-                  ან ბინაზეა არჩეული (ვერ აირჩევა)
+                  {mode === "video"
+                    ? t("doctor.schedule.legendYellowVideo")
+                    : t("doctor.schedule.legendYellowHome")}
                 </Text>
               </View>
               <View style={styles.timeLegendItem}>
@@ -2207,7 +2186,7 @@ export default function DoctorSchedule() {
                   ]}
                 />
                 <Text style={styles.timeLegendText}>
-                  თეთრი — გრაფიკში არ არის
+                  {t("doctor.schedule.legendWhite")}
                 </Text>
               </View>
             </View>
@@ -2497,7 +2476,7 @@ export default function DoctorSchedule() {
               >
                 <Text style={styles.selectAllText}>
                   {(() => {
-                    if (!currentEditDate) return "ყველას არჩევა";
+                    if (!currentEditDate) return t("doctor.schedule.selectAll");
                     const dateKey = `${currentEditDate}-${mode}`;
                     const otherMode = mode === "video" ? "home-visit" : "video";
                     const otherDateKey = `${currentEditDate}-${otherMode}`;
@@ -2531,8 +2510,8 @@ export default function DoctorSchedule() {
                       );
 
                     return allDeletableSelected
-                      ? "ყველას მოხსნა"
-                      : "ყველას არჩევა";
+                      ? t("doctor.schedule.deselectAll")
+                      : t("doctor.schedule.selectAll");
                   })()}
                 </Text>
               </TouchableOpacity>
@@ -2540,7 +2519,7 @@ export default function DoctorSchedule() {
                 style={styles.doneButton}
                 onPress={() => setShowTimeModal(false)}
               >
-                <Text style={styles.doneButtonText}>მზადაა</Text>
+                <Text style={styles.doneButtonText}>{t("doctor.schedule.confirm")}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -2560,11 +2539,11 @@ export default function DoctorSchedule() {
               <View style={styles.clearModalIconContainer}>
                 <Ionicons name="alert-circle" size={32} color="#EF4444" />
               </View>
-              <Text style={styles.clearModalTitle}>გრაფიკის გასუფთავება</Text>
+              <Text style={styles.clearModalTitle}>{t("doctor.schedule.clearTitle")}</Text>
               <Text style={styles.clearModalText}>
                 {Object.keys(bookedSlots).length > 0
-                  ? "თქვენ გაქვთ დაჯავშნილი საათები. გასუფთავებისას მხოლოდ თავისუფალი საათები წაიშლება, დაჯავშნილი საათები კი დარჩება."
-                  : "დარწმუნებული ხართ, რომ გსურთ გრაფიკის გასუფთავება? ყველა თავისუფალი საათი წაიშლება."}
+                  ? t("doctor.schedule.clearWithBooked")
+                  : t("doctor.schedule.clearConfirm")}
               </Text>
             </View>
             <View style={styles.clearModalFooter}>
@@ -2572,13 +2551,13 @@ export default function DoctorSchedule() {
                 style={styles.clearModalCancelButton}
                 onPress={() => setShowClearConfirmModal(false)}
               >
-                <Text style={styles.clearModalCancelText}>გაუქმება</Text>
+                <Text style={styles.clearModalCancelText}>{t("doctor.schedule.cancel")}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.clearModalConfirmButton}
                 onPress={handleClearSchedule}
               >
-                <Text style={styles.clearModalConfirmText}>გასუფთავება</Text>
+                <Text style={styles.clearModalConfirmText}>{t("doctor.schedule.clear")}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -2601,7 +2580,7 @@ export default function DoctorSchedule() {
               <View style={styles.clearModalIconContainer}>
                 <Ionicons name="alert-circle" size={32} color="#EF4444" />
               </View>
-              <Text style={styles.clearModalTitle}>თარიღის წაშლა</Text>
+              <Text style={styles.clearModalTitle}>{t("doctor.schedule.deleteDateTitle")}</Text>
               <Text style={styles.clearModalText}>
                 {dateToDelete &&
                   (() => {
@@ -2615,9 +2594,9 @@ export default function DoctorSchedule() {
                     const currentSlots = currentSchedules[dateStr] || [];
 
                     if (bookedForDate.length > 0) {
-                      return `დარწმუნებული ხართ, რომ გსურთ ამ თარიღის (${dateStr}) წაშლა? დაჯავშნილი ${bookedForDate.length} საათი დარჩება, მაგრამ თარიღი და ${currentSlots.length} თავისუფალი საათი წაიშლება.`;
+                      return `${t("doctor.schedule.deleteDateWithBookedPrefix")} (${dateStr})? ${t("doctor.schedule.deleteDateWithBookedMiddle")} ${bookedForDate.length} ${t("doctor.schedule.hourUnit")} ${t("doctor.schedule.deleteDateWithBookedSuffix")} ${currentSlots.length} ${t("doctor.schedule.deleteDateWithBookedEnd")}`;
                     } else {
-                      return `დარწმუნებული ხართ, რომ გსურთ ამ თარიღის (${dateStr}) წაშლა? ყველა საათი (${currentSlots.length}) წაიშლება.`;
+                      return `${t("doctor.schedule.deleteDateAllPrefix")} (${dateStr})? ${t("doctor.schedule.deleteDateAllMiddle")} (${currentSlots.length}) ${t("doctor.schedule.deleteDateAllEnd")}`;
                     }
                   })()}
               </Text>
@@ -2630,7 +2609,7 @@ export default function DoctorSchedule() {
                   setDateToDelete(null);
                 }}
               >
-                <Text style={styles.clearModalCancelText}>გაუქმება</Text>
+                <Text style={styles.clearModalCancelText}>{t("doctor.schedule.cancel")}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.clearModalConfirmButton}
@@ -2663,7 +2642,7 @@ export default function DoctorSchedule() {
                   setDateToDelete(null);
                 }}
               >
-                <Text style={styles.clearModalConfirmText}>წაშლა</Text>
+                <Text style={styles.clearModalConfirmText}>{t("doctor.schedule.delete")}</Text>
               </TouchableOpacity>
             </View>
           </View>

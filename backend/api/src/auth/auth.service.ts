@@ -685,10 +685,13 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    const user = tokenDoc.userId as unknown as string;
+    const userId = this.resolveUserIdFromRefreshTokenDoc(tokenDoc.userId);
+    if (!userId) {
+      throw new UnauthorizedException('Invalid refresh token user');
+    }
 
     // Generate new tokens
-    const tokens = await this.generateTokens(user);
+    const tokens = await this.generateTokens(userId);
 
     // Revoke old refresh token
     await this.refreshTokenModel.findByIdAndUpdate(tokenDoc._id, {
@@ -716,6 +719,35 @@ export class AuthService {
       success: true,
       message: 'Logged out successfully',
     };
+  }
+
+  private resolveUserIdFromRefreshTokenDoc(userRef: unknown): string | null {
+    if (!userRef) {
+      return null;
+    }
+
+    if (typeof userRef === 'string') {
+      const trimmed = userRef.trim();
+      return mongoose.Types.ObjectId.isValid(trimmed) ? trimmed : null;
+    }
+
+    if (userRef instanceof mongoose.Types.ObjectId) {
+      return userRef.toString();
+    }
+
+    if (typeof userRef === 'object') {
+      const doc = userRef as { _id?: unknown; id?: unknown };
+      const rawId = doc._id ?? doc.id;
+      if (rawId instanceof mongoose.Types.ObjectId) {
+        return rawId.toString();
+      }
+      if (typeof rawId === 'string') {
+        const trimmed = rawId.trim();
+        return mongoose.Types.ObjectId.isValid(trimmed) ? trimmed : null;
+      }
+    }
+
+    return null;
   }
 
   private async generateTokens(userId: string) {

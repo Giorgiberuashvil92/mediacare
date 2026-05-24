@@ -104,22 +104,29 @@ const getDefaultBaseUrl = () => {
     return RAILWAY_URL;
   }
 
-  // Development რეჟიმშიც პირველ რიგში env/apiUrl გამოვიყენოთ
-  // (მაგ. production API-ზე ტესტირებისას).
-  if (envUrl) {
-    console.log("✅ Using development URL from env:", envUrl);
-    return envUrl;
-  }
+  // Development: ლოკალური backend (ადმინ ცვლილებების სანახავად).
+  // Production/Railway URL მხოლოდ production build-ში გამოიყენება.
+  if (__DEV__) {
+    const isRemoteProdUrl =
+      envUrl &&
+      (envUrl.includes("mediacare-production") ||
+        envUrl.includes("railway.app"));
 
-  const devIP = getDevelopmentIP();
-  if (devIP) {
-    const devUrl = `http://${devIP}:4001`;
-    console.log("🔧 Using development URL with IP:", devUrl);
-    return devUrl;
-  }
+    if (envUrl && !isRemoteProdUrl) {
+      console.log("✅ Using development URL from env:", envUrl);
+      return envUrl;
+    }
 
-  console.warn("⚠️ No API URL found, using localhost fallback");
-  return "http://localhost:4001";
+    const devIP = getDevelopmentIP();
+    if (devIP) {
+      const devUrl = `http://${devIP}:4001`;
+      console.log("🔧 Using local development API:", devUrl);
+      return devUrl;
+    }
+
+    console.warn("⚠️ No local IP found, using localhost fallback");
+    return "http://localhost:4001";
+  }
 };
 
 const API_BASE_URL = getDefaultBaseUrl();
@@ -189,6 +196,8 @@ export interface Specialization {
 export interface ShopProduct {
   id: string;
   name: string;
+  nameEn?: string;
+  nameRu?: string;
   description?: string;
   type: "laboratory" | "equipment";
   category?: string | null;
@@ -208,6 +217,8 @@ export interface ShopProduct {
 export interface ShopCategory {
   id: string;
   name: string;
+  nameEn?: string;
+  nameRu?: string;
   slug: string;
   type: "laboratory" | "equipment";
   description?: string;
@@ -312,6 +323,7 @@ export interface SendMessageResponse {
 
 class ApiService {
   private baseURL: string;
+  private refreshInFlight: Promise<boolean> | null = null;
 
   constructor() {
     this.baseURL = API_BASE_URL;
@@ -330,8 +342,115 @@ class ApiService {
     return USE_MOCK_API;
   }
 
-  private async getAuthHeaders(): Promise<HeadersInit> {
-    const token = await AsyncStorage.getItem("accessToken");
+  private isPublicAuthEndpoint(endpoint: string): boolean {
+    const publicPaths = [
+      "/auth/login",
+      "/auth/register",
+      "/auth/refresh",
+      "/auth/verify-login-otp",
+      "/auth/send-verification-code",
+      "/auth/forgot-password",
+      "/auth/reset-password",
+      "/auth/verify-phone",
+    ];
+    return publicPaths.some((path) => endpoint.startsWith(path));
+  }
+
+  private async performTokenRefresh(): Promise<void> {
+    const refreshToken = await AsyncStorage.getItem("refreshToken");
+
+    if (USE_MOCK_API) {
+      await AsyncStorage.setItem("accessToken", "mock-access-token");
+      return;
+    }
+
+    if (!refreshToken) {
+      throw new Error("No refresh token available");
+    }
+
+    const response = await fetch(`${this.baseURL}/auth/refresh`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ refreshToken }),
+    });
+
+    const data = await this.handleResponse<{
+      success: boolean;
+      data: { token: string; refreshToken: string };
+    }>(response);
+
+    if (!data.data?.token) {
+      throw new Error("No access token in refresh response");
+    }
+
+    if (!this.isValidAccessToken(data.data.token)) {
+      throw new Error("Invalid access token received from refresh");
+    }
+
+    await AsyncStorage.setItem("accessToken", data.data.token);
+    if (data.data.refreshToken) {
+      await AsyncStorage.setItem("refreshToken", data.data.refreshToken);
+    }
+  }
+
+  private tryRefreshSession(): Promise<boolean> {
+    if (!this.refreshInFlight) {
+      this.refreshInFlight = this.performTokenRefresh()
+        .then(() => true)
+        .catch((error) => {
+          console.warn("Token refresh failed:", error);
+          return false;
+        })
+        .finally(() => {
+          this.refreshInFlight = null;
+        });
+    }
+    return this.refreshInFlight;
+  }
+
+  private isValidAccessToken(token: string): boolean {
+    try {
+      const parts = token.split(".");
+      if (parts.length !== 3) {
+        return false;
+      }
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+      const sub = payload?.sub;
+      if (typeof sub === "object" && sub !== null) {
+        return false;
+      }
+      if (typeof sub !== "string") {
+        return false;
+      }
+      return /^[0-9a-fA-F]{24}$/.test(sub.trim());
+    } catch {
+      return false;
+    }
+  }
+
+  private async clearInvalidStoredTokens(): Promise<void> {
+    const accessToken = await AsyncStorage.getItem("accessToken");
+    if (accessToken && !this.isValidAccessToken(accessToken)) {
+      console.warn(
+        "🔐 [AuthDebug] Removing invalid accessToken from storage",
+        { tokenLength: accessToken.length },
+      );
+      await AsyncStorage.multiRemove(["accessToken", "refreshToken", "user"]);
+    }
+  }
+
+  private async getAuthHeaders(
+    includeAuth = true,
+  ): Promise<HeadersInit> {
+    if (includeAuth) {
+      await this.clearInvalidStoredTokens();
+    }
+
+    const token = includeAuth
+      ? await AsyncStorage.getItem("accessToken")
+      : null;
     if (__DEV__) {
       const maskedToken = token
         ? `${token.slice(0, 12)}...${token.slice(-8)}`
@@ -406,6 +525,11 @@ class ApiService {
       mockMode: USE_MOCK_API,
     });
     logger.auth.login(credentials.email);
+
+    if (!USE_MOCK_API) {
+      await AsyncStorage.multiRemove(["accessToken", "refreshToken", "user"]);
+    }
+
     if (USE_MOCK_API) {
       // simple validation mimic
       if (!credentials.email || !credentials.password) {
@@ -767,34 +891,10 @@ class ApiService {
   }
 
   async refreshToken(): Promise<{ accessToken: string }> {
-    const refreshToken = await AsyncStorage.getItem("refreshToken");
-
-    if (USE_MOCK_API) {
-      const newAccessToken = "mock-access-token";
-      await AsyncStorage.setItem("accessToken", newAccessToken);
-      return { accessToken: newAccessToken };
-    }
-
-    if (!refreshToken) {
-      throw new Error("No refresh token available");
-    }
-
-    const response = await fetch(`${this.baseURL}/auth/refresh`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ refreshToken }),
-    });
-
-    const data = await this.handleResponse<{ accessToken: string }>(response);
-
-    // Update access token only if it exists
-    if (data.accessToken) {
-      await AsyncStorage.setItem("accessToken", data.accessToken);
-    }
-
-    return data;
+    await this.performTokenRefresh();
+    const accessToken =
+      (await AsyncStorage.getItem("accessToken")) || "mock-access-token";
+    return { accessToken };
   }
 
   async logout(): Promise<void> {
@@ -2431,7 +2531,11 @@ class ApiService {
   }
 
   // Generic API call method with timeout and better error handling
-  async apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  async apiCall<T>(
+    endpoint: string,
+    options: RequestInit = {},
+    retryOn401 = true,
+  ): Promise<T> {
     const fullUrl = `${this.baseURL}${endpoint}`;
     const timeoutMs = 30000; // 30 seconds timeout
 
@@ -2451,10 +2555,13 @@ class ApiService {
       return Promise.resolve({} as T);
     }
 
-    const headers = await this.getAuthHeaders();
+    const includeAuth = !this.isPublicAuthEndpoint(endpoint);
+    const headers = await this.getAuthHeaders(includeAuth);
     console.log(
       "🔑 Auth headers prepared:",
-      headers ? "Token present" : "No token",
+      includeAuth && (headers as Record<string, string>).Authorization
+        ? "Token present"
+        : "No token",
     );
 
     if (options.body && typeof options.body === "string") {
@@ -2498,6 +2605,41 @@ class ApiService {
         ok: response.ok,
         url: response.url,
       });
+
+      if (
+        response.status === 401 &&
+        retryOn401 &&
+        includeAuth
+      ) {
+        const errorBody = await response.clone().json().catch(() => ({}));
+        const errorMessage = String(
+          (errorBody as { message?: string }).message || "",
+        ).toLowerCase();
+        const isPermissionError =
+          errorMessage.includes("only patients") ||
+          errorMessage.includes("only doctors") ||
+          errorMessage.includes("not allowed") ||
+          errorMessage.includes("insufficient permissions");
+        const isCorruptedTokenError =
+          errorMessage.includes("invalid user id format") ||
+          errorMessage.includes("missing user id");
+
+        if (isCorruptedTokenError) {
+          console.warn("🔐 Corrupted session token detected, clearing storage");
+          await this.logout();
+          throw new Error("Session expired. Please log in again.");
+        }
+
+        if (!isPermissionError) {
+          console.log("🔁 Access token expired, attempting refresh...");
+          const refreshed = await this.tryRefreshSession();
+          if (refreshed) {
+            return this.apiCall<T>(endpoint, options, false);
+          }
+          await this.logout();
+          throw new Error("Session expired. Please log in again.");
+        }
+      }
 
       return this.handleResponse<T>(response);
     } catch (error: any) {
@@ -2651,9 +2793,13 @@ class ApiService {
       faqs: {
         question: string;
         answer: string;
+        questionEn?: string;
+        answerEn?: string;
+        questionRu?: string;
+        answerRu?: string;
         isActive?: boolean;
         order?: number;
-        role?: "doctor" | "patient"; // Role: doctor or patient
+        role?: "doctor" | "patient";
       }[];
       contactInfo: {
         phone?: string;

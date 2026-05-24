@@ -49,7 +49,7 @@ const TodayAppointment = () => {
       let cancelled = false;
 
       const loadTodayAppointments = async () => {
-        if (!isAuthenticated || !user?.id) {
+        if (!isAuthenticated || !user?.id || user.role !== "patient") {
           if (!cancelled) setLoading(false);
           return;
         }
@@ -271,15 +271,17 @@ const TodayAppointment = () => {
         <View style={styles.content}>
           <Text style={styles.title}>
             {isUrgent()
-              ? "კონსულტაცია მალე!"
+              ? t("todayAppointment.consultationSoon")
               : isToday
-                ? "დღეს გაქვთ ჯავშანი"
-                : "გაქვთ ჯავშანი"}
+                ? t("todayAppointment.hasAppointmentToday")
+                : t("todayAppointment.hasAppointment")}
           </Text>
           <View style={styles.infoRow}>
             <Ionicons name="medical" size={16} color="#FFFFFF" />
             <Text style={styles.doctorName}>
-              {appointment.doctorName || appointment.doctorId?.name || "ექიმი"}
+              {appointment.doctorName ||
+                appointment.doctorId?.name ||
+                t("appointments.common.doctor")}
             </Text>
           </View>
           <View style={styles.infoRow}>
@@ -312,7 +314,9 @@ const TodayAppointment = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>დღევანდელი ჯავშანი</Text>
+              <Text style={styles.modalTitle}>
+                {t("todayAppointment.modalTitle")}
+              </Text>
               <TouchableOpacity
                 onPress={() => setShowModal(false)}
                 style={styles.closeButton}
@@ -326,11 +330,13 @@ const TodayAppointment = () => {
                 <View style={styles.detailRow}>
                   <Ionicons name="medical" size={20} color="#06B6D4" />
                   <View style={styles.detailContent}>
-                    <Text style={styles.detailLabel}>ექიმი</Text>
+                    <Text style={styles.detailLabel}>
+                      {t("appointments.common.doctor")}
+                    </Text>
                     <Text style={styles.detailValue}>
                       {appointment.doctorName ||
                         appointment.doctorId?.name ||
-                        "ექიმი"}
+                        t("appointments.common.doctor")}
                     </Text>
                     <Text style={styles.detailSubValue}>
                       {appointment.doctorSpecialty ||
@@ -343,7 +349,9 @@ const TodayAppointment = () => {
                 <View style={styles.detailRow}>
                   <Ionicons name="calendar-outline" size={20} color="#8B5CF6" />
                   <View style={styles.detailContent}>
-                    <Text style={styles.detailLabel}>თარიღი</Text>
+                    <Text style={styles.detailLabel}>
+                      {t("todayAppointment.date")}
+                    </Text>
                     <Text style={styles.detailValue}>
                       {formatAppointmentDate(
                         appointment.formattedDate || appointment.date || "",
@@ -355,7 +363,9 @@ const TodayAppointment = () => {
                 <View style={styles.detailRow}>
                   <Ionicons name="time-outline" size={20} color="#8B5CF6" />
                   <View style={styles.detailContent}>
-                    <Text style={styles.detailLabel}>დრო</Text>
+                    <Text style={styles.detailLabel}>
+                      {t("todayAppointment.time")}
+                    </Text>
                     <Text style={styles.detailValue}>
                       {formatAppointmentTime(
                         appointment.time || appointment.appointmentTime || "",
@@ -391,7 +401,7 @@ const TodayAppointment = () => {
                       appointment.doctorId != null
                         ? (appointment.doctorId as { name?: string }).name
                         : undefined) ||
-                      "ექიმი";
+                      t("appointments.common.doctor");
                     setShowModal(false);
                     router.push({
                       pathname: "/screens/video-call",
@@ -404,7 +414,9 @@ const TodayAppointment = () => {
                   }}
                 >
                   <Ionicons name="videocam" size={20} color="#FFFFFF" />
-                  <Text style={styles.joinCallText}>შესვლა კონსულტაციაზე</Text>
+                  <Text style={styles.joinCallText}>
+                    {t("appointments.filtered.joinConsultation")}
+                  </Text>
                   <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
                 </TouchableOpacity>
               ) : null}
@@ -416,7 +428,9 @@ const TodayAppointment = () => {
                   router.push("/(tabs)/appointment");
                 }}
               >
-                <Text style={styles.viewAllText}>ყველა ჯავშნის ნახვა</Text>
+                <Text style={styles.viewAllText}>
+                  {t("todayAppointment.viewAll")}
+                </Text>
                 <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
               </TouchableOpacity>
             </View>

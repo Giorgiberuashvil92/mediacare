@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -13,10 +13,12 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { apiService } from "../_services/api";
+import { useLanguage } from "../contexts/LanguageContext";
+import { getLabDisplayName, type LabNamedItem } from "../utils/labLabel";
 import { showToast } from "../utils/toast";
 
 type ExamType = "laboratory" | "instrumental";
@@ -24,6 +26,8 @@ type ExamType = "laboratory" | "instrumental";
 interface LabTest {
   id: string;
   name: string;
+  nameEn?: string;
+  nameRu?: string;
   category: string;
   price: number;
   description?: string;
@@ -55,41 +59,106 @@ interface PrescribedTest {
 }
 
 export default function LaboratoryScreen() {
-  const params = useLocalSearchParams<{ 
-    patientId?: string; 
+  const { t, language } = useLanguage();
+  const params = useLocalSearchParams<{
+    patientId?: string;
     patientName?: string;
     appointmentId?: string;
   }>();
   const [labTests, setLabTests] = useState<LabTest[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [prescribedTests, setPrescribedTests] = useState<PrescribedTest[]>([]);
-  const [filteredPrescribedTests, setFilteredPrescribedTests] = useState<PrescribedTest[]>([]);
+  const [filteredPrescribedTests, setFilteredPrescribedTests] = useState<
+    PrescribedTest[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [preSelectedApplied, setPreSelectedApplied] = useState<string | null>(null);
-  
+  const [preSelectedApplied, setPreSelectedApplied] = useState<string | null>(
+    null,
+  );
+
   // Type filter (laboratory vs instrumental)
   const [selectedType, setSelectedType] = useState<ExamType>("laboratory");
-  
+
   // Modal states
   const [showTestModal, setShowTestModal] = useState(false);
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   const [selectedTests, setSelectedTests] = useState<LabTest[]>([]);
-  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [selectedAppointment, setSelectedAppointment] =
+    useState<Appointment | null>(null);
   const [appointmentSearchQuery, setAppointmentSearchQuery] = useState("");
-  
+
   // Category filter
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [categories, setCategories] = useState<{ id: string; name: string }[]>([
-    { id: "all", name: "ყველა" },
-  ]);
-  
+  const [categories, setCategories] = useState<
+    { id: string; name: string; nameEn?: string; nameRu?: string }[]
+  >([{ id: "all", name: "all" }]);
+
   // Store all categories by type
   const [allCategories, setAllCategories] = useState<{
-    laboratory: { id: string; name: string }[];
-    instrumental: { id: string; name: string }[];
+    laboratory: { id: string; name: string; nameEn?: string; nameRu?: string }[];
+    instrumental: { id: string; name: string; nameEn?: string; nameRu?: string }[];
   }>({ laboratory: [], instrumental: [] });
+
+  const getCategoryDisplayName = (cat: {
+    id: string;
+    name: string;
+    nameEn?: string;
+    nameRu?: string;
+  }) => {
+    if (cat.id === "all") return t("doctor.laboratory.all");
+    return getLabDisplayName(cat, language, t);
+  };
+
+  const labCatalog = useMemo(() => {
+    const map = new Map<string, LabNamedItem>();
+    labTests.forEach((test) => {
+      map.set(test.id, {
+        name: test.name,
+        nameEn: test.nameEn,
+        nameRu: test.nameRu,
+      });
+    });
+    return map;
+  }, [labTests]);
+
+  const resolveLabName = useCallback(
+    (productId: string | undefined, fallbackName: string) => {
+      const item =
+        productId && labCatalog.has(productId)
+          ? labCatalog.get(productId)!
+          : { name: fallbackName };
+      return getLabDisplayName(item, language, t);
+    },
+    [labCatalog, language, t],
+  );
+
+  const getLabSearchText = useCallback(
+    (item: LabNamedItem) =>
+      [item.name, item.nameEn, item.nameRu]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase(),
+    [],
+  );
+
+  const getAppointmentTypeLabel = (apt: Appointment) => {
+    if (apt.isFollowUp) return t("appointments.type.followUp");
+    if (apt.type === "video") return t("appointments.type.videoConsultation");
+    if (apt.type === "home-visit") return t("appointments.type.homeVisit");
+    return apt.type ?? "";
+  };
+
+  const getAppointmentStatusLabel = (status: string) => {
+    if (status === "scheduled" || status === "confirmed") {
+      return t("appointments.status.scheduled");
+    }
+    if (status === "in-progress") {
+      return t("appointments.status.inProgress");
+    }
+    return t("appointments.status.completed");
+  };
 
   const loadData = useCallback(async () => {
     try {
@@ -98,87 +167,125 @@ export default function LaboratoryScreen() {
         apiService.getMedicineShopOverview(),
         apiService.getDoctorDashboardAppointments(100),
       ]);
-      
+
       // Load lab tests from API
       if (overviewResponse.success && overviewResponse.data) {
         // Map laboratory products
-        const labProducts = (overviewResponse.data.laboratoryProducts || []).map((p: any): LabTest => ({
-          id: p._id || p.id,
-          name: p.name,
-          category: p.category || "other",
-          price: p.price || 0,
-          description: p.description,
-          type: "laboratory" as ExamType,
-        }));
-        
+        const labProducts = (
+          overviewResponse.data.laboratoryProducts || []
+        ).map(
+          (p: any): LabTest => ({
+            id: p._id || p.id,
+            name: p.name,
+            nameEn: p.nameEn,
+            nameRu: p.nameRu,
+            category: p.category || "other",
+            price: p.price || 0,
+            description: p.description,
+            type: "laboratory" as ExamType,
+          }),
+        );
+
         // Map equipment/instrumental products
-        const instrumentalProducts = (overviewResponse.data.equipmentProducts || []).map((p: any): LabTest => ({
-          id: p._id || p.id,
-          name: p.name,
-          category: p.category || "other",
-          price: p.price || 0,
-          description: p.description,
-          type: "instrumental" as ExamType,
-        }));
-        
+        const instrumentalProducts = (
+          overviewResponse.data.equipmentProducts || []
+        ).map(
+          (p: any): LabTest => ({
+            id: p._id || p.id,
+            name: p.name,
+            nameEn: p.nameEn,
+            nameRu: p.nameRu,
+            category: p.category || "other",
+            price: p.price || 0,
+            description: p.description,
+            type: "instrumental" as ExamType,
+          }),
+        );
+
         // Combine all products
         setLabTests([...labProducts, ...instrumentalProducts]);
-        
+
         // Build dynamic categories for each type
         const labCategories = [
-          { id: "all", name: "ყველა" },
-          ...(overviewResponse.data.laboratoryCategories || []).map((cat: any) => ({
-            id: cat._id || cat.id,
-            name: cat.name,
-          })),
+          { id: "all", name: "all" },
+          ...(overviewResponse.data.laboratoryCategories || []).map(
+            (cat: any) => ({
+              id: cat._id || cat.id,
+              name: cat.name,
+              nameEn: cat.nameEn,
+              nameRu: cat.nameRu,
+            }),
+          ),
         ];
-        
+
         const instrumentalCategories = [
-          { id: "all", name: "ყველა" },
-          ...(overviewResponse.data.equipmentCategories || []).map((cat: any) => ({
-            id: cat._id || cat.id,
-            name: cat.name,
-          })),
+          { id: "all", name: "all" },
+          ...(overviewResponse.data.equipmentCategories || []).map(
+            (cat: any) => ({
+              id: cat._id || cat.id,
+              name: cat.name,
+              nameEn: cat.nameEn,
+              nameRu: cat.nameRu,
+            }),
+          ),
         ];
-        
+
         setAllCategories({
           laboratory: labCategories,
           instrumental: instrumentalCategories,
         });
-        
+
         // Set initial categories based on selected type
         setCategories(labCategories);
       }
-      
+
       // Build appointments list for lab test assignment
-      console.log('🏥 [Laboratory] appointmentsResponse:', {
+      console.log("🏥 [Laboratory] appointmentsResponse:", {
         success: appointmentsResponse.success,
         hasData: !!appointmentsResponse.data,
-        dataType: Array.isArray(appointmentsResponse.data) ? 'array' : typeof appointmentsResponse.data,
-        dataLength: Array.isArray(appointmentsResponse.data) ? appointmentsResponse.data.length : 'N/A',
+        dataType: Array.isArray(appointmentsResponse.data)
+          ? "array"
+          : typeof appointmentsResponse.data,
+        dataLength: Array.isArray(appointmentsResponse.data)
+          ? appointmentsResponse.data.length
+          : "N/A",
         fullResponse: JSON.stringify(appointmentsResponse, null, 2),
       });
-      
-      if (appointmentsResponse.success && Array.isArray(appointmentsResponse.data)) {
-        console.log('🏥 [Laboratory] Total appointments from API:', appointmentsResponse.data.length);
-        console.log('🏥 [Laboratory] First 3 raw appointments:', appointmentsResponse.data.slice(0, 3));
-        
+
+      if (
+        appointmentsResponse.success &&
+        Array.isArray(appointmentsResponse.data)
+      ) {
+        console.log(
+          "🏥 [Laboratory] Total appointments from API:",
+          appointmentsResponse.data.length,
+        );
+        console.log(
+          "🏥 [Laboratory] First 3 raw appointments:",
+          appointmentsResponse.data.slice(0, 3),
+        );
+
         const allowedStatuses = ["scheduled", "confirmed", "in-progress"]; // მხოლოდ მიმდინარე appointments, დასრულებული აღარ
-        
+
         // Log all appointments before filtering
-        console.log('🏥 [Laboratory] All appointments statuses:', 
+        console.log(
+          "🏥 [Laboratory] All appointments statuses:",
           appointmentsResponse.data.map((apt: any) => ({
             id: apt.id,
             status: apt.status,
             patientName: apt.patientName,
-          }))
+          })),
         );
-        
+
         // სპეციალურად ვნახოთ "in-progress" და "completed" სტატუსების appointments
-        const inProgressAppts = appointmentsResponse.data.filter((apt: any) => apt.status === "in-progress");
-        const completedAppts = appointmentsResponse.data.filter((apt: any) => apt.status === "completed");
-        
-        console.log('🟡 [Laboratory] მიმდინარე appointments (in-progress):', {
+        const inProgressAppts = appointmentsResponse.data.filter(
+          (apt: any) => apt.status === "in-progress",
+        );
+        const completedAppts = appointmentsResponse.data.filter(
+          (apt: any) => apt.status === "completed",
+        );
+
+        console.log("🟡 [Laboratory] მიმდინარე appointments (in-progress):", {
           count: inProgressAppts.length,
           appointments: inProgressAppts.map((apt: any) => ({
             id: apt.id,
@@ -191,8 +298,8 @@ export default function LaboratoryScreen() {
             fullData: apt,
           })),
         });
-        
-        console.log('🟢 [Laboratory] დასრულებული appointments (completed):', {
+
+        console.log("🟢 [Laboratory] დასრულებული appointments (completed):", {
           count: completedAppts.length,
           appointments: completedAppts.map((apt: any) => ({
             id: apt.id,
@@ -205,12 +312,12 @@ export default function LaboratoryScreen() {
             fullData: apt,
           })),
         });
-        
+
         const appointmentList: Appointment[] = appointmentsResponse.data
           .filter((apt: any) => {
             const isAllowed = allowedStatuses.includes(apt.status);
             if (!isAllowed) {
-              console.log('❌ [Laboratory] Appointment filtered out:', {
+              console.log("❌ [Laboratory] Appointment filtered out:", {
                 id: apt.id,
                 status: apt.status,
                 patientName: apt.patientName,
@@ -221,8 +328,8 @@ export default function LaboratoryScreen() {
           .map((apt: any): Appointment => {
             // Extract patientId - can be object or string
             const patientId = apt.patientId?._id || apt.patientId || "";
-            
-            console.log('🏥 [Laboratory] Processing appointment:', {
+
+            console.log("🏥 [Laboratory] Processing appointment:", {
               id: apt.id,
               patientName: apt.patientName,
               rawPatientId: apt.patientId,
@@ -234,10 +341,10 @@ export default function LaboratoryScreen() {
               status: apt.status,
               fullApt: JSON.stringify(apt, null, 2),
             });
-            
+
             return {
               id: apt.id,
-              patientName: apt.patientName || "უცნობი პაციენტი",
+              patientName: apt.patientName || t("doctor.laboratory.unknownPatient"),
               patientId: patientId,
               date: apt.date || "",
               time: apt.time || "",
@@ -245,76 +352,120 @@ export default function LaboratoryScreen() {
               status: apt.status,
             };
           });
-        
-        console.log('🏥 [Laboratory] Filtered appointmentList length:', appointmentList.length);
-        console.log('🏥 [Laboratory] Final appointmentList:', appointmentList);
-        
+
+        console.log(
+          "🏥 [Laboratory] Filtered appointmentList length:",
+          appointmentList.length,
+        );
+        console.log("🏥 [Laboratory] Final appointmentList:", appointmentList);
+
         // Sort by date (newest first)
         // Parse dates in local timezone (same as patient side)
         appointmentList.sort((a, b) => {
-          const [yearA, monthA, dayA] = a.date.split('-').map(Number);
-          const [hoursA, minutesA] = (a.time || "00:00").split(':').map(Number);
-          const dateA = new Date(yearA, monthA - 1, dayA, hoursA, minutesA, 0, 0);
-          
-          const [yearB, monthB, dayB] = b.date.split('-').map(Number);
-          const [hoursB, minutesB] = (b.time || "00:00").split(':').map(Number);
-          const dateB = new Date(yearB, monthB - 1, dayB, hoursB, minutesB, 0, 0);
-          
+          const [yearA, monthA, dayA] = a.date.split("-").map(Number);
+          const [hoursA, minutesA] = (a.time || "00:00").split(":").map(Number);
+          const dateA = new Date(
+            yearA,
+            monthA - 1,
+            dayA,
+            hoursA,
+            minutesA,
+            0,
+            0,
+          );
+
+          const [yearB, monthB, dayB] = b.date.split("-").map(Number);
+          const [hoursB, minutesB] = (b.time || "00:00").split(":").map(Number);
+          const dateB = new Date(
+            yearB,
+            monthB - 1,
+            dayB,
+            hoursB,
+            minutesB,
+            0,
+            0,
+          );
+
           return dateB.getTime() - dateA.getTime();
         });
-        
+
         setAppointments(appointmentList);
-        
+
         // If came from active-patients screen with appointment - pre-select it automatically
-        const currentParamsKey = params.appointmentId || params.patientId || params.patientName || null;
+        const currentParamsKey =
+          params.appointmentId ||
+          params.patientId ||
+          params.patientName ||
+          null;
         if (preSelectedApplied !== currentParamsKey && currentParamsKey) {
           // Prioritize appointmentId if provided - automatically select that specific appointment
           if (params.appointmentId) {
-            const matchingApt = appointmentList.find((a) => a.id === params.appointmentId);
+            const matchingApt = appointmentList.find(
+              (a) => a.id === params.appointmentId,
+            );
             if (matchingApt) {
-              console.log('✅ [Laboratory] Auto-selecting appointment from params.appointmentId:', matchingApt.id);
+              console.log(
+                "✅ [Laboratory] Auto-selecting appointment from params.appointmentId:",
+                matchingApt.id,
+              );
               setSelectedAppointment(matchingApt);
               setPreSelectedApplied(currentParamsKey);
             }
           } else if (params.patientId || params.patientName) {
             // Fallback to patientId/patientName matching - select first matching appointment
             const matchingApt = appointmentList.find(
-              (a) => a.patientId === params.patientId || a.patientName === params.patientName
+              (a) =>
+                a.patientId === params.patientId ||
+                a.patientName === params.patientName,
             );
             if (matchingApt) {
-              console.log('✅ [Laboratory] Auto-selecting appointment from params.patientId/patientName:', matchingApt.id);
+              console.log(
+                "✅ [Laboratory] Auto-selecting appointment from params.patientId/patientName:",
+                matchingApt.id,
+              );
               setSelectedAppointment(matchingApt);
               setPreSelectedApplied(currentParamsKey);
             }
           }
         }
       }
-      
+
       // Load all prescribed tests from appointments (will be filtered later)
       // Build product type map locally for use in prescribed tests
       const localTypeMap = new Map<string, ExamType>();
       if (overviewResponse.success && overviewResponse.data) {
         const labProducts = overviewResponse.data.laboratoryProducts || [];
-        const instrumentalProducts = overviewResponse.data.equipmentProducts || [];
-        labProducts.forEach((p: any) => localTypeMap.set(p._id || p.id, "laboratory"));
-        instrumentalProducts.forEach((p: any) => localTypeMap.set(p._id || p.id, "instrumental"));
+        const instrumentalProducts =
+          overviewResponse.data.equipmentProducts || [];
+        labProducts.forEach((p: any) =>
+          localTypeMap.set(p._id || p.id, "laboratory"),
+        );
+        instrumentalProducts.forEach((p: any) =>
+          localTypeMap.set(p._id || p.id, "instrumental"),
+        );
       }
-      
-      if (appointmentsResponse.success && Array.isArray(appointmentsResponse.data)) {
+
+      if (
+        appointmentsResponse.success &&
+        Array.isArray(appointmentsResponse.data)
+      ) {
         const allPrescribed: PrescribedTest[] = [];
         appointmentsResponse.data.forEach((apt: any) => {
           // Extract patientId - can be object or string
           const aptPatientId = apt.patientId?._id || apt.patientId || "";
-          const aptPatientName = apt.patientName || "უცნობი პაციენტი";
-          
+          const aptPatientName = apt.patientName || t("doctor.laboratory.unknownPatient");
+
           if (apt.laboratoryTests && Array.isArray(apt.laboratoryTests)) {
-            console.log('🧪 [Laboratory] Processing lab tests for appointment:', {
-              aptId: apt.id,
-              patientName: aptPatientName,
-              rawPatientId: apt.patientId,
-              extractedPatientId: aptPatientId,
-              testsCount: apt.laboratoryTests.length,
-            });
+            console.log(
+              "🧪 [Laboratory] Processing lab tests for appointment:",
+              {
+                aptId: apt.id,
+                patientName: aptPatientName,
+                rawPatientId: apt.patientId,
+                extractedPatientId: aptPatientId,
+                testsCount: apt.laboratoryTests.length,
+              },
+            );
             apt.laboratoryTests.forEach((test: any) => {
               const testType = localTypeMap.get(test.productId) || "laboratory";
               allPrescribed.push({
@@ -326,17 +477,22 @@ export default function LaboratoryScreen() {
                 appointmentId: apt.id,
                 type: testType,
                 prescribedDate: apt.date || "",
-                doctorName: "თქვენ",
-                status: test.resultFile ? "completed" : (test.status || "pending"),
+                doctorName: t("doctor.laboratory.you"),
+                status: test.resultFile
+                  ? "completed"
+                  : test.status || "pending",
               });
             });
           }
           if (apt.instrumentalTests && Array.isArray(apt.instrumentalTests)) {
-            console.log('🧪 [Laboratory] Processing instrumental tests for appointment:', {
-              aptId: apt.id,
-              patientName: aptPatientName,
-              testsCount: apt.instrumentalTests.length,
-            });
+            console.log(
+              "🧪 [Laboratory] Processing instrumental tests for appointment:",
+              {
+                aptId: apt.id,
+                patientName: aptPatientName,
+                testsCount: apt.instrumentalTests.length,
+              },
+            );
             apt.instrumentalTests.forEach((test: any) => {
               allPrescribed.push({
                 id: `${apt.id}-inst-${test.productId}`,
@@ -347,14 +503,19 @@ export default function LaboratoryScreen() {
                 appointmentId: apt.id,
                 type: "instrumental" as ExamType,
                 prescribedDate: apt.date || "",
-                doctorName: "თქვენ",
-                status: test.resultFile ? "completed" : (test.status || "pending"),
+                doctorName: t("doctor.laboratory.you"),
+                status: test.resultFile
+                  ? "completed"
+                  : test.status || "pending",
               });
             });
           }
         });
-        
-        console.log('🧪 [Laboratory] All prescribed tests loaded:', allPrescribed.length);
+
+        console.log(
+          "🧪 [Laboratory] All prescribed tests loaded:",
+          allPrescribed.length,
+        );
         setPrescribedTests(allPrescribed);
       }
     } catch (error) {
@@ -362,7 +523,7 @@ export default function LaboratoryScreen() {
     } finally {
       setLoading(false);
     }
-  }, [params.appointmentId, params.patientId, params.patientName]);
+  }, [params.appointmentId, params.patientId, params.patientName, t]);
 
   useEffect(() => {
     loadData();
@@ -370,8 +531,8 @@ export default function LaboratoryScreen() {
 
   // Filter prescribed tests based on selected appointment or patient
   useEffect(() => {
-    console.log('🔄 [Laboratory] useEffect triggered for filtering');
-    console.log('🔄 [Laboratory] Dependencies:', {
+    console.log("🔄 [Laboratory] useEffect triggered for filtering");
+    console.log("🔄 [Laboratory] Dependencies:", {
       prescribedTestsLength: prescribedTests.length,
       paramsAppointmentId: params.appointmentId,
       paramsPatientId: params.patientId,
@@ -380,12 +541,12 @@ export default function LaboratoryScreen() {
       selectedAppointmentPatientId: selectedAppointment?.patientId,
       preSelectedApplied: preSelectedApplied,
     });
-    
+
     // Priority: appointmentId > selectedAppointment > patientId/patientName from params
     let filterAppointmentId: string | null = null;
     let filterPatientId: string | null = null;
     let filterPatientName: string | null = null;
-    
+
     // If params has appointmentId, filter by that specific appointment
     if (params.appointmentId) {
       filterAppointmentId = params.appointmentId;
@@ -394,85 +555,114 @@ export default function LaboratoryScreen() {
       filterAppointmentId = selectedAppointment.id;
     } else {
       // Fallback to patient filter if pre-selection was applied
-      const useParamsFilter = preSelectedApplied && (params.patientId || params.patientName);
+      const useParamsFilter =
+        preSelectedApplied && (params.patientId || params.patientName);
       if (useParamsFilter) {
         filterPatientId = params.patientId || null;
         filterPatientName = params.patientName || null;
       }
     }
-    
-    console.log('🧪 [Laboratory] Filter values:', {
+
+    console.log("🧪 [Laboratory] Filter values:", {
       filterAppointmentId,
       filterPatientId,
       filterPatientName,
-      hasFilter: !!(filterAppointmentId || filterPatientId || filterPatientName),
+      hasFilter: !!(
+        filterAppointmentId ||
+        filterPatientId ||
+        filterPatientName
+      ),
     });
-    
+
     if (filterAppointmentId || filterPatientId || filterPatientName) {
       const filtered = prescribedTests.filter((test) => {
         // First filter by type (laboratory or instrumental)
         const matchesType = !test.type || test.type === selectedType;
         if (!matchesType) {
-          console.log('❌ [Laboratory] Test excluded by type:', {
+          console.log("❌ [Laboratory] Test excluded by type:", {
             testName: test.testName,
             testType: test.type,
             selectedType,
-            reason: 'type mismatch',
+            reason: "type mismatch",
           });
           return false;
         }
-        
+
         // If filtering by appointmentId, match exactly
         if (filterAppointmentId) {
           const matches = test.appointmentId === filterAppointmentId;
           if (!matches) {
-            console.log('❌ [Laboratory] Test excluded:', {
+            console.log("❌ [Laboratory] Test excluded:", {
               testName: test.testName,
               testAppointmentId: test.appointmentId,
               filterAppointmentId,
-              reason: 'appointmentId mismatch',
+              reason: "appointmentId mismatch",
             });
           }
           return matches;
         }
-        
+
         // Otherwise filter by patient
         const matchesId = filterPatientId && test.patientId === filterPatientId;
-        const matchesName = filterPatientName && test.patientName === filterPatientName;
+        const matchesName =
+          filterPatientName && test.patientName === filterPatientName;
         const shouldInclude = matchesId || matchesName;
-        
+
         if (!shouldInclude) {
-          console.log('❌ [Laboratory] Test excluded:', {
+          console.log("❌ [Laboratory] Test excluded:", {
             testName: test.testName,
             testPatientId: test.patientId,
             filterPatientId,
-            reason: 'patientId mismatch',
+            reason: "patientId mismatch",
           });
         } else {
-          console.log('✅ [Laboratory] Test included:', {
+          console.log("✅ [Laboratory] Test included:", {
             testName: test.testName,
             testPatientId: test.patientId,
           });
         }
-        
+
         return shouldInclude;
       });
-      
-      console.log('✨ [Laboratory] Final filtered tests:', filtered.length, 'out of', prescribedTests.length);
-      console.log('✨ [Laboratory] Setting filteredPrescribedTests to:', filtered.map(t => ({
-        id: t.id,
-        name: t.testName,
-        patientName: t.patientName,
-        appointmentId: t.appointmentId,
-      })));
+
+      console.log(
+        "✨ [Laboratory] Final filtered tests:",
+        filtered.length,
+        "out of",
+        prescribedTests.length,
+      );
+      console.log(
+        "✨ [Laboratory] Setting filteredPrescribedTests to:",
+        filtered.map((t) => ({
+          id: t.id,
+          name: t.testName,
+          patientName: t.patientName,
+          appointmentId: t.appointmentId,
+        })),
+      );
       setFilteredPrescribedTests(filtered);
     } else {
       // If no filter, show all tests matching the selected type
-      const filteredByType = prescribedTests.filter((test) => !test.type || test.type === selectedType);
-      console.log('🧪 [Laboratory] No filter applied, showing all tests of type', selectedType, ':', filteredByType.length);
+      const filteredByType = prescribedTests.filter(
+        (test) => !test.type || test.type === selectedType,
+      );
+      console.log(
+        "🧪 [Laboratory] No filter applied, showing all tests of type",
+        selectedType,
+        ":",
+        filteredByType.length,
+      );
       setFilteredPrescribedTests(filteredByType);
     }
-  }, [prescribedTests, params.appointmentId, params.patientId, params.patientName, selectedAppointment, preSelectedApplied, selectedType]);
+  }, [
+    prescribedTests,
+    params.appointmentId,
+    params.patientId,
+    params.patientName,
+    selectedAppointment,
+    preSelectedApplied,
+    selectedType,
+  ]);
 
   // Reset pre-selection when params change
   useEffect(() => {
@@ -488,11 +678,14 @@ export default function LaboratoryScreen() {
 
   const filteredTests = labTests.filter((test) => {
     const matchesType = test.type === selectedType;
-    const matchesSearch = test.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === "all" || test.category === selectedCategory;
+    const query = searchQuery.toLowerCase();
+    const matchesSearch =
+      !query || getLabSearchText(test).includes(query);
+    const matchesCategory =
+      selectedCategory === "all" || test.category === selectedCategory;
     return matchesType && matchesSearch && matchesCategory;
   });
-  
+
   // Update categories when type changes
   const handleTypeChange = (type: ExamType) => {
     setSelectedType(type);
@@ -501,22 +694,27 @@ export default function LaboratoryScreen() {
     setSelectedTests([]); // Clear selected tests when changing type
   };
 
-
   const toggleTestSelection = (test: LabTest) => {
     setSelectedTests((prev) =>
       prev.find((t) => t.id === test.id)
         ? prev.filter((t) => t.id !== test.id)
-        : [...prev, test]
+        : [...prev, test],
     );
   };
 
   const handlePrescribe = async () => {
     if (!selectedAppointment) {
-      showToast.error("გთხოვთ აირჩიოთ ჯავშანი", "შეცდომა");
+      showToast.error(
+        t("doctor.laboratory.errorSelectConsultation"),
+        t("appointments.common.error"),
+      );
       return;
     }
     if (selectedTests.length === 0) {
-      showToast.error("გთხოვთ აირჩიოთ კვლევები", "შეცდომა");
+      showToast.error(
+        t("doctor.laboratory.errorSelectExamination"),
+        t("appointments.common.error"),
+      );
       return;
     }
 
@@ -529,58 +727,82 @@ export default function LaboratoryScreen() {
       // ლაბორატორიული → laboratory-tests, ინსტრუმენტული → instrumental-tests (ერთმანეთს არ ჩაერთვება)
       const response =
         selectedType === "instrumental"
-          ? await apiService.assignInstrumentalTests(selectedAppointment.id, testsToSend)
-          : await apiService.assignLaboratoryTests(selectedAppointment.id, testsToSend);
+          ? await apiService.assignInstrumentalTests(
+              selectedAppointment.id,
+              testsToSend,
+            )
+          : await apiService.assignLaboratoryTests(
+              selectedAppointment.id,
+              testsToSend,
+            );
 
       if (response.success) {
-        const newPrescribed: PrescribedTest[] = selectedTests.map((test, idx) => ({
-          id: `new-${Date.now()}-${idx}`,
-          testId: test.id,
-          testName: test.name,
-          patientId: selectedAppointment.patientId,
-          patientName: selectedAppointment.patientName,
-          appointmentId: selectedAppointment.id, // Store appointmentId for filtering
-          type: test.type, // Store type for filtering
-          prescribedDate: new Date().toISOString().split("T")[0],
-          doctorName: "თქვენ",
-          status: "pending" as const,
-        }));
+        const newPrescribed: PrescribedTest[] = selectedTests.map(
+          (test, idx) => ({
+            id: `new-${Date.now()}-${idx}`,
+            testId: test.id,
+            testName: test.name,
+            patientId: selectedAppointment.patientId,
+            patientName: selectedAppointment.patientName,
+            appointmentId: selectedAppointment.id, // Store appointmentId for filtering
+            type: test.type, // Store type for filtering
+            prescribedDate: new Date().toISOString().split("T")[0],
+            doctorName: t("doctor.laboratory.you"),
+            status: "pending" as const,
+          }),
+        );
 
         setPrescribedTests((prev) => [...newPrescribed, ...prev]);
         setSelectedTests([]);
         setSelectedAppointment(null);
         setShowTestModal(false);
-        
+
         showToast.success(
-          `${selectedTests.length} კვლევა დაენიშნა`,
-          "წარმატება"
+          `${selectedTests.length} ${t("doctor.laboratory.successPrescribed")}`,
+          t("appointments.common.success"),
         );
       } else {
-        showToast.error(response.message || "კვლევების დანიშვნა ვერ მოხერხდა", "შეცდომა");
+        showToast.error(
+          response.message || t("doctor.laboratory.errorPrescribeFailed"),
+          t("appointments.common.error"),
+        );
       }
     } catch (error) {
       console.error("Error prescribing tests:", error);
-      showToast.error("კვლევების დანიშვნა ვერ მოხერხდა", "შეცდომა");
+      showToast.error(
+        t("doctor.laboratory.errorPrescribeFailed"),
+        t("appointments.common.error"),
+      );
     }
   };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case "pending": return "მოლოდინში";
-      case "in-cart": return "კალათაში";
-      case "paid": return "გადახდილი";
-      case "completed": return "დასრულებული";
-      default: return status;
+      case "pending":
+        return t("doctor.laboratory.status.pending");
+      case "in-cart":
+        return t("doctor.laboratory.status.inCart");
+      case "paid":
+        return t("doctor.laboratory.status.paid");
+      case "completed":
+        return t("doctor.laboratory.status.completed");
+      default:
+        return status;
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "pending": return "#9CA3AF";
-      case "in-cart": return "#F59E0B";
-      case "paid": return "#0EA5E9";
-      case "completed": return "#10B981";
-      default: return "#6B7280";
+      case "pending":
+        return "#9CA3AF";
+      case "in-cart":
+        return "#F59E0B";
+      case "paid":
+        return "#0EA5E9";
+      case "completed":
+        return "#10B981";
+      default:
+        return "#6B7280";
     }
   };
 
@@ -590,18 +812,32 @@ export default function LaboratoryScreen() {
     return (
       <TouchableOpacity
         style={[
-          styles.testItem, 
-          isSelected && [styles.testItemSelected, { borderColor: accentColor }]
+          styles.testItem,
+          isSelected && [styles.testItemSelected, { borderColor: accentColor }],
         ]}
         onPress={() => toggleTestSelection(item)}
         activeOpacity={0.7}
       >
         <View style={styles.testInfo}>
-          <Text style={styles.testName}>{item.name}</Text>
-          <Text style={[styles.testPrice, { color: accentColor }]}>{item.price} ₾</Text>
+          <Text style={styles.testName}>
+            {getLabDisplayName(item, language, t)}
+          </Text>
+          <Text style={[styles.testPrice, { color: accentColor }]}>
+            {item.price} ₾
+          </Text>
         </View>
-        <View style={[styles.checkbox, isSelected && [styles.checkboxSelected, { backgroundColor: accentColor, borderColor: accentColor }]]}>
-          {isSelected && <Ionicons name="checkmark" size={16} color="#FFFFFF" />}
+        <View
+          style={[
+            styles.checkbox,
+            isSelected && [
+              styles.checkboxSelected,
+              { backgroundColor: accentColor, borderColor: accentColor },
+            ],
+          ]}
+        >
+          {isSelected && (
+            <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+          )}
         </View>
       </TouchableOpacity>
     );
@@ -614,16 +850,27 @@ export default function LaboratoryScreen() {
           <Ionicons name="flask" size={20} color="#F59E0B" />
         </View>
         <View style={styles.prescribedInfo}>
-          <Text style={styles.prescribedTestName}>{item.testName}</Text>
+          <Text style={styles.prescribedTestName}>
+            {resolveLabName(item.testId, item.testName)}
+          </Text>
           <Text style={styles.prescribedPatient}>{item.patientName}</Text>
         </View>
-        <View style={[styles.prescribedStatus, { backgroundColor: `${getStatusColor(item.status)}20` }]}>
-          <Text style={[styles.prescribedStatusText, { color: getStatusColor(item.status) }]}>
+        <View
+          style={[
+            styles.prescribedStatus,
+            { backgroundColor: `${getStatusColor(item.status)}20` },
+          ]}
+        >
+          <Text
+            style={[
+              styles.prescribedStatusText,
+              { color: getStatusColor(item.status) },
+            ]}
+          >
             {getStatusLabel(item.status)}
           </Text>
         </View>
       </View>
-     
     </View>
   );
 
@@ -632,7 +879,7 @@ export default function LaboratoryScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#F59E0B" />
-          <Text style={styles.loadingText}>ჩატვირთვა...</Text>
+          <Text style={styles.loadingText}>{t("doctor.laboratory.loading")}</Text>
         </View>
       </SafeAreaView>
     );
@@ -642,16 +889,26 @@ export default function LaboratoryScreen() {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
           <Ionicons name="arrow-back" size={24} color="#1F2937" />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
-          <View style={[styles.headerIcon, selectedType === "instrumental" && { backgroundColor: "#8B5CF6" }]}>
-            <Ionicons name={selectedType === "laboratory" ? "flask" : "pulse"} size={18} color="#FFFFFF" />
+          <View
+            style={[
+              styles.headerIcon,
+              selectedType === "instrumental" && { backgroundColor: "#8B5CF6" },
+            ]}
+          >
+            <Ionicons
+              name={selectedType === "laboratory" ? "flask" : "pulse"}
+              size={18}
+              color="#FFFFFF"
+            />
           </View>
-          <Text style={styles.headerTitle}>
-            {selectedType === "laboratory" ? "ლაბორატორია" : "ინსტრუმენტული"}
-          </Text>
+          <Text style={styles.headerTitle}>{t("doctor.laboratory.title")}</Text>
         </View>
         <View style={styles.headerRight} />
       </View>
@@ -659,44 +916,60 @@ export default function LaboratoryScreen() {
       {/* Type Selector Tabs */}
       <View style={styles.typeTabsContainer}>
         <TouchableOpacity
-          style={[styles.typeTab, selectedType === "laboratory" && styles.typeTabActive]}
+          style={[
+            styles.typeTab,
+            selectedType === "laboratory" && styles.typeTabActive,
+          ]}
           onPress={() => handleTypeChange("laboratory")}
         >
-          <Ionicons 
-            name="flask-outline" 
-            size={18} 
-            color={selectedType === "laboratory" ? "#F59E0B" : "#6B7280"} 
+          <Ionicons
+            name="flask-outline"
+            size={18}
+            color={selectedType === "laboratory" ? "#F59E0B" : "#6B7280"}
           />
-          <Text style={[styles.typeTabText, selectedType === "laboratory" && styles.typeTabTextActive]}>
-            ლაბორატორიული
+          <Text
+            style={[
+              styles.typeTabText,
+              selectedType === "laboratory" && styles.typeTabTextActive,
+            ]}
+          >
+            {t("doctor.laboratory.tabLaboratory")}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.typeTab, selectedType === "instrumental" && styles.typeTabActiveInstrumental]}
+          style={[
+            styles.typeTab,
+            selectedType === "instrumental" && styles.typeTabActiveInstrumental,
+          ]}
           onPress={() => handleTypeChange("instrumental")}
         >
-          <Ionicons 
-            name="pulse-outline" 
-            size={18} 
-            color={selectedType === "instrumental" ? "#8B5CF6" : "#6B7280"} 
+          <Ionicons
+            name="pulse-outline"
+            size={18}
+            color={selectedType === "instrumental" ? "#8B5CF6" : "#6B7280"}
           />
-          <Text style={[styles.typeTabText, selectedType === "instrumental" && styles.typeTabTextActiveInstrumental]}>
-            ინსტრუმენტული
+          <Text
+            style={[
+              styles.typeTabText,
+              selectedType === "instrumental" &&
+                styles.typeTabTextActiveInstrumental,
+            ]}
+          >
+            {t("doctor.laboratory.tabInstrumental")}
           </Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
         {/* Quick Prescribe Card */}
         <View style={styles.prescribeCard}>
           <Text style={styles.prescribeTitle}>
-            {selectedType === "laboratory" ? "ლაბორატორიული კვლევების" : "ინსტრუმენტული გამოკვლევების"} დანიშვნა
-          </Text>
-          <Text style={styles.prescribeSubtitle}>
-            აირჩიეთ ჯავშანი და {selectedType === "laboratory" ? "ლაბორატორიული კვლევები" : "ინსტრუმენტული გამოკვლევები"}
+            {t("doctor.laboratory.prescribeTitle")}
           </Text>
 
           {/* Appointment Selection */}
@@ -704,23 +977,45 @@ export default function LaboratoryScreen() {
             style={styles.selectionButton}
             onPress={async () => {
               // Disable if came from dashboard (has params)
-              if (!params.appointmentId && !params.patientId && !params.patientName) {
+              if (
+                !params.appointmentId &&
+                !params.patientId &&
+                !params.patientName
+              ) {
                 await loadData();
-                console.log('🧪 [Laboratory] ჯავშნის მოდალი — იხსნება, ჯავშნების ტიპები:', appointments.map((apt) => ({ id: apt.id, patientName: apt.patientName, type: apt.type, isFollowUp: apt.isFollowUp, typeLabel: apt.isFollowUp ? "განმეორებითი" : apt.type === "video" ? "ვიდეო" : apt.type === "home-visit" ? "სახლში ვიზიტი" : apt.type ?? "უცნობი" })));
+                console.log(
+                  "🧪 [Laboratory] ჯავშნის მოდალი — იხსნება, ჯავშნების ტიპები:",
+                  appointments.map((apt) => ({
+                    id: apt.id,
+                    patientName: apt.patientName,
+                    type: apt.type,
+                    isFollowUp: apt.isFollowUp,
+                    typeLabel: getAppointmentTypeLabel(apt),
+                  })),
+                );
                 setShowAppointmentModal(true);
               }
             }}
-            disabled={!!(params.appointmentId || params.patientId || params.patientName)}
+            disabled={
+              !!(params.appointmentId || params.patientId || params.patientName)
+            }
           >
             <Ionicons name="calendar-outline" size={20} color="#6B7280" />
-            <Text style={[styles.selectionText, selectedAppointment && styles.selectionTextActive]}>
+            <Text
+              style={[
+                styles.selectionText,
+                selectedAppointment && styles.selectionTextActive,
+              ]}
+            >
               {selectedAppointment
                 ? `${selectedAppointment.patientName} • ${selectedAppointment.date} ${selectedAppointment.time}`
-                : "აირჩიეთ ჯავშანი"}
+                : t("doctor.laboratory.selectConsultation")}
             </Text>
-            {!(params.appointmentId || params.patientId || params.patientName) && (
-              <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-            )}
+            {!(
+              params.appointmentId ||
+              params.patientId ||
+              params.patientName
+            ) && <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />}
           </TouchableOpacity>
 
           {/* Tests Selection */}
@@ -728,11 +1023,24 @@ export default function LaboratoryScreen() {
             style={styles.selectionButton}
             onPress={() => setShowTestModal(true)}
           >
-            <Ionicons name={selectedType === "laboratory" ? "flask-outline" : "pulse-outline"} size={20} color="#6B7280" />
-            <Text style={[styles.selectionText, selectedTests.length > 0 && styles.selectionTextActive]}>
+            <Ionicons
+              name={
+                selectedType === "laboratory"
+                  ? "flask-outline"
+                  : "pulse-outline"
+              }
+              size={20}
+              color="#6B7280"
+            />
+            <Text
+              style={[
+                styles.selectionText,
+                selectedTests.length > 0 && styles.selectionTextActive,
+              ]}
+            >
               {selectedTests.length > 0
-                ? `${selectedTests.length} ${selectedType === "laboratory" ? "კვლევა" : "გამოკვლევა"} არჩეულია`
-                : `აირჩიეთ ${selectedType === "laboratory" ? "კვლევები" : "გამოკვლევები"}`}
+                ? `${selectedTests.length} ${t("doctor.laboratory.selected")}`
+                : t("doctor.laboratory.selectExamination")}
             </Text>
             <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
           </TouchableOpacity>
@@ -742,7 +1050,9 @@ export default function LaboratoryScreen() {
             <View style={styles.selectedPreview}>
               {selectedTests.slice(0, 3).map((test) => (
                 <View key={test.id} style={styles.selectedChip}>
-                  <Text style={styles.selectedChipText}>{test.name}</Text>
+                  <Text style={styles.selectedChipText}>
+                    {getLabDisplayName(test, language, t)}
+                  </Text>
                   <TouchableOpacity onPress={() => toggleTestSelection(test)}>
                     <Ionicons name="close-circle" size={16} color="#F59E0B" />
                   </TouchableOpacity>
@@ -750,7 +1060,9 @@ export default function LaboratoryScreen() {
               ))}
               {selectedTests.length > 3 && (
                 <View style={styles.moreChip}>
-                  <Text style={styles.moreChipText}>+{selectedTests.length - 3}</Text>
+                  <Text style={styles.moreChipText}>
+                    +{selectedTests.length - 3}
+                  </Text>
                 </View>
               )}
             </View>
@@ -760,22 +1072,24 @@ export default function LaboratoryScreen() {
           {selectedTests.length > 0 && (
             <View style={styles.prescribeFooter}>
               <View>
-                <Text style={styles.totalLabel}>ჯამი:</Text>
+                <Text style={styles.totalLabel}>{t("doctor.laboratory.total")}</Text>
                 <Text style={styles.totalValue}>
                   {selectedTests.reduce((sum, t) => sum + t.price, 0)} ₾
                 </Text>
               </View>
               <TouchableOpacity
                 style={[
-                  styles.prescribeButton, 
+                  styles.prescribeButton,
                   !selectedAppointment && styles.prescribeButtonDisabled,
-                  selectedType === "instrumental" && { backgroundColor: "#8B5CF6" }
+                  selectedType === "instrumental" && {
+                    backgroundColor: "#8B5CF6",
+                  },
                 ]}
                 onPress={handlePrescribe}
                 disabled={!selectedAppointment}
               >
                 <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
-                <Text style={styles.prescribeButtonText}>დანიშვნა</Text>
+                <Text style={styles.prescribeButtonText}>{t("doctor.laboratory.confirm")}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -783,14 +1097,18 @@ export default function LaboratoryScreen() {
 
         {/* Prescribed Tests History */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>დანიშნული კვლევები</Text>
+          <Text style={styles.sectionTitle}>{t("doctor.laboratory.prescribedExamination")}</Text>
           {filteredPrescribedTests.length > 0 ? (
             filteredPrescribedTests.map((item, index) => (
-              <View key={`${item.id}-${index}`}>{renderPrescribedItem({ item })}</View>
+              <View key={`${item.id}-${index}`}>
+                {renderPrescribedItem({ item })}
+              </View>
             ))
           ) : (
             <View style={styles.emptySection}>
-              <Text style={styles.emptySectionText}>დანიშნული კვლევები არ არის</Text>
+              <Text style={styles.emptySectionText}>
+                {t("doctor.laboratory.noPrescribed")}
+              </Text>
             </View>
           )}
         </View>
@@ -810,7 +1128,7 @@ export default function LaboratoryScreen() {
         >
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>აირჩიეთ ჯავშანი</Text>
+              <Text style={styles.modalTitle}>{t("doctor.laboratory.modalSelectConsultation")}</Text>
               <TouchableOpacity onPress={() => setShowAppointmentModal(false)}>
                 <Ionicons name="close" size={24} color="#1F2937" />
               </TouchableOpacity>
@@ -820,7 +1138,7 @@ export default function LaboratoryScreen() {
               <Ionicons name="search" size={20} color="#9CA3AF" />
               <TextInput
                 style={styles.modalSearchInput}
-                placeholder="პაციენტის სახელი..."
+                placeholder={`${t("doctor.laboratory.namePlaceholder")}...`}
                 placeholderTextColor="#9CA3AF"
                 value={appointmentSearchQuery}
                 onChangeText={setAppointmentSearchQuery}
@@ -830,24 +1148,30 @@ export default function LaboratoryScreen() {
             <FlatList
               data={appointments.filter((apt) => {
                 // Filter by search query
-                const matchesSearch = apt.patientName.toLowerCase().includes(appointmentSearchQuery.toLowerCase());
-                
+                const matchesSearch = apt.patientName
+                  .toLowerCase()
+                  .includes(appointmentSearchQuery.toLowerCase());
+
                 // If params has appointmentId, only show that specific appointment
                 if (params.appointmentId) {
                   return matchesSearch && apt.id === params.appointmentId;
                 }
-                
+
                 // If params has patientId or patientName, only show that patient's appointments
                 const hasParamsFilter = params.patientId || params.patientName;
                 let matchesPatient = true;
-                
+
                 if (hasParamsFilter) {
                   // Check if appointment matches the patient from params
-                  const matchesId = params.patientId ? apt.patientId === params.patientId : false;
-                  const matchesName = params.patientName ? apt.patientName === params.patientName : false;
+                  const matchesId = params.patientId
+                    ? apt.patientId === params.patientId
+                    : false;
+                  const matchesName = params.patientName
+                    ? apt.patientName === params.patientName
+                    : false;
                   matchesPatient = matchesId || matchesName;
                 }
-                
+
                 return matchesSearch && matchesPatient;
               })}
               keyExtractor={(item) => item.id}
@@ -855,47 +1179,100 @@ export default function LaboratoryScreen() {
                 <TouchableOpacity
                   style={[
                     styles.patientItem,
-                    selectedAppointment?.id === item.id && styles.patientItemSelected,
+                    selectedAppointment?.id === item.id &&
+                      styles.patientItemSelected,
                   ]}
                   onPress={() => {
-                    const aptType = item.isFollowUp ? "განმეორებითი" : item.type === "video" ? "ვიდეო" : item.type === "home-visit" ? "სახლში ვიზიტი" : (item.type ?? "უცნობი");
-                    console.log('🧪 [Laboratory] ჯავშნის მოდალი — არჩეული ჯავშანი:', {
-                      id: item.id,
-                      patientName: item.patientName,
-                      type: item.type,
-                      typeLabel: aptType,
-                    });
+                    const aptType = getAppointmentTypeLabel(item);
+                    console.log(
+                      "🧪 [Laboratory] ჯავშნის მოდალი — არჩეული ჯავშანი:",
+                      {
+                        id: item.id,
+                        patientName: item.patientName,
+                        type: item.type,
+                        typeLabel: aptType,
+                      },
+                    );
                     // Clear pre-selection flag to allow new selection
                     setPreSelectedApplied(null);
                     setSelectedAppointment(item);
                     setShowAppointmentModal(false);
                   }}
                 >
-                  <View style={[styles.patientAvatar, { backgroundColor: (item.type === "video" || item.isFollowUp) ? "#0EA5E9" : "#10B981" }]}>
-                    <Ionicons name={item.isFollowUp ? "repeat" : (item.type === "video" ? "videocam" : "home")} size={18} color="#FFFFFF" />
+                  <View
+                    style={[
+                      styles.patientAvatar,
+                      {
+                        backgroundColor:
+                          item.type === "video" || item.isFollowUp
+                            ? "#0EA5E9"
+                            : "#10B981",
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name={
+                        item.isFollowUp
+                          ? "repeat"
+                          : item.type === "video"
+                            ? "videocam"
+                            : "home"
+                      }
+                      size={18}
+                      color="#FFFFFF"
+                    />
                   </View>
                   <View style={styles.patientInfo}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 6,
+                        flexWrap: "wrap",
+                      }}
+                    >
                       <Text style={styles.patientName}>{item.patientName}</Text>
                       {item.isFollowUp && (
-                        <View style={{ backgroundColor: "#0EA5E9", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                          <Text style={{ fontSize: 11, color: "#FFFFFF", fontWeight: "600" }}>განმეორებითი</Text>
+                        <View
+                          style={{
+                            backgroundColor: "#0EA5E9",
+                            paddingHorizontal: 6,
+                            paddingVertical: 2,
+                            borderRadius: 4,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 11,
+                              color: "#FFFFFF",
+                              fontWeight: "600",
+                            }}
+                          >
+                            {t("appointments.type.followUp")}
+                          </Text>
                         </View>
                       )}
                     </View>
                     <Text style={styles.patientId}>
-                      {item.date} • {item.time} • {item.status === "scheduled" || item.status === "confirmed" ? "დანიშნული" : item.status === "in-progress" ? "მიმდინარე" : "დასრულებული"}
+                      {item.date} • {item.time} •{" "}
+{getAppointmentStatusLabel(item.status)}
                     </Text>
                   </View>
                   {selectedAppointment?.id === item.id && (
-                    <Ionicons name="checkmark-circle" size={24} color="#F59E0B" />
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={24}
+                      color="#F59E0B"
+                    />
                   )}
                 </TouchableOpacity>
               )}
               contentContainerStyle={styles.modalList}
               ListEmptyComponent={
                 <View style={styles.emptySection}>
-                  <Text style={styles.emptySectionText}>ჯავშნები არ მოიძებნა</Text>
+                  <Text style={styles.emptySectionText}>
+                    {t("doctor.laboratory.noAppointmentsFound")}
+                  </Text>
                 </View>
               }
             />
@@ -918,7 +1295,7 @@ export default function LaboratoryScreen() {
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                აირჩიეთ {selectedType === "laboratory" ? "კვლევები" : "გამოკვლევები"}
+                {t("doctor.laboratory.modalSelectExamination")}
               </Text>
               <TouchableOpacity onPress={() => setShowTestModal(false)}>
                 <Ionicons name="close" size={24} color="#1F2937" />
@@ -937,17 +1314,21 @@ export default function LaboratoryScreen() {
                   key={cat.id}
                   style={[
                     styles.categoryChip,
-                    selectedCategory === cat.id && (selectedType === "instrumental" ? styles.categoryChipActiveInstrumental : styles.categoryChipActive),
+                    selectedCategory === cat.id &&
+                      (selectedType === "instrumental"
+                        ? styles.categoryChipActiveInstrumental
+                        : styles.categoryChipActive),
                   ]}
                   onPress={() => setSelectedCategory(cat.id)}
                 >
                   <Text
                     style={[
                       styles.categoryChipText,
-                      selectedCategory === cat.id && styles.categoryChipTextActive,
+                      selectedCategory === cat.id &&
+                        styles.categoryChipTextActive,
                     ]}
                   >
-                    {cat.name}
+                    {getCategoryDisplayName(cat)}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -958,7 +1339,7 @@ export default function LaboratoryScreen() {
               <Ionicons name="search" size={20} color="#9CA3AF" />
               <TextInput
                 style={styles.modalSearchInput}
-                placeholder={selectedType === "laboratory" ? "კვლევის ძებნა..." : "გამოკვლევის ძებნა..."}
+                placeholder={t("doctor.laboratory.searchExamination")}
                 placeholderTextColor="#9CA3AF"
                 value={searchQuery}
                 onChangeText={setSearchQuery}
@@ -975,13 +1356,18 @@ export default function LaboratoryScreen() {
             {/* Footer */}
             <View style={styles.modalFooter}>
               <Text style={styles.modalFooterText}>
-                არჩეულია: {selectedTests.length} {selectedType === "laboratory" ? "კვლევა" : "გამოკვლევა"}
+                {selectedTests.length} {t("doctor.laboratory.selected")}
               </Text>
               <TouchableOpacity
-                style={[styles.modalDoneButton, selectedType === "instrumental" && { backgroundColor: "#8B5CF6" }]}
+                style={[
+                  styles.modalDoneButton,
+                  selectedType === "instrumental" && {
+                    backgroundColor: "#8B5CF6",
+                  },
+                ]}
                 onPress={() => setShowTestModal(false)}
               >
-                <Text style={styles.modalDoneButtonText}>მზადაა</Text>
+                <Text style={styles.modalDoneButtonText}>{t("doctor.laboratory.save")}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1465,4 +1851,3 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
 });
-

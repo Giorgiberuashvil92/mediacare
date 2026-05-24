@@ -4,8 +4,10 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Tabs, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { ScheduleProvider } from "../contexts/ScheduleContext";
 import FloatingAIAssistant from "../components/ui/FloatingAIAssistant";
+import { tabBarLabel, tabBarScreenOptions } from "../components/ui/TabBarLabel";
+import { useLanguage } from "../contexts/LanguageContext";
+import { ScheduleProvider } from "../contexts/ScheduleContext";
 import {
   CallOverlayState,
   getCallOverlayState,
@@ -14,6 +16,7 @@ import {
 
 export default function DoctorTabsLayout() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [callOverlay, setCallOverlay] = useState<CallOverlayState>(
     getCallOverlayState(),
   );
@@ -29,18 +32,15 @@ export default function DoctorTabsLayout() {
           screenOptions={{
             tabBarActiveTintColor: "#20BEB8",
             tabBarInactiveTintColor: "#94A3B8",
-            tabBarStyle: {
-              backgroundColor: "#FFFFFF",
-              borderTopWidth: 1,
-              borderTopColor: "#E5E5EA",
-            },
+            ...tabBarScreenOptions,
             headerShown: false,
           }}
         >
           <Tabs.Screen
             name="index"
             options={{
-              title: "დეშბორდი",
+              title: t("doctor.tabs.home"),
+              tabBarLabel: tabBarLabel(t("doctor.tabs.home")),
               tabBarIcon: ({ color, size }) => (
                 <Ionicons name="home" size={size} color={color} />
               ),
@@ -49,7 +49,8 @@ export default function DoctorTabsLayout() {
           <Tabs.Screen
             name="appointments"
             options={{
-              title: "მიმდინარე ",
+              title: t("doctor.tabs.primaryVisits"),
+              tabBarLabel: tabBarLabel(t("doctor.tabs.primaryVisits")),
               tabBarIcon: ({ color, size }) => (
                 <Ionicons name="calendar-outline" size={size} color={color} />
               ),
@@ -58,7 +59,8 @@ export default function DoctorTabsLayout() {
           <Tabs.Screen
             name="patients"
             options={{
-              title: "განმეორებითი",
+              title: t("doctor.tabs.secondaryVisits"),
+              tabBarLabel: tabBarLabel(t("doctor.tabs.secondaryVisits")),
               tabBarIcon: ({ color, size }) => (
                 <FontAwesome6 name="users" size={size} color={color} />
               ),
@@ -67,7 +69,8 @@ export default function DoctorTabsLayout() {
           <Tabs.Screen
             name="schedule"
             options={{
-              title: "გრაფიკი",
+              title: t("doctor.tabs.schedule"),
+              tabBarLabel: tabBarLabel(t("doctor.tabs.schedule")),
               tabBarIcon: ({ color, size }) => (
                 <AntDesign name="calendar" size={size} color={color} />
               ),
@@ -76,7 +79,8 @@ export default function DoctorTabsLayout() {
           <Tabs.Screen
             name="ai-assistant"
             options={{
-              title: "AI ასისტენტი",
+              title: t("tabs.aiAssistant"),
+              tabBarLabel: tabBarLabel(t("tabs.aiAssistant")),
               tabBarIcon: ({ color, size }) => (
                 <Ionicons name="chatbubbles" size={size} color={color} />
               ),
@@ -85,7 +89,8 @@ export default function DoctorTabsLayout() {
           <Tabs.Screen
             name="profile"
             options={{
-              title: "პროფილი",
+              title: t("settings.menu.profile"),
+              tabBarLabel: tabBarLabel(t("settings.menu.profile")),
               tabBarIcon: ({ color, size }) => (
                 <Ionicons name="person" size={size} color={color} />
               ),

@@ -31,9 +31,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import {
   Consultation,
-  getConsultationTypeLabel,
   getStatusColor,
-  getStatusLabel,
   hasForm100ForVisitCompletion,
 } from "../../assets/data/doctorDashboard";
 import { apiService, Clinic, ShopProduct } from "../_services/api";
@@ -96,6 +94,40 @@ export default function DoctorAppointments() {
   const { t, language } = useLanguage();
   const formatDisplayDate = (dateStr: string) =>
     formatAppointmentDateLong(dateStr, language);
+  const formatTimeCount = (count: number, unitKey: string) =>
+    `${count} ${t(unitKey)}`;
+  const getLocalizedTypeLabel = (
+    type: Consultation["type"],
+    isFollowUp?: boolean,
+  ) => {
+    if (isFollowUp === true) return t("appointments.type.followUp");
+    switch (type) {
+      case "video":
+        return t("appointments.type.videoConsultation");
+      case "home-visit":
+        return t("appointments.type.homeVisit");
+      case "consultation":
+        return t("appointments.type.consultation");
+      case "emergency":
+        return t("appointments.type.emergency");
+      default:
+        return t("appointments.type.consultation");
+    }
+  };
+  const getLocalizedStatusLabel = (status: Consultation["status"]) => {
+    switch (status) {
+      case "completed":
+        return t("appointments.status.completed");
+      case "scheduled":
+        return t("appointments.status.scheduled");
+      case "cancelled":
+        return t("appointments.status.cancelled");
+      case "in-progress":
+        return t("appointments.status.inProgress");
+      default:
+        return t("doctor.appointments.statusUnknown");
+    }
+  };
   const router = useRouter();
   const { user } = useAuth();
   const params = useLocalSearchParams<{
@@ -275,7 +307,7 @@ export default function DoctorAppointments() {
     setMisHisDocuments([]);
     try {
       const { documents, error, misForm100AvailableAt } =
-        await loadMisPrintFormsFromApi(appointmentId);
+        await loadMisPrintFormsFromApi(appointmentId, t);
       setMisHisDocuments(documents);
       setMisHisError(error);
       if (misForm100AvailableAt !== undefined) {
@@ -302,10 +334,11 @@ export default function DoctorAppointments() {
         action,
         htmlForPdf,
         shareDialogTitle,
+        t,
       });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      Alert.alert("შეცდომა", msg || "PDF მოქმედება ვერ შესრულდა");
+      Alert.alert(t("appointments.common.error"), msg || t("doctor.appointments.pdfActionFailed"));
     } finally {
       setMisPdfLoading(false);
     }
@@ -473,11 +506,11 @@ export default function DoctorAppointments() {
           docsCountMap,
         );
       } else {
-        setError("კონსულტაციების ჩატვირთვა ვერ მოხერხდა");
+        setError(t("doctor.appointments.loadError"));
       }
     } catch (err) {
       console.error("Error fetching consultations:", err);
-      setError("კონსულტაციების ჩატვირთვა ვერ მოხერხდა");
+      setError(t("doctor.appointments.loadError"));
     } finally {
       if (isRefresh) {
         setRefreshing(false);
@@ -566,13 +599,13 @@ export default function DoctorAppointments() {
     const days = Math.floor(hours / 24);
 
     if (days > 0) {
-      return `${days} დღეში`;
+      return formatTimeCount(days, "doctor.appointments.timeInDays");
     } else if (hours > 0) {
-      return `${hours} საათში`;
+      return formatTimeCount(hours, "doctor.appointments.timeInHours");
     } else if (minutes > 0) {
-      return `${minutes} წუთში`;
+      return formatTimeCount(minutes, "doctor.appointments.timeInMinutes");
     } else {
-      return "ახლა";
+      return t("appointments.time.now");
     }
   };
 
@@ -726,27 +759,31 @@ export default function DoctorAppointments() {
       });
     } catch (error: any) {
       console.error("Error opening file:", error);
-      Alert.alert("შეცდომა", error?.message || "ფაილის გახსნა ვერ მოხერხდა");
+      Alert.alert(t("appointments.common.error"), error?.message || t("doctor.appointments.fileOpenFailed"));
     }
   };
 
   const openForm100File = (filePath?: string | null) => {
     const url = buildFileUrl(filePath);
     if (!url) {
-      Alert.alert("ფაილი ვერ მოიძებნა");
+      Alert.alert(t("doctor.appointments.fileNotFound"));
       return;
     }
     setSelectedDocumentPreview({
       url,
-      name: "ფორმა 100",
+      name: t("doctor.appointments.form100Name"),
       type: "application/pdf",
     });
   };
 
-  const openDocumentPreview = (fileUrl?: string, fileName?: string, fileType?: string) => {
+  const openDocumentPreview = (
+    fileUrl?: string,
+    fileName?: string,
+    fileType?: string,
+  ) => {
     const resolvedUrl = buildFileUrl(fileUrl);
     if (!resolvedUrl) {
-      Alert.alert("ფაილი ვერ მოიძებნა");
+      Alert.alert(t("doctor.appointments.fileNotFound"));
       return;
     }
     setSelectedDocumentPreview({
@@ -756,7 +793,11 @@ export default function DoctorAppointments() {
     });
   };
 
-  const isImagePreview = (file?: { url?: string; type?: string; name?: string }) => {
+  const isImagePreview = (file?: {
+    url?: string;
+    type?: string;
+    name?: string;
+  }) => {
     if (!file?.url) return false;
     const mime = (file.type || "").toLowerCase();
     if (mime.startsWith("image/")) return true;
@@ -777,14 +818,14 @@ export default function DoctorAppointments() {
       setDownloadingPreview(true);
       const canShare = await Sharing.isAvailableAsync();
       if (!canShare) {
-        Alert.alert("შენიშვნა", "გადმოწერა ამ მოწყობილობაზე მიუწვდომელია");
+        Alert.alert(t("appointments.common.note"), t("appointments.documents.downloadUnavailable"));
         return;
       }
 
       const sourceUrl = selectedDocumentPreview.url;
       if (sourceUrl.startsWith("file://")) {
         await Sharing.shareAsync(sourceUrl, {
-          dialogTitle: "დოკუმენტის გადმოწერა",
+          dialogTitle: t("appointments.documents.downloadDialog"),
         });
         return;
       }
@@ -802,17 +843,17 @@ export default function DoctorAppointments() {
       const targetPath = `${cacheDir}${safeBaseName || `document_${Date.now()}`}.${extension}`;
       const downloaded = await FileSystem.downloadAsync(sourceUrl, targetPath);
       if (downloaded.status !== 200) {
-        throw new Error("ვერ მოხერხდა ფაილის გადმოწერა");
+        throw new Error(t("appointments.documents.downloadError"));
       }
 
       await Sharing.shareAsync(downloaded.uri, {
-        dialogTitle: "დოკუმენტის გადმოწერა",
+        dialogTitle: t("appointments.documents.downloadDialog"),
         mimeType: extension === "pdf" ? "application/pdf" : "image/jpeg",
         UTI: extension === "pdf" ? "com.adobe.pdf" : "public.jpeg",
       });
     } catch (error) {
       console.error("[DoctorAppointments] Failed to download preview:", error);
-      Alert.alert("შეცდომა", "გადმოწერა ვერ მოხერხდა");
+      Alert.alert(t("appointments.common.error"), t("appointments.documents.downloadFailed"));
     } finally {
       setDownloadingPreview(false);
     }
@@ -836,8 +877,8 @@ export default function DoctorAppointments() {
 
       if (asset.size && asset.size > FORM100_MAX_FILE_SIZE) {
         Alert.alert(
-          "ფაილი ძალიან დიდია",
-          "მაქსიმუმ 5MB ზომის PDF ან გამოსახულება აირჩიეთ.",
+          t("doctor.appointments.fileTooLargeTitle"),
+          t("doctor.appointments.fileTooLargeMessage"),
         );
         return;
       }
@@ -845,7 +886,7 @@ export default function DoctorAppointments() {
       setForm100File(asset);
     } catch (error) {
       console.error("Failed to pick Form 100 file", error);
-      Alert.alert("შეცდომა", "ფორმა 100-ის ატვირთვა ვერ მოხერხდა");
+      Alert.alert(t("appointments.common.error"), t("doctor.appointments.form100UploadFailed"));
     }
   };
 
@@ -881,7 +922,7 @@ export default function DoctorAppointments() {
 
       for (const asset of result.assets) {
         if (asset.size && asset.size > APPOINTMENT_PATIENT_DOC_MAX_SIZE) {
-          rejected.push(asset.name || "ფაილი");
+          rejected.push(asset.name || t("doctor.appointments.fileDefault"));
           continue;
         }
         const row: PendingPatientUploadAsset = {
@@ -891,7 +932,7 @@ export default function DoctorAppointments() {
           size: asset.size ?? null,
         };
         if (!isValidPatientAppointmentDoc(row)) {
-          rejected.push(asset.name || "ფაილი");
+          rejected.push(asset.name || t("doctor.appointments.fileDefault"));
           continue;
         }
         accepted.push(row);
@@ -899,8 +940,8 @@ export default function DoctorAppointments() {
 
       if (rejected.length > 0) {
         Alert.alert(
-          "შეზღუდვა",
-          "დასაშვებია PDF ან სურათი (JPEG, PNG, WebP), თითო ფაილი 5MB-მდე. ვერ შევიდა: " +
+          t("doctor.appointments.restrictionTitle"),
+          t("doctor.appointments.filesRestrictionPrefix") +
             rejected.slice(0, 5).join(", ") +
             (rejected.length > 5 ? "…" : ""),
         );
@@ -920,7 +961,7 @@ export default function DoctorAppointments() {
       }
     } catch (error) {
       console.error("Patient documents picker error:", error);
-      Alert.alert("შეცდომა", "ფაილების არჩევა ვერ მოხერხდა");
+      Alert.alert(t("appointments.common.error"), t("doctor.appointments.filesPickFailed"));
     }
   };
 
@@ -930,8 +971,8 @@ export default function DoctorAppointments() {
         await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
         Alert.alert(
-          "წვდომა",
-          "გალერეიდან სურათების ასარჩევად საჭიროა ფოტოების წვდომა.",
+          t("doctor.appointments.accessTitle"),
+          t("doctor.appointments.galleryAccessMessage"),
         );
         return;
       }
@@ -952,7 +993,7 @@ export default function DoctorAppointments() {
       const accepted: PendingPatientUploadAsset[] = [];
 
       result.assets.forEach((a, index) => {
-        const label = a.fileName || `სურათი ${index + 1}`;
+        const label = a.fileName || `${t("doctor.appointments.imageDefault")} ${index + 1}`;
         const size = a.fileSize ?? undefined;
         if (size && size > APPOINTMENT_PATIENT_DOC_MAX_SIZE) {
           rejected.push(label);
@@ -975,8 +1016,8 @@ export default function DoctorAppointments() {
 
       if (rejected.length > 0) {
         Alert.alert(
-          "შეზღუდვა",
-          "გალერეიდან მხოლოდ სურათები (5MB-მდე). ვერ შევიდა: " +
+          t("doctor.appointments.restrictionTitle"),
+          t("doctor.appointments.galleryRestrictionPrefix") +
             rejected.slice(0, 5).join(", ") +
             (rejected.length > 5 ? "…" : ""),
         );
@@ -996,7 +1037,7 @@ export default function DoctorAppointments() {
       }
     } catch (error) {
       console.error("Gallery picker error:", error);
-      Alert.alert("შეცდომა", "გალერეის გახსნა ვერ მოხერხდა");
+      Alert.alert(t("appointments.common.error"), t("doctor.appointments.galleryOpenFailed"));
     }
   };
 
@@ -1258,7 +1299,6 @@ export default function DoctorAppointments() {
         if (selectedConsultation?.id === appointmentId) {
           await openDetails(selectedConsultation);
         }
-
       } else {
         Alert.alert(
           t("appointments.common.error"),
@@ -1497,7 +1537,7 @@ export default function DoctorAppointments() {
       !appointmentData.followUpRequired &&
       !appointmentData.diagnosis.trim()
     ) {
-      alert("გთხოვთ შეიყვანოთ დიაგნოზი");
+      alert(t("doctor.appointments.enterDiagnosis"));
       return;
     }
 
@@ -1506,7 +1546,7 @@ export default function DoctorAppointments() {
       (!appointmentData.followUpDate.trim() ||
         !appointmentData.followUpTime.trim())
     ) {
-      alert("გთხოვთ მიუთითოთ განმეორებითი ვიზიტის თარიღი და დრო");
+      alert(t("doctor.appointments.enterFollowUpDateTime"));
       return;
     }
 
@@ -1533,7 +1573,7 @@ export default function DoctorAppointments() {
       }
       if (!hasForm100ForVisitCompletion(consultationForForm100Check)) {
         alert(
-          "ფორმა IV–100 უნდა ჩანდეს HIS mis-print-forms-ზე (ჯავშანზე HIS ფორმების ჩატვირთვა). ატვირთული PDF დასრულებისთვის არ ითვლება.",
+          t("doctor.appointments.form100Required"),
         );
         return;
       }
@@ -1558,9 +1598,9 @@ export default function DoctorAppointments() {
         );
         if (!formResponse.success) {
           Alert.alert(
-            "შეცდომა",
+            t("appointments.common.error"),
             (formResponse as { message?: string }).message ||
-              "ფორმა 100 ვერ აიტვირთა",
+              t("doctor.appointments.form100UploadError"),
           );
           return;
         }
@@ -1629,8 +1669,8 @@ export default function DoctorAppointments() {
         } catch (err) {
           console.error("Failed to assign laboratory tests:", err);
           Alert.alert(
-            "შეცდომა",
-            "ლაბორატორიული კვლევების დამატება ვერ მოხერხდა",
+            t("appointments.common.error"),
+            t("doctor.appointments.labTestsAddFailed"),
           );
         }
       }
@@ -1654,8 +1694,8 @@ export default function DoctorAppointments() {
         } catch (err) {
           console.error("Failed to assign instrumental tests:", err);
           Alert.alert(
-            "შეცდომა",
-            "ინსტრუმენტული კვლევების დამატება ვერ მოხერხდა",
+            t("appointments.common.error"),
+            t("doctor.appointments.instrumentalTestsAddFailed"),
           );
         }
       }
@@ -1670,7 +1710,7 @@ export default function DoctorAppointments() {
           appointmentData.followUpType === "home-visit" &&
           !appointmentData.followUpVisitAddress.trim()
         ) {
-          alert("გთხოვთ მიუთითოთ ბინაზე ვიზიტის მისამართი");
+          alert(t("doctor.appointments.enterHomeVisitAddress"));
           return;
         }
 
@@ -1718,10 +1758,12 @@ export default function DoctorAppointments() {
 
       if (pendingPatientDocuments.length > 0) {
         let uploadFailures = 0;
-        const uniqueFiles = pendingPatientDocuments.filter((file, index, arr) => {
-          const key = getPendingDocKey(file);
-          return arr.findIndex((x) => getPendingDocKey(x) === key) === index;
-        });
+        const uniqueFiles = pendingPatientDocuments.filter(
+          (file, index, arr) => {
+            const key = getPendingDocKey(file);
+            return arr.findIndex((x) => getPendingDocKey(x) === key) === index;
+          },
+        );
 
         for (const file of uniqueFiles) {
           try {
@@ -1748,8 +1790,8 @@ export default function DoctorAppointments() {
         }
         if (uploadFailures > 0) {
           Alert.alert(
-            "ყურადღება",
-            "კონსულტაცია შენახულია, თუმცა ზოგიერთი დოკუმენტი ვერ აიტვირთა.",
+            t("doctor.appointments.warningTitle"),
+            t("doctor.appointments.partialUploadWarning"),
           );
         }
         try {
@@ -1790,7 +1832,7 @@ export default function DoctorAppointments() {
     } catch (error: any) {
       console.error("Failed to save appointment summary", error);
       alert(
-        error?.message || "დანიშნულების შენახვა ვერ მოხერხდა, სცადეთ თავიდან",
+        error?.message || t("doctor.appointments.savePrescriptionFailed"),
       );
     } finally {
       setSavingAppointment(false);
@@ -1812,7 +1854,7 @@ export default function DoctorAppointments() {
       }
     } catch (error: any) {
       console.error("Failed to update appointment status", error);
-      alert(error?.message || "სტატუსის განახლება ვერ მოხერხდა");
+      alert(error?.message || t("doctor.appointments.statusUpdateFailed"));
     } finally {
       setStatusActionLoading(null);
     }
@@ -1825,7 +1867,7 @@ export default function DoctorAppointments() {
           style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
         >
           <Text style={{ fontSize: 16, color: "#6B7280" }}>
-            კონსულტაციების ჩატვირთვა...
+            {t("doctor.appointments.loading")}
           </Text>
         </View>
       </SafeAreaView>
@@ -1859,11 +1901,11 @@ export default function DoctorAppointments() {
                 if (response.success) {
                   setConsultations(response.data as any);
                 } else {
-                  setError("კონსულტაციების ჩატვირთვა ვერ მოხერხდა");
+                  setError(t("doctor.appointments.loadError"));
                 }
               } catch (err) {
                 console.error("Error fetching consultations:", err);
-                setError("კონსულტაციების ჩატვირთვა ვერ მოხერხდა");
+                setError(t("doctor.appointments.loadError"));
               } finally {
                 setLoading(false);
               }
@@ -1876,7 +1918,7 @@ export default function DoctorAppointments() {
             }}
           >
             <Text style={{ color: "#FFFFFF", fontWeight: "600" }}>
-              ხელახლა ცდა
+              {t("appointments.filtered.retry")}
             </Text>
           </TouchableOpacity>
         </View>
@@ -1900,8 +1942,9 @@ export default function DoctorAppointments() {
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.title}>{t("appointments.doctor.listTitle")}</Text>
-            <Text style={styles.subtitle}>ყველა დანიშვნა და კონსულტაცია</Text>
+            <Text style={styles.title}>
+              {t("appointments.doctor.listTitle")}
+            </Text>
           </View>
         </View>
 
@@ -1911,7 +1954,7 @@ export default function DoctorAppointments() {
             <Ionicons name="search" size={20} color="#9CA3AF" />
             <TextInput
               style={styles.searchInput}
-              placeholder="ძებნა პაციენტის სახელით..."
+              placeholder={t("doctor.appointments.searchPlaceholder")}
               placeholderTextColor="#9CA3AF"
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -1952,7 +1995,7 @@ export default function DoctorAppointments() {
                 filterStatus === "scheduled" && styles.statLabelActive,
               ]}
             >
-              დანიშნული
+              {t("appointments.status.scheduled")}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -1981,14 +2024,13 @@ export default function DoctorAppointments() {
                 filterStatus === "completed" && styles.statLabelActive,
               ]}
             >
-              დასრულებული
+              {t("appointments.status.completed")}
             </Text>
           </TouchableOpacity>
         </View>
 
         {/* Type Filter */}
         <View style={styles.typeFilterSection}>
-          <Text style={styles.typeFilterTitle}>კონსულტაციის ტიპი</Text>
           <View style={styles.typeFilterRow}>
             <TouchableOpacity
               style={[
@@ -2038,12 +2080,6 @@ export default function DoctorAppointments() {
 
         {/* Consultations List */}
         <View style={styles.listSection}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>
-              {filteredConsultations.length} კონსულტაცია
-            </Text>
-          </View>
-
           {filteredConsultations.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="calendar-outline" size={64} color="#D1D5DB" />
@@ -2102,13 +2138,13 @@ export default function DoctorAppointments() {
                                     size={12}
                                     color="#EF4444"
                                   />
-                                  <Text style={styles.soonText}>მალე</Text>
+                                  <Text style={styles.soonText}>{t("doctor.appointments.soon")}</Text>
                                 </View>
                               )}
                           </View>
                           <Text style={styles.patientAge}>
-                            {consultation.patientAge} წლის •{" "}
-                            {getConsultationTypeLabel(consultation.type)}
+                            {consultation.patientAge} {t("doctor.appointments.yearsOld")} •{" "}
+                            {getLocalizedTypeLabel(consultation.type)}
                           </Text>
                         </View>
                       </View>
@@ -2128,7 +2164,7 @@ export default function DoctorAppointments() {
                             { color: getStatusColor(consultation.status) },
                           ]}
                         >
-                          {getStatusLabel(consultation.status)}
+                          {getLocalizedStatusLabel(consultation.status)}
                         </Text>
                       </View>
                     </View>
@@ -2142,7 +2178,9 @@ export default function DoctorAppointments() {
                         activeOpacity={0.7}
                       >
                         <Text style={styles.expandDetailsButtonText}>
-                          {isExpanded ? "დეტალების დაფარვა" : "დეტალების ნახვა"}
+                          {isExpanded
+                            ? t("appointments.card.hideDetails")
+                            : t("doctor.appointments.showDetails")}
                         </Text>
                         <Ionicons
                           name={isExpanded ? "chevron-up" : "chevron-down"}
@@ -2202,10 +2240,24 @@ export default function DoctorAppointments() {
                               style={[styles.infoText, { color: "#0EA5E9" }]}
                             >
                               {consultationDocumentsCount[consultation.id]}{" "}
-                              ფაილი ატვირთულია
+                              {t("doctor.appointments.fileUploadedShort")}
                             </Text>
                           </View>
                         )}
+                      {((consultation as any).patientEmail ||
+                        (consultation as any).patientId?.email) && (
+                        <View style={styles.infoRow}>
+                          <Ionicons
+                            name="mail-outline"
+                            size={16}
+                            color="#6B7280"
+                          />
+                          <Text style={styles.infoText}>
+                            {(consultation as any).patientEmail ||
+                              (consultation as any).patientId?.email}
+                          </Text>
+                        </View>
+                      )}
                       {/* Symptoms and Diagnosis - Show only indicators if completed, full text if not completed */}
                       {consultation.status === "completed" ? (
                         <>
@@ -2218,7 +2270,7 @@ export default function DoctorAppointments() {
                               color="#F59E0B"
                             />
                             <Text style={styles.infoText}>
-                              სიმპტომები ჩანს დეტალებში
+                              {t("doctor.appointments.symptomsInDetails")}
                             </Text>
                           </View>
                         )} */}
@@ -2231,7 +2283,7 @@ export default function DoctorAppointments() {
                                 color="#10B981"
                               />
                               <Text style={styles.infoText}>
-                                დიაგნოზი ჩანს დეტალებში
+                                {t("doctor.appointments.diagnosisInDetails")}
                               </Text>
                             </View>
                           )}
@@ -2280,97 +2332,12 @@ export default function DoctorAppointments() {
                   {/* Expanded Details - არ ჩანს დასრულებული ტაბში */}
                   {isExpanded && filterStatus !== "completed" && (
                     <View style={styles.expandedSection}>
-                      <View style={styles.detailSection}>
-                        <Text style={styles.detailSectionTitle}>
-                          პაციენტის ინფორმაცია
-                        </Text>
-                        <View style={styles.patientInfoCard}>
-                          <View style={styles.patientInfoRow}>
-                            <Text style={styles.patientInfoLabel}>სახელი:</Text>
-                            <Text style={styles.patientInfoValue}>
-                              {(consultation as any).patientDetails?.name ||
-                                consultation.patientName ||
-                                "არ არის მითითებული"}
-                            </Text>
-                          </View>
-
-                          {(consultation as any).patientDetails?.lastName && (
-                            <View style={styles.patientInfoRow}>
-                              <Text style={styles.patientInfoLabel}>
-                                გვარი:
-                              </Text>
-                              <Text style={styles.patientInfoValue}>
-                                {(consultation as any).patientDetails.lastName}
-                              </Text>
-                            </View>
-                          )}
-
-                          <View style={styles.patientInfoRow}>
-                            <Text style={styles.patientInfoLabel}>
-                              დაბადების თარიღი:
-                            </Text>
-                            <Text style={styles.patientInfoValue}>
-                              {(consultation as any).patientDetails?.dateOfBirth
-                                ? new Date(
-                                    (consultation as any).patientDetails
-                                      .dateOfBirth,
-                                  ).toLocaleDateString("ka-GE", {
-                                    year: "numeric",
-                                    month: "long",
-                                    day: "numeric",
-                                  })
-                                : consultation.patientAge
-                                  ? `${consultation.patientAge} წელი`
-                                  : "არ არის მითითებული"}
-                            </Text>
-                          </View>
-
-                          {(consultation as any).patientDetails?.personalId && (
-                            <View style={styles.patientInfoRow}>
-                              <Text style={styles.patientInfoLabel}>
-                                პირადი ნომერი:
-                              </Text>
-                              <Text style={styles.patientInfoValue}>
-                                {
-                                  (consultation as any).patientDetails
-                                    .personalId
-                                }
-                              </Text>
-                            </View>
-                          )}
-
-                          {(consultation as any).patientDetails?.address && (
-                            <View style={styles.patientInfoRow}>
-                              <Text style={styles.patientInfoLabel}>
-                                მისამართი:
-                              </Text>
-                              <Text style={styles.patientInfoValue}>
-                                {(consultation as any).patientDetails.address}
-                              </Text>
-                            </View>
-                          )}
-
-                          {((consultation as any).patientEmail ||
-                            (consultation as any).patientId?.email) && (
-                            <View style={styles.patientInfoRow}>
-                              <Text style={styles.patientInfoLabel}>
-                                Email:
-                              </Text>
-                              <Text style={styles.patientInfoValue}>
-                                {(consultation as any).patientEmail ||
-                                  (consultation as any).patientId?.email}
-                              </Text>
-                            </View>
-                          )}
-                        </View>
-                      </View>
-
                       {/* Symptoms - Full View */}
                       {(consultation.consultationSummary?.symptoms ||
                         consultation.symptoms) && (
                         <View style={styles.detailSection}>
                           <Text style={styles.detailSectionTitle}>
-                            სიმპტომები
+                            {t("doctor.appointments.symptoms")}
                           </Text>
                           <View style={styles.symptomsCard}>
                             <Ionicons
@@ -2391,7 +2358,7 @@ export default function DoctorAppointments() {
                         consultation.diagnosis) && (
                         <View style={styles.detailSection}>
                           <Text style={styles.detailSectionTitle}>
-                            დიაგნოზი
+                            {t("doctor.appointments.diagnosis")}
                           </Text>
                           <View style={styles.diagnosisCard}>
                             <MaterialCommunityIcons
@@ -2411,7 +2378,7 @@ export default function DoctorAppointments() {
                       {consultation.consultationSummary?.medications && (
                         <View style={styles.detailSection}>
                           <Text style={styles.detailSectionTitle}>
-                            დანიშნული მედიკამენტები
+                            {t("doctor.appointments.prescribedMedicines")}
                           </Text>
                           <View style={styles.medicationsCard}>
                             <Ionicons
@@ -2433,7 +2400,7 @@ export default function DoctorAppointments() {
                         consultation.laboratoryTests.length > 0 && (
                           <View style={styles.detailSection}>
                             <Text style={styles.detailSectionTitle}>
-                              ლაბორატორიული კვლევები
+                              {t("doctor.appointments.labTests")}
                             </Text>
                             {consultation.laboratoryTests.map(
                               (test: any, index: number) => (
@@ -2450,7 +2417,7 @@ export default function DoctorAppointments() {
                                       </Text>
                                       {test.clinicName && (
                                         <Text style={styles.testNotes}>
-                                          კლინიკა: {test.clinicName}
+                                          {t("appointments.tests.clinic")}: {test.clinicName}
                                         </Text>
                                       )}
                                     </View>
@@ -2466,7 +2433,7 @@ export default function DoctorAppointments() {
                         (consultation as any).instrumentalTests.length > 0 && (
                           <View style={styles.detailSection}>
                             <Text style={styles.detailSectionTitle}>
-                              ინსტრუმენტული კვლევები
+                              {t("doctor.appointments.instrumentalTests")}
                             </Text>
                             {(consultation as any).instrumentalTests.map(
                               (test: any, index: number) => (
@@ -2482,7 +2449,7 @@ export default function DoctorAppointments() {
                                         {test.productName}
                                       </Text>
                                       <Text style={styles.testNotes}>
-                                        შენიშვნა
+                                        {t("appointments.tests.note")}
                                       </Text>
                                     </View>
                                   </View>
@@ -2496,7 +2463,7 @@ export default function DoctorAppointments() {
                       {consultation.consultationSummary?.notes && (
                         <View style={styles.detailSection}>
                           <Text style={styles.detailSectionTitle}>
-                            შენიშვნები
+                            {t("doctor.appointments.notes")}
                           </Text>
                           <View style={styles.notesCard}>
                             <Ionicons
@@ -2517,7 +2484,7 @@ export default function DoctorAppointments() {
                         consultationDocuments[consultation.id].length > 0 && (
                           <View style={styles.detailSection}>
                             <Text style={styles.detailSectionTitle}>
-                              პაციენტის ატვირთული ფაილები
+                              {t("doctor.appointments.patientUploadedFiles")}
                               <Text
                                 style={{ color: "#0EA5E9", fontWeight: "600" }}
                               >
@@ -2554,7 +2521,7 @@ export default function DoctorAppointments() {
                                     numberOfLines={1}
                                   >
                                     {truncateFileName(doc.name) ||
-                                      "ფაილის ნახვა"}
+                                      t("doctor.appointments.viewFile")}
                                   </Text>
                                   <Ionicons
                                     name="open-outline"
@@ -2659,28 +2626,7 @@ export default function DoctorAppointments() {
                   })()}
 
                   {/* Status Actions */}
-                  <View style={styles.statusActionsRow}>
-                    {consultation.status !== "cancelled" && (
-                      <TouchableOpacity
-                        style={styles.statusActionButtonPrimary}
-                        onPress={() => openAppointment(consultation)}
-                        disabled={savingAppointment}
-                      >
-                        <Ionicons
-                          name="document-text"
-                          size={16}
-                          color="#FFFFFF"
-                        />
-                        <Text style={styles.statusActionPrimaryText}>
-                          {consultation.consultationSummary
-                            ? "რედაქტირება"
-                            : consultation.status === "completed"
-                              ? "რედაქტირება"
-                              : "დასრულება"}
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-
+                  <View style={styles.statusActionsBlock}>
                     {consultation.type === "video" &&
                       isJoinButtonActive(consultation) && (
                         <TouchableOpacity
@@ -2704,7 +2650,8 @@ export default function DoctorAppointments() {
                               params: {
                                 appointmentId: consultation.id,
                                 patientName:
-                                  consultation.patientName || "პაციენტი",
+                                  consultation.patientName ||
+                                  t("doctor.appointments.patient"),
                                 roomName: `medicare-${consultation.id}`,
                               },
                             });
@@ -2712,7 +2659,7 @@ export default function DoctorAppointments() {
                         >
                           <Ionicons name="videocam" size={20} color="#FFFFFF" />
                           <Text style={styles.joinCallText}>
-                            შესვლა კონსულტაციაზე
+                            {t("appointments.filtered.joinConsultation")}
                           </Text>
                           <Ionicons
                             name="arrow-forward"
@@ -2722,35 +2669,70 @@ export default function DoctorAppointments() {
                         </TouchableOpacity>
                       )}
 
-                    {/* Reschedule button - only for scheduled appointments and if no pending request */}
-                    {consultation.status === "scheduled" &&
-                      !(
-                        consultation.rescheduleRequest?.status === "pending"
-                      ) && (
+                    <View style={styles.statusActionsSecondaryRow}>
+                      {consultation.status !== "cancelled" && (
                         <TouchableOpacity
-                          style={styles.statusActionButtonReschedule}
-                          onPress={() => handleOpenReschedule(consultation)}
+                          style={[
+                            styles.statusActionChip,
+                            styles.statusActionButtonPrimary,
+                          ]}
+                          onPress={() => openAppointment(consultation)}
+                          disabled={savingAppointment}
                         >
                           <Ionicons
-                            name="calendar-outline"
+                            name="document-text"
                             size={16}
-                            color="#8B5CF6"
+                            color="#FFFFFF"
                           />
-                          <Text style={styles.statusActionTextReschedule}>
-                            {t("appointments.reschedule.rescheduleShort")}
+                          <Text
+                            style={styles.statusActionPrimaryText}
+                            numberOfLines={1}
+                          >
+                            {consultation.consultationSummary
+                              ? t("doctor.appointments.edit")
+                              : consultation.status === "completed"
+                                ? t("doctor.appointments.edit")
+                                : t("doctor.appointments.complete")}
                           </Text>
                         </TouchableOpacity>
                       )}
 
-                    {/* Complete consultation button - for video consultations after both parties joined */}
-                    {consultation.type === "video" &&
-                      consultation.status === "scheduled" &&
-                      consultation.patientJoinedAt &&
-                      consultation.doctorJoinedAt &&
-                      consultation.subStatus !== "conducted" && (
-                        <TouchableOpacity
-                          style={styles.statusActionButtonComplete}
-                          onPress={async () => {
+                      {consultation.status === "scheduled" &&
+                        !(
+                          consultation.rescheduleRequest?.status === "pending"
+                        ) && (
+                          <TouchableOpacity
+                            style={[
+                              styles.statusActionChip,
+                              styles.statusActionButtonReschedule,
+                            ]}
+                            onPress={() => handleOpenReschedule(consultation)}
+                          >
+                            <Ionicons
+                              name="calendar-outline"
+                              size={16}
+                              color="#8B5CF6"
+                            />
+                            <Text
+                              style={styles.statusActionTextReschedule}
+                              numberOfLines={1}
+                            >
+                              {t("appointments.reschedule.rescheduleShort")}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+
+                      {consultation.type === "video" &&
+                        consultation.status === "scheduled" &&
+                        consultation.patientJoinedAt &&
+                        consultation.doctorJoinedAt &&
+                        consultation.subStatus !== "conducted" && (
+                          <TouchableOpacity
+                            style={[
+                              styles.statusActionChip,
+                              styles.statusActionButtonComplete,
+                            ]}
+                            onPress={async () => {
                             let merged: Consultation & Record<string, unknown> =
                               consultation as Consultation &
                                 Record<string, unknown>;
@@ -2773,8 +2755,8 @@ export default function DoctorAppointments() {
                               )
                             ) {
                               Alert.alert(
-                                "ფორმა IV–100 (HIS)",
-                                "სანამ ვიზიტს დაასრულებთ, ჯავშანზე უნდა ჩაიტვირთოს HIS mis-print-forms და პასუხში ჩანდეს ფორმა IV–100. ატვირთული PDF არ ითვლება.",
+                                t("doctor.appointments.form100HisTitle"),
+                                t("doctor.appointments.form100HisMessage"),
                               );
                               return;
                             }
@@ -2789,8 +2771,8 @@ export default function DoctorAppointments() {
                                   );
                                 if (response.success) {
                                   Alert.alert(
-                                    "წარმატება",
-                                    "კონსულტაცია მონიშნულია როგორც ჩატარებული",
+                                    t("appointments.common.success"),
+                                    t("doctor.appointments.markedAsConducted"),
                                   );
                                   setFilterStatus("completed");
                                   router.setParams({
@@ -2800,14 +2782,18 @@ export default function DoctorAppointments() {
                                   await fetchConsultations();
                                 } else {
                                   Alert.alert(
-                                    "შეცდომა",
-                                    response.message || "ოპერაცია ვერ მოხერხდა",
+                                    t("appointments.common.error"),
+                                    response.message ||
+                                      t(
+                                        "doctor.appointments.operationFailed",
+                                      ),
                                   );
                                 }
                               } catch (err: any) {
                                 Alert.alert(
-                                  "შეცდომა",
-                                  err.message || "ოპერაცია ვერ მოხერხდა",
+                                  t("appointments.common.error"),
+                                  err.message ||
+                                    t("doctor.appointments.operationFailed"),
                                 );
                               }
                               return;
@@ -2826,11 +2812,15 @@ export default function DoctorAppointments() {
                             size={16}
                             color="#10B981"
                           />
-                          <Text style={styles.statusActionTextComplete}>
-                            ჩატარებულია
+                          <Text
+                            style={styles.statusActionTextComplete}
+                            numberOfLines={1}
+                          >
+                            {t("doctor.appointments.conducted")}
                           </Text>
                         </TouchableOpacity>
-                      )}
+                        )}
+                    </View>
                   </View>
 
                   <View style={styles.consultationFooter}></View>
@@ -2851,7 +2841,7 @@ export default function DoctorAppointments() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>კონსულტაციის დეტალები</Text>
+              <Text style={styles.modalTitle}>{t("appointments.details.title")}</Text>
               <TouchableOpacity
                 onPress={() => setShowDetailsModal(false)}
                 style={styles.closeButton}
@@ -2874,7 +2864,7 @@ export default function DoctorAppointments() {
                   <Text
                     style={{ marginTop: 16, fontSize: 14, color: "#6B7280" }}
                   >
-                    მონაცემების ჩატვირთვა...
+                    {t("doctor.appointments.loadingDetails")}
                   </Text>
                 </View>
               </View>
@@ -2883,22 +2873,22 @@ export default function DoctorAppointments() {
                 {/* Patient Details Section - for Form 100 generation */}
                 <View style={styles.detailSection}>
                   <Text style={styles.detailSectionTitle}>
-                    კონსულტაციის ისტორია
+                    {t("doctor.appointments.consultationHistory")}
                   </Text>
 
                   <View style={styles.patientInfoCard}>
                     <View style={styles.patientInfoRow}>
-                      <Text style={styles.patientInfoLabel}>სახელი:</Text>
+                      <Text style={styles.patientInfoLabel}>{t("doctor.appointments.firstName")}</Text>
                       <Text style={styles.patientInfoValue}>
                         {(selectedConsultation as any).patientDetails?.name ||
                           selectedConsultation.patientName ||
-                          "არ არის მითითებული"}
+                          t("doctor.appointments.notSpecified")}
                       </Text>
                     </View>
 
                     {(selectedConsultation as any).patientDetails?.lastName && (
                       <View style={styles.patientInfoRow}>
-                        <Text style={styles.patientInfoLabel}>გვარი:</Text>
+                        <Text style={styles.patientInfoLabel}>{t("doctor.appointments.lastName")}</Text>
                         <Text style={styles.patientInfoValue}>
                           {
                             (selectedConsultation as any).patientDetails
@@ -2908,32 +2898,11 @@ export default function DoctorAppointments() {
                       </View>
                     )}
 
-                    <View style={styles.patientInfoRow}>
-                      <Text style={styles.patientInfoLabel}>
-                        დაბადების თარიღი:
-                      </Text>
-                      <Text style={styles.patientInfoValue}>
-                        {(selectedConsultation as any).patientDetails
-                          ?.dateOfBirth
-                          ? new Date(
-                              (selectedConsultation as any).patientDetails
-                                .dateOfBirth,
-                            ).toLocaleDateString("ka-GE", {
-                              year: "numeric",
-                              month: "long",
-                              day: "numeric",
-                            })
-                          : selectedConsultation.patientAge
-                            ? `${selectedConsultation.patientAge} წელი`
-                            : "არ არის მითითებული"}
-                      </Text>
-                    </View>
-
                     {(selectedConsultation as any).patientDetails
                       ?.personalId && (
                       <View style={styles.patientInfoRow}>
                         <Text style={styles.patientInfoLabel}>
-                          პირადი ნომერი:
+                          {t("doctor.appointments.personalId")}
                         </Text>
                         <Text style={styles.patientInfoValue}>
                           {
@@ -2946,7 +2915,7 @@ export default function DoctorAppointments() {
 
                     {(selectedConsultation as any).patientDetails?.address && (
                       <View style={styles.patientInfoRow}>
-                        <Text style={styles.patientInfoLabel}>მისამართი:</Text>
+                        <Text style={styles.patientInfoLabel}>{t("doctor.appointments.addressLabel")}</Text>
                         <Text style={styles.patientInfoValue}>
                           {(selectedConsultation as any).patientDetails.address}
                         </Text>
@@ -2961,7 +2930,7 @@ export default function DoctorAppointments() {
                         {((selectedConsultation as any).patientEmail ||
                           (selectedConsultation as any).patientId?.email) && (
                           <View style={styles.patientInfoRow}>
-                            <Text style={styles.patientInfoLabel}>Email:</Text>
+                            <Text style={styles.patientInfoLabel}>{t("doctor.appointments.emailLabel")}</Text>
                             <Text style={styles.patientInfoValue}>
                               {(selectedConsultation as any).patientEmail ||
                                 (selectedConsultation as any).patientId?.email}
@@ -2974,37 +2943,37 @@ export default function DoctorAppointments() {
                 </View>
 
                 <View style={styles.detailSection}>
-                  <Text style={styles.detailLabel}>პაციენტი</Text>
+                  <Text style={styles.detailLabel}>{t("doctor.appointments.patient")}</Text>
                   <Text style={styles.detailValue}>
                     {selectedConsultation.patientName}
                   </Text>
                 </View>
 
                 <View style={styles.detailSection}>
-                  <Text style={styles.detailLabel}>ასაკი</Text>
+                  <Text style={styles.detailLabel}>{t("doctor.appointments.age")}</Text>
                   <Text style={styles.detailValue}>
-                    {selectedConsultation.patientAge} წელი
+                    {selectedConsultation.patientAge} {t("doctor.appointments.years")}
                   </Text>
                 </View>
 
                 <View style={styles.detailSection}>
-                  <Text style={styles.detailLabel}>თარიღი და დრო</Text>
+                  <Text style={styles.detailLabel}>{t("appointments.details.dateTime")}</Text>
                   <Text style={styles.detailValue}>
                     {selectedConsultation.date} • {selectedConsultation.time}
                   </Text>
                 </View>
 
                 <View style={styles.detailSection}>
-                  <Text style={styles.detailLabel}>ტიპი</Text>
+                  <Text style={styles.detailLabel}>{t("appointments.details.type")}</Text>
                   <Text style={styles.detailValue}>
-                    {getConsultationTypeLabel(selectedConsultation.type)}
+                    {getLocalizedTypeLabel(selectedConsultation.type)}
                   </Text>
                 </View>
 
                 {selectedConsultation.type === "home-visit" &&
                   (selectedConsultation as any).visitAddress && (
                     <View style={styles.detailSection}>
-                      <Text style={styles.detailLabel}>ვიზიტის მისამართი</Text>
+                      <Text style={styles.detailLabel}>{t("doctor.appointments.visitAddress")}</Text>
                       <Text style={styles.detailValue}>
                         {(selectedConsultation as any).visitAddress}
                       </Text>
@@ -3013,7 +2982,7 @@ export default function DoctorAppointments() {
 
                 {selectedConsultation.symptoms && (
                   <View style={styles.detailSection}>
-                    <Text style={styles.detailLabel}>სიმპტომები</Text>
+                    <Text style={styles.detailLabel}>{t("doctor.appointments.symptoms")}</Text>
                     <Text style={styles.detailValue}>
                       {selectedConsultation.symptoms}
                     </Text>
@@ -3022,7 +2991,9 @@ export default function DoctorAppointments() {
 
                 {selectedConsultation.diagnosis && (
                   <View style={styles.detailSection}>
-                    <Text style={styles.detailLabel}>დიაგნოზი</Text>
+                    <Text style={styles.detailLabel}>
+                      {t("doctor.appointments.diagnosis")}
+                    </Text>
                     <Text style={styles.detailValue}>
                       {selectedConsultation.diagnosis}
                     </Text>
@@ -3032,7 +3003,7 @@ export default function DoctorAppointments() {
                 {selectedConsultation.consultationSummary?.medications && (
                   <View style={styles.detailSection}>
                     <Text style={styles.detailLabel}>
-                      დანიშნული მედიკამენტები
+                      {t("doctor.appointments.prescribedMedicines")}
                     </Text>
                     <Text style={styles.detailValue}>
                       {formatMedicationsForDisplay(
@@ -3045,7 +3016,7 @@ export default function DoctorAppointments() {
                   selectedConsultation.laboratoryTests.length > 0 && (
                     <View style={styles.detailSection}>
                       <Text style={styles.detailLabel}>
-                        ლაბორატორიული კვლევები
+                        {t("doctor.appointments.labTests")}
                       </Text>
                       {selectedConsultation.laboratoryTests.map((test: any) => (
                         <View
@@ -3064,7 +3035,7 @@ export default function DoctorAppointments() {
                               </Text>
                               {test.resultFile?.name && (
                                 <Text style={styles.laboratoryTestMeta}>
-                                  ატვირთული შედეგი • {test.resultFile.name}
+                                  {t("doctor.appointments.uploadedResult")} • {test.resultFile.name}
                                 </Text>
                               )}
                             </View>
@@ -3085,7 +3056,7 @@ export default function DoctorAppointments() {
                                   color="#0369A1"
                                 />
                                 <Text style={styles.viewResultPillText}>
-                                  შედეგის ნახვა
+                                  {t("history.viewResult")}
                                 </Text>
                               </TouchableOpacity>
                             )}
@@ -3100,7 +3071,7 @@ export default function DoctorAppointments() {
                     0 && (
                     <View style={styles.detailSection}>
                       <Text style={styles.detailLabel}>
-                        ინსტრუმენტული კვლევები
+                        {t("doctor.appointments.instrumentalTests")}
                       </Text>
                       {(selectedConsultation as any).instrumentalTests.map(
                         (test: any) => (
@@ -3120,12 +3091,12 @@ export default function DoctorAppointments() {
                                 </Text>
                                 {test.notes && (
                                   <Text style={styles.laboratoryTestMeta}>
-                                    შენიშვნა: {test.notes}
+                                    {t("appointments.tests.note")}: {test.notes}
                                   </Text>
                                 )}
                                 {test.resultFile?.name && (
                                   <Text style={styles.laboratoryTestMeta}>
-                                    ატვირთული შედეგი • {test.resultFile.name}
+                                    {t("doctor.appointments.uploadedResult")} • {test.resultFile.name}
                                   </Text>
                                 )}
                               </View>
@@ -3146,7 +3117,7 @@ export default function DoctorAppointments() {
                                     color="#8B5CF6"
                                   />
                                   <Text style={styles.viewResultPillText}>
-                                    შედეგის ნახვა
+                                    {t("history.viewResult")}
                                   </Text>
                                 </TouchableOpacity>
                               )}
@@ -3159,7 +3130,9 @@ export default function DoctorAppointments() {
 
                 {selectedConsultation.consultationSummary?.notes && (
                   <View style={styles.detailSection}>
-                    <Text style={styles.detailLabel}>შენიშვნები</Text>
+                    <Text style={styles.detailLabel}>
+                      {t("doctor.appointments.notes")}
+                    </Text>
                     <Text style={styles.detailValue}>
                       {selectedConsultation.consultationSummary.notes}
                     </Text>
@@ -3168,7 +3141,9 @@ export default function DoctorAppointments() {
 
                 {selectedConsultation.followUp?.required && (
                   <View style={styles.detailSection}>
-                    <Text style={styles.detailLabel}>განმეორებითი ვიზიტი</Text>
+                    <Text style={styles.detailLabel}>
+                      {t("doctor.appointments.followUpRequiredDetail")}
+                    </Text>
                     {selectedConsultation.followUp.date && (
                       <Text style={styles.detailValue}>
                         {selectedConsultation.followUp.date.split("T")[0]}
@@ -3184,7 +3159,7 @@ export default function DoctorAppointments() {
 
                 {selectedConsultation.form100?.pdfUrl && (
                   <View style={styles.detailSection}>
-                    <Text style={styles.detailLabel}>ფორმა 100</Text>
+                    <Text style={styles.detailLabel}>{t("doctor.appointments.form100Name")}</Text>
                     <TouchableOpacity
                       style={styles.viewFileButton}
                       onPress={() =>
@@ -3198,7 +3173,7 @@ export default function DoctorAppointments() {
                       />
                       <Text style={styles.viewFileButtonText}>
                         {selectedConsultation.form100?.fileName ||
-                          "ფაილის ნახვა"}
+                          t("doctor.appointments.viewFile")}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -3208,7 +3183,7 @@ export default function DoctorAppointments() {
                 {selectedConsultation.status !== "completed" && (
                   <View style={styles.detailSection}>
                     <Text style={styles.detailLabel}>
-                      პაციენტის ატვირთული ფაილები
+                      {t("doctor.appointments.patientUploadedFiles")}
                       {appointmentDocuments.length > 0 && (
                         <Text style={{ color: "#0EA5E9", fontWeight: "600" }}>
                           {" "}
@@ -3241,7 +3216,7 @@ export default function DoctorAppointments() {
                             style={styles.viewFileButtonText}
                             numberOfLines={1}
                           >
-                            {truncateFileName(doc.name) || "ფაილის ნახვა"}
+                            {truncateFileName(doc.name) || t("doctor.appointments.viewFile")}
                           </Text>
                           <Ionicons
                             name="open-outline"
@@ -3258,7 +3233,7 @@ export default function DoctorAppointments() {
                           { color: "#9CA3AF", fontStyle: "italic" },
                         ]}
                       >
-                        დოკუმენტები არ არის ატვირთული
+                        {t("doctor.appointments.noDocumentsUploaded")}
                       </Text>
                     )}
                   </View>
@@ -3282,12 +3257,12 @@ export default function DoctorAppointments() {
                       <Text style={styles.rescheduleRequestText}>
                         {t("appointments.reschedule.newDate")}:{" "}
                         {formatDisplayDate(
-                          selectedConsultation.rescheduleRequest.requestedDate ||
-                            "",
+                          selectedConsultation.rescheduleRequest
+                            .requestedDate || "",
                         )}{" "}
                         {formatAppointmentTime(
-                          selectedConsultation.rescheduleRequest.requestedTime ||
-                            "",
+                          selectedConsultation.rescheduleRequest
+                            .requestedTime || "",
                         )}
                       </Text>
                       {selectedConsultation.rescheduleRequest.reason && (
@@ -3347,7 +3322,8 @@ export default function DoctorAppointments() {
                         </Text>
                       </View>
                       {selectedConsultation.rescheduleRequest.requestedDate &&
-                        selectedConsultation.rescheduleRequest.requestedTime && (
+                        selectedConsultation.rescheduleRequest
+                          .requestedTime && (
                           <Text style={styles.rescheduleRequestText}>
                             {t("appointments.reschedule.newDate")}:{" "}
                             {formatDisplayDate(
@@ -3397,7 +3373,7 @@ export default function DoctorAppointments() {
                 style={styles.modalButton}
                 onPress={() => setShowDetailsModal(false)}
               >
-                <Text style={styles.modalButtonText}>დახურვა</Text>
+                <Text style={styles.modalButtonText}>{t("common.actions.close")}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -3419,12 +3395,9 @@ export default function DoctorAppointments() {
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <View>
-                  <Text style={styles.modalTitle}>დანიშნულება</Text>
-                  {selectedConsultation && (
-                    <Text style={styles.modalSubtitle}>
-                      {selectedConsultation.patientName}
-                    </Text>
-                  )}
+                  <Text style={styles.modalTitle}>
+                    {t("doctor.appointments.prescription")}
+                  </Text>
                 </View>
                 <TouchableOpacity
                   onPress={closeAppointmentFormModal}
@@ -3446,13 +3419,13 @@ export default function DoctorAppointments() {
                 ).trim() ? (
                   <View style={styles.misFormsWrap}>
                     <Text style={styles.misFormsTitle}>
-                      HIS ეფოინთმენტის ფორმები (ბეჭდვადი)
+                      {t("doctor.appointments.hisFormsTitle")}
                     </Text>
                     {misHisLoading ? (
                       <View style={styles.misFormsLoadingBox}>
                         <ActivityIndicator color="#06B6D4" />
                         <Text style={styles.misFormsHint}>
-                          იტვირთება HIS-იდან...
+                          {t("doctor.appointments.formsLoading")}
                         </Text>
                       </View>
                     ) : misHisError && misHisDocuments.length === 0 ? (
@@ -3471,7 +3444,7 @@ export default function DoctorAppointments() {
                         >
                           <Ionicons name="refresh" size={18} color="#0369A1" />
                           <Text style={styles.misFormsReloadBtnText}>
-                            ხელახლა
+                            {t("doctor.appointments.reload")}
                           </Text>
                         </TouchableOpacity>
                       </View>
@@ -3488,6 +3461,7 @@ export default function DoctorAppointments() {
                             {
                               printTypeName: doc.printTypeName,
                               html: doc.html,
+                              t,
                             },
                           );
                           const total = misHisDocuments.length;
@@ -3559,7 +3533,7 @@ export default function DoctorAppointments() {
                                     />
                                   )}
                                   <Text style={styles.misPdfActionBtnText}>
-                                    PDF ნახვა
+                                    {t("doctor.appointments.pdfView")}
                                   </Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
@@ -3590,7 +3564,7 @@ export default function DoctorAppointments() {
                                   <Text
                                     style={styles.misPdfActionBtnTextPrimary}
                                   >
-                                    PDF გადმოწერა
+                                    {t("doctor.appointments.pdfDownload")}
                                   </Text>
                                 </TouchableOpacity>
                               </View>
@@ -3600,8 +3574,7 @@ export default function DoctorAppointments() {
                       </View>
                     ) : (
                       <Text style={styles.misFormsHint}>
-                        ფორმები ჯერ არ არის შენახული — &quot;ხელახლა&quot;
-                        სცადეთ ან განაახლეთ ჯავშანი.
+                        {t("doctor.appointments.formsNotLoaded")}
                       </Text>
                     )}
                   </View>
@@ -3610,11 +3583,12 @@ export default function DoctorAppointments() {
                 {/* Diagnosis */}
                 <View style={styles.formSection}>
                   <Text style={styles.formLabel}>
-                    დიაგნოზი {!appointmentData.followUpRequired && "*"}
+                    {t("doctor.appointments.diagnosis")}{" "}
+                    {!appointmentData.followUpRequired && "*"}
                   </Text>
                   <TextInput
                     style={styles.textInput}
-                    placeholder="მიუთითეთ დიაგნოზი"
+                    placeholder={t("doctor.appointments.diagnosisPlaceholder")}
                     placeholderTextColor="#9CA3AF"
                     value={appointmentData.diagnosis}
                     onChangeText={(text) =>
@@ -3649,7 +3623,7 @@ export default function DoctorAppointments() {
                       )}
                     </View>
                     <Text style={styles.checkboxLabel}>
-                      საჭიროა განმეორებითი ვიზიტი
+                      {t("doctor.appointments.followUpRequired")}
                     </Text>
                   </TouchableOpacity>
 
@@ -3657,7 +3631,9 @@ export default function DoctorAppointments() {
                     <>
                       {/* Follow-up Type Selection */}
                       <View style={styles.formSection}>
-                        <Text style={styles.formLabel}>კონსულტაციის ტიპი</Text>
+                        <Text style={styles.formLabel}>
+                          {t("doctor.appointments.consultationType")}
+                        </Text>
                         <View style={styles.typeSelectorContainer}>
                           <TouchableOpacity
                             style={[
@@ -3689,7 +3665,7 @@ export default function DoctorAppointments() {
                                   styles.typeChipTextActive,
                               ]}
                             >
-                              ვიდეო კონსულტაცია
+                              {t("appointments.type.videoConsultation")}
                             </Text>
                           </TouchableOpacity>
                         </View>
@@ -3699,11 +3675,13 @@ export default function DoctorAppointments() {
                       {appointmentData.followUpType === "home-visit" && (
                         <View style={styles.formSection}>
                           <Text style={styles.formLabel}>
-                            ვიზიტის მისამართი *
+                            {t("doctor.appointments.visitAddress")} *
                           </Text>
                           <TextInput
                             style={styles.textInput}
-                            placeholder="მიუთითეთ ზუსტი მისამართი"
+                            placeholder={t(
+                              "doctor.appointments.visitAddressPlaceholder",
+                            )}
                             placeholderTextColor="#9CA3AF"
                             value={appointmentData.followUpVisitAddress}
                             onChangeText={(text) =>
@@ -3718,12 +3696,14 @@ export default function DoctorAppointments() {
 
                       {/* Date and Time Selection */}
                       <View style={styles.formSection}>
-                        <Text style={styles.formLabel}>თარიღი და დრო</Text>
+                        <Text style={styles.formLabel}>
+                          {t("appointments.details.dateTime")}
+                        </Text>
                         <TouchableOpacity
                           style={styles.scheduleButton}
                           onPress={async () => {
                             if (!user?.id) {
-                              Alert.alert("შეცდომა", "ექიმის ID ვერ მოიძებნა");
+                              Alert.alert(t("appointments.common.error"), t("doctor.appointments.doctorIdNotFound"));
                               return;
                             }
 
@@ -3752,8 +3732,8 @@ export default function DoctorAppointments() {
                                   response,
                                 );
                                 Alert.alert(
-                                  "შეცდომა",
-                                  "განრიგის ჩატვირთვა ვერ მოხერხდა",
+                                  t("appointments.common.error"),
+                                  t("doctor.appointments.scheduleLoadFailed"),
                                 );
                               }
                             } catch (error) {
@@ -3762,8 +3742,8 @@ export default function DoctorAppointments() {
                                 error,
                               );
                               Alert.alert(
-                                "შეცდომა",
-                                "განრიგის ჩატვირთვა ვერ მოხერხდა",
+                                t("appointments.common.error"),
+                                t("doctor.appointments.scheduleLoadFailed"),
                               );
                             } finally {
                               setLoadingFollowUpAvailability(false);
@@ -3779,7 +3759,9 @@ export default function DoctorAppointments() {
                             {appointmentData.followUpDate &&
                             appointmentData.followUpTime
                               ? `${appointmentData.followUpDate} • ${appointmentData.followUpTime}`
-                              : t("appointments.reschedule.modal.selectDateTime")}
+                              : t(
+                                  "appointments.reschedule.modal.selectDateTime",
+                                )}
                           </Text>
                           {loadingFollowUpAvailability && (
                             <ActivityIndicator size="small" color="#06B6D4" />
@@ -3788,10 +3770,14 @@ export default function DoctorAppointments() {
                       </View>
 
                       <View style={styles.formSection}>
-                        <Text style={styles.formLabel}>მიზეზი</Text>
+                        <Text style={styles.formLabel}>
+                          {t("appointments.reschedule.reason")}
+                        </Text>
                         <TextInput
                           style={styles.textInput}
-                          placeholder="მიუთითეთ მიზეზი"
+                          placeholder={t(
+                            "doctor.appointments.followUpReasonPlaceholder",
+                          )}
                           placeholderTextColor="#9CA3AF"
                           multiline
                           numberOfLines={2}
@@ -3812,7 +3798,7 @@ export default function DoctorAppointments() {
                 <View style={styles.formSection}>
                   <View style={styles.medicationsHeader}>
                     <Text style={styles.formLabel}>
-                      დანიშნული მედიკამენტები
+                      {t("doctor.appointments.prescribedMedicines")}
                     </Text>
                     <TouchableOpacity
                       style={styles.addMedicationButton}
@@ -3833,7 +3819,9 @@ export default function DoctorAppointments() {
                       }}
                     >
                       <Ionicons name="add-circle" size={20} color="#06B6D4" />
-                      <Text style={styles.addMedicationText}>დამატება</Text>
+                      <Text style={styles.addMedicationText}>
+                        {t("doctor.appointments.add")}
+                      </Text>
                     </TouchableOpacity>
                   </View>
 
@@ -3847,7 +3835,9 @@ export default function DoctorAppointments() {
                         />
                         <TextInput
                           style={styles.medicationNameInput}
-                          placeholder="მედიკამენტის სახელი"
+                          placeholder={t(
+                            "doctor.appointments.medicationNamePlaceholder",
+                          )}
                           placeholderTextColor="#9CA3AF"
                           value={med.name}
                           onChangeText={(text) => {
@@ -3886,11 +3876,11 @@ export default function DoctorAppointments() {
                       <View style={styles.medicationDetails}>
                         <View style={styles.medicationDetailRow}>
                           <Text style={styles.medicationDetailLabel}>
-                            დოზა:
+                            {t("doctor.appointments.dose")}:
                           </Text>
                           <TextInput
                             style={styles.medicationDetailInput}
-                            placeholder="მაგ: 10მგ"
+                            placeholder={t("doctor.appointments.dosePlaceholder")}
                             placeholderTextColor="#9CA3AF"
                             value={med.dosage}
                             onChangeText={(text) => {
@@ -3907,11 +3897,11 @@ export default function DoctorAppointments() {
                         </View>
                         <View style={styles.medicationDetailRow}>
                           <Text style={styles.medicationDetailLabel}>
-                            სიხშირე:
+                            {t("doctor.appointments.frequency")}:
                           </Text>
                           <TextInput
                             style={styles.medicationDetailInput}
-                            placeholder="მაგ: დღეში 1-ჯერ"
+                            placeholder={t("doctor.appointments.frequencyPlaceholder")}
                             placeholderTextColor="#9CA3AF"
                             value={med.frequency}
                             onChangeText={(text) => {
@@ -3928,11 +3918,11 @@ export default function DoctorAppointments() {
                         </View>
                         <View style={styles.medicationDetailRow}>
                           <Text style={styles.medicationDetailLabel}>
-                            ხანგრძლივობა:
+                            {t("doctor.appointments.duration")}:
                           </Text>
                           <TextInput
                             style={styles.medicationDetailInput}
-                            placeholder="მაგ: 7 დღე"
+                            placeholder={t("doctor.appointments.durationPlaceholder")}
                             placeholderTextColor="#9CA3AF"
                             value={med.duration}
                             onChangeText={(text) => {
@@ -3949,11 +3939,13 @@ export default function DoctorAppointments() {
                         </View>
                         <View style={styles.medicationInstructionsRow}>
                           <Text style={styles.medicationDetailLabel}>
-                            ინსტრუქცია:
+                            {t("doctor.appointments.instruction")}:
                           </Text>
                           <TextInput
                             style={styles.medicationInstructionsInput}
-                            placeholder="დამატებითი ინსტრუქცია (არასავალდებულო)"
+                            placeholder={t(
+                              "doctor.appointments.instructionPlaceholder",
+                            )}
                             placeholderTextColor="#9CA3AF"
                             multiline
                             numberOfLines={2}
@@ -3986,7 +3978,7 @@ export default function DoctorAppointments() {
                   <View style={styles.formSection}>
                     <View style={styles.medicationsHeader}>
                       <Text style={styles.formLabel}>
-                        ლაბორატორიული კვლევები
+                        {t("doctor.appointments.labTests")}
                       </Text>
                     </View>
 
@@ -4003,11 +3995,11 @@ export default function DoctorAppointments() {
                               {test.productName}
                             </Text>
                             <Text style={styles.clinicNameText}>
-                              კლინიკა აირჩევა პაციენტის მიერ დაჯავშნისას
+                              {t("doctor.appointments.clinicChosenByPatient")}
                             </Text>
                             {test.resultFile?.name && (
                               <Text style={styles.clinicNameText}>
-                                ატვირთული შედეგი: {test.resultFile.name}
+                                {t("doctor.appointments.uploadedResult")}: {test.resultFile.name}
                               </Text>
                             )}
                           </View>
@@ -4033,7 +4025,7 @@ export default function DoctorAppointments() {
                     {loadingLaboratoryData && (
                       <View style={styles.loadingContainer}>
                         <ActivityIndicator size="small" color="#06B6D4" />
-                        <Text style={styles.loadingText}>იტვირთება...</Text>
+                        <Text style={styles.loadingText}>{t("doctor.appointments.loadingShort")}</Text>
                       </View>
                     )}
                   </View>
@@ -4046,7 +4038,7 @@ export default function DoctorAppointments() {
                   <View style={styles.formSection}>
                     <View style={styles.medicationsHeader}>
                       <Text style={styles.formLabel}>
-                        ინსტრუმენტული კვლევები
+                        {t("doctor.appointments.instrumentalTests")}
                       </Text>
                     </View>
 
@@ -4087,12 +4079,10 @@ export default function DoctorAppointments() {
                 <View style={styles.formSection}>
                   <View style={styles.patientDocsHeaderBlock}>
                     <Text style={styles.formLabel}>
-                      პაციენტისთვის დოკუმენტები
+                      {t("doctor.appointments.patientDocuments")}
                     </Text>
                     <Text style={styles.patientDocsHint}>
-                      აირჩიეთ ფაილებიდან (PDF/სურათი) ან გალერეიდან (სურათები);
-                      თითო 5MB-მდე, რამდენიმე ფაილი — პაციენტს ჩანს ვიზიტის
-                      ისტორიაში.
+                      {t("doctor.appointments.patientDocumentsHint")}
                     </Text>
                     <View style={styles.patientDocSourceButtons}>
                       <TouchableOpacity
@@ -4104,7 +4094,9 @@ export default function DoctorAppointments() {
                           size={20}
                           color="#06B6D4"
                         />
-                        <Text style={styles.addMedicationText}>ფაილები</Text>
+                        <Text style={styles.addMedicationText}>
+                          {t("doctor.appointments.files")}
+                        </Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.addMedicationButton}
@@ -4115,7 +4107,7 @@ export default function DoctorAppointments() {
                           size={20}
                           color="#06B6D4"
                         />
-                        <Text style={styles.addMedicationText}>გალერეა</Text>
+                        <Text style={styles.addMedicationText}>{t("doctor.appointments.gallery")}</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -4134,7 +4126,7 @@ export default function DoctorAppointments() {
                         color="#0369A1"
                       />
                       <Text style={styles.patientDocName} numberOfLines={1}>
-                        {doc.name || "დოკუმენტი"}
+                        {doc.name || t("appointments.documents.defaultName")}
                       </Text>
                       <TouchableOpacity
                         onPress={() =>
@@ -4155,10 +4147,15 @@ export default function DoctorAppointments() {
                 </View>
 
                 <View style={styles.formSection}>
-                  <Text style={styles.formLabel}>შენიშვნები</Text>
+                  <Text style={styles.formLabel}>
+                    {t("doctor.appointments.notes")}
+                  </Text>
+                  <Text style={styles.patientDocsHint}>
+                    {t("doctor.appointments.notesHint")}
+                  </Text>
                   <TextInput
                     style={styles.textInput}
-                    placeholder="დამატებითი ინფორმაცია..."
+                    placeholder={t("doctor.appointments.notesPlaceholder")}
                     placeholderTextColor="#9CA3AF"
                     multiline
                     numberOfLines={4}
@@ -4175,7 +4172,9 @@ export default function DoctorAppointments() {
                   style={[styles.modalButton, styles.modalButtonSecondary]}
                   onPress={closeAppointmentFormModal}
                 >
-                  <Text style={styles.modalButtonTextSecondary}>გაუქმება</Text>
+                  <Text style={styles.modalButtonTextSecondary}>
+                    {t("doctor.appointments.cancel")}
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.modalButton, styles.modalButtonPrimary]}
@@ -4183,7 +4182,9 @@ export default function DoctorAppointments() {
                   disabled={savingAppointment}
                 >
                   <Text style={styles.modalButtonTextPrimary}>
-                    {savingAppointment ? "ინახება..." : "შენახვა"}
+                    {savingAppointment
+                      ? t("doctor.appointments.saving")
+                      : t("doctor.appointments.save")}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -4207,7 +4208,7 @@ export default function DoctorAppointments() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, styles.misPreviewModalContent]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>HIS ფორმები — დასრულებამდე</Text>
+              <Text style={styles.modalTitle}>{t("doctor.appointments.hisFormsBeforeComplete")}</Text>
               <TouchableOpacity
                 onPress={() => {
                   setShowMisCompletePreviewModal(false);
@@ -4228,16 +4229,16 @@ export default function DoctorAppointments() {
               !hasForm100ForVisitCompletion(pendingCompleteConsultation) ? (
                 <View style={styles.misFormsLoadingBox}>
                   <Text style={styles.misFormsErrorText}>
-                    HIS mis-print-forms-ის ბოლო ჩატვირთვაზე ფორმა IV–100 ჯერ არ
-                    არის დადასტურებული. ჩაიტვირთეთ HIS ფორმები ან განაახლეთ
-                    ჩამოტვირთვა, შემდეგ ისევ სცადეთ. ატვირთული PDF არ ითვლება.
+                    {t("doctor.appointments.form100NotConfirmed")}
                   </Text>
                 </View>
               ) : null}
               {misHisLoading ? (
                 <View style={styles.misFormsLoadingBox}>
                   <ActivityIndicator size="large" color="#06B6D4" />
-                  <Text style={styles.misFormsHint}>იტვირთება HIS-იდან...</Text>
+                  <Text style={styles.misFormsHint}>
+                    {t("doctor.appointments.formsLoading")}
+                  </Text>
                 </View>
               ) : misHisError && misHisDocuments.length === 0 ? (
                 <View style={styles.misFormsLoadingBox}>
@@ -4253,7 +4254,7 @@ export default function DoctorAppointments() {
                   >
                     <Ionicons name="refresh" size={18} color="#0369A1" />
                     <Text style={styles.misFormsReloadBtnText}>
-                      ხელახლა ჩატვირთვა
+                      {t("doctor.appointments.reloadFull")}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -4266,6 +4267,7 @@ export default function DoctorAppointments() {
                     const section = formatMisDocumentSectionTitle(doc.title, {
                       printTypeName: doc.printTypeName,
                       html: doc.html,
+                      t,
                     });
                     const total = misHisDocuments.length;
                     return (
@@ -4332,7 +4334,7 @@ export default function DoctorAppointments() {
                               />
                             )}
                             <Text style={styles.misPdfActionBtnText}>
-                              PDF ნახვა
+                              {t("doctor.appointments.pdfView")}
                             </Text>
                           </TouchableOpacity>
                           <TouchableOpacity
@@ -4360,7 +4362,7 @@ export default function DoctorAppointments() {
                               color="#FFFFFF"
                             />
                             <Text style={styles.misPdfActionBtnTextPrimary}>
-                              PDF გადმოწერა
+                              {t("doctor.appointments.pdfDownload")}
                             </Text>
                           </TouchableOpacity>
                         </View>
@@ -4370,7 +4372,7 @@ export default function DoctorAppointments() {
                 </View>
               ) : (
                 <Text style={styles.misFormsHint}>
-                  ფორმების შიგთავსი ვერ მოიძებნა.
+                  {t("doctor.appointments.formsContentNotFound")}
                 </Text>
               )}
             </ScrollView>
@@ -4384,7 +4386,7 @@ export default function DoctorAppointments() {
                   setMisHisError(null);
                 }}
               >
-                <Text style={styles.modalButtonTextSecondary}>დახურვა</Text>
+                <Text style={styles.modalButtonTextSecondary}>{t("common.actions.close")}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[
@@ -4419,8 +4421,8 @@ export default function DoctorAppointments() {
                       setMisHisDocuments([]);
                       setMisHisError(null);
                       Alert.alert(
-                        "წარმატება",
-                        "კონსულტაცია მონიშნულია როგორც ჩატარებული",
+                        t("appointments.common.success"),
+                        t("doctor.appointments.markedAsConducted"),
                       );
                       setFilterStatus("completed");
                       router.setParams({
@@ -4430,21 +4432,21 @@ export default function DoctorAppointments() {
                       await fetchConsultations();
                     } else {
                       Alert.alert(
-                        "შეცდომა",
-                        response.message || "ოპერაცია ვერ მოხერხდა",
+                        t("appointments.common.error"),
+                        response.message || t("doctor.appointments.operationFailed"),
                       );
                     }
                   } catch (err: unknown) {
                     const msg =
                       err instanceof Error
                         ? err.message
-                        : "ოპერაცია ვერ მოხერხდა";
-                    Alert.alert("შეცდომა", msg);
+                         : t("doctor.appointments.operationFailed");
+                    Alert.alert(t("appointments.common.error"), msg);
                   }
                 }}
               >
                 <Text style={styles.modalButtonTextPrimary}>
-                  კონსულტაციის დასრულება
+                  {t("doctor.appointments.completeConsultation")}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -4462,7 +4464,7 @@ export default function DoctorAppointments() {
           <View style={styles.documentPreviewModalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {selectedDocumentPreview?.name || "დოკუმენტის ნახვა"}
+                {selectedDocumentPreview?.name || t("appointments.documents.viewTitle")}
               </Text>
               <View style={styles.previewHeaderActions}>
                 <TouchableOpacity
@@ -4474,8 +4476,12 @@ export default function DoctorAppointments() {
                     <ActivityIndicator size="small" color="#FFFFFF" />
                   ) : (
                     <>
-                      <Ionicons name="download-outline" size={16} color="#FFFFFF" />
-                      <Text style={styles.downloadButtonText}>გადმოწერა</Text>
+                      <Ionicons
+                        name="download-outline"
+                        size={16}
+                        color="#FFFFFF"
+                      />
+                      <Text style={styles.downloadButtonText}>{t("appointments.documents.download")}</Text>
                     </>
                   )}
                 </TouchableOpacity>
@@ -4520,16 +4526,16 @@ export default function DoctorAppointments() {
             <View style={styles.successModalIconContainer}>
               <Ionicons name="checkmark-circle" size={64} color="#10B981" />
             </View>
-            <Text style={styles.successModalTitle}>შენახულია</Text>
+            <Text style={styles.successModalTitle}>{t("doctor.appointments.saved")}</Text>
             <Text style={styles.successModalMessage}>
-              დანიშნულება წარმატებით დამატებულია
+              {t("doctor.appointments.prescriptionSaved")}
             </Text>
             <View style={{ flexDirection: "row", gap: 12, width: "100%" }}>
               <TouchableOpacity
                 style={[styles.successModalButton, { flex: 1 }]}
                 onPress={() => setShowSuccessModal(false)}
               >
-                <Text style={styles.successModalButtonText}>დასრულება</Text>
+                <Text style={styles.successModalButtonText}>{t("doctor.appointments.done")}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -4583,8 +4589,7 @@ export default function DoctorAppointments() {
                         color="#9CA3AF"
                       />
                       <Text style={styles.followUpEmptyStateText}>
-                        ამ ტიპის კონსულტაციისთვის თავისუფალი დრო არ არის ან უკვე
-                        გასულია
+                        {t("doctor.appointments.followUpNoSlots")}
                       </Text>
                     </View>
                   );
@@ -5140,15 +5145,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    backgroundColor: "#10B981",
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    backgroundColor: "#06B6D4",
     borderRadius: 12,
-    shadowColor: "#10B981",
+    alignSelf: "stretch",
+    width: "100%",
+    shadowColor: "#06B6D4",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.25,
     shadowRadius: 8,
-    elevation: 5,
+    elevation: 4,
   },
   joinCallButtonPulsing: {
     backgroundColor: "#EF4444",
@@ -5547,6 +5554,28 @@ const styles = StyleSheet.create({
     color: "#1F2937",
     marginBottom: 8,
   },
+  statusActionsBlock: {
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 14,
+    gap: 10,
+  },
+  statusActionsSecondaryRow: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    gap: 8,
+  },
+  statusActionChip: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 12,
+    borderRadius: 12,
+    minHeight: 46,
+  },
   statusActionsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -5569,12 +5598,6 @@ const styles = StyleSheet.create({
     color: "#2563EB",
   },
   statusActionButtonPrimary: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 999,
     backgroundColor: "#8B5CF6",
     shadowColor: "#8B5CF6",
     shadowOffset: { width: 0, height: 2 },
@@ -5583,43 +5606,32 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   statusActionPrimaryText: {
+    flexShrink: 1,
     fontSize: 13,
     fontFamily: "Poppins-SemiBold",
     color: "#FFFFFF",
   },
   statusActionButtonReschedule: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: "#F5F3FF",
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: "#DDD6FE",
   },
   statusActionTextReschedule: {
+    flexShrink: 1,
     fontSize: 13,
     fontFamily: "Poppins-SemiBold",
-    color: "#8B5CF6",
+    color: "#7C3AED",
   },
   statusActionButtonComplete: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: "#D1FAE5",
+    backgroundColor: "#ECFDF5",
     borderWidth: 1,
-    borderColor: "#10B981",
+    borderColor: "#A7F3D0",
   },
   statusActionTextComplete: {
+    flexShrink: 1,
     fontSize: 13,
     fontFamily: "Poppins-SemiBold",
-    color: "#10B981",
+    color: "#059669",
   },
   rescheduleRequestCardInline: {
     backgroundColor: "#FEF3C7",

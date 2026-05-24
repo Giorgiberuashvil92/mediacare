@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useSidebarContext } from "../sidebar/sidebar-context";
 import { MenuIcon } from "./icons";
+import { LanguageSwitcher } from "./language-switcher";
 import { Notification } from "./notification";
 import { ThemeToggleSwitch } from "./theme-toggle";
 import { UserInfo } from "./user-info";
@@ -51,6 +52,8 @@ export function Header() {
 
           <SearchIcon className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 max-[1015px]:size-5" />
         </div>
+
+        <LanguageSwitcher />
 
         <ThemeToggleSwitch />
 

@@ -36,6 +36,8 @@ type ProductLeanDocument = ShopProduct & {
 type FormattedCategory = {
   id: string;
   name: string;
+  nameEn?: string;
+  nameRu?: string;
   slug: string;
   type: ShopCategoryType;
   description?: string;
@@ -53,6 +55,8 @@ type FormattedCategory = {
 type FormattedProduct = {
   id: string;
   name: string;
+  nameEn?: string;
+  nameRu?: string;
   description?: string;
   type: ShopProductType;
   category: string | null;
@@ -121,6 +125,8 @@ export class ShopService {
     return {
       id: category._id.toString(),
       name: category.name,
+      nameEn: category.nameEn,
+      nameRu: category.nameRu,
       slug: category.slug,
       type: category.type,
       description: category.description,
@@ -139,6 +145,8 @@ export class ShopService {
     return {
       id: product._id.toString(),
       name: product.name,
+      nameEn: product.nameEn,
+      nameRu: product.nameRu,
       description: product.description,
       type: product.type,
       category: this.normalizeObjectIdToString(product.category),

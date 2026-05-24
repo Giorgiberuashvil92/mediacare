@@ -1,9 +1,8 @@
 // API Service for Medicare Admin Panel
 import { ADMIN_DEV_TOKEN } from "./dev-token";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  "https://mediacare-production.up.railway.app";
+// დროებით: ლოკალური API (production: https://mediacare-production.up.railway.app)
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4001";
 
 // DEVELOPMENT MODE: Skip auth and use static token (from dev-token.ts)
 const DISABLE_AUTH = true;
@@ -92,6 +91,8 @@ export type ShopEntityType = "laboratory" | "equipment";
 export interface ShopCategory {
   id: string;
   name: string;
+  nameEn?: string;
+  nameRu?: string;
   slug: string;
   type: ShopEntityType;
   description?: string;
@@ -109,6 +110,8 @@ export interface ShopCategory {
 export interface ShopProduct {
   id: string;
   name: string;
+  nameEn?: string;
+  nameRu?: string;
   icdCode?: string;
   icdCode2?: string;
   uniqueCode?: string;
@@ -959,6 +962,10 @@ class ApiService {
       faqs: {
         question: string;
         answer: string;
+        questionEn?: string;
+        answerEn?: string;
+        questionRu?: string;
+        answerRu?: string;
         isActive?: boolean;
         order?: number;
       }[];
@@ -986,6 +993,10 @@ class ApiService {
       faqs: {
         question: string;
         answer: string;
+        questionEn?: string;
+        answerEn?: string;
+        questionRu?: string;
+        answerRu?: string;
         isActive: boolean;
         order: number;
         role?: "doctor" | "patient";
@@ -1013,6 +1024,10 @@ class ApiService {
     faqs?: {
       question: string;
       answer: string;
+      questionEn?: string;
+      answerEn?: string;
+      questionRu?: string;
+      answerRu?: string;
       isActive?: boolean;
       order?: number;
       role?: "doctor" | "patient";

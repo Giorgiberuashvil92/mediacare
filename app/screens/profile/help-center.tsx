@@ -14,11 +14,17 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { apiService } from "../../_services/api";
 import { useAuth } from "../../contexts/AuthContext";
+import { useLanguage } from "../../contexts/LanguageContext";
+import { getFaqDisplayText } from "../../utils/faqLabel";
 
 interface FAQItem {
   question: string;
   answer: string;
-  role?: 'doctor' | 'patient'; // Role: doctor or patient
+  questionEn?: string;
+  answerEn?: string;
+  questionRu?: string;
+  answerRu?: string;
+  role?: "doctor" | "patient";
 }
 
 interface ContactInfo {
@@ -35,8 +41,9 @@ type TabType = "faq" | "contact";
 const HelpCenterScreen = () => {
   const params = useLocalSearchParams();
   const { user } = useAuth();
+  const { t, language } = useLanguage();
   const [activeTab, setActiveTab] = useState<TabType>(
-    (params.tab as TabType) || "faq"
+    (params.tab as TabType) || "faq",
   );
   const [expandedFAQ, setExpandedFAQ] = useState<number | null>(0);
   const [loading, setLoading] = useState(true);
@@ -50,7 +57,7 @@ const HelpCenterScreen = () => {
       if (response.success && response.data) {
         const allFaqs = response.data.faqs || [];
         // Filter FAQs based on user role
-        const userRole = user?.role || 'patient';
+        const userRole = user?.role || "patient";
         const filteredFaqs = allFaqs.filter((faq: FAQItem) => {
           // If FAQ has no role specified, show it to everyone
           if (!faq.role) return true;
@@ -78,7 +85,6 @@ const HelpCenterScreen = () => {
       setActiveTab(params.tab as TabType);
     }
   }, [params.tab]);
-
 
   const handleTabChange = (tab: TabType) => {
     setActiveTab(tab);
@@ -128,48 +134,48 @@ const HelpCenterScreen = () => {
           <Ionicons name="chevron-back" size={20} color="#1F2937" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
-          {params.tab === "faq" 
-            ? "ხშირად დასმული კითხვები" 
-            : params.tab === "contact" 
-            ? "კონტაქტები" 
-            : "დახმარების ცენტრი"}
+          {params.tab === "faq"
+            ? t("settings.menu.faq")
+            : params.tab === "contact"
+              ? t("settings.menu.contacts")
+              : t("settings.menu.helpCenter")}
         </Text>
         <View style={styles.placeholder} />
       </View>
 
       {/* Tab Navigation - Show only if no specific tab is requested */}
       {!params.tab && (
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={styles.tab}
-          onPress={() => handleTabChange("faq")}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "faq" && styles.activeTabText,
-            ]}
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            style={styles.tab}
+            onPress={() => handleTabChange("faq")}
           >
-            FAQ
-          </Text>
-          {activeTab === "faq" && <View style={styles.tabIndicator} />}
-        </TouchableOpacity>
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === "faq" && styles.activeTabText,
+              ]}
+            >
+              {t("settings.menu.faq")}
+            </Text>
+            {activeTab === "faq" && <View style={styles.tabIndicator} />}
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.tab}
-          onPress={() => handleTabChange("contact")}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "contact" && styles.activeTabText,
-            ]}
+          <TouchableOpacity
+            style={styles.tab}
+            onPress={() => handleTabChange("contact")}
           >
-            კონტაქტი
-          </Text>
-          {activeTab === "contact" && <View style={styles.tabIndicator} />}
-        </TouchableOpacity>
-      </View>
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === "contact" && styles.activeTabText,
+              ]}
+            >
+              {t("settings.menu.contacts")}
+            </Text>
+            {activeTab === "contact" && <View style={styles.tabIndicator} />}
+          </TouchableOpacity>
+        </View>
       )}
 
       {/* Content */}
@@ -182,41 +188,53 @@ const HelpCenterScreen = () => {
           <View style={styles.faqContainer}>
             {faqs.length === 0 ? (
               <View style={styles.emptyContainer}>
-                <Ionicons name="help-circle-outline" size={48} color="#9CA3AF" />
+                <Ionicons
+                  name="help-circle-outline"
+                  size={48}
+                  color="#9CA3AF"
+                />
                 <Text style={styles.emptyText}>FAQ ჯერ არ არის დამატებული</Text>
               </View>
             ) : (
-              faqs.map((faq, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.faqItem}
-                  onPress={() => toggleFAQ(index)}
-                >
-                  <View style={styles.faqContent}>
-                    <Text style={styles.faqQuestion}>{faq.question}</Text>
-                    {expandedFAQ === index && (
-                      <Text style={styles.faqAnswer}>{faq.answer}</Text>
-                    )}
-                  </View>
-                  <Feather
-                    name={expandedFAQ === index ? "arrow-up" : "arrow-down"}
-                    size={20}
-                    color={expandedFAQ === index ? "#20BEB8" : "#6B7280"}
-                  />
-                </TouchableOpacity>
-              ))
+              faqs.map((faq, index) => {
+                const { question, answer } = getFaqDisplayText(faq, language);
+                return (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.faqItem}
+                    onPress={() => toggleFAQ(index)}
+                  >
+                    <View style={styles.faqContent}>
+                      <Text style={styles.faqQuestion}>{question}</Text>
+                      {expandedFAQ === index && (
+                        <Text style={styles.faqAnswer}>{answer}</Text>
+                      )}
+                    </View>
+                    <Feather
+                      name={expandedFAQ === index ? "arrow-up" : "arrow-down"}
+                      size={20}
+                      color={expandedFAQ === index ? "#20BEB8" : "#6B7280"}
+                    />
+                  </TouchableOpacity>
+                );
+              })
             )}
           </View>
         ) : (
           <View style={styles.contactContainer}>
             {contactInfo.phone && (
-              <TouchableOpacity style={styles.contactItem} onPress={handlePhoneCall}>
+              <TouchableOpacity
+                style={styles.contactItem}
+                onPress={handlePhoneCall}
+              >
                 <View style={styles.contactLeft}>
                   <View style={styles.contactIconContainer}>
                     <Ionicons name="call-outline" size={20} color="#20BEB8" />
                   </View>
                   <View style={styles.contactInfoView}>
-                    <Text style={styles.contactTitle}>ტელეფონი</Text>
+                    <Text style={styles.contactTitle}>
+                      {t("helpCenter.contact.phone")}
+                    </Text>
                     <Text style={styles.contactValue}>{contactInfo.phone}</Text>
                   </View>
                 </View>
@@ -225,14 +243,19 @@ const HelpCenterScreen = () => {
             )}
 
             {contactInfo.whatsapp && (
-              <TouchableOpacity style={styles.contactItem} onPress={handleWhatsApp}>
+              <TouchableOpacity
+                style={styles.contactItem}
+                onPress={handleWhatsApp}
+              >
                 <View style={styles.contactLeft}>
                   <View style={styles.contactIconContainer}>
                     <Ionicons name="logo-whatsapp" size={20} color="#20BEB8" />
                   </View>
                   <View style={styles.contactInfoView}>
                     <Text style={styles.contactTitle}>WhatsApp</Text>
-                    <Text style={styles.contactValue}>{contactInfo.whatsapp}</Text>
+                    <Text style={styles.contactValue}>
+                      {contactInfo.whatsapp}
+                    </Text>
                   </View>
                 </View>
                 <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
@@ -240,13 +263,18 @@ const HelpCenterScreen = () => {
             )}
 
             {contactInfo.email && (
-              <TouchableOpacity style={styles.contactItem} onPress={handleEmail}>
+              <TouchableOpacity
+                style={styles.contactItem}
+                onPress={handleEmail}
+              >
                 <View style={styles.contactLeft}>
                   <View style={styles.contactIconContainer}>
                     <Ionicons name="mail-outline" size={20} color="#20BEB8" />
                   </View>
                   <View style={styles.contactInfoView}>
-                    <Text style={styles.contactTitle}>ელ-ფოსტა</Text>
+                    <Text style={styles.contactTitle}>
+                      {t("helpCenter.contact.email")}
+                    </Text>
                     <Text style={styles.contactValue}>{contactInfo.email}</Text>
                   </View>
                 </View>
@@ -255,14 +283,21 @@ const HelpCenterScreen = () => {
             )}
 
             {contactInfo.website && (
-              <TouchableOpacity style={styles.contactItem} onPress={handleWebsite}>
+              <TouchableOpacity
+                style={styles.contactItem}
+                onPress={handleWebsite}
+              >
                 <View style={styles.contactLeft}>
                   <View style={styles.contactIconContainer}>
                     <Ionicons name="globe-outline" size={20} color="#20BEB8" />
                   </View>
                   <View style={styles.contactInfoView}>
-                    <Text style={styles.contactTitle}>ვებსაიტი</Text>
-                    <Text style={styles.contactValue}>{contactInfo.website}</Text>
+                    <Text style={styles.contactTitle}>
+                      {t("helpCenter.contact.website")}
+                    </Text>
+                    <Text style={styles.contactValue}>
+                      {contactInfo.website}
+                    </Text>
                   </View>
                 </View>
                 <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
@@ -273,11 +308,19 @@ const HelpCenterScreen = () => {
               <View style={styles.contactItem}>
                 <View style={styles.contactLeft}>
                   <View style={styles.contactIconContainer}>
-                    <Ionicons name="location-outline" size={20} color="#20BEB8" />
+                    <Ionicons
+                      name="location-outline"
+                      size={20}
+                      color="#20BEB8"
+                    />
                   </View>
                   <View style={styles.contactInfoView}>
-                    <Text style={styles.contactTitle}>მისამართი</Text>
-                    <Text style={styles.contactValue}>{contactInfo.address}</Text>
+                    <Text style={styles.contactTitle}>
+                      {t("helpCenter.contact.address")}
+                    </Text>
+                    <Text style={styles.contactValue}>
+                      {contactInfo.address}
+                    </Text>
                   </View>
                 </View>
               </View>
@@ -290,19 +333,28 @@ const HelpCenterScreen = () => {
                     <Ionicons name="time-outline" size={20} color="#20BEB8" />
                   </View>
                   <View style={styles.contactInfoView}>
-                    <Text style={styles.contactTitle}>სამუშაო საათები</Text>
-                    <Text style={styles.contactValue}>{contactInfo.workingHours}</Text>
+                    <Text style={styles.contactTitle}>
+                      {t("helpCenter.contact.workingHours")}
+                    </Text>
+                    <Text style={styles.contactValue}>
+                      {contactInfo.workingHours}
+                    </Text>
                   </View>
                 </View>
               </View>
             )}
 
-            {!contactInfo.phone && !contactInfo.whatsapp && !contactInfo.email && !contactInfo.website && (
-              <View style={styles.emptyContainer}>
-                <Ionicons name="call-outline" size={48} color="#9CA3AF" />
-                <Text style={styles.emptyText}>საკონტაქტო ინფორმაცია ჯერ არ არის დამატებული</Text>
-              </View>
-            )}
+            {!contactInfo.phone &&
+              !contactInfo.whatsapp &&
+              !contactInfo.email &&
+              !contactInfo.website && (
+                <View style={styles.emptyContainer}>
+                  <Ionicons name="call-outline" size={48} color="#9CA3AF" />
+                  <Text style={styles.emptyText}>
+                    საკონტაქტო ინფორმაცია ჯერ არ არის დამატებული
+                  </Text>
+                </View>
+              )}
           </View>
         )}
       </ScrollView>

@@ -6,6 +6,7 @@ import {
   parseMisPrintFormDocuments,
 } from "@/lib/mis-print-forms/html";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { Image as ExpoImage } from "expo-image";
 import * as FileSystem from "expo-file-system/legacy";
 import { useFocusEffect, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
@@ -25,6 +26,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import { apiService } from "../_services/api";
 import { useAuth } from "../contexts/AuthContext";
+import { useLanguage } from "../contexts/LanguageContext";
+import {
+  formatAppointmentDateLong,
+  formatAppointmentTime,
+} from "../utils/appointmentDateTime";
 
 function normalizeAppointmentId(raw: unknown): string {
   if (raw == null || raw === "") return "";
@@ -93,11 +99,11 @@ function buildVisitDocumentUrl(
 ): string | null {
   const u = doc?.url;
   if (!u || typeof u !== "string") return null;
-  const t = u.trim();
-  if (!t) return null;
-  if (t.startsWith("http://") || t.startsWith("https://")) return t;
-  if (t.startsWith("//")) return `https:${t}`;
-  const path = t.startsWith("/") ? t.slice(1) : t;
+
+  if (!u) return null;
+  if (u.startsWith("http://") || u.startsWith("https://")) return u;
+  if (u.startsWith("//")) return `https:${u}`;
+  const path = u.startsWith("/") ? u.slice(1) : u;
   return `${baseURL.replace(/\/$/, "")}/${path}`;
 }
 
@@ -121,8 +127,14 @@ function historyVisitHasForm100(visit: {
   );
 }
 
+function isExcludedMedicalExam(test: { productName?: string }): boolean {
+  const name = (test.productName || "").toLowerCase();
+  return name.includes("ხერხემლის სვეტის") || name.includes("rectum");
+}
+
 const History = () => {
   const router = useRouter();
+  const { t, language } = useLanguage();
   const { isAuthenticated, user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedVisit, setSelectedVisit] = useState<any>(null);
@@ -174,13 +186,54 @@ const History = () => {
   const loadedVisitDocIdsRef = useRef<Set<string>>(new Set());
   const inFlightDocVisitIdsRef = useRef<Set<string>>(new Set());
 
+  const formatDisplayDate = (dateStr: string) =>
+    formatAppointmentDateLong(dateStr, language);
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "completed":
+        return t("appointments.status.completed");
+      case "scheduled":
+        return t("appointments.status.scheduled");
+      case "cancelled":
+        return t("appointments.status.cancelled");
+      case "in-progress":
+        return t("appointments.status.inProgress");
+      case "pending":
+        return t("appointments.status.pending");
+      case "confirmed":
+        return t("appointments.status.confirmed");
+      default:
+        return status;
+    }
+  };
+
+  const getConsultationTypeLabelLocalized = (
+    type: string,
+    isFollowUp?: boolean,
+  ) => {
+    if (isFollowUp === true) return t("appointments.type.followUp");
+    switch (type) {
+      case "video":
+        return t("appointments.type.videoConsultation");
+      case "home-visit":
+        return t("appointments.type.homeVisit");
+      case "consultation":
+        return t("appointments.type.consultation");
+      case "emergency":
+        return t("appointments.type.emergency");
+      default:
+        return type;
+    }
+  };
+
   useEffect(() => {
-    if (isAuthenticated && user?.id) {
+    if (isAuthenticated && user?.id && user.role === "patient") {
       loadPastAppointments();
     } else {
       setLoading(false);
     }
-  }, [isAuthenticated, user?.id]);
+  }, [isAuthenticated, user?.id, user?.role]);
 
   const runMisPrintFormsSync = useCallback(() => {
     if (!isAuthenticated || !user?.id || apiService.isMockMode()) return;
@@ -272,9 +325,13 @@ const History = () => {
 
       if (selectedDocumentPreview.html) {
         const htmlPath = `${cacheDir}${safeName || `document_${Date.now()}`}.html`;
-        await FileSystem.writeAsStringAsync(htmlPath, selectedDocumentPreview.html, {
-          encoding: FileSystem.EncodingType.UTF8,
-        });
+        await FileSystem.writeAsStringAsync(
+          htmlPath,
+          selectedDocumentPreview.html,
+          {
+            encoding: FileSystem.EncodingType.UTF8,
+          },
+        );
         await Sharing.shareAsync(htmlPath, {
           dialogTitle: "დოკუმენტის გადმოწერა",
           mimeType: "text/html",
@@ -364,9 +421,14 @@ const History = () => {
           }
         });
 
+        const apiBaseUrl = apiService.getBaseURL();
         const mapped = response.data
           .map((appointment) => {
-            const visit = mapAppointmentToVisit(appointment);
+            const visit = mapAppointmentToVisit(
+              appointment,
+              apiBaseUrl,
+              t("history.unknownDoctor"),
+            );
             console.log("📋 [History] Mapped visit:", {
               id: visit?.id,
               doctorId: visit?.doctorId,
@@ -415,7 +477,7 @@ const History = () => {
       }
     } catch (err: any) {
       console.error("History load failed", err);
-      setError(err.message || "ვიზიტების ჩატვირთვა ვერ მოხერხდა");
+      setError(err.message || t("history.loadError"));
       setVisits([]);
     } finally {
       setLoading(false);
@@ -541,10 +603,13 @@ const History = () => {
     if (visit.form100?.pdfUrl?.trim()) {
       try {
         const url = visit.form100.pdfUrl.trim();
-        openDocumentPreview(url, "ფორმა 100");
+        openDocumentPreview(url, t("history.form100"));
       } catch (e) {
         console.error("Error opening Form 100:", e);
-        Alert.alert("შეცდომა", "PDF ფაილის გახსნა ვერ მოხერხდა");
+        Alert.alert(
+          t("appointments.common.error"),
+          t("history.form100.pdfOpenFailed"),
+        );
       }
       return;
     }
@@ -552,7 +617,7 @@ const History = () => {
     const freshVisit = await refreshVisitMisState(visit);
 
     if (!historyVisitHasForm100(freshVisit)) {
-      Alert.alert("ინფორმაცია", "ფორმა 100 ჯერ არ არის ხელმისაწვდომი.");
+      Alert.alert(t("common.info"), t("history.form100.notAvailable"));
       return;
     }
 
@@ -560,7 +625,10 @@ const History = () => {
     try {
       const mis = await apiService.getMisPrintForms(id, true);
       if (!mis.success || !mis.data) {
-        Alert.alert("შეცდომა", "HIS ფორმები ვერ ჩაიტვირთა");
+        Alert.alert(
+          t("appointments.common.error"),
+          t("history.form100.hisLoadFailed"),
+        );
         return;
       }
       const d = mis.data;
@@ -584,7 +652,7 @@ const History = () => {
         }
 
         if (htmlForPdf) {
-          await openHtmlAsPdfPreview(htmlForPdf, "ფორმა 100");
+          await openHtmlAsPdfPreview(htmlForPdf, t("history.form100"));
           return;
         }
       }
@@ -607,10 +675,7 @@ const History = () => {
         formIndex = freshVisit.misForm100PrintFormIndex;
       }
       if (formIndex == null) {
-        Alert.alert(
-          "ინფორმაცია",
-          "ფორმა IV–100-ის მონაცემი ვერ მოიძებნა. სთხოვეთ ექიმს ერთხელ მაინც გახსნას ამ ჯავშნის HIS ფორმები აპში, შემდეგ სცადეთ თავიდან.",
-        );
+        Alert.alert(t("common.info"), t("history.form100.dataNotFound"));
         return;
       }
       const dl = await apiService.downloadMisPrintFormPdf(id, {
@@ -618,14 +683,20 @@ const History = () => {
         refetch: true,
       });
       if (dl.success && dl.uri) {
-        openDocumentPreview(dl.uri, "ფორმა 100");
+        openDocumentPreview(dl.uri, t("history.form100"));
       } else {
-        Alert.alert("შეცდომა", "PDF-ის ჩამოტვირთვა ვერ მოხერხდა");
+        Alert.alert(
+          t("appointments.common.error"),
+          t("history.form100.pdfDownloadFailed"),
+        );
       }
     } catch (e: unknown) {
       console.error("[History] Form 100 HIS/PDF:", e);
       const msg = e instanceof Error ? e.message : String(e);
-      Alert.alert("შეცდომა", msg || "ფორმა 100 ვერ გაიხსნა");
+      Alert.alert(
+        t("appointments.common.error"),
+        msg || t("history.form100.openFailed"),
+      );
     } finally {
       setOpeningForm100VisitId(null);
     }
@@ -638,10 +709,7 @@ const History = () => {
     const freshVisit = await refreshVisitMisState(visit);
 
     if (!freshVisit.misForm100AvailableAt?.trim?.()) {
-      Alert.alert(
-        "ინფორმაცია",
-        "კალკულაცია ხელმისაწვდომია მხოლოდ HIS-ზე დადასტურებული ვიზიტისთვის.",
-      );
+      Alert.alert(t("common.info"), t("history.calculation.hisOnly"));
       return;
     }
 
@@ -649,7 +717,10 @@ const History = () => {
     try {
       const mis = await apiService.getMisPrintForms(id, true);
       if (!mis.success || !mis.data) {
-        Alert.alert("შეცდომა", "HIS ფორმები ვერ ჩაიტვირთა");
+        Alert.alert(
+          t("appointments.common.error"),
+          t("history.form100.hisLoadFailed"),
+        );
         return;
       }
       const d = mis.data;
@@ -672,19 +743,19 @@ const History = () => {
         }
 
         if (htmlForPdf) {
-          await openHtmlAsPdfPreview(htmlForPdf, "კალკულაცია");
+          await openHtmlAsPdfPreview(htmlForPdf, t("history.calculation"));
           return;
         }
       }
 
-      Alert.alert(
-        "ინფორმაცია",
-        "კალკულაცია ამ ვიზიტისთვის ვერ მოიძებნა ან ჯერ არ არის HIS-ში.",
-      );
+      Alert.alert(t("common.info"), t("history.calculation.notFound"));
     } catch (e: unknown) {
       console.error("[History] MIS calculation:", e);
       const msg = e instanceof Error ? e.message : String(e);
-      Alert.alert("შეცდომა", msg || "კალკულაცია ვერ გაიხსნა");
+      Alert.alert(
+        t("appointments.common.error"),
+        msg || t("history.calculation.openFailed"),
+      );
     } finally {
       setOpeningMisCalcVisitId(null);
     }
@@ -798,10 +869,8 @@ const History = () => {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>ისტორია</Text>
-          <Text style={styles.subtitle}>
-            დასრულებული ან გასული ვიზიტები ავტომატურად გადმოდის აქ
-          </Text>
+          <Text style={styles.title}>{t("history.tab.title")}</Text>
+          <Text style={styles.subtitle}>{t("history.tab.subtitle")}</Text>
         </View>
 
         {/* Search */}
@@ -809,34 +878,36 @@ const History = () => {
         {/* Visits List */}
         <View style={styles.listSection}>
           <Text style={styles.sectionTitle}>
-            {filteredVisits.length} ვიზიტი
+            {filteredVisits.length} {t("history.visitCount")}
           </Text>
 
           {loading ? (
             <View style={styles.loadingState}>
               <ActivityIndicator size="large" color="#06B6D4" />
-              <Text style={styles.loadingText}>
-                იტვირთება ვიზიტების ისტორია...
-              </Text>
+              <Text style={styles.loadingText}>{t("history.loading")}</Text>
             </View>
           ) : error ? (
             <View style={styles.emptyState}>
               <Ionicons name="alert-circle" size={64} color="#F87171" />
-              <Text style={styles.emptyStateTitle}>ვერ ჩაიტვირთა</Text>
+              <Text style={styles.emptyStateTitle}>
+                {t("history.errorTitle")}
+              </Text>
               <Text style={styles.emptyStateText}>{error}</Text>
               <TouchableOpacity
                 style={styles.retryButton}
                 onPress={loadPastAppointments}
               >
-                <Text style={styles.retryButtonText}>თავიდან ცდა</Text>
+                <Text style={styles.retryButtonText}>{t("history.retry")}</Text>
               </TouchableOpacity>
             </View>
           ) : filteredVisits.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="medical-outline" size={64} color="#D1D5DB" />
-              <Text style={styles.emptyStateTitle}>ვიზიტები ვერ მოიძებნა</Text>
+              <Text style={styles.emptyStateTitle}>
+                {t("history.notFound.title")}
+              </Text>
               <Text style={styles.emptyStateText}>
-                როგორც კი ვიზიტი დასრულდება, ავტომატურად გადმოვა აქ
+                {t("history.notFound.hint")}
               </Text>
             </View>
           ) : (
@@ -850,7 +921,19 @@ const History = () => {
                     <View style={styles.visitHeader}>
                       <View style={styles.doctorInfo}>
                         <View style={styles.avatarContainer}>
-                          <Ionicons name="medical" size={24} color="#06B6D4" />
+                          {visit.doctorImage ? (
+                            <ExpoImage
+                              source={visit.doctorImage}
+                              style={styles.doctorAvatarImage}
+                              contentFit="cover"
+                            />
+                          ) : (
+                            <Ionicons
+                              name="medical"
+                              size={24}
+                              color="#06B6D4"
+                            />
+                          )}
                         </View>
                         <View style={styles.doctorDetails}>
                           <View style={styles.doctorNameRow}>
@@ -859,7 +942,7 @@ const History = () => {
                             </Text>
                           </View>
                           <Text style={styles.doctorSpecialty}>
-                            {visit.doctorSpecialty || "სპეციალისტი"}
+                            {visit.doctorSpecialty || t("history.specialist")}
                           </Text>
                         </View>
                       </View>
@@ -889,7 +972,7 @@ const History = () => {
                             },
                           ]}
                         >
-                          {visit.statusLabel || "დასრულებული"}
+                          {getStatusLabel(visit.status)}
                         </Text>
                       </View>
                     </View>
@@ -900,7 +983,9 @@ const History = () => {
                       activeOpacity={0.7}
                     >
                       <Text style={styles.expandDetailsButtonText}>
-                        {isExpanded ? "დეტალების დაფარვა" : "დეტალების ნახვა"}
+                        {isExpanded
+                          ? t("history.card.hide")
+                          : t("history.card.more")}
                       </Text>
                       <Ionicons
                         name={isExpanded ? "chevron-up" : "chevron-down"}
@@ -910,26 +995,33 @@ const History = () => {
                     </TouchableOpacity>
 
                     <View style={styles.visitBody}>
-                      <View style={styles.infoRow}>
-                        <Ionicons
-                          name="calendar-outline"
-                          size={16}
-                          color="#6B7280"
-                        />
-                        <Text style={styles.infoText}>{visit.date}</Text>
-                      </View>
-                      {visit.appointmentTime && (
+                      <View style={styles.dateTimeRow}>
                         <View style={styles.infoRow}>
                           <Ionicons
-                            name="time-outline"
+                            name="calendar-outline"
                             size={16}
                             color="#6B7280"
                           />
                           <Text style={styles.infoText}>
-                            {visit.appointmentTime}
+                            {formatDisplayDate(visit.date)}
                           </Text>
                         </View>
-                      )}
+                        {visit.appointmentTime ? (
+                          <>
+                            <Text style={styles.dateTimeSeparator}>•</Text>
+                            <View style={styles.infoRow}>
+                              <Ionicons
+                                name="time-outline"
+                                size={16}
+                                color="#6B7280"
+                              />
+                              <Text style={styles.infoText}>
+                                {formatAppointmentTime(visit.appointmentTime)}
+                              </Text>
+                            </View>
+                          </>
+                        ) : null}
+                      </View>
                       {visit.consultationType && (
                         <View style={styles.infoRow}>
                           <Ionicons
@@ -938,59 +1030,13 @@ const History = () => {
                             color="#6B7280"
                           />
                           <Text style={styles.infoText}>
-                            {getConsultationTypeLabel(
+                            {getConsultationTypeLabelLocalized(
                               visit.consultationType,
                               (visit as any).isFollowUp,
                             )}
                           </Text>
                         </View>
                       )}
-                      {/* Tests Indicator - Always visible */}
-                      {(() => {
-                        const instrumentalBooked =
-                          visit.instrumentalTests?.filter((t: any) => t.booked)
-                            .length || 0;
-                        const laboratoryBooked =
-                          visit.laboratoryTests?.filter((t: any) => t.booked)
-                            .length || 0;
-                        const totalBooked =
-                          instrumentalBooked + laboratoryBooked;
-
-                        const instrumentalTotal =
-                          visit.instrumentalTests?.length || 0;
-                        const laboratoryTotal =
-                          visit.laboratoryTests?.length || 0;
-                        const totalAssigned =
-                          instrumentalTotal + laboratoryTotal;
-
-                        if (totalAssigned > 0) {
-                          return (
-                            <View style={styles.infoRow}>
-                              <Ionicons
-                                name="flask-outline"
-                                size={16}
-                                color="#10B981"
-                              />
-                              <Text style={styles.infoText}>
-                                დაჯავშნილი:{" "}
-                                <Text style={styles.bookedCountText}>
-                                  {totalBooked}
-                                </Text>
-                                {totalAssigned > totalBooked && (
-                                  <>
-                                    {" "}
-                                    • დანიშნული:{" "}
-                                    <Text style={styles.assignedCountText}>
-                                      {totalAssigned}
-                                    </Text>
-                                  </>
-                                )}
-                              </Text>
-                            </View>
-                          );
-                        }
-                        return null;
-                      })()}
                       {visitDocs.length > 0 && (
                         <View style={styles.infoRow}>
                           <Ionicons
@@ -999,7 +1045,7 @@ const History = () => {
                             color="#0EA5E9"
                           />
                           <Text style={[styles.infoText, { color: "#0EA5E9" }]}>
-                            {visitDocs.length} ფაილი ატვირთულია
+                            {visitDocs.length} {t("history.fileUploaded")}
                           </Text>
                         </View>
                       )}
@@ -1049,7 +1095,9 @@ const History = () => {
                               color="#10B981"
                             />
                           )}
-                          <Text style={styles.actionButtonText}>ფორმა 100</Text>
+                          <Text style={styles.actionButtonText}>
+                            {t("history.form100")}
+                          </Text>
                           <Ionicons
                             name="chevron-forward"
                             size={16}
@@ -1077,7 +1125,7 @@ const History = () => {
                               />
                             )}
                             <Text style={styles.actionButtonText}>
-                              კალკულაცია
+                              {t("history.calculation")}
                             </Text>
                             <Ionicons
                               name="chevron-forward"
@@ -1102,7 +1150,7 @@ const History = () => {
                             color="#8B5CF6"
                           />
                           <Text style={styles.actionButtonText}>
-                            დანიშნულება
+                            {t("history.prescription")}
                           </Text>
                           <Ionicons
                             name="chevron-forward"
@@ -1130,7 +1178,7 @@ const History = () => {
                             />
                             <View style={styles.followUpRequiredContent}>
                               <Text style={styles.followUpRequiredTitle}>
-                                საჭიროა განმეორებითი ვიზიტი
+                                {t("history.followUpRequired")}
                               </Text>
                               {visit.followUp.reason && (
                                 <Text style={styles.followUpRequiredReason}>
@@ -1152,13 +1200,13 @@ const History = () => {
                     <View style={styles.expandedSection}>
                       <View style={styles.detailSection}>
                         <Text style={styles.detailSectionTitle}>
-                          დოკუმენტები
+                          {t("history.uploadedFiles")}
                         </Text>
                         {loadingDocVisitId === visit.id ? (
                           <View style={styles.visitDocsLoading}>
                             <ActivityIndicator size="small" color="#0EA5E9" />
                             <Text style={styles.visitDocsLoadingText}>
-                              იტვირთება...
+                              {t("history.docsLoading")}
                             </Text>
                           </View>
                         ) : visitDocs.length > 0 ? (
@@ -1194,7 +1242,8 @@ const History = () => {
                                     style={styles.uploadedDocName}
                                     numberOfLines={1}
                                   >
-                                    {doc.name || "დოკუმენტი"}
+                                    {doc.name ||
+                                      t("appointments.documents.defaultName")}
                                   </Text>
                                   {url ? (
                                     <Ionicons
@@ -1209,182 +1258,132 @@ const History = () => {
                           </View>
                         ) : (
                           <Text style={styles.visitDocsEmpty}>
-                            ამ ვიზიტზე დოკუმენტები არ არის
+                            {t("history.docsEmpty")}
                           </Text>
                         )}
                       </View>
 
-                      {visit.instrumentalTests &&
-                        visit.instrumentalTests.length > 0 && (
+                      {(() => {
+                        const medicalExams = [
+                          ...(visit.instrumentalTests || []).map(
+                            (test: any) => ({
+                              ...test,
+                              examKind: "instrumental" as const,
+                            }),
+                          ),
+                          ...(visit.laboratoryTests || []).map((test: any) => ({
+                            ...test,
+                            examKind: "laboratory" as const,
+                          })),
+                        ].filter((test) => !isExcludedMedicalExam(test));
+
+                        if (medicalExams.length === 0) return null;
+
+                        return (
                           <View style={styles.detailSection}>
                             <Text style={styles.detailSectionTitle}>
-                              დანიშნული ინსტრუმენტული კვლევები
+                              {t("history.medicalExams")}
                             </Text>
-                            {visit.instrumentalTests.map(
-                              (test: any, index: number) => (
-                                <View key={index} style={styles.testCard}>
-                                  <View style={styles.testHeader}>
-                                    <Ionicons
-                                      name="pulse-outline"
-                                      size={18}
-                                      color="#8B5CF6"
-                                    />
-                                    <View style={styles.testInfo}>
-                                      <Text style={styles.testName}>
-                                        {test.productName}
+                            {medicalExams.map((test: any, index: number) => (
+                              <View
+                                key={`${test.productId || test.productName}-${index}`}
+                                style={styles.testCard}
+                              >
+                                <View style={styles.testHeader}>
+                                  <Ionicons
+                                    name={
+                                      test.examKind === "instrumental"
+                                        ? "pulse-outline"
+                                        : "flask-outline"
+                                    }
+                                    size={18}
+                                    color={
+                                      test.examKind === "instrumental"
+                                        ? "#8B5CF6"
+                                        : "#06B6D4"
+                                    }
+                                  />
+                                  <View style={styles.testInfo}>
+                                    <Text style={styles.testName}>
+                                      {test.productName}
+                                    </Text>
+                                    {test.clinicName && (
+                                      <Text style={styles.testNotes}>
+                                        {t("appointments.tests.clinic")}:{" "}
+                                        {test.clinicName}
                                       </Text>
-                                      {test.clinicName && (
-                                        <Text style={styles.testNotes}>
-                                          კლინიკა: {test.clinicName}
-                                        </Text>
-                                      )}
-                                      {test.notes && (
-                                        <Text style={styles.testNotes}>
-                                          შენიშვნა: {test.notes}
-                                        </Text>
-                                      )}
-                                    </View>
+                                    )}
+                                    {test.notes && (
+                                      <Text style={styles.testNotes}>
+                                        {t("appointments.tests.note")}:{" "}
+                                        {test.notes}
+                                      </Text>
+                                    )}
                                   </View>
-                                  {test.booked && (
-                                    <View style={styles.bookedBadge}>
-                                      <Ionicons
-                                        name="checkmark-circle"
-                                        size={16}
-                                        color="#10B981"
-                                      />
-                                      <Text style={styles.bookedBadgeText}>
-                                        დაჯავშნილია
-                                      </Text>
-                                    </View>
-                                  )}
-                                  {test.resultFile && (
-                                    <TouchableOpacity
-                                      style={styles.viewResultButton}
-                                      onPress={async (e) => {
-                                        e.stopPropagation();
-                                        if (test.resultFile?.url) {
-                                          const url = test.resultFile.url;
-                                          const isPdf =
-                                            test.resultFile.type ===
-                                              "application/pdf" ||
-                                            url.endsWith(".pdf");
-
-                                          if (isPdf) {
-                                            const googleDocsUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=false`;
-                                            openDocumentPreview(
-                                              googleDocsUrl,
-                                              test.resultFile?.name,
-                                            );
-                                          } else {
-                                            openDocumentPreview(
-                                              url,
-                                              test.resultFile?.name,
-                                            );
-                                          }
-                                        }
-                                      }}
-                                    >
-                                      <Ionicons
-                                        name="document-text-outline"
-                                        size={16}
-                                        color="#8B5CF6"
-                                      />
-                                      <Text style={styles.viewResultButtonText}>
-                                        შედეგის ნახვა
-                                      </Text>
-                                    </TouchableOpacity>
-                                  )}
                                 </View>
-                              ),
-                            )}
-                          </View>
-                        )}
-
-                      {/* Laboratory Tests */}
-                      {visit.laboratoryTests &&
-                        visit.laboratoryTests.length > 0 && (
-                          <View style={styles.detailSection}>
-                            <Text style={styles.detailSectionTitle}>
-                              დანიშნული ლაბორატორიული კვლევები
-                            </Text>
-                            {visit.laboratoryTests.map(
-                              (test: any, index: number) => (
-                                <View key={index} style={styles.testCard}>
-                                  <View style={styles.testHeader}>
+                                {test.booked && (
+                                  <View style={styles.bookedBadge}>
                                     <Ionicons
-                                      name="flask-outline"
-                                      size={18}
-                                      color="#06B6D4"
+                                      name="checkmark-circle"
+                                      size={16}
+                                      color="#10B981"
                                     />
-                                    <View style={styles.testInfo}>
-                                      <Text style={styles.testName}>
-                                        {test.productName}
-                                      </Text>
-                                      {test.clinicName && (
-                                        <Text style={styles.testNotes}>
-                                          კლინიკა: {test.clinicName}
-                                        </Text>
-                                      )}
-                                    </View>
+                                    <Text style={styles.bookedBadgeText}>
+                                      {t("history.booked")}
+                                    </Text>
                                   </View>
-                                  {test.booked && (
-                                    <View style={styles.bookedBadge}>
-                                      <Ionicons
-                                        name="checkmark-circle"
-                                        size={16}
-                                        color="#10B981"
-                                      />
-                                      <Text style={styles.bookedBadgeText}>
-                                        დაჯავშნილია
-                                      </Text>
-                                    </View>
-                                  )}
-                                  {test.resultFile && (
-                                    <TouchableOpacity
-                                      style={styles.viewResultButton}
-                                      onPress={async (e) => {
-                                        e.stopPropagation();
-                                        if (test.resultFile?.url) {
-                                          const url = test.resultFile.url;
-                                          const isPdf =
-                                            test.resultFile.type ===
-                                              "application/pdf" ||
-                                            url.endsWith(".pdf");
+                                )}
+                                {test.resultFile && (
+                                  <TouchableOpacity
+                                    style={styles.viewResultButton}
+                                    onPress={async (e) => {
+                                      e.stopPropagation();
+                                      if (test.resultFile?.url) {
+                                        const url = test.resultFile.url;
+                                        const isPdf =
+                                          test.resultFile.type ===
+                                            "application/pdf" ||
+                                          url.endsWith(".pdf");
 
-                                          if (isPdf) {
-                                            const googleDocsUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=false`;
-                                            openDocumentPreview(
-                                              googleDocsUrl,
-                                              test.resultFile?.name,
-                                            );
-                                          } else {
-                                            openDocumentPreview(
-                                              url,
-                                              test.resultFile?.name,
-                                            );
-                                          }
+                                        if (isPdf) {
+                                          const googleDocsUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=false`;
+                                          openDocumentPreview(
+                                            googleDocsUrl,
+                                            test.resultFile?.name,
+                                          );
+                                        } else {
+                                          openDocumentPreview(
+                                            url,
+                                            test.resultFile?.name,
+                                          );
                                         }
-                                      }}
-                                    >
-                                      <Ionicons
-                                        name="document-text-outline"
-                                        size={16}
-                                        color="#06B6D4"
-                                      />
-                                      <Text style={styles.viewResultButtonText}>
-                                        შედეგის ნახვა
-                                      </Text>
-                                    </TouchableOpacity>
-                                  )}
-                                </View>
-                              ),
-                            )}
+                                      }
+                                    }}
+                                  >
+                                    <Ionicons
+                                      name="document-text-outline"
+                                      size={16}
+                                      color={
+                                        test.examKind === "instrumental"
+                                          ? "#8B5CF6"
+                                          : "#06B6D4"
+                                      }
+                                    />
+                                    <Text style={styles.viewResultButtonText}>
+                                      {t("history.viewResult")}
+                                    </Text>
+                                  </TouchableOpacity>
+                                )}
+                              </View>
+                            ))}
                           </View>
-                        )}
+                        );
+                      })()}
+
                       {visit.notes && (
                         <View style={styles.detailSection}>
                           <Text style={styles.detailSectionTitle}>
-                            შენიშვნები
+                            {t("history.doctorRecommendation")}
                           </Text>
                           <View style={styles.notesCard}>
                             <Ionicons
@@ -1418,7 +1417,8 @@ const History = () => {
           <View style={styles.documentPreviewModalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {selectedDocumentPreview?.name || "დოკუმენტის ნახვა"}
+                {selectedDocumentPreview?.name ||
+                  t("appointments.documents.viewTitle")}
               </Text>
               <View style={styles.previewHeaderActions}>
                 <TouchableOpacity
@@ -1430,8 +1430,14 @@ const History = () => {
                     <ActivityIndicator size="small" color="#FFFFFF" />
                   ) : (
                     <>
-                      <Ionicons name="download-outline" size={16} color="#FFFFFF" />
-                      <Text style={styles.downloadButtonText}>გადმოწერა</Text>
+                      <Ionicons
+                        name="download-outline"
+                        size={16}
+                        color="#FFFFFF"
+                      />
+                      <Text style={styles.downloadButtonText}>
+                        {t("appointments.documents.download")}
+                      </Text>
                     </>
                   )}
                 </TouchableOpacity>
@@ -1470,7 +1476,7 @@ const History = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>დიაგნოზი</Text>
+              <Text style={styles.modalTitle}>{t("history.diagnosis")}</Text>
               <TouchableOpacity
                 onPress={() => setShowDiagnosisModal(false)}
                 style={styles.closeButton}
@@ -1488,7 +1494,9 @@ const History = () => {
                 style={styles.modalButton}
                 onPress={() => setShowDiagnosisModal(false)}
               >
-                <Text style={styles.modalButtonText}>დახურვა</Text>
+                <Text style={styles.modalButtonText}>
+                  {t("common.actions.close")}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1505,7 +1513,7 @@ const History = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>დანიშნულება</Text>
+              <Text style={styles.modalTitle}>{t("history.prescription")}</Text>
               <TouchableOpacity
                 onPress={() => setShowPrescriptionModal(false)}
                 style={styles.closeButton}
@@ -1564,7 +1572,7 @@ const History = () => {
                   ))
                 ) : (
                   <Text style={styles.detailValue}>
-                    დანიშნულება არ არის მითითებული
+                    {t("history.prescriptionEmpty")}
                   </Text>
                 )}
               </View>
@@ -1574,7 +1582,9 @@ const History = () => {
                 style={styles.modalButton}
                 onPress={() => setShowPrescriptionModal(false)}
               >
-                <Text style={styles.modalButtonText}>დახურვა</Text>
+                <Text style={styles.modalButtonText}>
+                  {t("common.actions.close")}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1584,31 +1594,11 @@ const History = () => {
   );
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  completed: "დასრულებული",
-  cancelled: "გაუქმებული",
-  "in-progress": "მიმდინარე",
-  scheduled: "დანიშნული",
-  pending: "მოლოდინში",
-};
-
-const getConsultationTypeLabel = (type: string, isFollowUp?: boolean) => {
-  if (isFollowUp === true) return "განმეორებითი";
-  switch (type) {
-    case "video":
-      return "ვიდეო კონსულტაცია";
-    case "home-visit":
-      return "ბინაზე ვიზიტი";
-    case "consultation":
-      return "კონსულტაცია";
-    case "emergency":
-      return "სასწრაფო";
-    default:
-      return type;
-  }
-};
-
-const mapAppointmentToVisit = (appointment: any) => {
+const mapAppointmentToVisit = (
+  appointment: any,
+  apiBaseUrl: string,
+  doctorFallback: string,
+) => {
   if (!appointment) {
     return null;
   }
@@ -1694,14 +1684,28 @@ const mapAppointmentToVisit = (appointment: any) => {
 
   const status = appointment.status || "scheduled";
 
+  let doctorImage: { uri: string } | number;
+  if (doctor.profileImage) {
+    if (doctor.profileImage.startsWith("http")) {
+      doctorImage = { uri: doctor.profileImage };
+    } else {
+      doctorImage = {
+        uri: `${apiBaseUrl.replace(/\/$/, "")}/${doctor.profileImage.replace(/^\//, "")}`,
+      };
+    }
+  } else {
+    doctorImage = require("@/assets/images/doctors/doctor1.png");
+  }
+
   const visit = {
     id:
       normalizeAppointmentId(appointment._id) ||
       normalizeAppointmentId(appointment.id) ||
       Math.random().toString(36).slice(2),
     doctorId: doctorId,
-    doctorName: doctor?.name || "უცნობი ექიმი",
+    doctorName: doctor?.name || doctorFallback,
     doctorSpecialty: doctor?.specialization || doctor?.speciality || "",
+    doctorImage,
     date: appointmentDate,
     appointmentDate,
     appointmentTime: appointment.appointmentTime || appointment.time || "",
@@ -1734,7 +1738,6 @@ const mapAppointmentToVisit = (appointment: any) => {
     laboratoryTests: appointment.laboratoryTests || [],
     instrumentalTests: appointment.instrumentalTests || [],
     status,
-    statusLabel: STATUS_LABELS[status],
   };
 
   console.log("📋 History - mapAppointmentToVisit - returning visit:", {
@@ -1976,6 +1979,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#06B6D410",
     justifyContent: "center",
     alignItems: "center",
+    overflow: "hidden",
+  },
+  doctorAvatarImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
   },
   doctorDetails: {
     flex: 1,
@@ -2108,6 +2117,17 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#F3F4F6",
+  },
+  dateTimeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  dateTimeSeparator: {
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#9CA3AF",
   },
   infoRow: {
     flexDirection: "row",

@@ -11,6 +11,18 @@ export class FAQItem {
   @Prop({ required: true })
   answer: string;
 
+  @Prop()
+  questionEn?: string;
+
+  @Prop()
+  answerEn?: string;
+
+  @Prop()
+  questionRu?: string;
+
+  @Prop()
+  answerRu?: string;
+
   @Prop({ default: true })
   isActive: boolean;
 

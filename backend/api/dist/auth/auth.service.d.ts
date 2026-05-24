@@ -117,6 +117,7 @@ export declare class AuthService {
         success: boolean;
         message: string;
     }>;
+    private resolveUserIdFromRefreshTokenDoc;
     private generateTokens;
     private generateDevTokens;
     forgotPassword(forgotPasswordDto: ForgotPasswordDto): Promise<{

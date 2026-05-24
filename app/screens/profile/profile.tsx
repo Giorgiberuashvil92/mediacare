@@ -9,15 +9,17 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { apiService } from "../../_services/api";
 import { useAuth } from "../../contexts/AuthContext";
+import { useLanguage } from "../../contexts/LanguageContext";
 import { showToast } from "../../utils/toast";
 
 export default function ProfileScreen() {
   const { user, logout, isAuthenticated } = useAuth();
+  const { t } = useLanguage();
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [identificationDocumentUrl, setIdentificationDocumentUrl] = useState<
     string | null
@@ -288,7 +290,7 @@ export default function ProfileScreen() {
             <View style={styles.menuIconContainer}>
               <Ionicons name="call-outline" size={20} color="#10B981" />
             </View>
-            <Text style={styles.menuText}>კონტაქტები</Text>
+            <Text style={styles.menuText}>{t("settings.menu.contacts")}</Text>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity>
 

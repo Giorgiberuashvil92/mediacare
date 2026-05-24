@@ -2,7 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   BackHandler,
@@ -20,9 +20,12 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   MedicineShopOverview,
+  ShopCategory,
   ShopProduct,
   apiService,
 } from "../_services/api";
+import { useLanguage } from "../contexts/LanguageContext";
+import { getLabDisplayName } from "../utils/labLabel";
 
 const fallbackOverview: MedicineShopOverview = {
   laboratoryCategories: [],
@@ -31,7 +34,14 @@ const fallbackOverview: MedicineShopOverview = {
   equipmentProducts: [],
 };
 
+const getLabSearchText = (product: ShopProduct) =>
+  [product.name, product.nameEn, product.nameRu, product.description]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
 const Lab = () => {
+  const { t, language } = useLanguage();
   const params = useLocalSearchParams<{ tab?: string }>();
   const [overview, setOverview] = useState<MedicineShopOverview | null>(null);
   const [loading, setLoading] = useState(true);
@@ -43,9 +53,24 @@ const Lab = () => {
   );
   const [keyboardVisible, setKeyboardVisible] = useState(false);
 
+  const loadOverview = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await apiService.getMedicineShopOverview();
+      setOverview(response.data);
+    } catch (err) {
+      console.error("Laboratory load failed", err);
+      setError(t("patient.lab.loadError"));
+      setOverview(fallbackOverview);
+    } finally {
+      setLoading(false);
+    }
+  }, [t]);
+
   useEffect(() => {
-    loadOverview();
-  }, []);
+    void loadOverview();
+  }, [loadOverview]);
 
   useEffect(() => {
     if (params.tab === "laboratory") {
@@ -59,7 +84,6 @@ const Lab = () => {
     }
   }, [params.tab]);
 
-  // უკან ღილაკზე კლავიატურის დახურვა (Android)
   useEffect(() => {
     const showSub = Keyboard.addListener(
       Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
@@ -86,21 +110,6 @@ const Lab = () => {
     };
   }, [keyboardVisible]);
 
-  const loadOverview = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await apiService.getMedicineShopOverview();
-      setOverview(response.data);
-    } catch (err) {
-      console.error("Laboratory load failed", err);
-      setError("მონაცემების ჩატვირთვა ვერ მოხერხდა");
-      setOverview(fallbackOverview);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const {
     laboratoryProducts,
     laboratoryCategories,
@@ -108,7 +117,6 @@ const Lab = () => {
     equipmentCategories,
   } = overview || fallbackOverview;
 
-  // Determine which products to show based on active tab
   const currentProducts =
     (activeTab === "laboratory" ? laboratoryProducts : equipmentProducts) || [];
 
@@ -116,11 +124,20 @@ const Lab = () => {
     (activeTab === "laboratory" ? laboratoryCategories : equipmentCategories) ||
     [];
 
+  const getCategoryDisplayName = (category: ShopCategory) =>
+    getLabDisplayName(
+      {
+        name: category.name,
+        nameEn: category.nameEn,
+        nameRu: category.nameRu,
+      },
+      language,
+      t,
+    );
+
   const filteredProducts = currentProducts.filter((product) => {
-    const matchesSearch =
-      !searchQuery ||
-      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      product.description?.toLowerCase().includes(searchQuery.toLowerCase());
+    const query = searchQuery.toLowerCase();
+    const matchesSearch = !query || getLabSearchText(product).includes(query);
     const matchesCategory =
       !selectedCategory || product.category === selectedCategory;
     return matchesSearch && matchesCategory;
@@ -131,7 +148,7 @@ const Lab = () => {
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#06B6D4" />
-          <Text style={styles.loadingText}>იტვირთება...</Text>
+          <Text style={styles.loadingText}>{t("patient.lab.loading")}</Text>
         </View>
       </SafeAreaView>
     );
@@ -141,7 +158,6 @@ const Lab = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header with Gradient */}
       <LinearGradient
         colors={["#06B6D4", "#0891B2"]}
         start={{ x: 0, y: 0 }}
@@ -150,9 +166,9 @@ const Lab = () => {
       >
         <View style={styles.headerContent}>
           <View>
-            <Text style={styles.headerTitle}>დიაგნოსტიკური კვლევები </Text>
+            <Text style={styles.headerTitle}>{t("patient.lab.title")}</Text>
             <Text style={styles.headerSubtitle}>
-              ანალიზები და ლაბორატორიული ტესტები
+              {t("patient.lab.subtitle")}
             </Text>
           </View>
           <View style={styles.headerIconContainer}>
@@ -166,11 +182,11 @@ const Lab = () => {
           <View style={styles.centralBanner}>
             <Text style={styles.centralBannerText}>
               {activeTab === "laboratory"
-                ? "ეს ფუნქცია მალე დაემატება — შეძლებ ლაბორატორიული კვლევის სახლში გამოძახებას"
-                : "ეს ფუნქცია მალე დაემატება — შეძლებ ინსტრუმენტული კვლევის კლინიკაში დაჯავშნას"}
+                ? t("patient.lab.banner.laboratory")
+                : t("patient.lab.banner.instrumental")}
             </Text>
           </View>
-          {/* Tabs */}
+
           <View style={styles.tabsContainer}>
             <TouchableOpacity
               style={[
@@ -188,7 +204,7 @@ const Lab = () => {
                   activeTab === "laboratory" && styles.tabTextActive,
                 ]}
               >
-                ლაბორატორიული
+                {t("patient.lab.tabLaboratory")}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -207,12 +223,11 @@ const Lab = () => {
                   activeTab === "immunological" && styles.tabTextActive,
                 ]}
               >
-                ინსტრუმენტული
+                {t("patient.lab.tabInstrumental")}
               </Text>
             </TouchableOpacity>
           </View>
 
-          {/* Search Bar */}
           <View style={styles.searchContainer}>
             <View style={styles.searchBar}>
               <Ionicons
@@ -223,7 +238,7 @@ const Lab = () => {
               />
               <TextInput
                 style={styles.searchInput}
-                placeholder="მოძებნე ანალიზი..."
+                placeholder={t("patient.lab.searchPlaceholder")}
                 placeholderTextColor="#94A3B8"
                 value={searchQuery}
                 onChangeText={setSearchQuery}
@@ -236,7 +251,6 @@ const Lab = () => {
             </View>
           </View>
 
-          {/* Categories Filter */}
           {currentCategories && currentCategories.length > 0 && (
             <View style={styles.categoriesContainer}>
               <ScrollView
@@ -257,7 +271,7 @@ const Lab = () => {
                       !selectedCategory && styles.categoryChipTextActive,
                     ]}
                   >
-                    ყველა
+                    {t("patient.lab.all")}
                   </Text>
                 </TouchableOpacity>
                 {currentCategories.map((category) => (
@@ -277,7 +291,7 @@ const Lab = () => {
                           styles.categoryChipTextActive,
                       ]}
                     >
-                      {String(category.name || "")}
+                      {getCategoryDisplayName(category)}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -285,7 +299,6 @@ const Lab = () => {
             </View>
           )}
 
-          {/* Products List */}
           {error && (
             <View style={styles.errorContainer}>
               <Ionicons name="alert-circle-outline" size={24} color="#EF4444" />
@@ -294,7 +307,9 @@ const Lab = () => {
                 style={styles.retryButton}
                 onPress={loadOverview}
               >
-                <Text style={styles.retryButtonText}>ხელახლა ცდა</Text>
+                <Text style={styles.retryButtonText}>
+                  {t("patient.lab.retry")}
+                </Text>
               </TouchableOpacity>
             </View>
           )}
@@ -304,11 +319,11 @@ const Lab = () => {
               <Ionicons name="flask-outline" size={64} color="#CBD5E1" />
               <Text style={styles.emptyTitle}>
                 {searchQuery || selectedCategory
-                  ? "პროდუქტი არ მოიძებნა"
-                  : "ლაბორატორიის პროდუქტები ჯერ არ არის დამატებული"}
+                  ? t("patient.lab.notFound")
+                  : t("patient.lab.empty")}
               </Text>
               <Text style={styles.emptySubtitle}>
-                სცადეთ სხვა ძიება ან დაბრუნდით მოგვიანებით
+                {t("patient.lab.emptyHint")}
               </Text>
             </View>
           ) : (
@@ -328,7 +343,9 @@ const Lab = () => {
 };
 
 const ProductCard = ({ product }: { product: ShopProduct }) => {
+  const { t, language } = useLanguage();
   const [imageError, setImageError] = useState(false);
+  const displayName = getLabDisplayName(product, language, t);
 
   return (
     <TouchableOpacity
@@ -360,7 +377,7 @@ const ProductCard = ({ product }: { product: ShopProduct }) => {
 
       <View style={styles.productContent}>
         <Text style={styles.productName} numberOfLines={2}>
-          {String(product.name || "")}
+          {displayName}
         </Text>
         {Boolean(product.description) && (
           <Text style={styles.productDescription} numberOfLines={1}>

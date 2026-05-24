@@ -163,13 +163,30 @@ const Doctor = () => {
         );
       }
 
+      const apiBaseUrl = apiService.getBaseURL();
+      console.log("🏥 [DoctorTab] GET /doctors →", `${apiBaseUrl}/doctors`);
+
       const response = await apiService.getDoctors({ page: 1, limit: 100 });
 
+      console.log("🏥 [DoctorTab] API response:", {
+        success: response.success,
+        total: response.data?.pagination?.total ?? response.data?.doctors?.length,
+        count: response.data?.doctors?.length ?? 0,
+        doctors: (response.data?.doctors ?? []).map((d: any) => ({
+          id: d.id,
+          name: d.name,
+          specialization: d.specialization,
+          doctorStatus: d.doctorStatus,
+          approvalStatus: d.approvalStatus,
+          availabilityTypes: d.availabilityTypes,
+        })),
+      });
+
       if (response.success) {
-        const apiBaseUrl = apiService.getBaseURL();
         const mappedDoctors = response.data.doctors.map((doctor: any) =>
           mapDoctorFromAPI(doctor, apiBaseUrl, t),
         );
+        console.log("🏥 [DoctorTab] mapped doctors:", mappedDoctors.length);
         setDoctors(mappedDoctors);
       }
     } catch (err: any) {
@@ -222,6 +239,17 @@ const Doctor = () => {
             ?.toLowerCase()
             .includes(searchQuery.toLowerCase()),
       );
+    }
+
+    if (__DEV__ && doctors.length > 0) {
+      console.log("🏥 [DoctorTab] after filters:", {
+        selectedFilter,
+        selectedAppointmentType,
+        searchQuery,
+        before: doctors.length,
+        after: filtered.length,
+        names: filtered.map((d) => d.name),
+      });
     }
 
     return filtered;

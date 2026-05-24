@@ -17,6 +17,16 @@ export class CreateProductDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(160)
+  nameEn?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  nameRu?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(50)
   icdCode?: string;
 

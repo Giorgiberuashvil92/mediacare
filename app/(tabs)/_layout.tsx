@@ -5,6 +5,7 @@ import { Tabs, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import FloatingAIAssistant from "../components/ui/FloatingAIAssistant";
+import { tabBarLabel, tabBarScreenOptions } from "../components/ui/TabBarLabel";
 import { useLanguage } from "../contexts/LanguageContext";
 import {
   CallOverlayState,
@@ -29,11 +30,7 @@ export default function TabLayout() {
         screenOptions={{
           tabBarActiveTintColor: "#20BEB8",
           tabBarInactiveTintColor: "#94A3B8",
-          tabBarStyle: {
-            backgroundColor: "#FFFFFF",
-            borderTopWidth: 1,
-            borderTopColor: "#E5E5EA",
-          },
+          ...tabBarScreenOptions,
           headerStyle: {
             backgroundColor: "#007AFF",
           },
@@ -47,6 +44,7 @@ export default function TabLayout() {
           name="index"
           options={{
             title: t("tabs.home"),
+            tabBarLabel: tabBarLabel(t("tabs.home")),
             headerShown: false,
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="home" size={size} color={color} />
@@ -58,6 +56,7 @@ export default function TabLayout() {
           options={{
             headerShown: false,
             title: t("tabs.doctors"),
+            tabBarLabel: tabBarLabel(t("tabs.doctors")),
             tabBarIcon: ({ color, size }) => (
               <FontAwesome6 name="user-doctor" size={size} color={color} />
             ),
@@ -67,6 +66,7 @@ export default function TabLayout() {
           name="lab"
           options={{
             title: t("tabs.lab"),
+            tabBarLabel: tabBarLabel(t("tabs.lab")),
             headerShown: false,
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="flask-outline" size={size} color={color} />
@@ -77,6 +77,7 @@ export default function TabLayout() {
           name="appointment"
           options={{
             title: t("tabs.appointments"),
+            tabBarLabel: tabBarLabel(t("tabs.appointments")),
             headerShown: false,
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="calendar-outline" size={size} color={color} />
@@ -87,6 +88,7 @@ export default function TabLayout() {
           name="ai-assistant"
           options={{
             title: t("tabs.aiAssistant"),
+            tabBarLabel: tabBarLabel(t("tabs.aiAssistant")),
             headerShown: false,
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="chatbubbles" size={size} color={color} />
@@ -97,6 +99,7 @@ export default function TabLayout() {
           name="history"
           options={{
             title: t("tabs.history"),
+            tabBarLabel: tabBarLabel(t("tabs.history")),
             headerShown: false,
             tabBarIcon: ({ color, size }) => (
               <AntDesign name="calendar" size={size} color={color} />
@@ -107,6 +110,7 @@ export default function TabLayout() {
           name="settings"
           options={{
             title: t("tabs.settings"),
+            tabBarLabel: tabBarLabel(t("tabs.settings")),
             headerShown: false,
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="settings-outline" size={size} color={color} />

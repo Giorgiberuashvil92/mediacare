@@ -179,9 +179,7 @@ export class AdminService {
       .select('doctorId')
       .lean();
 
-    return new Set(
-      records.map((r) => (r.doctorId as mongoose.Types.ObjectId).toString()),
-    );
+    return new Set(records.map((r) => r.doctorId.toString()));
   }
 
   private async syncApprovedDoctorStatuses(

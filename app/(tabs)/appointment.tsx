@@ -57,25 +57,6 @@ interface PatientAppointment {
   };
 }
 
-const getStatusLabel = (status: string) => {
-  switch (status) {
-    case "completed":
-      return "დასრულებული";
-    case "scheduled":
-      return "დანიშნული";
-    case "cancelled":
-      return "გაუქმებული";
-    case "in-progress":
-      return "მიმდინარე";
-    case "pending":
-      return "მოლოდინში";
-    case "confirmed":
-      return "დადასტურებული";
-    default:
-      return status;
-  }
-};
-
 const getStatusColor = (status: string) => {
   switch (status) {
     case "completed":
@@ -91,26 +72,11 @@ const getStatusColor = (status: string) => {
   }
 };
 
-const getConsultationTypeLabel = (type: string, isFollowUp?: boolean) => {
-  if (isFollowUp === true) return "განმეორებითი";
-  switch (type) {
-    case "video":
-      return "ვიდეო კონსულტაცია";
-    case "home-visit":
-      return "ბინაზე ვიზიტი";
-    case "consultation":
-      return "კონსულტაცია";
-    case "emergency":
-      return "სასწრაფო";
-    default:
-      return type;
-  }
-};
-
 // Helper function to map backend appointment to app format
 const mapAppointmentFromAPI = (
   appointment: any,
   apiBaseUrl: string,
+  doctorFallback: string,
 ): PatientAppointment => {
   // Handle populated doctorId (object) or non-populated doctorId (string/ObjectId)
   let doctor: any = {};
@@ -197,7 +163,7 @@ const mapAppointmentFromAPI = (
 
   return {
     id: appointment._id || appointment.id || "",
-    doctorName: doctor.name || "ექიმი",
+    doctorName: doctor.name || doctorFallback,
     doctorSpecialty: doctor.specialization || "",
     date: appointmentDate,
     time: appointment.appointmentTime || "",
@@ -245,24 +211,46 @@ const Appointment = () => {
   const formatDisplayDate = (dateStr: string) =>
     formatAppointmentDateLong(dateStr, language);
 
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "completed":
+        return t("appointments.status.completed");
+      case "scheduled":
+        return t("appointments.status.scheduled");
+      case "cancelled":
+        return t("appointments.status.cancelled");
+      case "in-progress":
+        return t("appointments.status.inProgress");
+      case "pending":
+        return t("appointments.status.pending");
+      case "confirmed":
+        return t("appointments.status.confirmed");
+      default:
+        return status;
+    }
+  };
+
   const getConsultationTypeLabelLocalized = (
     type: string,
     isFollowUp?: boolean,
   ) => {
-    if (isFollowUp === true) return "განმეორებითი";
+    if (isFollowUp === true) return t("appointments.type.followUp");
     switch (type) {
       case "video":
-        return t("appointments.tab.filter.video");
+        return t("appointments.type.videoConsultation");
       case "home-visit":
-        return t("appointments.tab.filter.visit");
+        return t("appointments.type.homeVisit");
       case "consultation":
-        return "კონსულტაცია";
+        return t("appointments.type.consultation");
       case "emergency":
-        return "სასწრაფო";
+        return t("appointments.type.emergency");
       default:
         return type;
     }
   };
+
+  const formatTimeCount = (count: number, unitKey: string) =>
+    `${count} ${t(unitKey)}`;
   const router = useRouter();
   const params = useLocalSearchParams<{ filterType?: string }>();
   const { isAuthenticated, user } = useAuth();
@@ -367,7 +355,10 @@ const Appointment = () => {
       setDownloadingPreview(true);
       const canShare = await Sharing.isAvailableAsync();
       if (!canShare) {
-        Alert.alert("შენიშვნა", "გადმოწერა ამ მოწყობილობაზე მიუწვდომელია");
+        Alert.alert(
+          t("appointments.common.note"),
+          t("appointments.documents.downloadUnavailable"),
+        );
         return;
       }
 
@@ -386,24 +377,27 @@ const Appointment = () => {
 
       if (sourceUrl.startsWith("file://")) {
         await Sharing.shareAsync(sourceUrl, {
-          dialogTitle: "დოკუმენტის გადმოწერა",
+          dialogTitle: t("appointments.documents.downloadDialog"),
         });
         return;
       }
 
       const downloaded = await FileSystem.downloadAsync(sourceUrl, targetPath);
       if (downloaded.status !== 200) {
-        throw new Error("ვერ მოხერხდა ფაილის გადმოწერა");
+        throw new Error(t("appointments.documents.downloadError"));
       }
 
       await Sharing.shareAsync(downloaded.uri, {
-        dialogTitle: "დოკუმენტის გადმოწერა",
+        dialogTitle: t("appointments.documents.downloadDialog"),
         mimeType: extension === "pdf" ? "application/pdf" : "image/jpeg",
         UTI: extension === "pdf" ? "com.adobe.pdf" : "public.jpeg",
       });
     } catch (error) {
       console.error("[Appointment] Failed to download preview:", error);
-      Alert.alert("შეცდომა", "გადმოწერა ვერ მოხერხდა");
+      Alert.alert(
+        t("appointments.common.error"),
+        t("appointments.documents.downloadFailed"),
+      );
     } finally {
       setDownloadingPreview(false);
     }
@@ -411,12 +405,12 @@ const Appointment = () => {
 
   // Load appointments from API
   useEffect(() => {
-    if (isAuthenticated && user?.id) {
+    if (isAuthenticated && user?.id && user.role === "patient") {
       loadAppointments();
     } else {
       setLoading(false);
     }
-  }, [isAuthenticated, user?.id]);
+  }, [isAuthenticated, user?.id, user?.role]);
 
   // Update filterType from params
   useEffect(() => {
@@ -477,7 +471,11 @@ const Appointment = () => {
         }
         const apiBaseUrl = apiService.getBaseURL();
         const mappedAppointments = response.data.map((appointment: any) =>
-          mapAppointmentFromAPI(appointment, apiBaseUrl),
+          mapAppointmentFromAPI(
+            appointment,
+            apiBaseUrl,
+            t("appointments.common.doctor"),
+          ),
         );
         console.log(
           "📋 [getPatientAppointments] map-ის შემდეგ (type ველი):",
@@ -531,7 +529,7 @@ const Appointment = () => {
       }
     } catch (err: any) {
       console.log("Error loading appointments:", err);
-      setError(err.message || "ჯავშნების ჩატვირთვა ვერ მოხერხდა");
+      setError(err.message || t("appointments.filtered.loadError"));
       setAppointments([]);
     } finally {
       setLoading(false);
@@ -552,11 +550,11 @@ const Appointment = () => {
     const days = Math.floor(totalHours / 24);
 
     if (days > 0) {
-      return `${days} დღე`;
+      return formatTimeCount(days, "appointments.time.day");
     } else if (totalHours > 0) {
-      return `${totalHours} საათი`;
+      return formatTimeCount(totalHours, "appointments.time.hour");
     } else {
-      return "ახლა";
+      return t("appointments.time.now");
     }
   };
 
@@ -672,13 +670,13 @@ const Appointment = () => {
     const days = Math.floor(hours / 24);
 
     if (days > 0) {
-      return `${days} დღე ${hours % 24} საათი`;
+      return `${formatTimeCount(days, "appointments.time.day")} ${formatTimeCount(hours % 24, "appointments.time.hour")}`;
     } else if (hours > 0) {
-      return `${hours} საათი ${minutes} წუთი`;
+      return `${formatTimeCount(hours, "appointments.time.hour")} ${formatTimeCount(minutes, "appointments.time.minute")}`;
     } else if (minutes > 0) {
-      return `${minutes} წუთი`;
+      return formatTimeCount(minutes, "appointments.time.minute");
     } else {
-      return "ნაკლები წუთი";
+      return t("appointments.time.lessThanMinute");
     }
   };
 
@@ -923,7 +921,10 @@ const Appointment = () => {
       const file = result.assets?.[0];
       if (!file) return;
       if (file.size && file.size > 5 * 1024 * 1024) {
-        Alert.alert("შეცდომა", "ფაილი უნდა იყოს 5MB-მდე");
+        Alert.alert(
+          t("appointments.common.error"),
+          t("appointments.documents.fileTooLarge"),
+        );
         return;
       }
       setUploadingDocForId(appointmentId);
@@ -944,13 +945,22 @@ const Appointment = () => {
           ];
           return next;
         });
-        Alert.alert("წარმატება", "ფაილი აიტვირთა");
+        Alert.alert(
+          t("appointments.common.success"),
+          t("appointments.documents.uploadSuccess"),
+        );
       } else {
-        Alert.alert("შეცდომა", "ატვირთვა ვერ მოხერხდა");
+        Alert.alert(
+          t("appointments.common.error"),
+          t("appointments.documents.uploadFailed"),
+        );
       }
     } catch (err: any) {
       console.error("Document upload error:", err);
-      Alert.alert("შეცდომა", err?.message || "ფაილის ატვირთვა ვერ მოხერხდა");
+      Alert.alert(
+        t("appointments.common.error"),
+        err?.message || t("appointments.documents.uploadError"),
+      );
     } finally {
       setUploadingDocForId(null);
     }
@@ -960,9 +970,9 @@ const Appointment = () => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.content}>
-          <Text style={styles.title}>ჯავშნები</Text>
+          <Text style={styles.title}>{t("appointments.tab.title")}</Text>
           <Text style={styles.subtitle}>
-            გთხოვთ შეხვიდეთ სისტემაში ჯავშნების სანახავად
+            {t("appointments.tab.loginRequired")}
           </Text>
         </View>
       </SafeAreaView>
@@ -974,7 +984,9 @@ const Appointment = () => {
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#06B6D4" />
-          <Text style={styles.loadingText}>ჯავშნების ჩატვირთვა...</Text>
+          <Text style={styles.loadingText}>
+            {t("appointments.filtered.loading")}
+          </Text>
         </View>
       </SafeAreaView>
     );
@@ -989,7 +1001,9 @@ const Appointment = () => {
             style={styles.retryButton}
             onPress={loadAppointments}
           >
-            <Text style={styles.retryButtonText}>ხელახლა ცდა</Text>
+            <Text style={styles.retryButtonText}>
+              {t("appointments.filtered.retry")}
+            </Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -1288,15 +1302,15 @@ const Appointment = () => {
   const handleCancelAppointment = async (appointmentId: string) => {
     // Show confirmation alert
     Alert.alert(
-      "ჯავშნის გაუქმება",
-      "დარწმუნებული ხართ რომ გსურთ ჯავშნის გაუქმება?",
+      t("appointments.cancel.title"),
+      t("appointments.cancel.message"),
       [
         {
-          text: "არა",
+          text: t("common.actions.no"),
           style: "cancel",
         },
         {
-          text: "კი, გაუქმება",
+          text: t("appointments.cancel.confirm"),
           style: "destructive",
           onPress: async () => {
             try {
@@ -1308,20 +1322,20 @@ const Appointment = () => {
                 // Reload appointments to get updated data
                 await loadAppointments();
                 Alert.alert(
-                  "წარმატება",
-                  response.message || "ჯავშანი წარმატებით გაუქმდა",
+                  t("appointments.common.success"),
+                  response.message || t("appointments.cancel.success"),
                 );
               } else {
                 Alert.alert(
-                  "შეცდომა",
-                  response.message || "ჯავშნის გაუქმება ვერ მოხერხდა",
+                  t("appointments.common.error"),
+                  response.message || t("appointments.cancel.failed"),
                 );
               }
             } catch (err: any) {
               console.error("Cancel appointment error:", err);
               Alert.alert(
-                "შეცდომა",
-                err.message || "ჯავშნის გაუქმება ვერ მოხერხდა",
+                t("appointments.common.error"),
+                err.message || t("appointments.cancel.failed"),
               );
             } finally {
               setCancellingAppointmentId(null);
@@ -1534,7 +1548,7 @@ const Appointment = () => {
                           ]}
                         >
                           {isAppointmentTimePassed(appointment)
-                            ? "ვიდეო დასრულებულია"
+                            ? t("appointments.status.videoEnded")
                             : getStatusLabel(appointment.status)}
                         </Text>
                       </View>
@@ -1546,7 +1560,9 @@ const Appointment = () => {
                       activeOpacity={0.7}
                     >
                       <Text style={styles.expandDetailsButtonText}>
-                        {isExpanded ? "დეტალების დაფარვა" : "დეტალების ნახვა"}
+                        {isExpanded
+                          ? t("appointments.card.hideDetails")
+                          : t("appointments.card.showDetails")}
                       </Text>
                       <Ionicons
                         name={isExpanded ? "chevron-up" : "chevron-down"}
@@ -1617,7 +1633,9 @@ const Appointment = () => {
                               pathname: "/screens/video-call",
                               params: {
                                 appointmentId: id,
-                                doctorName: appointment.doctorName || "ექიმი",
+                                doctorName:
+                                  appointment.doctorName ||
+                                  t("appointments.common.doctor"),
                                 roomName: `medicare-${id}`,
                               },
                             });
@@ -1625,7 +1643,7 @@ const Appointment = () => {
                         >
                           <Ionicons name="videocam" size={20} color="#FFFFFF" />
                           <Text style={styles.joinCallText}>
-                            შესვლა კონსულტაციაზე
+                            {t("appointments.filtered.joinConsultation")}
                           </Text>
                           <Ionicons
                             name="arrow-forward"
@@ -1644,7 +1662,8 @@ const Appointment = () => {
                             color="#0EA5E9"
                           />
                           <Text style={[styles.infoText, { color: "#0EA5E9" }]}>
-                            {documents.length} ფაილი ატვირთულია
+                            {documents.length}{" "}
+                            {t("appointments.documents.filesUploaded")}
                           </Text>
                         </View>
                       )}
@@ -1657,7 +1676,7 @@ const Appointment = () => {
                       {/* დანიშნულება — ფაილის ატვირთვა */}
                       <View style={styles.detailSection}>
                         <Text style={styles.detailSectionTitle}>
-                          დანიშნულება
+                          {t("appointments.details.prescription")}
                         </Text>
                         <TouchableOpacity
                           style={[
@@ -1681,12 +1700,12 @@ const Appointment = () => {
                           )}
                           <Text style={styles.uploadDocButtonText}>
                             {uploadingDocForId === appointment.id
-                              ? "იტვირთება..."
-                              : "ფაილის ატვირთვა"}
+                              ? t("appointments.documents.uploading")
+                              : t("appointments.documents.upload")}
                           </Text>
                         </TouchableOpacity>
                         <Text style={[styles.uploadDocHint, { marginTop: 0 }]}>
-                          PDF ან სურათი, მაქს. 5MB
+                          {t("appointments.documents.hint")}
                         </Text>
                         {documents.length > 0 && (
                           <View style={styles.uploadedDocList}>
@@ -1713,7 +1732,8 @@ const Appointment = () => {
                                   style={styles.uploadedDocName}
                                   numberOfLines={1}
                                 >
-                                  {doc.name || "დოკუმენტი"}
+                                  {doc.name ||
+                                    t("appointments.documents.defaultName")}
                                 </Text>
                                 {doc.url && (
                                   <Ionicons
@@ -1733,7 +1753,7 @@ const Appointment = () => {
                         appointment.instrumentalTests.length > 0 && (
                           <View style={styles.detailSection}>
                             <Text style={styles.detailSectionTitle}>
-                              დანიშნული ინსტრუმენტული კვლევები
+                              {t("appointments.details.instrumentalTests")}
                             </Text>
                             {appointment.instrumentalTests.map(
                               (test: any, index: number) => (
@@ -1750,7 +1770,8 @@ const Appointment = () => {
                                       </Text>
                                       {test.notes && (
                                         <Text style={styles.testNotes}>
-                                          შენიშვნა: {test.notes}
+                                          {t("appointments.tests.note")}:{" "}
+                                          {test.notes}
                                         </Text>
                                       )}
                                     </View>
@@ -1766,7 +1787,7 @@ const Appointment = () => {
                         appointment.laboratoryTests.length > 0 && (
                           <View style={styles.detailSection}>
                             <Text style={styles.detailSectionTitle}>
-                              დანიშნული ლაბორატორიული კვლევები
+                              {t("appointments.details.laboratoryTests")}
                             </Text>
                             {appointment.laboratoryTests.map(
                               (test: any, index: number) => (
@@ -1783,7 +1804,8 @@ const Appointment = () => {
                                       </Text>
                                       {test.clinicName && (
                                         <Text style={styles.testNotes}>
-                                          კლინიკა: {test.clinicName}
+                                          {t("appointments.tests.clinic")}:{" "}
+                                          {test.clinicName}
                                         </Text>
                                       )}
                                     </View>
@@ -1926,7 +1948,7 @@ const Appointment = () => {
                             color="#8B5CF6"
                           />
                           <Text style={styles.rescheduleCardButtonText}>
-                            გადაჯავშნა
+                            {t("appointments.reschedule.rescheduleShort")}
                           </Text>
                         </TouchableOpacity>
                         <TouchableOpacity
@@ -1950,7 +1972,7 @@ const Appointment = () => {
                                 color="#EF4444"
                               />
                               <Text style={styles.cancelCardButtonText}>
-                                გაუქმება
+                                {t("appointments.common.cancel")}
                               </Text>
                             </>
                           )}
@@ -1974,7 +1996,9 @@ const Appointment = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>კონსულტაციის დეტალები</Text>
+              <Text style={styles.modalTitle}>
+                {t("appointments.details.title")}
+              </Text>
               <TouchableOpacity
                 onPress={() => setShowDetailsModal(false)}
                 style={styles.closeButton}
@@ -1986,30 +2010,38 @@ const Appointment = () => {
             {selectedAppointment && (
               <ScrollView style={styles.modalBody}>
                 <View style={styles.detailSection}>
-                  <Text style={styles.detailLabel}>ექიმი</Text>
+                  <Text style={styles.detailLabel}>
+                    {t("appointments.details.doctor")}
+                  </Text>
                   <Text style={styles.detailValue}>
                     {selectedAppointment.doctorName}
                   </Text>
                 </View>
 
                 <View style={styles.detailSection}>
-                  <Text style={styles.detailLabel}>სპეციალობა</Text>
+                  <Text style={styles.detailLabel}>
+                    {t("appointments.details.specialty")}
+                  </Text>
                   <Text style={styles.detailValue}>
                     {selectedAppointment.doctorSpecialty}
                   </Text>
                 </View>
 
                 <View style={styles.detailSection}>
-                  <Text style={styles.detailLabel}>თარიღი და დრო</Text>
+                  <Text style={styles.detailLabel}>
+                    {t("appointments.details.dateTime")}
+                  </Text>
                   <Text style={styles.detailValue}>
                     {selectedAppointment.date} • {selectedAppointment.time}
                   </Text>
                 </View>
 
                 <View style={styles.detailSection}>
-                  <Text style={styles.detailLabel}>ტიპი</Text>
+                  <Text style={styles.detailLabel}>
+                    {t("appointments.details.type")}
+                  </Text>
                   <Text style={styles.detailValue}>
-                    {getConsultationTypeLabel(
+                    {getConsultationTypeLabelLocalized(
                       selectedAppointment.type,
                       selectedAppointment.isFollowUp,
                     )}
@@ -2019,7 +2051,9 @@ const Appointment = () => {
                 {selectedAppointment.type === "home-visit" &&
                   selectedAppointment.visitAddress && (
                     <View style={styles.detailSection}>
-                      <Text style={styles.detailLabel}>მისამართი</Text>
+                      <Text style={styles.detailLabel}>
+                        {t("appointments.address.label")}
+                      </Text>
                       <Text style={styles.detailValue}>
                         {selectedAppointment.visitAddress}
                       </Text>
@@ -2030,9 +2064,11 @@ const Appointment = () => {
                 {appointmentDocuments[selectedAppointment.id] &&
                   appointmentDocuments[selectedAppointment.id].length > 0 && (
                     <View style={styles.detailSection}>
-                      <Text style={styles.detailLabel}>დოკუმენტები</Text>
+                      <Text style={styles.detailLabel}>
+                        {t("appointments.details.documents")}
+                      </Text>
                       <Text style={styles.uploadDocHint}>
-                        თქვენი და ექიმის ფაილები
+                        {t("appointments.details.documentsHint")}
                       </Text>
                       {appointmentDocuments[selectedAppointment.id].map(
                         (doc: any, idx: number) => (
@@ -2058,7 +2094,8 @@ const Appointment = () => {
                               style={styles.uploadedDocName}
                               numberOfLines={1}
                             >
-                              {doc.name || "დოკუმენტი"}
+                              {doc.name ||
+                                t("appointments.documents.defaultName")}
                             </Text>
                             {doc.url && (
                               <Ionicons
@@ -2075,7 +2112,9 @@ const Appointment = () => {
 
                 {selectedAppointment.diagnosis && (
                   <View style={styles.detailSection}>
-                    <Text style={styles.detailLabel}>დიაგნოზი</Text>
+                    <Text style={styles.detailLabel}>
+                      {t("appointments.details.diagnosis")}
+                    </Text>
                     <Text style={styles.detailValue}>
                       {selectedAppointment.diagnosis}
                     </Text>
@@ -2087,7 +2126,7 @@ const Appointment = () => {
                   selectedAppointment.instrumentalTests.length > 0 && (
                     <View style={styles.detailSection}>
                       <Text style={styles.detailLabel}>
-                        დანიშნული ინსტრუმენტული კვლევები
+                        {t("appointments.details.instrumentalTests")}
                       </Text>
                       {selectedAppointment.instrumentalTests.map(
                         (test: any, index: number) => (
@@ -2104,7 +2143,7 @@ const Appointment = () => {
                                 </Text>
                                 {test.notes && (
                                   <Text style={styles.testNotes}>
-                                    შენიშვნა: {test.notes}
+                                    {t("appointments.tests.note")}: {test.notes}
                                   </Text>
                                 )}
                               </View>
@@ -2120,7 +2159,7 @@ const Appointment = () => {
                   selectedAppointment.laboratoryTests.length > 0 && (
                     <View style={styles.detailSection}>
                       <Text style={styles.detailLabel}>
-                        დანიშნული ლაბორატორიული კვლევები
+                        {t("appointments.details.laboratoryTests")}
                       </Text>
                       {selectedAppointment.laboratoryTests.map(
                         (test: any, index: number) => (
@@ -2137,7 +2176,8 @@ const Appointment = () => {
                                 </Text>
                                 {test.clinicName && (
                                   <Text style={styles.testNotes}>
-                                    კლინიკა: {test.clinicName}
+                                    {t("appointments.tests.clinic")}:{" "}
+                                    {test.clinicName}
                                   </Text>
                                 )}
                               </View>
@@ -2149,7 +2189,9 @@ const Appointment = () => {
                   )}
 
                 <View style={styles.detailSection}>
-                  <Text style={styles.detailLabel}>ანაზღაურება</Text>
+                  <Text style={styles.detailLabel}>
+                    {t("appointments.details.fee")}
+                  </Text>
                   <Text style={styles.detailValue}>
                     {typeof selectedAppointment.fee === "number"
                       ? `${selectedAppointment.fee} ₾`
@@ -2158,7 +2200,9 @@ const Appointment = () => {
                 </View>
 
                 <View style={styles.detailSection}>
-                  <Text style={styles.detailLabel}>გადახდის სტატუსი</Text>
+                  <Text style={styles.detailLabel}>
+                    {t("appointments.details.paymentStatus")}
+                  </Text>
                   <View
                     style={[
                       styles.paymentBadge,
@@ -2175,7 +2219,9 @@ const Appointment = () => {
                           : styles.paymentTextPending,
                       ]}
                     >
-                      {selectedAppointment.isPaid ? "გადახდილი" : "მოსალოდნელი"}
+                      {selectedAppointment.isPaid
+                        ? t("appointments.payment.paid")
+                        : t("appointments.payment.awaiting")}
                     </Text>
                   </View>
                 </View>
@@ -2187,7 +2233,9 @@ const Appointment = () => {
                 style={styles.modalButton}
                 onPress={() => setShowDetailsModal(false)}
               >
-                <Text style={styles.modalButtonText}>დახურვა</Text>
+                <Text style={styles.modalButtonText}>
+                  {t("common.actions.close")}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -2505,12 +2553,13 @@ const Appointment = () => {
               ]}
             >
               <Ionicons name="time-outline" size={48} color="#F59E0B" />
-              <Text style={styles.modalTitle}>კონსულტაციის დრო არ მოვიდა</Text>
+              <Text style={styles.modalTitle}>
+                {t("appointments.consultation.notYetTitle")}
+              </Text>
             </View>
             <View style={styles.modalBody}>
               <Text style={styles.modalMessage}>
-                ვერ შეხვალ ჯერ კონსულტაციის დრო არაა. გთხოვთ დაელოდოთ
-                კონსულტაციის დროს.
+                {t("appointments.consultation.notYetMessage")}
               </Text>
             </View>
             <View style={styles.modalFooter}>
@@ -2521,7 +2570,7 @@ const Appointment = () => {
                 <Text
                   style={[styles.modalButtonText, styles.primaryButtonText]}
                 >
-                  გასაგებია
+                  {t("common.actions.understand")}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -2539,7 +2588,8 @@ const Appointment = () => {
           <View style={styles.documentPreviewModalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {selectedDocumentPreview?.name || "დოკუმენტის ნახვა"}
+                {selectedDocumentPreview?.name ||
+                  t("appointments.documents.viewTitle")}
               </Text>
               <View style={styles.previewHeaderActions}>
                 <TouchableOpacity
@@ -2552,7 +2602,9 @@ const Appointment = () => {
                   ) : (
                     <>
                       <Ionicons name="download-outline" size={16} color="#FFFFFF" />
-                      <Text style={styles.downloadButtonText}>გადმოწერა</Text>
+                      <Text style={styles.downloadButtonText}>
+                        {t("appointments.documents.download")}
+                      </Text>
                     </>
                   )}
                 </TouchableOpacity>
@@ -2595,7 +2647,9 @@ const Appointment = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.filterModalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>ფილტრი</Text>
+              <Text style={styles.modalTitle}>
+                {t("appointments.filter.title")}
+              </Text>
               <TouchableOpacity
                 onPress={() => setShowFilterModal(false)}
                 style={styles.closeButton}
@@ -2608,7 +2662,9 @@ const Appointment = () => {
               showsVerticalScrollIndicator={false}
             >
               <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>საწყისი თარიღი</Text>
+                <Text style={styles.detailLabel}>
+                  {t("appointments.filter.startDate")}
+                </Text>
                 <TouchableOpacity
                   style={styles.dateInput}
                   onPress={() => setShowStartPicker(true)}
@@ -2620,7 +2676,8 @@ const Appointment = () => {
                       !filterStartDate && styles.dateInputTextPlaceholder,
                     ]}
                   >
-                    {filterStartDate || "აირჩიე თარიღი"}
+                    {filterStartDate ||
+                      t("appointments.reschedule.modal.selectDate")}
                   </Text>
                   {filterStartDate && (
                     <TouchableOpacity
@@ -2657,7 +2714,9 @@ const Appointment = () => {
               </View>
 
               <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>ბოლო თარიღი</Text>
+                <Text style={styles.detailLabel}>
+                  {t("appointments.filter.endDate")}
+                </Text>
                 <TouchableOpacity
                   style={styles.dateInput}
                   onPress={() => setShowEndPicker(true)}
@@ -2669,7 +2728,8 @@ const Appointment = () => {
                       !filterEndDate && styles.dateInputTextPlaceholder,
                     ]}
                   >
-                    {filterEndDate || "აირჩიე თარიღი"}
+                    {filterEndDate ||
+                      t("appointments.reschedule.modal.selectDate")}
                   </Text>
                   {filterEndDate && (
                     <TouchableOpacity
@@ -2714,7 +2774,9 @@ const Appointment = () => {
                   setShowFilterModal(false);
                 }}
               >
-                <Text style={styles.modalButtonText}>გასუფთავება</Text>
+                <Text style={styles.modalButtonText}>
+                  {t("appointments.filter.clear")}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalButton, styles.modalButtonPrimary]}
@@ -2726,7 +2788,7 @@ const Appointment = () => {
                     styles.modalButtonTextPrimary,
                   ]}
                 >
-                  ფილტრი
+                  {t("appointments.filter.apply")}
                 </Text>
               </TouchableOpacity>
             </View>

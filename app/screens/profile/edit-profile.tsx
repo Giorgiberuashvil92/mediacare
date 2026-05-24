@@ -16,16 +16,18 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import { useAuth } from "../../contexts/AuthContext";
+import { useLanguage } from "../../contexts/LanguageContext";
 export default function EditProfileScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -112,7 +114,7 @@ export default function EditProfileScreen() {
         if (idDoc && String(idDoc).trim()) {
           setIdentificationDocument({
             filePath: String(idDoc).trim(),
-            name: "პირადობის მოწმობა",
+            name: t("editProfile.idDocumentName"),
           });
         } else {
           setIdentificationDocument(null);
@@ -150,7 +152,10 @@ export default function EditProfileScreen() {
 
       if (apiService.isMockMode()) {
         setProfileImage(result.assets[0].uri);
-        Alert.alert("წარმატება", "სურათი აიტვირთა (mock)");
+        Alert.alert(
+          t("settings.security.success.title"),
+          t("editProfile.imageUploadedMock"),
+        );
       } else {
         const uploadResponse = await apiService.uploadProfileImagePublic({
           uri: result.assets[0].uri,
@@ -166,14 +171,23 @@ export default function EditProfileScreen() {
             uploadResponse.url,
           );
           setProfileImage(uploadResponse.url);
-          Alert.alert("წარმატება", "სურათი წარმატებით აიტვირთა");
+          Alert.alert(
+            t("settings.security.success.title"),
+            t("editProfile.imageUploaded"),
+          );
         } else {
-          Alert.alert("შეცდომა", "სურათის ატვირთვა ვერ მოხერხდა");
+          Alert.alert(
+            t("settings.security.error.title"),
+            t("doctor.profile.photoUploadFailed"),
+          );
         }
       }
     } catch (error) {
       console.error("Profile image pick error:", error);
-      Alert.alert("შეცდომა", "სურათის ატვირთვა ვერ მოხერხდა");
+      Alert.alert(
+        t("settings.security.error.title"),
+        t("doctor.profile.photoUploadFailed"),
+      );
     } finally {
       setUploadingProfileImage(false);
     }
@@ -188,7 +202,10 @@ export default function EditProfileScreen() {
       if (result.canceled) return;
       const file = result.assets[0];
       if (file.size && file.size > 5 * 1024 * 1024) {
-        Alert.alert("შეცდომა", "ფაილის ზომა არ უნდა აღემატებოდეს 5MB-ს");
+        Alert.alert(
+          t("settings.security.error.title"),
+          t("editProfile.fileTooLarge"),
+        );
         return;
       }
       setUploadingIdentificationDocument(true);
@@ -222,10 +239,16 @@ export default function EditProfileScreen() {
         const filePath = data.data?.url || data.data?.filePath;
         setIdentificationDocument({ filePath, name: file.name });
       } else {
-        Alert.alert("შეცდომა", data.message || "ფაილის ატვირთვა ვერ მოხერხდა");
+        Alert.alert(
+          t("settings.security.error.title"),
+          data.message || t("editProfile.fileUploadFailed"),
+        );
       }
     } catch (err: any) {
-      Alert.alert("შეცდომა", err?.message || "ფაილის ატვირთვა ვერ მოხერხდა");
+      Alert.alert(
+        t("settings.security.error.title"),
+        err?.message || t("editProfile.fileUploadFailed"),
+      );
     } finally {
       setUploadingIdentificationDocument(false);
     }
@@ -235,12 +258,18 @@ export default function EditProfileScreen() {
     if (savingProfile) return;
 
     if (!name.trim()) {
-      Alert.alert("შეცდომა", "გთხოვთ შეიყვანოთ სახელი");
+      Alert.alert(
+        t("settings.security.error.title"),
+        t("editProfile.error.nameRequired"),
+      );
       return;
     }
 
     if (!email.trim()) {
-      Alert.alert("შეცდომა", "გთხოვთ შეიყვანოთ ელ. ფოსტა");
+      Alert.alert(
+        t("settings.security.error.title"),
+        t("editProfile.error.emailRequired"),
+      );
       return;
     }
 
@@ -306,15 +335,21 @@ export default function EditProfileScreen() {
       const response = await apiService.updateProfile(payload);
       console.log("📸 [EditProfile] updateProfile response:", response);
       if (!response.success) {
-        Alert.alert("შეცდომა", "ინფორმაციის შენახვა ვერ მოხერხდა");
+        Alert.alert(
+          t("settings.security.error.title"),
+          t("editProfile.saveFailed"),
+        );
         return;
       }
-      Alert.alert("წარმატება", "პროფილი წარმატებით განახლდა", [
-        { text: "კარგი", onPress: () => router.back() },
+      Alert.alert(t("settings.security.success.title"), t("editProfile.saveSuccess"), [
+        { text: t("common.actions.ok"), onPress: () => router.back() },
       ]);
     } catch (err) {
       console.error("Failed to save profile", err);
-      Alert.alert("შეცდომა", "ინფორმაციის შენახვა ვერ მოხერხდა");
+      Alert.alert(
+        t("settings.security.error.title"),
+        t("editProfile.saveFailed"),
+      );
     } finally {
       setSavingProfile(false);
     }
@@ -330,12 +365,12 @@ export default function EditProfileScreen() {
           >
             <Ionicons name="chevron-back" size={20} color="#1F2937" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>პროფილი</Text>
+          <Text style={styles.headerTitle}>{t("editProfile.title")}</Text>
           <View style={styles.placeholder} />
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#06B6D4" />
-          <Text style={styles.loadingText}>მონაცემების ჩატვირთვა...</Text>
+          <Text style={styles.loadingText}>{t("editProfile.loading")}</Text>
         </View>
       </SafeAreaView>
     );
@@ -357,7 +392,7 @@ export default function EditProfileScreen() {
             >
               <Ionicons name="chevron-back" size={20} color="#1F2937" />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>პროფილი</Text>
+            <Text style={styles.headerTitle}>{t("editProfile.title")}</Text>
             <View style={styles.placeholder} />
           </View>
 
@@ -405,8 +440,8 @@ export default function EditProfileScreen() {
 
                 <Text style={styles.profileImageHint}>
                   {isDoctor
-                    ? "პროფილის ფოტო შეიძლება შეიცვალოს მხოლოდ ადმინ პანელიდან"
-                    : "დააჭირეთ კამერას პროფილის ფოტოს შესაცვლელად"}
+                    ? t("editProfile.photoAdminOnly")
+                    : t("editProfile.photoChangeHint")}
                 </Text>
               </View>
 
@@ -414,7 +449,7 @@ export default function EditProfileScreen() {
               <View style={styles.formItem}>
                 <View style={styles.labelContainer}>
                   <Ionicons name="person-outline" size={20} color="#06B6D4" />
-                  <Text style={styles.label}>სახელი</Text>
+                  <Text style={styles.label}>{t("settings.profile.fullName")}</Text>
                 </View>
                 <View
                   style={[styles.input, styles.inputDisabled]}
@@ -422,7 +457,7 @@ export default function EditProfileScreen() {
                 >
                   <TextInput
                     style={[styles.textInput, styles.textInputDisabled]}
-                    placeholder="შეიყვანეთ სახელი"
+                    placeholder={t("editProfile.placeholder.fullName")}
                     placeholderTextColor="#9CA3AF"
                     value={name}
                     onChangeText={setName}
@@ -435,7 +470,7 @@ export default function EditProfileScreen() {
               <View style={styles.formItem}>
                 <View style={styles.labelContainer}>
                   <Ionicons name="mail-outline" size={20} color="#06B6D4" />
-                  <Text style={styles.label}>ელ. ფოსტა</Text>
+                  <Text style={styles.label}>{t("settings.profile.email")}</Text>
                 </View>
                 <View
                   style={[styles.input, styles.inputDisabled]}
@@ -443,7 +478,7 @@ export default function EditProfileScreen() {
                 >
                   <TextInput
                     style={[styles.textInput, styles.textInputDisabled]}
-                    placeholder="შეიყვანეთ ელ. ფოსტა"
+                    placeholder={t("editProfile.placeholder.email")}
                     placeholderTextColor="#9CA3AF"
                     value={email}
                     onChangeText={setEmail}
@@ -458,7 +493,7 @@ export default function EditProfileScreen() {
               <View style={styles.formItem}>
                 <View style={styles.labelContainer}>
                   <Ionicons name="call-outline" size={20} color="#06B6D4" />
-                  <Text style={styles.label}>ტელეფონი</Text>
+                  <Text style={styles.label}>{t("settings.profile.phone")}</Text>
                 </View>
                 <View
                   style={[styles.input, styles.inputDisabled]}
@@ -466,7 +501,7 @@ export default function EditProfileScreen() {
                 >
                   <TextInput
                     style={[styles.textInput, styles.textInputDisabled]}
-                    placeholder="შეიყვანეთ ტელეფონი"
+                    placeholder={t("editProfile.placeholder.phone")}
                     placeholderTextColor="#9CA3AF"
                     value={phone}
                     onChangeText={setPhone}
@@ -480,7 +515,7 @@ export default function EditProfileScreen() {
               <View style={styles.formItem}>
                 <View style={styles.labelContainer}>
                   <Ionicons name="card-outline" size={20} color="#06B6D4" />
-                  <Text style={styles.label}>პირადი ნომერი</Text>
+                  <Text style={styles.label}>{t("settings.profile.idNumber")}</Text>
                 </View>
                 <View
                   style={[styles.input, styles.inputDisabled]}
@@ -488,7 +523,7 @@ export default function EditProfileScreen() {
                 >
                   <TextInput
                     style={[styles.textInput, styles.textInputDisabled]}
-                    placeholder="შეიყვანეთ პირადი ნომერი"
+                    placeholder={t("editProfile.placeholder.idNumber")}
                     placeholderTextColor="#9CA3AF"
                     value={idNumber}
                     onChangeText={setIdNumber}
@@ -502,7 +537,7 @@ export default function EditProfileScreen() {
               <View style={styles.formItem}>
                 <View style={styles.labelContainer}>
                   <Ionicons name="person-outline" size={20} color="#06B6D4" />
-                  <Text style={styles.label}>სქესი</Text>
+                  <Text style={styles.label}>{t("editProfile.gender")}</Text>
                 </View>
                 <View style={styles.genderRow}>
                   {(["male", "female"] as const).map((g) => (
@@ -525,7 +560,9 @@ export default function EditProfileScreen() {
                           gender === g && styles.genderOptionTextSelected,
                         ]}
                       >
-                        {g === "male" ? "კაცი" : "ქალი"}
+                        {g === "male"
+                          ? t("settings.profile.gender.male")
+                          : t("settings.profile.gender.female")}
                       </Text>
                     </View>
                   ))}
@@ -533,31 +570,12 @@ export default function EditProfileScreen() {
               </View>
 
               {/* მისამართი */}
-              <View style={styles.formItem}>
-                <View style={styles.labelContainer}>
-                  <Ionicons name="location-outline" size={20} color="#06B6D4" />
-                  <Text style={styles.label}>მისამართი</Text>
-                </View>
-                <View
-                  style={[styles.input, styles.inputDisabled]}
-                  pointerEvents="none"
-                >
-                  <TextInput
-                    style={[styles.textInput, styles.textInputDisabled]}
-                    placeholder="შეიყვანეთ მისამართი"
-                    placeholderTextColor="#9CA3AF"
-                    value={address}
-                    onChangeText={setAddress}
-                    editable={false}
-                  />
-                </View>
-              </View>
 
               {/* დაბადების თარიღი */}
               <View style={styles.formItem}>
                 <View style={styles.labelContainer}>
                   <Ionicons name="calendar-outline" size={20} color="#06B6D4" />
-                  <Text style={styles.label}>დაბადების თარიღი</Text>
+                  <Text style={styles.label}>{t("editProfile.dateOfBirth")}</Text>
                 </View>
                 <View
                   style={[styles.input, styles.inputDisabled]}
@@ -565,7 +583,7 @@ export default function EditProfileScreen() {
                 >
                   <TextInput
                     style={[styles.textInput, styles.textInputDisabled]}
-                    placeholder="მაგ: 1990-01-15"
+                    placeholder={t("editProfile.placeholder.dateOfBirth")}
                     placeholderTextColor="#9CA3AF"
                     value={dateOfBirth}
                     onChangeText={setDateOfBirth}
@@ -619,28 +637,7 @@ export default function EditProfileScreen() {
               {isDoctor && (
                 <>
                   {/* Consultation Fee */}
-                  <View style={styles.formItem}>
-                    <View style={styles.labelContainer}>
-                      <Ionicons name="cash-outline" size={20} color="#10B981" />
-                      <Text style={styles.label}>კონსულტაციის ფასი (₾)</Text>
-                    </View>
-                    <View
-                      style={[styles.input, styles.inputDisabled]}
-                      pointerEvents="none"
-                    >
-                      <TextInput
-                        style={[styles.textInput, styles.textInputDisabled]}
-                        placeholder="მაგ: 50"
-                        placeholderTextColor="#9CA3AF"
-                        value={consultationFee}
-                        onChangeText={setConsultationFee}
-                        keyboardType="numeric"
-                        editable={false}
-                      />
-                    </View>
-                  </View>
 
-                  {/* Experience */}
                   <View style={styles.formItem}>
                     <View style={styles.labelContainer}>
                       <Ionicons
@@ -648,7 +645,9 @@ export default function EditProfileScreen() {
                         size={20}
                         color="#8B5CF6"
                       />
-                      <Text style={styles.label}>გამოცდილება</Text>
+                      <Text style={styles.label}>
+                        {t("editProfile.workExperience")}
+                      </Text>
                     </View>
                     <View
                       style={[styles.input, styles.inputDisabled]}
@@ -656,7 +655,7 @@ export default function EditProfileScreen() {
                     >
                       <TextInput
                         style={[styles.textInput, styles.textInputDisabled]}
-                        placeholder="მაგ: 10 წელი"
+                        placeholder={t("editProfile.placeholder.experience")}
                         placeholderTextColor="#9CA3AF"
                         value={experience}
                         onChangeText={setExperience}
@@ -673,7 +672,7 @@ export default function EditProfileScreen() {
                         size={20}
                         color="#F59E0B"
                       />
-                      <Text style={styles.label}>მისამართი</Text>
+                      <Text style={styles.label}>{t("editProfile.address")}</Text>
                     </View>
                     <View
                       style={[styles.input, styles.inputDisabled]}
@@ -681,7 +680,7 @@ export default function EditProfileScreen() {
                     >
                       <TextInput
                         style={[styles.textInput, styles.textInputDisabled]}
-                        placeholder="მაგ: თბილისი, ვაკე"
+                        placeholder={t("editProfile.placeholder.address")}
                         placeholderTextColor="#9CA3AF"
                         value={location}
                         onChangeText={setLocation}
@@ -698,7 +697,9 @@ export default function EditProfileScreen() {
                         size={20}
                         color="#06B6D4"
                       />
-                      <Text style={styles.label}>კვალიფიკაცია / ხარისხი</Text>
+                      <Text style={styles.label}>
+                        {t("editProfile.qualification")}
+                      </Text>
                     </View>
                     <View
                       style={[
@@ -714,7 +715,7 @@ export default function EditProfileScreen() {
                           styles.textArea,
                           styles.textInputDisabled,
                         ]}
-                        placeholder="მაგ: მედიცინის დოქტორი, თსსუ"
+                        placeholder={t("editProfile.placeholder.qualification")}
                         placeholderTextColor="#9CA3AF"
                         value={degrees}
                         onChangeText={setDegrees}

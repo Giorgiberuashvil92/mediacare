@@ -12,6 +12,12 @@ export class ShopProduct {
   @Prop({ required: true, trim: true })
   name: string;
 
+  @Prop({ trim: true })
+  nameEn?: string;
+
+  @Prop({ trim: true })
+  nameRu?: string;
+
   @Prop({ trim: true, unique: true, sparse: true })
   icdCode?: string;
 

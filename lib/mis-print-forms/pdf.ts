@@ -14,8 +14,9 @@ export async function runMisPrintFormsPdfAction(options: {
   action: MisPrintFormsPdfAction;
   htmlForPdf: string;
   shareDialogTitle?: string;
+  t?: (key: string) => string;
 }): Promise<void> {
-  const { appointmentId, action, shareDialogTitle } = options;
+  const { appointmentId, action, shareDialogTitle, t } = options;
 
   let htmlForPdf = options.htmlForPdf.trim();
   if (!htmlForPdf) {
@@ -36,7 +37,11 @@ export async function runMisPrintFormsPdfAction(options: {
   }
 
   if (!htmlForPdf) {
-    Alert.alert("შეცდომა", "HIS ფორმის HTML ვერ მოიძებნა PDF გენერაციისთვის");
+    Alert.alert(
+      t?.("appointments.common.error") ?? "შეცდომა",
+      t?.("misPrintForms.pdfHtmlNotFound") ??
+        "HIS ფორმის HTML ვერ მოიძებნა PDF გენერაციისთვის",
+    );
     return;
   }
 
@@ -57,13 +62,17 @@ export async function runMisPrintFormsPdfAction(options: {
   if (shareAvailable) {
     await Sharing.shareAsync(printed.uri, {
       mimeType: "application/pdf",
-      dialogTitle: shareDialogTitle?.trim() || "HIS ფორმა (PDF)",
+      dialogTitle:
+        shareDialogTitle?.trim() ||
+        t?.("misPrintForms.pdfDialogTitle") ||
+        "HIS ფორმა (PDF)",
       UTI: "com.adobe.pdf",
     });
   } else {
     Alert.alert(
-      "შენიშვნა",
-      "გადმოწერა/გაზიარება ამ მოწყობილობაზე მიუწვდომელია",
+      t?.("appointments.common.note") ?? "შენიშვნა",
+      t?.("misPrintForms.pdfShareUnavailable") ??
+        "გადმოწერა/გაზიარება ამ მოწყობილობაზე მიუწვდომელია",
     );
   }
 }

@@ -4,12 +4,12 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
-    FlatList,
-    Modal,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  FlatList,
+  Modal,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -59,9 +59,7 @@ export default function FavouritesScreen() {
       <View style={styles.doctorInfo}>
         <Text style={styles.doctorName}>{doctor.name}</Text>
         <Text style={styles.doctorSpecialty}>{doctor.specialization}</Text>
-        <Text style={styles.doctorQualification}>
-          {doctor.degrees || ""}
-        </Text>
+        <Text style={styles.doctorQualification}>{doctor.degrees || ""}</Text>
         <Text style={styles.consultationFee}>
           {doctor.consultationFee || "არ არის მითითებული"}
         </Text>
@@ -94,12 +92,6 @@ export default function FavouritesScreen() {
       <Text style={styles.emptyDescription}>
         Start adding doctors to your favourites to see them here
       </Text>
-      <TouchableOpacity
-        style={styles.browseButton}
-        onPress={() => router.push("/screens/doctors/topdoctors")}
-      >
-        <Text style={styles.browseButtonText}>Browse Doctors</Text>
-      </TouchableOpacity>
     </View>
   );
 

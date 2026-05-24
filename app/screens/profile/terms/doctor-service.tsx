@@ -1,4 +1,5 @@
 import { apiService } from "@/app/_services/api";
+import { useLanguage } from "@/app/contexts/LanguageContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -13,6 +14,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function DoctorServiceTermsScreen() {
+  const { t } = useLanguage();
   const [content, setContent] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -52,7 +54,7 @@ export default function DoctorServiceTermsScreen() {
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={24} color="#1F2937" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>სერვისის პირობები</Text>
+        <Text style={styles.headerTitle}>{t("settings.menu.terms")}</Text>
         <View style={styles.placeholder} />
       </View>
 

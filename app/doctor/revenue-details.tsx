@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { apiService } from "../_services/api";
+import { useLanguage } from "../contexts/LanguageContext";
 
 interface PeriodStats {
   year: number;
@@ -31,30 +32,32 @@ interface DashboardStats {
     thisMonth: number;
     lastMonth: number;
   };
-  appointments: { completed: number; inProgress: number; uncompleted: number; total: number };
+  appointments: {
+    completed: number;
+    inProgress: number;
+    uncompleted: number;
+    total: number;
+  };
   patients: { total: number; new: number; returning: number };
   visits: { today: number; thisWeek: number; thisMonth: number; total: number };
-  videoConsultations?: { total: number; completed: number; thisMonth: number; lastMonth?: number };
-  homeVisits?: { total: number; completed: number; thisMonth: number; lastMonth?: number };
+  videoConsultations?: {
+    total: number;
+    completed: number;
+    thisMonth: number;
+    lastMonth?: number;
+  };
+  homeVisits?: {
+    total: number;
+    completed: number;
+    thisMonth: number;
+    lastMonth?: number;
+  };
   periodStats?: PeriodStats;
 }
 
-const MONTHS = [
-  { key: "01", label: "იანვარი" },
-  { key: "02", label: "თებერვალი" },
-  { key: "03", label: "მარტი" },
-  { key: "04", label: "აპრილი" },
-  { key: "05", label: "მაისი" },
-  { key: "06", label: "ივნისი" },
-  { key: "07", label: "ივლისი" },
-  { key: "08", label: "აგვისტო" },
-  { key: "09", label: "სექტემბერი" },
-  { key: "10", label: "ოქტომბერი" },
-  { key: "11", label: "ნოემბერი" },
-  { key: "12", label: "დეკემბერი" },
-];
-
-const WEEKDAYS = ["ორშ", "სამ", "ოთხ", "ხუთ", "პარ", "შაბ", "კვი"];
+const WEEKDAY_KEYS = [
+  "mon", "tue", "wed", "thu", "fri", "sat", "sun",
+] as const;
 
 function getCalendarGrid(year: number, month: number): (number | null)[] {
   const first = new Date(year, month - 1, 1);
@@ -73,17 +76,20 @@ function toYYYYMMDD(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-function formatDateLabel(dateStr: string): string {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  const monthLabel = MONTHS.find((x) => parseInt(x.key, 10) === m)?.label ?? "";
-  return `${d} ${monthLabel} ${y}`;
-}
-
 const startOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
 
 export default function RevenueDetails() {
   const router = useRouter();
+  const { t } = useLanguage();
   const now = new Date();
+
+  const getMonthLabel = (monthNum: number) =>
+    t(`doctor.revenue.month.${String(monthNum).padStart(2, "0")}`);
+
+  const formatDateLabel = (dateStr: string) => {
+    const [y, m, d] = dateStr.split("-").map(Number);
+    return `${d} ${getMonthLabel(m)} ${y}`;
+  };
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -110,15 +116,15 @@ export default function RevenueDetails() {
       if (response.success && response.data) {
         setStats(response.data as DashboardStats);
       } else {
-        setError("სტატისტიკის ჩატვირთვა ვერ მოხერხდა");
+        setError(t("doctor.revenue.loadError"));
       }
     } catch (err) {
       console.error("Error fetching stats:", err);
-      setError("სტატისტიკის ჩატვირთვა ვერ მოხერხდა");
+      setError(t("doctor.revenue.loadError"));
     } finally {
       setLoading(false);
     }
-  }, [dateFrom, dateTo]);
+  }, [dateFrom, dateTo, t]);
 
   useEffect(() => {
     fetchStats();
@@ -129,7 +135,7 @@ export default function RevenueDetails() {
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#06B6D4" />
-          <Text style={styles.loadingText}>მონაცემების ჩატვირთვა...</Text>
+          <Text style={styles.loadingText}>{t("doctor.revenue.loading")}</Text>
         </View>
       </SafeAreaView>
     );
@@ -141,13 +147,10 @@ export default function RevenueDetails() {
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle" size={48} color="#EF4444" />
           <Text style={styles.errorText}>
-            {error || "სტატისტიკის ჩატვირთვა ვერ მოხერხდა"}
+            {error || t("doctor.revenue.loadError")}
           </Text>
-          <TouchableOpacity
-            style={styles.retryButton}
-            onPress={fetchStats}
-          >
-            <Text style={styles.retryButtonText}>ხელახლა ცდა</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchStats}>
+            <Text style={styles.retryButtonText}>{t("doctor.revenue.retry")}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -156,11 +159,9 @@ export default function RevenueDetails() {
 
   const period = stats?.periodStats;
   const periodLabel =
-    period != null
-      ? period.dateFrom != null && period.dateTo != null
-        ? `${formatDateLabel(period.dateFrom)} — ${formatDateLabel(period.dateTo)}`
-        : `${MONTHS.find((m) => parseInt(m.key, 10) === period.month)?.label ?? ""} ${period.year}`
-      : "";
+    period?.dateFrom != null && period?.dateTo != null
+      ? `${formatDateLabel(period.dateFrom)} — ${formatDateLabel(period.dateTo)}`
+      : `${formatDateLabel(dateFrom)} — ${formatDateLabel(dateTo)}`;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -172,13 +173,13 @@ export default function RevenueDetails() {
           >
             <Ionicons name="arrow-back" size={24} color="#1F2937" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>დეტალური სტატისტიკა</Text>
+          <Text style={styles.headerTitle}>{t("doctor.profile.statistics")}</Text>
           <View style={styles.placeholder} />
         </View>
 
         {/* პერიოდი — დან / მდე */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>პერიოდი</Text>
+          <Text style={styles.sectionTitle}>{t("doctor.revenue.selectPeriod")}</Text>
           <View style={styles.periodRangeRow}>
             <TouchableOpacity
               style={styles.periodRangeField}
@@ -189,8 +190,10 @@ export default function RevenueDetails() {
                 setCalendarOpenFor("from");
               }}
             >
-              <Text style={styles.periodRangeLabel}>დან</Text>
-              <Text style={styles.periodRangeValue}>{formatDateLabel(dateFrom)}</Text>
+              <Text style={styles.periodRangeLabel}>{t("doctor.revenue.from")}</Text>
+              <Text style={styles.periodRangeValue}>
+                {formatDateLabel(dateFrom)}
+              </Text>
               <Ionicons name="calendar-outline" size={20} color="#06B6D4" />
             </TouchableOpacity>
             <TouchableOpacity
@@ -202,8 +205,10 @@ export default function RevenueDetails() {
                 setCalendarOpenFor("to");
               }}
             >
-              <Text style={styles.periodRangeLabel}>მდე</Text>
-              <Text style={styles.periodRangeValue}>{formatDateLabel(dateTo)}</Text>
+              <Text style={styles.periodRangeLabel}>{t("doctor.revenue.to")}</Text>
+              <Text style={styles.periodRangeValue}>
+                {formatDateLabel(dateTo)}
+              </Text>
               <Ionicons name="calendar-outline" size={20} color="#06B6D4" />
             </TouchableOpacity>
           </View>
@@ -226,8 +231,7 @@ export default function RevenueDetails() {
                   <Ionicons name="chevron-back" size={24} color="#1F2937" />
                 </TouchableOpacity>
                 <Text style={styles.calendarTitle}>
-                  {MONTHS.find((m) => parseInt(m.key, 10) === calendarViewMonth)?.label ?? ""}{" "}
-                  {calendarViewYear}
+                  {getMonthLabel(calendarViewMonth)} {calendarViewYear}
                 </Text>
                 <TouchableOpacity
                   hitSlop={12}
@@ -245,9 +249,9 @@ export default function RevenueDetails() {
                 </TouchableOpacity>
               </View>
               <View style={styles.weekdayRow}>
-                {WEEKDAYS.map((wd) => (
+                {WEEKDAY_KEYS.map((wd) => (
                   <Text key={wd} style={styles.weekdayLabel}>
-                    {wd}
+                    {t(`doctor.revenue.weekdayShort.${wd}`)}
                   </Text>
                 ))}
               </View>
@@ -307,49 +311,69 @@ export default function RevenueDetails() {
 
         {/* კონსულტაციების ტიპები - არჩეული პერიოდის მიხედვით */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>კონსულტაციების ტიპები</Text>
+          <Text style={styles.sectionTitle}>{t("doctor.revenue.service")}</Text>
           <View style={styles.consultationTypesRow}>
             <View style={styles.consultationTypeCard}>
-              <View style={[styles.consultationTypeIcon, { backgroundColor: "#E0F2FE" }]}>
+              <View
+                style={[
+                  styles.consultationTypeIcon,
+                  { backgroundColor: "#E0F2FE" },
+                ]}
+              >
                 <Ionicons name="videocam" size={28} color="#0EA5E9" />
               </View>
               <Text style={styles.consultationTypeValue}>
                 {period?.videoCount ?? 0}
               </Text>
-              <Text style={styles.consultationTypeLabel}>ვიდეო კონსულტაციები</Text>
+              <Text style={styles.consultationTypeLabel}>
+                {t("doctor.revenue.videoConsultation")}
+              </Text>
             </View>
             <View style={styles.consultationTypeCard}>
-              <View style={[styles.consultationTypeIcon, { backgroundColor: "#DCFCE7" }]}>
+              <View
+                style={[
+                  styles.consultationTypeIcon,
+                  { backgroundColor: "#DCFCE7" },
+                ]}
+              >
                 <Ionicons name="home" size={28} color="#10B981" />
               </View>
               <Text style={styles.consultationTypeValue}>
                 {period?.homeVisitCount ?? 0}
               </Text>
-              <Text style={styles.consultationTypeLabel}>ბინაზე ვიზიტები</Text>
+              <Text style={styles.consultationTypeLabel}>
+                {t("doctor.revenue.homeVisit")}
+              </Text>
             </View>
           </View>
         </View>
 
         {/* ფინანსური მიმოხილვა - არჩეული პერიოდის შემოსავალი (ექიმის წილი) */}
         <View style={[styles.section, { marginBottom: 24 }]}>
-          <Text style={styles.sectionTitle}>ფინანსური მიმოხილვა</Text>
+          <Text style={styles.sectionTitle}>{t("doctor.revenue.income")}</Text>
           <View style={styles.revenueCard}>
-            <Text style={styles.revenueLabel}>
-              {periodLabel ? `${periodLabel} — თქვენი შემოსავალი` : "არჩეული პერიოდი"}
-            </Text>
+            {periodLabel ? (
+              <Text style={styles.revenueLabel}>
+                {periodLabel} — {t("doctor.revenue.yourIncome")}
+              </Text>
+            ) : null}
             <Text style={styles.revenueValue}>
               ₾{(period?.totalEarnings ?? 0).toLocaleString()}
             </Text>
             <View style={styles.revenueDivider} />
             <View style={styles.revenueDetails}>
               <View style={styles.revenueItem}>
-                <Text style={styles.revenueItemLabel}>ვიდეო (60%)</Text>
+                <Text style={styles.revenueItemLabel}>
+                  {t("doctor.revenue.videoShare")}
+                </Text>
                 <Text style={styles.revenueItemValue}>
                   ₾{(period?.videoEarnings ?? 0).toLocaleString()}
                 </Text>
               </View>
               <View style={styles.revenueItem}>
-                <Text style={styles.revenueItemLabel}>ბინაზე ვიზიტი (50%)</Text>
+                <Text style={styles.revenueItemLabel}>
+                  {t("doctor.revenue.homeVisitShare")}
+                </Text>
                 <Text style={styles.revenueItemValue}>
                   ₾{(period?.homeVisitEarnings ?? 0).toLocaleString()}
                 </Text>

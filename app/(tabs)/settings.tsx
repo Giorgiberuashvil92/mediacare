@@ -16,10 +16,12 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { apiService } from "../_services/api";
 import { useAuth } from "../contexts/AuthContext";
+import { useLanguage } from "../contexts/LanguageContext";
 import { showToast } from "../utils/toast";
 
 export default function SettingsScreen() {
   const { user, logout, isAuthenticated } = useAuth();
+  const { t } = useLanguage();
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [comingSoonVisible, setComingSoonVisible] = useState(false);
 
@@ -49,13 +51,13 @@ export default function SettingsScreen() {
   };
 
   const handleLogout = async () => {
-    Alert.alert("გასვლა", "დარწმუნებული ხართ რომ გსურთ გასვლა?", [
+    Alert.alert(t("settings.logout.confirm"), undefined, [
       {
-        text: "გაუქმება",
+        text: t("appointments.common.cancel"),
         style: "cancel",
       },
       {
-        text: "გასვლა",
+        text: t("settings.logout.action"),
         style: "destructive",
         onPress: async () => {
           try {
@@ -73,7 +75,7 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>პარამეტრები</Text>
+        <Text style={styles.title}>{t("settings.title")}</Text>
       </View>
 
       <ScrollView style={styles.scrollContainer}>
@@ -100,7 +102,7 @@ export default function SettingsScreen() {
 
           <View style={styles.nameContainer}>
             <Text style={styles.userName}>
-              {user ? user.name : "მომხმარებელი"}
+              {user ? user.name : t("settings.user.default")}
             </Text>
           </View>
 
@@ -111,7 +113,9 @@ export default function SettingsScreen() {
           {user && (
             <View style={styles.roleContainer}>
               <Text style={styles.roleText}>
-                {user.role === "doctor" ? "ექიმი" : "პაციენტი"}
+                {user.role === "doctor"
+                  ? t("settings.role.doctor")
+                  : t("settings.role.patient")}
               </Text>
             </View>
           )}
@@ -130,7 +134,7 @@ export default function SettingsScreen() {
             >
               <Ionicons name="person-outline" size={20} color="#06B6D4" />
             </View>
-            <Text style={styles.menuText}>პროფილი</Text>
+            <Text style={styles.menuText}>{t("settings.menu.profile")}</Text>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity>
 
@@ -143,7 +147,7 @@ export default function SettingsScreen() {
             >
               <Ionicons name="document-text" size={20} color="#06B6D4" />
             </View>
-            <Text style={styles.menuText}>პირადი კაბინეტი - (მალე იქნება)</Text>
+            <Text style={styles.menuText}>{t("settings.menu.medicalHistory")}</Text>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity>
 
@@ -154,7 +158,7 @@ export default function SettingsScreen() {
             <View style={styles.menuIconContainer}>
               <Ionicons name="heart" size={20} color="#06B6D4" />
             </View>
-            <Text style={styles.menuText}>ფავორიტები</Text>
+            <Text style={styles.menuText}>{t("settings.menu.favorites")}</Text>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity>
           {/* 
@@ -184,7 +188,7 @@ export default function SettingsScreen() {
             <View style={styles.menuIconContainer}>
               <Ionicons name="shield-checkmark" size={20} color="#06B6D4" />
             </View>
-            <Text style={styles.menuText}>უსაფრთხოება</Text>
+            <Text style={styles.menuText}>{t("settings.menu.changePassword")}</Text>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity>
 
@@ -202,7 +206,9 @@ export default function SettingsScreen() {
             <View style={styles.menuIconContainer}>
               <Ionicons name="close-circle-outline" size={20} color="#06B6D4" />
             </View>
-            <Text style={styles.menuText}>ჯავშნების გაუქმების პირობები</Text>
+            <Text style={styles.menuText}>
+              {t("settings.menu.cancellationTerms")}
+            </Text>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity>
           <TouchableOpacity
@@ -216,7 +222,7 @@ export default function SettingsScreen() {
                 color="#06B6D4"
               />
             </View>
-            <Text style={styles.menuText}>სერვისის პირობები</Text>
+            <Text style={styles.menuText}>{t("settings.menu.terms")}</Text>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity>
           <TouchableOpacity
@@ -226,7 +232,7 @@ export default function SettingsScreen() {
             <View style={styles.menuIconContainer}>
               <Ionicons name="lock-closed-outline" size={20} color="#06B6D4" />
             </View>
-            <Text style={styles.menuText}>კონფიდენციალურობა</Text>
+            <Text style={styles.menuText}>{t("settings.menu.privacy")}</Text>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity>
           <TouchableOpacity
@@ -236,7 +242,7 @@ export default function SettingsScreen() {
             <View style={styles.menuIconContainer}>
               <Ionicons name="language" size={20} color="#06B6D4" />
             </View>
-            <Text style={styles.menuText}>ენა</Text>
+            <Text style={styles.menuText}>{t("settings.menu.language")}</Text>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity>
 
@@ -253,7 +259,7 @@ export default function SettingsScreen() {
             <View style={styles.menuIconContainer}>
               <Ionicons name="help-circle" size={20} color="#06B6D4" />
             </View>
-            <Text style={styles.menuText}>ხშირად დასმული კითხვები</Text>
+            <Text style={styles.menuText}>{t("settings.menu.faq")}</Text>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity>
 
@@ -270,7 +276,7 @@ export default function SettingsScreen() {
             <View style={styles.menuIconContainer}>
               <Ionicons name="call-outline" size={20} color="#10B981" />
             </View>
-            <Text style={styles.menuText}>კონტაქტები</Text>
+            <Text style={styles.menuText}>{t("settings.menu.contacts")}</Text>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity>
 
@@ -280,7 +286,7 @@ export default function SettingsScreen() {
                 <Ionicons name="log-out" size={20} color="#FF3B30" />
               </View>
               <Text style={[styles.menuText, { color: "#FF3B30" }]}>
-                გასვლა
+                {t("settings.logout.action")}
               </Text>
               <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
             </TouchableOpacity>
@@ -340,16 +346,18 @@ export default function SettingsScreen() {
             <View style={styles.modalIconWrap}>
               <Ionicons name="time-outline" size={40} color="#06B6D4" />
             </View>
-            <Text style={styles.modalTitle}>Coming soon</Text>
+            <Text style={styles.modalTitle}>{t("settings.comingSoon.title")}</Text>
             <Text style={styles.modalSubtitle}>
-              პირადი კაბინეტი მალე ხელმისაწვდომი იქნება.
+              {t("settings.comingSoon.message")}
             </Text>
             <TouchableOpacity
               style={styles.modalButton}
               onPress={() => setComingSoonVisible(false)}
               activeOpacity={0.85}
             >
-              <Text style={styles.modalButtonText}>გასაგებია</Text>
+              <Text style={styles.modalButtonText}>
+                {t("common.actions.understand")}
+              </Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>

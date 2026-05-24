@@ -1,6 +1,7 @@
 import { apiService } from "@/app/_services/api";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import Constants from "expo-constants";
 import * as DocumentPicker from "expo-document-picker";
 import { Image } from "expo-image";
 import { router, useFocusEffect } from "expo-router";
@@ -17,10 +18,17 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../contexts/AuthContext";
+import { useLanguage } from "../contexts/LanguageContext";
 import { showToast } from "../utils/toast";
 
 export default function DoctorProfile() {
   const { user, logout } = useAuth();
+  const { t, language } = useLanguage();
+  const dateLocale =
+    language === "ka" ? "ka-GE" : language === "ru" ? "ru-RU" : "en-US";
+  const appVersion = Constants.expoConfig?.version ?? "1.0.0";
+  const appName = t("onboarding.title");
+  const currentYear = new Date().getFullYear();
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [notifications, setNotifications] = useState({
     appointments: true,
@@ -39,7 +47,7 @@ export default function DoctorProfile() {
     const missingFields: string[] = [];
 
     if (!doctorProfile.profileImage) {
-      missingFields.push("პროფილის ფოტო");
+      missingFields.push(t("doctor.profile.label"));
     }
 
     return {
@@ -99,7 +107,10 @@ export default function DoctorProfile() {
       const file = result.assets[0];
 
       if (file.size && file.size > 5 * 1024 * 1024) {
-        showToast.error("სურათის ზომა არ უნდა აღემატებოდეს 5MB-ს", "შეცდომა");
+        showToast.error(
+          t("doctor.profile.imageTooLarge"),
+          t("settings.security.error.title"),
+        );
         return;
       }
 
@@ -123,14 +134,19 @@ export default function DoctorProfile() {
             ...prev,
             profileImage: uploadResponse.url,
           }));
-          showToast.success("ფოტო წარმატებით განახლდა", "წარმატება");
+          showToast.success(
+            t("doctor.profile.photoUpdated"),
+            t("settings.security.success.title"),
+          );
         }
       }
     } catch (error) {
       console.error("Profile image pick error:", error);
       showToast.error(
-        error instanceof Error ? error.message : "ფოტოს ატვირთვა ვერ მოხერხდა",
-        "შეცდომა",
+        error instanceof Error
+          ? error.message
+          : t("doctor.profile.photoUploadFailed"),
+        t("settings.security.error.title"),
       );
     } finally {
       setUploadingProfileImage(false);
@@ -138,13 +154,13 @@ export default function DoctorProfile() {
   };
 
   const handleLogout = () => {
-    Alert.alert("გასვლა", "დარწმუნებული ხართ რომ გსურთ გასვლა?", [
+    Alert.alert(t("settings.logout.confirm"), undefined, [
       {
-        text: "გაუქმება",
+        text: t("appointments.common.cancel"),
         style: "cancel",
       },
       {
-        text: "გასვლა",
+        text: t("settings.logout.action"),
         style: "destructive",
         onPress: async () => {
           await logout();
@@ -159,8 +175,8 @@ export default function DoctorProfile() {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>პარამეტრები</Text>
-          <Text style={styles.subtitle}>ექიმის პროფილი და პარამეტრები</Text>
+          <Text style={styles.title}>{t("settings.title")}</Text>
+          <Text style={styles.subtitle}>{t("doctor.profile.pageSubtitle")}</Text>
         </View>
 
         {/* Profile Card */}
@@ -230,7 +246,9 @@ export default function DoctorProfile() {
                       : styles.statusTextPassive,
                   ]}
                 >
-                  {profileStatus.isActive ? "აქტიური" : "პასიური"}
+                  {profileStatus.isActive
+                    ? t("doctor.profile.status.active")
+                    : t("doctor.profile.status.passive")}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -274,10 +292,10 @@ export default function DoctorProfile() {
               </View>
               <View>
                 <Text style={styles.detailedStatsTitle}>
-                  დეტალური სტატისტიკა
+                  {t("doctor.profile.statistics")}
                 </Text>
                 <Text style={styles.detailedStatsSubtitle}>
-                  ფინანსური და თვეების მიხედვით
+                  {t("doctor.profile.incomeByMonths")}
                 </Text>
               </View>
             </View>
@@ -287,7 +305,9 @@ export default function DoctorProfile() {
 
         {/* Language — იგივე ეკრანი, რაც პაციენტის პარამეტრებში */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>ენა და რეგიონი</Text>
+          <Text style={styles.sectionTitle}>
+            {t("doctor.profile.section.languageRegion")}
+          </Text>
           <View style={styles.menuCard}>
             <TouchableOpacity
               style={styles.menuItem}
@@ -298,9 +318,8 @@ export default function DoctorProfile() {
                   <Ionicons name="language" size={22} color="#06B6D4" />
                 </View>
                 <View style={styles.menuItemContent}>
-                  <Text style={styles.menuItemTitle}>ენა</Text>
-                  <Text style={styles.menuItemSubtitle}>
-                    აპლიკაციის ენის შეცვლა
+                  <Text style={styles.menuItemTitle}>
+                    {t("doctor.profile.languageShort")}
                   </Text>
                 </View>
               </View>
@@ -315,7 +334,9 @@ export default function DoctorProfile() {
 
         {/* Help & Support */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>დახმარება და მხარდაჭერა</Text>
+          <Text style={styles.sectionTitle}>
+            {t("doctor.profile.section.support")}
+          </Text>
           <View style={styles.menuCard}>
             <TouchableOpacity
               style={styles.menuItem}
@@ -332,10 +353,7 @@ export default function DoctorProfile() {
                 </View>
                 <View style={styles.menuItemContent}>
                   <Text style={styles.menuItemTitle}>
-                    ხშირად დასმული კითხვები
-                  </Text>
-                  <Text style={styles.menuItemSubtitle}>
-                    ხშირად დასმული კითხვები და პასუხები
+                    {t("settings.menu.faq")}
                   </Text>
                 </View>
               </View>
@@ -352,9 +370,8 @@ export default function DoctorProfile() {
                   <Ionicons name="lock-closed" size={22} color="#06B6D4" />
                 </View>
                 <View style={styles.menuItemContent}>
-                  <Text style={styles.menuItemTitle}>პაროლის შეცვლა</Text>
-                  <Text style={styles.menuItemSubtitle}>
-                    მიმდინარე პაროლის შეცვლა ახალი პაროლით
+                  <Text style={styles.menuItemTitle}>
+                    {t("settings.menu.changePassword")}
                   </Text>
                 </View>
               </View>
@@ -375,9 +392,8 @@ export default function DoctorProfile() {
                   <Ionicons name="call-outline" size={22} color="#10B981" />
                 </View>
                 <View style={styles.menuItemContent}>
-                  <Text style={styles.menuItemTitle}>კონტაქტები</Text>
-                  <Text style={styles.menuItemSubtitle}>
-                    საკონტაქტო ინფორმაცია
+                  <Text style={styles.menuItemTitle}>
+                    {t("settings.menu.contacts")}
                   </Text>
                 </View>
               </View>
@@ -388,7 +404,9 @@ export default function DoctorProfile() {
 
         {/* Collaboration Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>თანამშრომლობა</Text>
+          <Text style={styles.sectionTitle}>
+            {t("doctor.profile.section.collaboration")}
+          </Text>
           <View style={styles.menuCard}>
             <TouchableOpacity
               style={styles.menuItem}
@@ -401,9 +419,8 @@ export default function DoctorProfile() {
                   <Ionicons name="document-attach" size={22} color="#8B5CF6" />
                 </View>
                 <View style={styles.menuItemContent}>
-                  <Text style={styles.menuItemTitle}>ხელშეკრულება</Text>
-                  <Text style={styles.menuItemSubtitle}>
-                    თანამშრომლობის პირობები
+                  <Text style={styles.menuItemTitle}>
+                    {t("doctor.profile.menu.contract")}
                   </Text>
                 </View>
               </View>
@@ -414,16 +431,17 @@ export default function DoctorProfile() {
 
             <TouchableOpacity
               style={styles.menuItem}
-              onPress={() => router.push("/screens/profile/terms/usage" as any)}
+              onPress={() =>
+                router.push("/screens/profile/terms/privacy" as any)
+              }
             >
               <View style={styles.menuItemLeft}>
                 <View style={styles.menuIconContainer}>
                   <Ionicons name="reader" size={22} color="#10B981" />
                 </View>
                 <View style={styles.menuItemContent}>
-                  <Text style={styles.menuItemTitle}>მოხმარების წესები</Text>
-                  <Text style={styles.menuItemSubtitle}>
-                    აპლიკაციის მოხმარების წესები
+                  <Text style={styles.menuItemTitle}>
+                    {t("settings.menu.privacy")}
                   </Text>
                 </View>
               </View>
@@ -448,10 +466,7 @@ export default function DoctorProfile() {
                 </View>
                 <View style={styles.menuItemContent}>
                   <Text style={styles.menuItemTitle}>
-                    ჯავშნების გაუქმების პირობები
-                  </Text>
-                  <Text style={styles.menuItemSubtitle}>
-                    გაუქმების წესები და პირობები
+                    {t("settings.menu.cancellationTerms")}
                   </Text>
                 </View>
               </View>
@@ -475,9 +490,8 @@ export default function DoctorProfile() {
                   />
                 </View>
                 <View style={styles.menuItemContent}>
-                  <Text style={styles.menuItemTitle}>სერვისის პირობები</Text>
-                  <Text style={styles.menuItemSubtitle}>
-                    სერვისის გამოყენების პირობები
+                  <Text style={styles.menuItemTitle}>
+                    {t("settings.menu.terms")}
                   </Text>
                 </View>
               </View>
@@ -496,8 +510,9 @@ export default function DoctorProfile() {
                   />
                 </View>
                 <View style={styles.menuItemContent}>
-                  <Text style={styles.menuItemTitle}>აპლიკაციის შესახებ</Text>
-                  <Text style={styles.menuItemSubtitle}>ვერსია 1.0.0</Text>
+                  <Text style={styles.menuItemTitle}>
+                    {t("doctor.profile.menu.aboutApp")}
+                  </Text>
                 </View>
               </View>
               <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
@@ -513,13 +528,17 @@ export default function DoctorProfile() {
         <View style={styles.logoutSection}>
           <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
             <Ionicons name="log-out-outline" size={22} color="#EF4444" />
-            <Text style={styles.logoutText}>გასვლა</Text>
+            <Text style={styles.logoutText}>{t("settings.logout.action")}</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Medicare © 2024</Text>
-          <Text style={styles.footerVersion}>Version 1.0.0 (Build 100)</Text>
+          <Text style={styles.footerText}>
+            {appName} © {currentYear}
+          </Text>
+          <Text style={styles.footerVersion}>
+            {t("doctor.profile.versionLabel")} {appVersion}
+          </Text>
         </View>
       </ScrollView>
 
@@ -533,7 +552,9 @@ export default function DoctorProfile() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>პროფილის სტატუსი</Text>
+              <Text style={styles.modalTitle}>
+                {t("doctor.profile.statusModal.title")}
+              </Text>
               <TouchableOpacity
                 style={styles.modalCloseButton}
                 onPress={() => setStatusModalVisible(false)}
@@ -548,26 +569,25 @@ export default function DoctorProfile() {
                   <Ionicons name="checkmark-circle" size={48} color="#10B981" />
                 </View>
                 <Text style={styles.statusModalTitle}>
-                  თქვენი პროფილი აქტიურია!
+                  {t("doctor.profile.statusModal.activeTitle")}
                 </Text>
                 <Text style={styles.statusModalSubtitle}>
-                  ბოლოს განახლდა:{" "}
+                  {t("doctor.profile.statusModal.lastUpdated")}{" "}
                   {doctorProfile?.updatedAt
                     ? new Date(doctorProfile.updatedAt).toLocaleDateString(
-                        "ka-GE",
+                        dateLocale,
                         {
                           day: "numeric",
                           month: "long",
                           year: "numeric",
                         },
                       )
-                    : "უცნობია"}
+                    : t("doctor.profile.statusModal.unknownDate")}
                 </Text>
                 <View style={styles.recommendationBox}>
                   <Ionicons name="bulb-outline" size={20} color="#F59E0B" />
                   <Text style={styles.recommendationText}>
-                    ექიმის შესახებ ინფორმაციის განახლებისათვის მიწერეთ
-                    პლატფორმის ადმინისტრაციას
+                    {t("doctor.profile.statusModal.recommendation")}
                   </Text>
                 </View>
               </View>
@@ -577,10 +597,10 @@ export default function DoctorProfile() {
                   <Ionicons name="alert-circle" size={48} color="#EF4444" />
                 </View>
                 <Text style={styles.statusModalTitle}>
-                  თქვენი პროფილი არასრულია
+                  {t("doctor.profile.statusModal.incompleteTitle")}
                 </Text>
                 <Text style={styles.statusModalSubtitle}>
-                  გთხოვთ შეავსოთ შემდეგი ველები:
+                  {t("doctor.profile.statusModal.fillFields")}
                 </Text>
                 <View style={styles.missingFieldsList}>
                   {profileStatus.missingFields.map((field, index) => (
@@ -598,7 +618,7 @@ export default function DoctorProfile() {
                   }}
                 >
                   <Text style={styles.editProfileButtonText}>
-                    პროფილის რედაქტირება
+                    {t("doctor.profile.editProfile")}
                   </Text>
                 </TouchableOpacity>
               </View>

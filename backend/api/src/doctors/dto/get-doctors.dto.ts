@@ -56,7 +56,7 @@ export class GetDoctorsDto {
     if (typeof value === 'string') {
       return value as DoctorStatusFilter;
     }
-    return value;
+    return value as DoctorStatusFilter;
   })
   @IsEnum(DoctorStatusFilter, {
     message:

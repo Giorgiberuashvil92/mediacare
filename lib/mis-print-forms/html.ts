@@ -16,6 +16,14 @@ export type MisDocumentSectionPresentation = {
   caption?: string;
 };
 
+type TranslateFn = (key: string) => string;
+
+const docText = (
+  t: TranslateFn | undefined,
+  key: string,
+  fallback: string,
+): string => (t ? t(key) : fallback);
+
 /** MIS `templateKey` — ფორმა 100 (IV–100). */
 const MIS_TEMPLATE_KEY_FORM_100 =
   /ფორმა\s*iv|iv[\s\u2013\u2014\-]*100|ფორმა.*100\s*ა/i;
@@ -236,29 +244,52 @@ export function filterMisPrintDocumentsDoctorVisible(
  */
 export function formatMisDocumentSectionTitle(
   templateKey: string,
-  opts?: { printTypeName?: string; html?: string },
+  opts?: {
+    printTypeName?: string;
+    html?: string;
+    t?: TranslateFn;
+  },
 ): MisDocumentSectionPresentation {
+  const tr = opts?.t;
   const raw = templateKey.trim();
   const ptn = (opts?.printTypeName ?? "").trim();
   const htmlTitle = extractMisHtmlTitle(opts?.html ?? "");
   const bag = [raw, ptn, htmlTitle].filter(Boolean).join("\n");
-  if (!bag) return { heading: "დოკუმენტი" };
+  if (!bag) {
+    return { heading: docText(tr, "misPrintForms.document", "დოკუმენტი") };
+  }
 
   if (MIS_TEMPLATE_KEY_FORM_100.test(bag)) {
     return {
-      heading: "ფორმა 100",
-      caption: "IV–100 — ერთი მთლიანი დოკუმენტი",
+      heading: docText(tr, "misPrintForms.form100Heading", "ფორმა 100"),
+      caption: docText(
+        tr,
+        "misPrintForms.form100Caption",
+        "IV–100 — ერთი მთლიანი დოკუმენტი",
+      ),
     };
   }
 
   if (MIS_TEMPLATE_KEY_CALC_MONEY.test(bag) || MIS_HTML_TITLE_CALC.test(htmlTitle)) {
     return {
-      heading: "კალკულაცია",
-      caption: "ანგარიშფაქტურა · სერვისები და თანხები",
+      heading: docText(tr, "misPrintForms.calculationHeading", "კალკულაცია"),
+      caption: docText(
+        tr,
+        "misPrintForms.calculationCaption",
+        "ანგარიშფაქტურა · სერვისები და თანხები",
+      ),
     };
   }
 
-  return { heading: raw || ptn || htmlTitle || "დოკუმენტი" };
+  const hisCombined = docText(tr, "misPrintForms.hisFormCombined", "HIS ფორმა");
+  if (raw === "HIS ფორმა" || raw === hisCombined) {
+    return { heading: hisCombined };
+  }
+
+  return {
+    heading:
+      raw || ptn || htmlTitle || docText(tr, "misPrintForms.document", "დოკუმენტი"),
+  };
 }
 
 function wrapSingleMisHtmlDocument(fragmentOrFull: string): string {
@@ -272,7 +303,10 @@ function wrapSingleMisHtmlDocument(fragmentOrFull: string): string {
  * MIS GetFormsByServiceID — თითო ჩანაწერი ცალკე (პრევიუ + PDF), თუ `templateData` სტრიქონია.
  * სხვა სტრუქტურაზე — ერთი გაერთიანებული დოკუმენტი (`extractMisPrintFormsHtml`).
  */
-export function parseMisPrintFormDocuments(body: unknown): MisPrintFormDocument[] {
+export function parseMisPrintFormDocuments(
+  body: unknown,
+  t?: TranslateFn,
+): MisPrintFormDocument[] {
   if (body == null) return [];
 
   if (Array.isArray(body) && body.length > 0) {
@@ -292,7 +326,7 @@ export function parseMisPrintFormDocuments(body: unknown): MisPrintFormDocument[
         tk ||
         ptnRaw ||
         extractMisHtmlTitle(td) ||
-        `დოკუმენტი ${i + 1}`;
+        `${docText(t, "misPrintForms.document", "დოკუმენტი")} ${i + 1}`;
       const html = wrapSingleMisHtmlDocument(td);
       const rawFormNum = o.formNumber;
       const formNumber =
@@ -320,7 +354,13 @@ export function parseMisPrintFormDocuments(body: unknown): MisPrintFormDocument[
 
   const merged = extractMisPrintFormsHtml(body);
   if (!merged.trim()) return [];
-  return [{ id: "combined", title: "HIS ფორმა", html: merged }];
+  return [
+    {
+      id: "combined",
+      title: docText(t, "misPrintForms.hisFormCombined", "HIS ფორმა"),
+      html: merged,
+    },
+  ];
 }
 
 /**

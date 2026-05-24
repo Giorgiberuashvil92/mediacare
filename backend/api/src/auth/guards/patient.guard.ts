@@ -51,7 +51,7 @@ export class PatientGuard implements CanActivate {
         throw new UnauthorizedException('Invalid token: missing user ID');
       }
 
-      const userId = String(payload.sub).trim();
+      const userId = this.normalizeUserIdFromTokenSub(payload.sub);
 
       console.log('PatientGuard - normalized userId:', {
         userId,
@@ -131,5 +131,28 @@ export class PatientGuard implements CanActivate {
   private extractTokenFromHeader(request: Request): string | undefined {
     const [type, token] = request.headers.authorization?.split(' ') ?? [];
     return type === 'Bearer' ? token : undefined;
+  }
+
+  private normalizeUserIdFromTokenSub(sub: unknown): string {
+    if (typeof sub === 'string') {
+      return sub.trim();
+    }
+
+    if (sub instanceof mongoose.Types.ObjectId) {
+      return sub.toString();
+    }
+
+    if (sub && typeof sub === 'object') {
+      const doc = sub as { _id?: unknown; id?: unknown };
+      const rawId = doc._id ?? doc.id;
+      if (rawId instanceof mongoose.Types.ObjectId) {
+        return rawId.toString();
+      }
+      if (typeof rawId === 'string') {
+        return rawId.trim();
+      }
+    }
+
+    return String(sub).trim();
   }
 }

@@ -551,8 +551,11 @@ let AuthService = class AuthService {
         if (!tokenDoc) {
             throw new common_1.UnauthorizedException('Invalid refresh token');
         }
-        const user = tokenDoc.userId;
-        const tokens = await this.generateTokens(user);
+        const userId = this.resolveUserIdFromRefreshTokenDoc(tokenDoc.userId);
+        if (!userId) {
+            throw new common_1.UnauthorizedException('Invalid refresh token user');
+        }
+        const tokens = await this.generateTokens(userId);
         await this.refreshTokenModel.findByIdAndUpdate(tokenDoc._id, {
             revokedAt: new Date(),
         });
@@ -571,6 +574,30 @@ let AuthService = class AuthService {
             success: true,
             message: 'Logged out successfully',
         };
+    }
+    resolveUserIdFromRefreshTokenDoc(userRef) {
+        if (!userRef) {
+            return null;
+        }
+        if (typeof userRef === 'string') {
+            const trimmed = userRef.trim();
+            return mongoose.Types.ObjectId.isValid(trimmed) ? trimmed : null;
+        }
+        if (userRef instanceof mongoose.Types.ObjectId) {
+            return userRef.toString();
+        }
+        if (typeof userRef === 'object') {
+            const doc = userRef;
+            const rawId = doc._id ?? doc.id;
+            if (rawId instanceof mongoose.Types.ObjectId) {
+                return rawId.toString();
+            }
+            if (typeof rawId === 'string') {
+                const trimmed = rawId.trim();
+                return mongoose.Types.ObjectId.isValid(trimmed) ? trimmed : null;
+            }
+        }
+        return null;
     }
     async generateTokens(userId) {
         const payload = { sub: userId };

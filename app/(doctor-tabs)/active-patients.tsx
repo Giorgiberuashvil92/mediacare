@@ -19,6 +19,15 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { hasForm100ForVisitCompletion } from "../../assets/data/doctorDashboard";
 import { apiService } from "../_services/api";
+import { useLanguage } from "../contexts/LanguageContext";
+
+const resolvePatientImageUri = (image?: string | null): string | undefined => {
+  if (!image?.trim()) return undefined;
+  const trimmed = image.trim();
+  if (trimmed.startsWith("http")) return trimmed;
+  const base = apiService.getBaseURL()?.replace(/\/$/, "") ?? "";
+  return `${base}/${trimmed.replace(/^\//, "")}`;
+};
 
 interface LabTest {
   id: string;
@@ -57,6 +66,7 @@ interface ActivePatient {
 
 export default function ActivePatientsScreen() {
   const { type } = useLocalSearchParams<{ type: "video" | "home-visit" }>();
+  const { t } = useLanguage();
   const [patients, setPatients] = useState<ActivePatient[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -67,7 +77,12 @@ export default function ActivePatientsScreen() {
   const [showLabModal, setShowLabModal] = useState(false);
 
   const isVideoType = type === "video";
-  const title = isVideoType ? "ვიდეო კონსულტაცია" : "ბინაზე გამოძახება";
+  const title = isVideoType
+    ? t("doctor.tabs.videoConsultation")
+    : t("doctor.activePatients.homeVisit");
+  const emptyTypeLabel = isVideoType
+    ? t("doctor.tabs.videoConsultation")
+    : t("doctor.activePatients.homeVisit");
   const accentColor = isVideoType ? "#0EA5E9" : "#10B981";
 
   const loadPatients = useCallback(async () => {
@@ -125,7 +140,12 @@ export default function ActivePatientsScreen() {
                 (apt.patientDetails?.name && apt.patientDetails?.lastName
                   ? `${apt.patientDetails.name} ${apt.patientDetails.lastName}`
                   : apt.patientId?.name || "უცნობი პაციენტი"),
-              patientImage: apt.patientId?.profileImage,
+              patientImage: resolvePatientImageUri(
+                apt.patientProfileImage ||
+                  (typeof apt.patientId === "object"
+                    ? apt.patientId?.profileImage
+                    : undefined),
+              ),
               // date/time might come as 'date'/'time' or 'appointmentDate'/'appointmentTime'
               appointmentDate:
                 apt.date || apt.appointmentDate?.split("T")[0] || "",
@@ -270,21 +290,13 @@ export default function ActivePatientsScreen() {
                 contentFit="cover"
               />
             ) : (
-              <View
-                style={[
-                  styles.avatarPlaceholder,
-                  {
-                    backgroundColor:
-                      item.isFollowUp === true ? "#0EA5E9" : accentColor,
-                  },
-                ]}
-              >
-                <Ionicons
-                  name={item.isFollowUp ? "repeat" : "person"}
-                  size={24}
-                  color="#FFFFFF"
-                />
-              </View>
+              <Image
+                source={{
+                  uri: `https://ui-avatars.com/api/?name=${encodeURIComponent(item.patientName)}&size=200&background=06B6D4&color=fff`,
+                }}
+                style={styles.avatar}
+                contentFit="cover"
+              />
             )}
           </View>
           <View style={styles.patientInfo}>
@@ -334,21 +346,6 @@ export default function ActivePatientsScreen() {
               </View>
             )}
           </View>
-          <View
-            style={[
-              styles.statusBadge,
-              { backgroundColor: `${getStatusColor(item.status)}20` },
-            ]}
-          >
-            <Text
-              style={[
-                styles.statusText,
-                { color: getStatusColor(item.status) },
-              ]}
-            >
-              {getStatusLabel(item.status)}
-            </Text>
-          </View>
         </View>
 
         {/* Divider */}
@@ -381,7 +378,9 @@ export default function ActivePatientsScreen() {
                 { color: item.hasForm100 ? "#10B981" : "#EF4444" },
               ]}
             >
-              {item.hasForm100 ? "ფორმა 100 ✓" : "ფორმა 100 ❌"}
+              {item.hasForm100
+                ? `${t("doctor.activePatients.form100")} ✓`
+                : `${t("doctor.activePatients.form100")} ❌`}
             </Text>
             {!item.hasForm100 && <View style={styles.alertDot} />}
           </TouchableOpacity>
@@ -441,7 +440,7 @@ export default function ActivePatientsScreen() {
           >
             <Ionicons name="flask-outline" size={18} color="#F59E0B" />
             <Text style={[styles.actionButtonText, { color: "#F59E0B" }]}>
-              კვლევები
+              {t("doctor.activePatients.prescribeTests")}
             </Text>
           </TouchableOpacity>
         </View>
@@ -454,7 +453,9 @@ export default function ActivePatientsScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={accentColor} />
-          <Text style={styles.loadingText}>პაციენტების ჩატვირთვა...</Text>
+          <Text style={styles.loadingText}>
+            {t("doctor.activePatients.loading")}
+          </Text>
         </View>
       </SafeAreaView>
     );
@@ -487,14 +488,18 @@ export default function ActivePatientsScreen() {
       <View style={styles.statsBar}>
         <View style={styles.statItem}>
           <Text style={styles.statValue}>{patients.length}</Text>
-          <Text style={styles.statLabel}>სულ</Text>
+          <Text style={styles.statLabel}>
+            {t("doctor.activePatients.statsTotal")}
+          </Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
           <Text style={[styles.statValue, { color: "#EF4444" }]}>
             {patients.filter((p) => !p.hasForm100).length}
           </Text>
-          <Text style={styles.statLabel}>ფორმა 100 ❌</Text>
+          <Text style={styles.statLabel}>
+            {t("doctor.activePatients.form100")} ❌
+          </Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
@@ -507,7 +512,9 @@ export default function ActivePatientsScreen() {
               ).length
             }
           </Text>
-          <Text style={styles.statLabel}>ლაბ. მოლოდინში</Text>
+          <Text style={styles.statLabel}>
+            {t("doctor.activePatients.statsLabPending")}
+          </Text>
         </View>
       </View>
 
@@ -516,7 +523,7 @@ export default function ActivePatientsScreen() {
         <Ionicons name="search" size={20} color="#9CA3AF" />
         <TextInput
           style={styles.searchInput}
-          placeholder="პაციენტის ძებნა..."
+          placeholder={t("doctor.activePatients.searchPlaceholder")}
           placeholderTextColor="#9CA3AF"
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -544,10 +551,12 @@ export default function ActivePatientsScreen() {
               size={64}
               color="#D1D5DB"
             />
-            <Text style={styles.emptyTitle}>პაციენტები არ მოიძებნა</Text>
+            <Text style={styles.emptyTitle}>
+              {t("doctor.activePatients.notFound")}
+            </Text>
             <Text style={styles.emptySubtitle}>
-              აქტიური {isVideoType ? "ვიდეო კონსულტაციები" : "ბინაზე ვიზიტები"}{" "}
-              აქ გამოჩნდება
+              {t("doctor.activePatients.emptyPrefix")} {emptyTypeLabel}{" "}
+              {t("doctor.activePatients.emptySuffix")}
             </Text>
           </View>
         }
@@ -568,7 +577,9 @@ export default function ActivePatientsScreen() {
                 <Ionicons name="flask" size={24} color="#F59E0B" />
               </View>
               <View style={styles.labModalHeaderText}>
-                <Text style={styles.labModalTitle}>ლაბორატორიული კვლევები</Text>
+                <Text style={styles.labModalTitle}>
+                  {t("doctor.activePatients.laboratoryTests")}
+                </Text>
                 {selectedPatient && (
                   <Text style={styles.labModalSubtitle}>
                     {selectedPatient.patientName} •{" "}
@@ -594,7 +605,9 @@ export default function ActivePatientsScreen() {
                       <Text style={styles.labSummaryValue}>
                         {selectedPatient.labResultsTotal}
                       </Text>
-                      <Text style={styles.labSummaryLabel}>სულ კვლევა</Text>
+                      <Text style={styles.labSummaryLabel}>
+                        {t("doctor.activePatients.totalTests")}
+                      </Text>
                     </View>
                     <View style={styles.labSummaryDivider} />
                     <View style={styles.labSummaryItem}>
@@ -603,7 +616,9 @@ export default function ActivePatientsScreen() {
                       >
                         {selectedPatient.labResultsCompleted}
                       </Text>
-                      <Text style={styles.labSummaryLabel}>დასრულებული</Text>
+                      <Text style={styles.labSummaryLabel}>
+                        {t("doctor.activePatients.completedTests")}
+                      </Text>
                     </View>
                     <View style={styles.labSummaryDivider} />
                     <View style={styles.labSummaryItem}>
@@ -613,12 +628,16 @@ export default function ActivePatientsScreen() {
                         {selectedPatient.labResultsTotal -
                           selectedPatient.labResultsCompleted}
                       </Text>
-                      <Text style={styles.labSummaryLabel}>მოლოდინში</Text>
+                      <Text style={styles.labSummaryLabel}>
+                        {t("doctor.activePatients.pendingTests")}
+                      </Text>
                     </View>
                   </View>
 
                   {/* Tests List */}
-                  <Text style={styles.labTestsHeader}>დანიშნული კვლევები:</Text>
+                  <Text style={styles.labTestsHeader}>
+                    {t("doctor.activePatients.assignedTests")}:
+                  </Text>
                   {selectedPatient.labTests.map((test, index) => (
                     <View
                       key={`${test.id}-${index}`}

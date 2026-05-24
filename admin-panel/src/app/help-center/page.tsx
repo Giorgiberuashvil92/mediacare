@@ -9,9 +9,13 @@ type FAQRole = 'doctor' | 'patient';
 interface FAQItem {
   question: string;
   answer: string;
+  questionEn?: string;
+  answerEn?: string;
+  questionRu?: string;
+  answerRu?: string;
   isActive: boolean;
   order: number;
-  role?: FAQRole; // Role: doctor or patient
+  role?: FAQRole;
 }
 
 interface ContactInfo {
@@ -23,6 +27,77 @@ interface ContactInfo {
   workingHours?: string;
 }
 
+type FaqLangValues = Pick<
+  FAQItem,
+  'question' | 'answer' | 'questionEn' | 'answerEn' | 'questionRu' | 'answerRu'
+>;
+
+function FaqLanguageFields({
+  values,
+  onChange,
+}: {
+  values: FaqLangValues;
+  onChange: (field: keyof FaqLangValues, value: string) => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border border-stroke bg-white p-3">
+        <p className="mb-2 text-sm font-medium text-black">ქართული *</p>
+        <input
+          type="text"
+          value={values.question}
+          onChange={(e) => onChange('question', e.target.value)}
+          placeholder="კითხვა (ქართული)"
+          className="mb-2 w-full rounded border border-stroke bg-transparent px-4 py-2.5 text-black outline-none focus:border-primary"
+        />
+        <textarea
+          value={values.answer}
+          onChange={(e) => onChange('answer', e.target.value)}
+          placeholder="პასუხი (ქართული)"
+          rows={3}
+          className="w-full rounded border border-stroke bg-transparent px-4 py-2.5 text-black outline-none focus:border-primary"
+        />
+      </div>
+
+      <div className="rounded-lg border border-stroke bg-white p-3">
+        <p className="mb-2 text-sm font-medium text-black">English</p>
+        <input
+          type="text"
+          value={values.questionEn || ''}
+          onChange={(e) => onChange('questionEn', e.target.value)}
+          placeholder="Question (English)"
+          className="mb-2 w-full rounded border border-stroke bg-transparent px-4 py-2.5 text-black outline-none focus:border-primary"
+        />
+        <textarea
+          value={values.answerEn || ''}
+          onChange={(e) => onChange('answerEn', e.target.value)}
+          placeholder="Answer (English)"
+          rows={3}
+          className="w-full rounded border border-stroke bg-transparent px-4 py-2.5 text-black outline-none focus:border-primary"
+        />
+      </div>
+
+      <div className="rounded-lg border border-stroke bg-white p-3">
+        <p className="mb-2 text-sm font-medium text-black">Русский</p>
+        <input
+          type="text"
+          value={values.questionRu || ''}
+          onChange={(e) => onChange('questionRu', e.target.value)}
+          placeholder="Вопрос (русский)"
+          className="mb-2 w-full rounded border border-stroke bg-transparent px-4 py-2.5 text-black outline-none focus:border-primary"
+        />
+        <textarea
+          value={values.answerRu || ''}
+          onChange={(e) => onChange('answerRu', e.target.value)}
+          placeholder="Ответ (русский)"
+          rows={3}
+          className="w-full rounded border border-stroke bg-transparent px-4 py-2.5 text-black outline-none focus:border-primary"
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function HelpCenterPage() {
   const [faqs, setFaqs] = useState<FAQItem[]>([]);
   const [contactInfo, setContactInfo] = useState<ContactInfo>({});
@@ -32,7 +107,15 @@ export default function HelpCenterPage() {
   const [submitting, setSubmitting] = useState(false);
   
   // New FAQ form
-  const [newFaq, setNewFaq] = useState({ question: '', answer: '', role: 'patient' as FAQRole });
+  const [newFaq, setNewFaq] = useState({
+    question: '',
+    answer: '',
+    questionEn: '',
+    answerEn: '',
+    questionRu: '',
+    answerRu: '',
+    role: 'patient' as FAQRole,
+  });
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [filterRole, setFilterRole] = useState<'all' | FAQRole>('all');
 
@@ -66,6 +149,10 @@ export default function HelpCenterPage() {
         faqs: faqs.map((faq, index) => ({
           ...faq,
           order: index,
+          questionEn: faq.questionEn?.trim() || undefined,
+          answerEn: faq.answerEn?.trim() || undefined,
+          questionRu: faq.questionRu?.trim() || undefined,
+          answerRu: faq.answerRu?.trim() || undefined,
         })),
         contactInfo,
       });
@@ -89,7 +176,15 @@ export default function HelpCenterPage() {
       return;
     }
     setFaqs([...faqs, { ...newFaq, isActive: true, order: faqs.length }]);
-    setNewFaq({ question: '', answer: '', role: 'patient' });
+    setNewFaq({
+      question: '',
+      answer: '',
+      questionEn: '',
+      answerEn: '',
+      questionRu: '',
+      answerRu: '',
+      role: 'patient',
+    });
     setError(null);
   };
 
@@ -264,27 +359,15 @@ export default function HelpCenterPage() {
                 <option value="doctor">ექიმი</option>
               </select>
             </div>
-            <div className="mb-3">
-              <input
-                type="text"
-                value={newFaq.question}
-                onChange={(e) => setNewFaq({ ...newFaq, question: e.target.value })}
-                placeholder="კითხვა"
-                className="w-full rounded border border-stroke bg-white px-4 py-2.5 text-black outline-none focus:border-primary"
-              />
-            </div>
-            <div className="mb-3">
-              <textarea
-                value={newFaq.answer}
-                onChange={(e) => setNewFaq({ ...newFaq, answer: e.target.value })}
-                placeholder="პასუხი"
-                rows={3}
-                className="w-full rounded border border-stroke bg-white px-4 py-2.5 text-black outline-none focus:border-primary"
-              />
-            </div>
+            <FaqLanguageFields
+              values={newFaq}
+              onChange={(field, value) =>
+                setNewFaq({ ...newFaq, [field]: value })
+              }
+            />
             <button
               onClick={handleAddFaq}
-              className="rounded bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-opacity-90"
+              className="mt-4 rounded bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-opacity-90"
             >
               დამატება
             </button>
@@ -324,21 +407,15 @@ export default function HelpCenterPage() {
                           <option value="doctor">ექიმი</option>
                         </select>
                       </div>
-                      <input
-                        type="text"
-                        value={faq.question}
-                        onChange={(e) => handleUpdateFaq(index, 'question', e.target.value)}
-                        className="mb-2 w-full rounded border border-stroke px-3 py-2 text-black outline-none focus:border-primary"
-                      />
-                      <textarea
-                        value={faq.answer}
-                        onChange={(e) => handleUpdateFaq(index, 'answer', e.target.value)}
-                        rows={3}
-                        className="mb-2 w-full rounded border border-stroke px-3 py-2 text-black outline-none focus:border-primary"
+                      <FaqLanguageFields
+                        values={faq}
+                        onChange={(field, value) =>
+                          handleUpdateFaq(index, field, value)
+                        }
                       />
                       <button
                         onClick={() => setEditingIndex(null)}
-                        className="rounded bg-primary px-3 py-1.5 text-sm text-white hover:bg-opacity-90"
+                        className="mt-3 rounded bg-primary px-3 py-1.5 text-sm text-white hover:bg-opacity-90"
                       >
                         დასრულება
                       </button>
@@ -356,6 +433,16 @@ export default function HelpCenterPage() {
                                   : 'bg-green-100 text-green-800'
                               }`}>
                                 {faq.role === 'doctor' ? 'ექიმი' : 'პაციენტი'}
+                              </span>
+                            )}
+                            {faq.questionEn?.trim() && (
+                              <span className="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                                EN
+                              </span>
+                            )}
+                            {faq.questionRu?.trim() && (
+                              <span className="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                                RU
                               </span>
                             )}
                           </div>

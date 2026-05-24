@@ -29,6 +29,7 @@ const specializations_module_1 = require("./specializations/specializations.modu
 const terms_module_1 = require("./terms/terms.module");
 const integrations_module_1 = require("./integrations/integrations.module");
 const upload_module_1 = require("./upload/upload.module");
+const documents_module_1 = require("./documents/documents.module");
 const moduleImports = [
     config_1.ConfigModule.forRoot({
         isGlobal: true,
@@ -62,6 +63,7 @@ const moduleImports = [
     help_center_module_1.HelpCenterModule,
     notifications_module_1.NotificationsModule,
     payment_module_1.PaymentModule,
+    documents_module_1.DocumentsModule,
 ];
 let AppModule = class AppModule {
 };

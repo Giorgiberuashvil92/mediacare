@@ -7,6 +7,37 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
+import * as mongoose from 'mongoose';
+
+function normalizeJwtSubject(sub: unknown): string | null {
+  if (!sub) {
+    return null;
+  }
+
+  if (typeof sub === 'string') {
+    const trimmed = sub.trim();
+    return trimmed || null;
+  }
+
+  if (sub instanceof mongoose.Types.ObjectId) {
+    return sub.toString();
+  }
+
+  if (typeof sub === 'object') {
+    const doc = sub as { _id?: unknown; id?: unknown };
+    const rawId = doc._id ?? doc.id;
+    if (rawId instanceof mongoose.Types.ObjectId) {
+      return rawId.toString();
+    }
+    if (typeof rawId === 'string') {
+      const trimmed = rawId.trim();
+      return trimmed || null;
+    }
+  }
+
+  const fallback = String(sub).trim();
+  return fallback && fallback !== '[object Object]' ? fallback : null;
+}
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -44,10 +75,17 @@ export class JwtAuthGuard implements CanActivate {
           throw new UnauthorizedException('Invalid token: missing user ID');
         }
 
-        // Normalize payload.sub to ensure it's a string
+        const normalizedSub = normalizeJwtSubject(payload.sub);
+        if (!normalizedSub) {
+          console.error(
+            '🔐 JwtAuthGuard - payload.sub could not be normalized',
+          );
+          throw new UnauthorizedException('Invalid token: missing user ID');
+        }
+
         const normalizedPayload = {
           ...payload,
-          sub: String(payload.sub).trim(),
+          sub: normalizedSub,
         };
 
         console.log('🔐 JwtAuthGuard - normalized payload:', {

@@ -303,9 +303,93 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
   private lastResponse: MisLoginResponse | null = null;
   private refreshTimer: NodeJS.Timeout | null = null;
   private readonly autoRefreshIntervalMs = Number.parseInt(
-    process.env.MIS_AUTH_AUTO_REFRESH_MS || `${25 * 60 * 1000}`,
+    process.env.MIS_AUTH_AUTO_REFRESH_MS || `${20 * 60 * 1000}`,
     10,
   );
+
+  /** GET /Home/Login header-ისთვის: ჯერ მიმდინარე HIS token, შემდეგ env fallback */
+  private getLoginTokenForAuthRequest(): string {
+    return this.storedValue?.trim() || this.loginTokenHeader.trim();
+  }
+
+  private looksLikeMisTokenError(
+    status: number,
+    responseText: string,
+    parsed?: unknown,
+  ): boolean {
+    if (status === 401 || status === 403) {
+      return true;
+    }
+    const haystack = `${responseText} ${
+      parsed ? JSON.stringify(parsed) : ''
+    }`.toLowerCase();
+    return (
+      haystack.includes('token') &&
+      (haystack.includes('expir') ||
+        haystack.includes('invalid') ||
+        haystack.includes('unauthorized') ||
+        haystack.includes('logintoken'))
+    );
+  }
+
+  private async fetchMisLogin(
+    loginTokenForHeader: string,
+  ): Promise<MisLoginResponse | null> {
+    const url = new URL(this.loginUrl);
+    url.searchParams.set('loginName', this.loginName);
+    url.searchParams.set('password', this.password);
+
+    this.logger.log(
+      `MIS GET Login: ${url.origin}${url.pathname} | LoginToken header length=${loginTokenForHeader.length}`,
+    );
+
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        LoginToken: loginTokenForHeader,
+      },
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      this.logger.error(
+        `MIS login failed: ${response.status} ${response.statusText} | ${body}`,
+      );
+      return null;
+    }
+
+    const rawJson: unknown = await response.json();
+    const data = parseMisLoginResponse(rawJson);
+    if (!data) {
+      this.logger.error(
+        `MIS login: პასუხის ფორმატი არ ვიცნობ ${JSON.stringify(rawJson)}`,
+      );
+      return null;
+    }
+
+    this.lastResponse = data;
+
+    if (data.value) {
+      this.storedValue = data.value;
+      if (data.code !== 0) {
+        this.logger.warn(
+          `MIS login: Code=${data.code} (სავარაუდოდ 0 უნდა იყოს წარმატებაზე), მაგრამ Value მოვიდა — ვინახავთ LoginToken-ს`,
+        );
+      }
+      this.logger.log(
+        `MIS LoginToken (header LoginToken Ambulatory-ზე), სიგრძე=${data.value.length}: ${data.value}`,
+      );
+    } else {
+      this.logger.warn(
+        `MIS login: Value ცარიელია — Ambulatory მოთხოვნებზე LoginToken არ გექნება. code=${data.code} message="${data.message}"`,
+      );
+    }
+
+    this.logger.log(
+      `MIS login response code=${data.code} message="${data.message}"`,
+    );
+    return data;
+  }
 
   async onApplicationBootstrap(): Promise<void> {
     this.logger.log(
@@ -396,58 +480,18 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   async refreshLoginToken(): Promise<MisLoginResponse | null> {
-    const url = new URL(this.loginUrl);
-    url.searchParams.set('loginName', this.loginName);
-    url.searchParams.set('password', this.password);
-
     try {
-      this.logger.log(`MIS GET Login: ${url.origin}${url.pathname}`);
+      const previousToken = this.getLoginTokenForAuthRequest();
+      let data = await this.fetchMisLogin(previousToken);
 
-      const response = await fetch(url.toString(), {
-        method: 'GET',
-        headers: {
-          LoginToken: this.loginTokenHeader,
-        },
-      });
-
-      if (!response.ok) {
-        const body = await response.text();
-        this.logger.error(
-          `MIS login failed: ${response.status} ${response.statusText} | ${body}`,
-        );
-        return null;
-      }
-
-      const rawJson: unknown = await response.json();
-      const data = parseMisLoginResponse(rawJson);
-      if (!data) {
-        this.logger.error(
-          `MIS login: პასუხის ფორმატი არ ვიცნობ ${JSON.stringify(rawJson)}`,
-        );
-        return null;
-      }
-
-      this.lastResponse = data;
-
-      if (data.value) {
-        this.storedValue = data.value;
-        if (data.code !== 0) {
-          this.logger.warn(
-            `MIS login: Code=${data.code} (სავარაუდოდ 0 უნდა იყოს წარმატებაზე), მაგრამ Value მოვიდა — ვინახავთ LoginToken-ს`,
-          );
-        }
-        this.logger.log(
-          `MIS LoginToken (header LoginToken Ambulatory-ზე), სიგრძე=${data.value.length}: ${data.value}`,
-        );
-      } else {
+      if (!data?.value && previousToken) {
         this.logger.warn(
-          `MIS login: Value ცარიელია — Ambulatory მოთხოვნებზე LoginToken არ გექნება. code=${data.code} message="${data.message}"`,
+          'MIS login: ძველი LoginToken-ით refresh ვერ მოხერხდა — ვცდი env/ცარიელი header-ით',
         );
+        this.storedValue = null;
+        data = await this.fetchMisLogin(this.loginTokenHeader.trim());
       }
 
-      this.logger.log(
-        `MIS login response code=${data.code} message="${data.message}"`,
-      );
       return data;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -467,28 +511,50 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
   async upsertPatient(
     payload: MisPatientPayload,
   ): Promise<MisPatientUpsertResult> {
-    const loginToken = await this.ensureMisLoginToken(true);
+    const requestBody = buildMisAddOrUpdateRequestBody(payload);
+    const rawSentId = requestBody.ID;
+    const sentMisPatientGuid = typeof rawSentId === 'string' ? rawSentId : '';
+    const plainBody = misPatientRequestPlainObject(requestBody);
+    const bodyJson = JSON.stringify(plainBody);
 
-    if (!loginToken) {
-      this.logger.error('Cannot upsert MIS patient: LoginToken is empty');
-      return { success: false, personId: null };
-    }
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (attempt > 0) {
+        this.logger.warn(
+          'MIS AddOrUpdatePatient: მეორე ცდა — LoginToken ხელახლა განახლება',
+        );
+        await this.refreshLoginToken();
+      }
 
-    try {
-      this.logger.log(
-        `MIS patient upsert request | url=${this.patientUpsertUrl} | hasLoginToken=${Boolean(loginToken)}`,
-      );
-      const requestBody = buildMisAddOrUpdateRequestBody(payload);
-      const rawSentId = requestBody.ID;
-      const sentMisPatientGuid = typeof rawSentId === 'string' ? rawSentId : '';
-      const plainBody = misPatientRequestPlainObject(requestBody);
-      const bodyJson = JSON.stringify(plainBody);
-      this.logger.log(
-        `MIS patient upsert body (მხოლოდ აპლიკაციის ველები, undefined ამოღებული):\n${JSON.stringify(plainBody, null, 2)}`,
-      );
-      this.logger.log(
-        `MIS patient upsert request payload (exact outbound):\n${JSON.stringify(
-          {
+      const loginToken = await this.ensureMisLoginToken(attempt === 0);
+      if (!loginToken) {
+        this.logger.error('Cannot upsert MIS patient: LoginToken is empty');
+        return { success: false, personId: null };
+      }
+
+      try {
+        this.logger.log(
+          `MIS patient upsert request (ცდა ${attempt + 1}/2) | url=${this.patientUpsertUrl} | hasLoginToken=${Boolean(loginToken)}`,
+        );
+        this.logger.log(
+          `MIS patient upsert body (მხოლოდ აპლიკაციის ველები, undefined ამოღებული):\n${JSON.stringify(plainBody, null, 2)}`,
+        );
+        this.logger.log(
+          `MIS patient upsert request payload (exact outbound):\n${JSON.stringify(
+            {
+              method: 'POST',
+              url: this.patientUpsertUrl,
+              headers: {
+                'Content-Type': 'application/json; charset=utf-8',
+                LoginToken: loginToken,
+              },
+              body: plainBody,
+            },
+            null,
+            2,
+          )}`,
+        );
+        this.logger.log(
+          `MIS_UPSERT_OUTBOUND::${JSON.stringify({
             method: 'POST',
             url: this.patientUpsertUrl,
             headers: {
@@ -496,180 +562,211 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
               LoginToken: loginToken,
             },
             body: plainBody,
-          },
-          null,
-          2,
-        )}`,
-      );
-      this.logger.log(
-        `MIS_UPSERT_OUTBOUND::${JSON.stringify({
+          })}`,
+        );
+
+        const response = await fetch(this.patientUpsertUrl, {
           method: 'POST',
-          url: this.patientUpsertUrl,
           headers: {
             'Content-Type': 'application/json; charset=utf-8',
             LoginToken: loginToken,
           },
-          body: plainBody,
-        })}`,
-      );
+          body: bodyJson,
+        });
 
-      const response = await fetch(this.patientUpsertUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          LoginToken: loginToken,
-        },
-        body: bodyJson,
-      });
+        const responseText = await response.text();
 
-      const responseText = await response.text();
+        this.logger.log(
+          `MIS AddOrUpdatePatient ← HTTP ${response.status} ${response.statusText} | RAW BODY:\n${responseText}`,
+        );
 
-      this.logger.log(
-        `MIS AddOrUpdatePatient ← HTTP ${response.status} ${response.statusText} | RAW BODY:\n${responseText}`,
-      );
+        if (!response.ok) {
+          if (
+            attempt === 0 &&
+            this.looksLikeMisTokenError(response.status, responseText)
+          ) {
+            continue;
+          }
+          return { success: false, personId: null };
+        }
 
-      if (!response.ok) {
-        return { success: false, personId: null };
-      }
-
-      let parsed: unknown;
-      const trimmed = responseText.trim();
-      if (trimmed) {
-        try {
-          parsed = JSON.parse(trimmed) as unknown;
-          this.logger.log(
-            `MIS AddOrUpdatePatient ← PARSED (რასაც API დააბრუნებს):\n${JSON.stringify(parsed, null, 2)}`,
-          );
-        } catch {
-          this.logger.warn(
-            `MIS AddOrUpdatePatient: ტექსტი JSON არ არის (პირველი 800 სიმბოლო): ${trimmed.slice(0, 800)}`,
-          );
+        let parsed: unknown;
+        const trimmed = responseText.trim();
+        if (trimmed) {
+          try {
+            parsed = JSON.parse(trimmed) as unknown;
+            this.logger.log(
+              `MIS AddOrUpdatePatient ← PARSED (რასაც API დააბრუნებს):\n${JSON.stringify(parsed, null, 2)}`,
+            );
+          } catch {
+            this.logger.warn(
+              `MIS AddOrUpdatePatient: ტექსტი JSON არ არის (პირველი 800 სიმბოლო): ${trimmed.slice(0, 800)}`,
+            );
+            parsed = undefined;
+          }
+        } else {
           parsed = undefined;
         }
-      } else {
-        parsed = undefined;
-      }
 
-      const personId = tryPickPersonIdFromMisBody(parsed);
+        const personId = tryPickPersonIdFromMisBody(parsed);
 
-      if (misEnvelopeIndicatesFailure(parsed)) {
-        let failMsg = '';
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-          const m = (parsed as Record<string, unknown>).message;
-          if (typeof m === 'string') failMsg = m;
-        }
-        if (personId) {
-          if (
-            misPatientUpsertCanceledWithEchoedId(
-              failMsg,
-              personId,
-              sentMisPatientGuid,
-            )
-          ) {
-            this.logger.error(
-              `MIS AddOrUpdatePatient: result=false + „canceled“ და value ემთხვევა გაგზავნილ ID-ს (${personId}) — სავარაუდოდ პაციენტი არ დარეგისტრირდა (echo), წარუმატებლად ვითვლით.${failMsg ? ` message=${failMsg}` : ''}`,
-            );
-            return { success: false, personId: null };
+        if (misEnvelopeIndicatesFailure(parsed)) {
+          let failMsg = '';
+          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            const m = (parsed as Record<string, unknown>).message;
+            if (typeof m === 'string') failMsg = m;
           }
-          this.logger.warn(
-            `MIS AddOrUpdatePatient: result=false, მაგრამ სხვა სიგნალი PersonID-ზე (${personId}) — წარმატებად ვითვლით (დაადასტურე MIS-ში).${failMsg ? ` message=${failMsg}` : ''}`,
+          if (personId) {
+            if (
+              misPatientUpsertCanceledWithEchoedId(
+                failMsg,
+                personId,
+                sentMisPatientGuid,
+              )
+            ) {
+              this.logger.error(
+                `MIS AddOrUpdatePatient: result=false + „canceled“ და value ემთხვევა გაგზავნილ ID-ს (${personId}) — სავარაუდოდ პაციენტი არ დარეგისტრირდა (echo), წარუმატებლად ვითვლით.${failMsg ? ` message=${failMsg}` : ''}`,
+              );
+              return { success: false, personId: null };
+            }
+            this.logger.warn(
+              `MIS AddOrUpdatePatient: result=false, მაგრამ სხვა სიგნალი PersonID-ზე (${personId}) — წარმატებად ვითვლით (დაადასტურე MIS-ში).${failMsg ? ` message=${failMsg}` : ''}`,
+            );
+            return { success: true, personId };
+          }
+          this.logger.error(
+            `MIS AddOrUpdatePatient უარყოფილია (result=false ან Result=false)${failMsg ? `: ${failMsg}` : ''}`,
           );
-          return { success: true, personId };
+          if (
+            attempt === 0 &&
+            this.looksLikeMisTokenError(200, responseText, parsed)
+          ) {
+            continue;
+          }
+          return { success: false, personId: null };
         }
-        this.logger.error(
-          `MIS AddOrUpdatePatient უარყოფილია (result=false ან Result=false)${failMsg ? `: ${failMsg}` : ''}`,
+
+        this.logger.log(
+          `MIS AddOrUpdatePatient ← ამოღებული personId ველიდან (თუ იყო): ${personId ?? '(არ ვიპოვე — ზემოთ RAW/PARSED ნახე)'} | ჩვენი PersonalID=${payload.PersonalID}`,
         );
+        return { success: true, personId };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.error(`MIS patient upsert request error: ${message}`);
+        if (attempt === 0) {
+          continue;
+        }
         return { success: false, personId: null };
       }
-
-      this.logger.log(
-        `MIS AddOrUpdatePatient ← ამოღებული personId ველიდან (თუ იყო): ${personId ?? '(არ ვიპოვე — ზემოთ RAW/PARSED ნახე)'} | ჩვენი PersonalID=${payload.PersonalID}`,
-      );
-      return { success: true, personId };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`MIS patient upsert request error: ${message}`);
-      return { success: false, personId: null };
     }
+
+    return { success: false, personId: null };
   }
 
   async generateService(
     payload: MisGenerateServicePayload,
   ): Promise<MisGenerateServiceResult> {
-    const loginToken = await this.ensureMisLoginToken(true);
-
-    if (!loginToken) {
-      this.logger.error('Cannot call MIS GenerateService: LoginToken is empty');
-      return { success: false, serviceId: null };
-    }
-
-    try {
-      this.logger.log(
-        `MIS GenerateService request | url=${this.generateServiceUrl}`,
-      );
-      this.logger.log(`MIS GenerateService body: ${JSON.stringify(payload)}`);
-
-      const response = await fetch(this.generateServiceUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          LoginToken: loginToken,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const responseText = await response.text();
-
-      this.logger.log(
-        `MIS GenerateService ← HTTP ${response.status} ${response.statusText} | RAW BODY:\n${responseText}`,
-      );
-
-      if (!response.ok) {
-        return { success: false, serviceId: null };
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (attempt > 0) {
+        this.logger.warn(
+          'MIS GenerateService: მეორე ცდა — LoginToken ხელახლა განახლება',
+        );
+        await this.refreshLoginToken();
       }
 
-      let parsed: unknown;
-      const trimmed = responseText.trim();
-      if (trimmed) {
-        try {
-          parsed = JSON.parse(trimmed) as unknown;
-          this.logger.log(
-            `MIS GenerateService ← PARSED:\n${JSON.stringify(parsed, null, 2)}`,
-          );
-        } catch {
-          this.logger.warn(
-            `MIS GenerateService: JSON parse error, slice: ${trimmed.slice(0, 800)}`,
-          );
-          parsed = undefined;
-        }
-      } else {
-        parsed = undefined;
-      }
-
-      if (misEnvelopeIndicatesFailure(parsed)) {
-        let failMsg = '';
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-          const m = (parsed as Record<string, unknown>).message;
-          if (typeof m === 'string') failMsg = m;
-        }
+      const loginToken = await this.ensureMisLoginToken(attempt === 0);
+      if (!loginToken) {
         this.logger.error(
-          `MIS GenerateService უარყოფილია (result=false)${failMsg ? `: ${failMsg}` : ''}`,
+          'Cannot call MIS GenerateService: LoginToken is empty',
         );
         return { success: false, serviceId: null };
       }
 
-      const serviceId = tryPickMisGeneratedServiceId(parsed);
+      try {
+        this.logger.log(
+          `MIS GenerateService request (ცდა ${attempt + 1}/2) | url=${this.generateServiceUrl}`,
+        );
+        this.logger.log(`MIS GenerateService body: ${JSON.stringify(payload)}`);
 
-      this.logger.log(
-        `MIS GenerateService ← ამოღებული serviceId: ${serviceId ?? '(არ ვიპოვე)'}`,
-      );
+        const response = await fetch(this.generateServiceUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            LoginToken: loginToken,
+          },
+          body: JSON.stringify(payload),
+        });
 
-      return { success: true, serviceId };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`MIS GenerateService request error: ${message}`);
-      return { success: false, serviceId: null };
+        const responseText = await response.text();
+
+        this.logger.log(
+          `MIS GenerateService ← HTTP ${response.status} ${response.statusText} | RAW BODY:\n${responseText}`,
+        );
+
+        if (!response.ok) {
+          if (
+            attempt === 0 &&
+            this.looksLikeMisTokenError(response.status, responseText)
+          ) {
+            continue;
+          }
+          return { success: false, serviceId: null };
+        }
+
+        let parsed: unknown;
+        const trimmed = responseText.trim();
+        if (trimmed) {
+          try {
+            parsed = JSON.parse(trimmed) as unknown;
+            this.logger.log(
+              `MIS GenerateService ← PARSED:\n${JSON.stringify(parsed, null, 2)}`,
+            );
+          } catch {
+            this.logger.warn(
+              `MIS GenerateService: JSON parse error, slice: ${trimmed.slice(0, 800)}`,
+            );
+            parsed = undefined;
+          }
+        } else {
+          parsed = undefined;
+        }
+
+        if (misEnvelopeIndicatesFailure(parsed)) {
+          let failMsg = '';
+          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            const m = (parsed as Record<string, unknown>).message;
+            if (typeof m === 'string') failMsg = m;
+          }
+          this.logger.error(
+            `MIS GenerateService უარყოფილია (result=false)${failMsg ? `: ${failMsg}` : ''}`,
+          );
+          if (
+            attempt === 0 &&
+            this.looksLikeMisTokenError(200, responseText, parsed)
+          ) {
+            continue;
+          }
+          return { success: false, serviceId: null };
+        }
+
+        const serviceId = tryPickMisGeneratedServiceId(parsed);
+
+        this.logger.log(
+          `MIS GenerateService ← ამოღებული serviceId: ${serviceId ?? '(არ ვიპოვე)'}`,
+        );
+
+        return { success: true, serviceId };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.error(`MIS GenerateService request error: ${message}`);
+        if (attempt === 0) {
+          continue;
+        }
+        return { success: false, serviceId: null };
+      }
     }
+
+    return { success: false, serviceId: null };
   }
 
   /** Relative path თუ მოვიდა, MIS base-ზე ავაწყოთ absolute URL. */
@@ -795,11 +892,10 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
         this.logger.warn(
           'MIS GetFormsByServiceID: მეორე ცდა — LoginToken ხელახლა განახლება',
         );
-        this.storedValue = null;
         await this.refreshLoginToken();
       }
 
-      const loginToken = await this.ensureMisLoginToken(true);
+      const loginToken = await this.ensureMisLoginToken(attempt === 0);
       if (!loginToken) {
         this.logger.error(
           'Cannot call MIS GetFormsByServiceID: LoginToken is empty',

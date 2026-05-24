@@ -16,19 +16,21 @@ export type MisPrintFormsScreenState = {
   misForm100AvailableAt?: string | null;
 };
 
-const emptyContentMsg =
-  "ფორმების შიგთავსი ცარიელია ან HTML ვერ მოიძებნა პასუხში.";
+type TranslateFn = (key: string) => string;
 
 /**
- * HIS ფორმების HTML — ყოველთვის ახალი მოთხოვნა HIS-ზე (`refetch=true`), შენახული კეში არ გამოიყენება.
  */
 export async function loadMisPrintFormsFromApi(
   appointmentId: string,
+  t: TranslateFn,
 ): Promise<MisPrintFormsScreenState> {
   try {
     const res = await apiService.getMisPrintForms(appointmentId, true);
     if (!res.success) {
-      return { documents: [], error: "HIS ფორმების პასუხი წარმატებული არ არის" };
+      return {
+        documents: [],
+        error: t("misPrintForms.responseNotSuccess"),
+      };
     }
     const misForm100AvailableAt = res.data?.misForm100AvailableAt ?? null;
     const raw = res.data?.misPrintFormsByService;
@@ -46,7 +48,7 @@ export async function loadMisPrintFormsFromApi(
       });
     }
     devLogMisPrintForms(raw);
-    const parsedAll = parseMisPrintFormDocuments(raw);
+    const parsedAll = parseMisPrintFormDocuments(raw, t);
     if (__DEV__) {
       console.log(
         "[HIS mis-print-forms] parseMisPrintFormDocuments",
@@ -77,11 +79,14 @@ export async function loadMisPrintFormsFromApi(
     }
     return {
       documents: [],
-      error: emptyContentMsg,
+      error: t("misPrintForms.emptyContent"),
       misForm100AvailableAt,
     };
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    return { documents: [], error: msg || "HIS ვერ ჩაიტვირთა" };
+    return {
+      documents: [],
+      error: msg || t("history.form100.hisLoadFailed"),
+    };
   }
 }

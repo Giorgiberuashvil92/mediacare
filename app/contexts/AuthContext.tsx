@@ -7,6 +7,7 @@ import React, {
   useEffect,
   useState,
 } from "react";
+import { AppState, AppStateStatus } from "react-native";
 import {
   apiService,
   LoginRequest,
@@ -56,22 +57,114 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     loadUserData();
   }, []);
 
+  useEffect(() => {
+    const handleAppStateChange = (nextState: AppStateStatus) => {
+      if (nextState === "active") {
+        void refreshSessionIfNeeded();
+      }
+    };
+
+    const subscription = AppState.addEventListener(
+      "change",
+      handleAppStateChange,
+    );
+    return () => subscription.remove();
+  }, []);
+
+  const refreshSessionIfNeeded = async () => {
+    const refreshToken = await AsyncStorage.getItem("refreshToken");
+    if (!refreshToken) {
+      return;
+    }
+
+    try {
+      await apiService.refreshToken();
+      const accessToken = await AsyncStorage.getItem("accessToken");
+      if (!accessToken) {
+        throw new Error("No access token after refresh");
+      }
+    } catch (error) {
+      console.warn("Background token refresh failed, clearing session:", error);
+      await apiService.logout();
+      setUser(null);
+      setUserRoleState(null);
+    }
+  };
+
   const loadUserData = async () => {
     try {
-      const [currentUser, isAuth] = await Promise.all([
-        apiService.getCurrentUser(),
-        apiService.isAuthenticated(),
+      const [accessToken, refreshToken] = await Promise.all([
+        AsyncStorage.getItem("accessToken"),
+        AsyncStorage.getItem("refreshToken"),
       ]);
 
-      if (currentUser && isAuth) {
-        setUser(currentUser);
-        setUserRoleState(currentUser.role);
-      } else {
-        // Clear any invalid data
-        await apiService.logout();
+      if (!accessToken && !refreshToken) {
         setUser(null);
         setUserRoleState(null);
+        return;
       }
+
+      try {
+        const profileResponse = await apiService.getProfile();
+        if (profileResponse.success && profileResponse.data) {
+          const profile = profileResponse.data;
+          const currentUser: User = {
+            id: profile.id,
+            email: profile.email,
+            name: profile.name,
+            role: profile.role,
+            profileImage: profile.profileImage,
+            doctorStatus: profile.doctorStatus,
+            isActive: profile.isActive,
+            isVerified: profile.isVerified,
+            approvalStatus: profile.approvalStatus,
+            phone: profile.phone,
+          };
+          setUser(currentUser);
+          setUserRoleState(currentUser.role);
+          await AsyncStorage.setItem("user", JSON.stringify(currentUser));
+          if (currentUser.role) {
+            await AsyncStorage.setItem(ROLE_STORAGE_KEY, currentUser.role);
+          }
+          return;
+        }
+      } catch (error) {
+        console.warn("Stored session invalid, attempting refresh:", error);
+        if (refreshToken) {
+          try {
+            await apiService.refreshToken();
+            const profileResponse = await apiService.getProfile();
+            if (profileResponse.success && profileResponse.data) {
+              const profile = profileResponse.data;
+              const currentUser: User = {
+                id: profile.id,
+                email: profile.email,
+                name: profile.name,
+                role: profile.role,
+                profileImage: profile.profileImage,
+                doctorStatus: profile.doctorStatus,
+                isActive: profile.isActive,
+                isVerified: profile.isVerified,
+                approvalStatus: profile.approvalStatus,
+                phone: profile.phone,
+              };
+              setUser(currentUser);
+              setUserRoleState(currentUser.role);
+              await AsyncStorage.setItem("user", JSON.stringify(currentUser));
+              if (currentUser.role) {
+                await AsyncStorage.setItem(ROLE_STORAGE_KEY, currentUser.role);
+              }
+              return;
+            }
+          } catch (refreshError) {
+            console.warn("Session refresh failed, clearing auth state:", refreshError);
+          }
+        }
+      }
+
+      await apiService.logout();
+      setUser(null);
+      setUserRoleState(null);
     } catch (error) {
       console.error("Error loading user data:", error);
       await apiService.logout();
