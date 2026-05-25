@@ -1762,7 +1762,7 @@ export default function RegisterScreen() {
                 <View style={styles.logoContainer}>
                   <View style={styles.logo}>
                     <Image
-                      source={require("../../../assets/images/logo/logo.png")}
+                      source={require("../../../assets/images/WhatsApp Image 2026-05-22 at 14.04.27.jpeg")}
                       style={styles.logoImage}
                       contentFit="contain"
                     />

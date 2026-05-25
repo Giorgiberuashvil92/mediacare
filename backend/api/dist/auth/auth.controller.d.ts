@@ -41,11 +41,32 @@ export declare class AuthController {
                 name: string;
                 email: string;
                 phone: string;
+                idNumber: string;
                 isVerified: boolean;
                 approvalStatus: import("../schemas/user.schema").ApprovalStatus;
-                isActive: true;
+                isActive: boolean;
                 doctorStatus: import("../schemas/user.schema").DoctorStatus;
             };
+        };
+    } | {
+        success: boolean;
+        message: string;
+        requiresUserSelection: boolean;
+        requiresOTP: boolean;
+        data: {
+            users: {
+                id: string;
+                role: import("../schemas/user.schema").UserRole;
+                name: string;
+                email: string;
+                phone: string;
+                idNumber: string;
+                approvalStatus: import("../schemas/user.schema").ApprovalStatus;
+                doctorStatus: import("../schemas/user.schema").DoctorStatus;
+            }[];
+            user?: undefined;
+            token?: undefined;
+            refreshToken?: undefined;
         };
     } | {
         success: boolean;
@@ -58,14 +79,17 @@ export declare class AuthController {
                 name: string;
                 email: string;
                 phone: string;
+                idNumber: string;
                 isVerified: boolean;
                 approvalStatus: import("../schemas/user.schema").ApprovalStatus;
-                isActive: true;
+                isActive: boolean;
                 doctorStatus: import("../schemas/user.schema").DoctorStatus;
             };
             token: string;
             refreshToken: string;
+            users?: undefined;
         };
+        requiresUserSelection?: undefined;
     }>;
     refreshToken(refreshTokenDto: RefreshTokenDto): Promise<{
         success: boolean;
@@ -114,6 +138,7 @@ export declare class AuthController {
                 name: string;
                 email: string;
                 phone: string;
+                idNumber: string;
                 isVerified: boolean;
                 approvalStatus: import("../schemas/user.schema").ApprovalStatus;
                 isActive: boolean;

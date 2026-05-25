@@ -16,7 +16,7 @@ import {
   View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { apiService } from "../../_services/api";
+import { apiService, LoginSelectableUser } from "../../_services/api";
 import OTPModal from "../../components/ui/OTPModal";
 import { useAuth } from "../../contexts/AuthContext";
 import {
@@ -37,6 +37,10 @@ export default function LoginScreen() {
   const [phone, setPhone] = useState("");
   const [showOTPModal, setShowOTPModal] = useState(false);
   const [pendingLoginEmail, setPendingLoginEmail] = useState<string>("");
+  const [pendingLoginUserId, setPendingLoginUserId] = useState<string>("");
+  const [duplicateUsers, setDuplicateUsers] = useState<LoginSelectableUser[]>([]);
+  const [showUserSelectionModal, setShowUserSelectionModal] = useState(false);
+  const [skipOtpAfterSelection, setSkipOtpAfterSelection] = useState(false);
 
   const { login: loginContext, completeLoginAfterOTP } = useAuth();
   const { language, setLanguage, t } = useLanguage();
@@ -84,6 +88,111 @@ export default function LoginScreen() {
     setLanguageModalVisible(false);
   };
 
+  const getRoleLabel = (role: LoginSelectableUser["role"]) =>
+    role === "doctor"
+      ? t("auth.login.userSelection.role.doctor")
+      : t("auth.login.userSelection.role.patient");
+
+  const getMaskedIdNumber = (idNumber?: string) => {
+    if (!idNumber?.trim()) {
+      return t("auth.login.userSelection.idNumber.missing");
+    }
+
+    const trimmedId = idNumber.trim();
+    const idNumberLabel = t("auth.login.userSelection.idNumber.label");
+    return trimmedId.length > 4
+      ? `${idNumberLabel}: ****${trimmedId.slice(-4)}`
+      : `${idNumberLabel}: ${trimmedId}`;
+  };
+
+  const resetDuplicateSelection = () => {
+    setDuplicateUsers([]);
+    setShowUserSelectionModal(false);
+    setSkipOtpAfterSelection(false);
+  };
+
+  const navigateByRole = (role: string) => {
+    if (role === "doctor") {
+      router.replace("/(doctor-tabs)");
+    } else {
+      router.replace("/(tabs)");
+    }
+  };
+
+  const completeSelectedLogin = async (
+    authResponse: any,
+    selectedUserId?: string,
+    bypassOTP = false,
+  ) => {
+    if (authResponse.requiresUserSelection) {
+      const users = authResponse.data.users ?? [];
+      if (!users.length) {
+        throw new Error(t("auth.login.error.userSelectionMissing"));
+      }
+
+      setDuplicateUsers(users);
+      setSkipOtpAfterSelection(bypassOTP);
+      setShowUserSelectionModal(true);
+      return;
+    }
+
+    const loginUser = authResponse.data.user;
+    if (!loginUser) {
+      throw new Error(t("auth.login.error.userDataMissing"));
+    }
+
+    const loginUserId = selectedUserId ?? loginUser.id;
+
+    if (loginUser.phone && loginUser.phone.trim()) {
+      if (bypassOTP) {
+        const verifyResponse = await apiService.verifyLoginOTP(
+          loginUser.email,
+          "000000",
+          loginUserId,
+        );
+        await completeLoginAfterOTP(verifyResponse);
+        showToast.info("შესვლა OTP-ის გარეშე", "ინფორმაცია");
+        navigateByRole(verifyResponse.data.user?.role ?? loginUser.role);
+        resetDuplicateSelection();
+        return;
+      }
+
+      setPendingLoginEmail(loginUser.email || email.trim());
+      setPendingLoginUserId(loginUserId);
+      setPhone(loginUser.phone);
+      setShowOTPModal(true);
+      return;
+    }
+
+    showToast.auth.loginSuccess(loginUser.name || "მომხმარებელო");
+    navigateByRole(loginUser.role || authResponse.data.role);
+    resetDuplicateSelection();
+  };
+
+  const handleSelectDuplicateUser = async (selectedUser: LoginSelectableUser) => {
+    try {
+      setIsLoading(true);
+      const authResponse = await loginContext({
+        email: email.trim(),
+        password,
+        userId: selectedUser.id,
+      });
+
+      setShowUserSelectionModal(false);
+      await completeSelectedLogin(
+        authResponse,
+        selectedUser.id,
+        skipOtpAfterSelection,
+      );
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : t("auth.login.error.default");
+      showToast.auth.loginError(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
       showToast.error(
@@ -97,32 +206,7 @@ export default function LoginScreen() {
       setIsLoading(true);
       await persistRememberedEmail(rememberMe, email);
       const authResponse = await loginContext({ email: email.trim(), password });
-      
-      // ALWAYS require OTP if user has a phone number (after logout, force OTP)
-      if (authResponse.data.user.phone && authResponse.data.user.phone.trim()) {
-        // Store email for OTP verification
-        setPendingLoginEmail(email.trim());
-        // Set phone for OTP Modal
-        setPhone(authResponse.data.user.phone);
-        // Show OTP Modal - always require OTP after logout
-        setShowOTPModal(true);
-        setIsLoading(false);
-        return;
-      }
-      
-      // If user doesn't have a phone number, proceed with normal login
-      // Get role from response
-      const role = authResponse.data.user.role || authResponse.data.role;
-      
-      // Show success toast
-      showToast.auth.loginSuccess(authResponse.data.user.name || "მომხმარებელო");
-      
-      // Navigate based on role
-      if (role === "doctor") {
-        router.replace("/(doctor-tabs)");
-      } else {
-        router.replace("/(tabs)");
-      }
+      await completeSelectedLogin(authResponse);
     } catch (error) {
       let errorMessage = t("auth.login.error.default");
       
@@ -160,7 +244,8 @@ export default function LoginScreen() {
         console.log("⚠️ [Login] AuthResponse not provided, verifying OTP again...");
         finalAuthResponse = await apiService.verifyLoginOTP(
           pendingLoginEmail!,
-        code,
+          code,
+          pendingLoginUserId || undefined,
       );
       } else {
         console.log("✅ [Login] Using authResponse from OTPModal, skipping duplicate verification");
@@ -180,13 +265,10 @@ export default function LoginScreen() {
       // Close OTP Modal
       setShowOTPModal(false);
       setPendingLoginEmail("");
+      setPendingLoginUserId("");
+      resetDuplicateSelection();
 
-      // Navigate based on role
-      if (role === "doctor") {
-        router.replace("/(doctor-tabs)");
-      } else {
-        router.replace("/(tabs)");
-      }
+      navigateByRole(role);
     } catch (error) {
       const errorMessage =
         error instanceof Error
@@ -215,13 +297,17 @@ export default function LoginScreen() {
       const authResponse = await apiService.verifyLoginOTP(
         pendingLoginEmail,
         "000000", // Dummy code for development
+        pendingLoginUserId || undefined,
       );
 
       // Complete login in AuthContext
       await completeLoginAfterOTP(authResponse);
 
       // Get role from response
-      const role = authResponse.data.user.role;
+      const role = authResponse.data.user?.role;
+      if (!role) {
+        throw new Error("მომხმარებლის როლი ვერ მოიძებნა");
+      }
 
       // Show success toast
       showToast.info("OTP გამოტოვებულია (დროებით)", "ინფორმაცია");
@@ -229,13 +315,11 @@ export default function LoginScreen() {
       // Close OTP Modal
       setShowOTPModal(false);
       setPendingLoginEmail("");
+      setPendingLoginUserId("");
+      resetDuplicateSelection();
 
       // Navigate based on role
-      if (role === "doctor") {
-        router.replace("/(doctor-tabs)");
-      } else {
-        router.replace("/(tabs)");
-      }
+      navigateByRole(role);
     } catch (error) {
       const errorMessage =
         error instanceof Error
@@ -261,30 +345,7 @@ export default function LoginScreen() {
       setIsLoading(true);
       await persistRememberedEmail(rememberMe, email);
       const authResponse = await loginContext({ email: email.trim(), password });
-
-      if (authResponse.data.user.phone && authResponse.data.user.phone.trim()) {
-        // OTP საჭირო იქნებოდა — ვერიფიკაციას ვაკეთებთ კოდით გამოტოვებით
-        const verifyResponse = await apiService.verifyLoginOTP(
-          email.trim(),
-          "000000",
-        );
-        await completeLoginAfterOTP(verifyResponse);
-        showToast.info("შესვლა OTP-ის გარეშე", "ინფორმაცია");
-        const role = verifyResponse.data.user.role;
-        if (role === "doctor") {
-          router.replace("/(doctor-tabs)");
-        } else {
-          router.replace("/(tabs)");
-        }
-      } else {
-        showToast.auth.loginSuccess(authResponse.data.user.name || "მომხმარებელო");
-        const role = authResponse.data.user.role || authResponse.data.role;
-        if (role === "doctor") {
-          router.replace("/(doctor-tabs)");
-        } else {
-          router.replace("/(tabs)");
-        }
-      }
+      await completeSelectedLogin(authResponse, undefined, true);
     } catch (err) {
       let errorMessage = t("auth.login.error.default");
       if (err instanceof Error) {
@@ -322,7 +383,7 @@ export default function LoginScreen() {
                 <View style={styles.logoContainer}>
                   <View style={styles.logo}>
                     <Image
-                      source={require("../../../assets/images/logo/logo.png")}
+                      source={require("../../../assets/images/WhatsApp Image 2026-05-22 at 14.04.27.jpeg")}
                       style={styles.logoImage}
                       contentFit="contain"
                     />
@@ -596,6 +657,73 @@ export default function LoginScreen() {
         </View>
       </Modal>
 
+      {/* Duplicate account selection modal */}
+      <Modal
+        visible={showUserSelectionModal}
+        transparent
+        animationType="slide"
+        onRequestClose={resetDuplicateSelection}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>
+              {t("auth.login.userSelection.title")}
+            </Text>
+            <Text style={styles.userSelectionSubtitle}>
+              {t("auth.login.userSelection.subtitle")}
+            </Text>
+
+            {duplicateUsers.map((userOption) => (
+              <TouchableOpacity
+                key={userOption.id}
+                style={styles.userOptionCard}
+                onPress={() => handleSelectDuplicateUser(userOption)}
+                disabled={isLoading}
+              >
+                <View style={styles.userOptionIcon}>
+                  <Ionicons
+                    name={
+                      userOption.role === "doctor"
+                        ? "medkit-outline"
+                        : "person-outline"
+                    }
+                    size={22}
+                    color="#06B6D4"
+                  />
+                </View>
+                <View style={styles.userOptionContent}>
+                  <Text style={styles.userOptionName}>
+                    {userOption.name ||
+                      t("auth.login.userSelection.defaultName")}
+                  </Text>
+                  <Text style={styles.userOptionMeta}>
+                    {getRoleLabel(userOption.role)} •{" "}
+                    {getMaskedIdNumber(userOption.idNumber)}
+                  </Text>
+                  {!!userOption.phone && (
+                    <Text style={styles.userOptionMeta}>
+                      {t("auth.login.userSelection.phone")}: {userOption.phone}
+                    </Text>
+                  )}
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+              </TouchableOpacity>
+            ))}
+
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={resetDuplicateSelection}
+              disabled={isLoading}
+            >
+              <Text style={styles.modalCloseButtonText}>
+                {t("auth.login.userSelection.cancel")}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* OTP Verification Modal */}
       <OTPModal
         visible={showOTPModal}
@@ -603,12 +731,15 @@ export default function LoginScreen() {
         onClose={() => {
           setShowOTPModal(false);
           setPendingLoginEmail("");
+          setPendingLoginUserId("");
+          resetDuplicateSelection();
         }}
         onVerified={handleOTPVerified}
         onSkip={handleSkipOTP}
         showSkipButton={true}
         isLoginOTP={true}
         loginEmail={pendingLoginEmail}
+        loginUserId={pendingLoginUserId || undefined}
       />
     </View>
   );
@@ -937,6 +1068,48 @@ const styles = StyleSheet.create({
     color: "#0F172A",
     marginBottom: 16,
     textAlign: "center",
+  },
+  userSelectionSubtitle: {
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#64748B",
+    lineHeight: 20,
+    textAlign: "center",
+    marginBottom: 16,
+  },
+  userOptionCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    backgroundColor: "#FFFFFF",
+    marginBottom: 12,
+  },
+  userOptionIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "#ECFEFF",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  userOptionContent: {
+    flex: 1,
+  },
+  userOptionName: {
+    fontSize: 16,
+    fontFamily: "Poppins-SemiBold",
+    color: "#0F172A",
+    marginBottom: 2,
+  },
+  userOptionMeta: {
+    fontSize: 13,
+    fontFamily: "Poppins-Regular",
+    color: "#64748B",
   },
   modalOption: {
     flexDirection: "row",

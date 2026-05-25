@@ -79,7 +79,7 @@ let AuthController = class AuthController {
         return this.phoneVerificationService.verifyCode(dto.phone, dto.code);
     }
     async verifyLoginOTP(dto) {
-        return this.authService.verifyLoginOTP(dto.email, dto.verificationCode);
+        return this.authService.verifyLoginOTP(dto.email, dto.verificationCode, dto.userId);
     }
     async forgotPassword(dto) {
         return this.authService.forgotPassword(dto);

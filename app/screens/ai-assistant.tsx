@@ -776,10 +776,9 @@ export default function AIAssistantScreen() {
     }
   };
 
-  // შემოთავაზებული კითხვა — ჩაწერა და ავტომატური გაგზავნა
+  // შემოთავაზებული კითხვა — მხოლოდ input-ში ჩაწერა
   const handlePromptSelect = (promptText: string) => {
     setInputText(promptText);
-    handleSendMessage(promptText);
   };
 
   // Handle session selection from history

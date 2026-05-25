@@ -26,6 +26,7 @@ interface OTPModalProps {
   showSkipButton?: boolean; // Show skip button (temporary for development)
   isLoginOTP?: boolean; // If true, use verifyLoginOTP instead of verifyPhoneCode
   loginEmail?: string; // Email for login OTP verification
+  loginUserId?: string; // Selected duplicate account ID for login OTP verification
   autoSendOnOpen?: boolean; // Auto send OTP when modal opens
   sendCodeRequest?: (
     phone: string,
@@ -43,6 +44,7 @@ export default function OTPModal({
   showSkipButton = false, // Default to false, set to true for development
   isLoginOTP = false, // Default to false for phone verification
   loginEmail, // Email for login OTP verification
+  loginUserId,
   autoSendOnOpen = true,
   sendCodeRequest,
 }: OTPModalProps) {
@@ -200,11 +202,13 @@ export default function OTPModal({
         // For login OTP, use verifyLoginOTP
         console.log("📞 [OTPModal] Verifying login OTP:", {
           email: loginEmail.trim(),
+          userId: loginUserId,
           userEnteredCode: verificationCode.trim(),
         });
         const response = await apiService.verifyLoginOTP(
           loginEmail.trim(),
-          verificationCode.trim()
+          verificationCode.trim(),
+          loginUserId,
         );
         console.log("✅ [OTPModal] verifyLoginOTP response:", {
           success: response.success,
@@ -268,6 +272,7 @@ export default function OTPModal({
     handleClose,
     isLoginOTP,
     loginEmail,
+    loginUserId,
     t,
   ]);
 

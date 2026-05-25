@@ -10,6 +10,7 @@ import React, {
 import { AppState, AppStateStatus } from "react-native";
 import {
   apiService,
+  AuthResponse,
   LoginRequest,
   RegisterRequest,
   User,
@@ -23,7 +24,7 @@ interface AuthContextType {
   userRole: UserRole;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (credentials: LoginRequest) => Promise<{ data: { user: User; role: string }; requiresOTP?: boolean }>;
+  login: (credentials: LoginRequest) => Promise<AuthResponse>;
   register: (userData: RegisterRequest) => Promise<void>;
   logout: () => Promise<void>;
   setUserRole: (role: UserRole) => Promise<void>;
@@ -182,29 +183,39 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log('📞 Calling apiService.login...');
       const authResponse = await apiService.login(credentials);
       console.log('✅ Login response received:', authResponse);
+
+      if (authResponse.requiresUserSelection) {
+        return authResponse;
+      }
+
+      const loggedInUser = authResponse.data.user;
+      if (!loggedInUser) {
+        throw new Error("Login response missing user");
+      }
       
       // ALWAYS require OTP if user has a phone number (after logout, force OTP)
       // Even if backend says requiresOTP: false, we still require OTP on frontend
-      if (authResponse.data.user.phone && authResponse.data.user.phone.trim()) {
+      if (loggedInUser.phone && loggedInUser.phone.trim()) {
         // Don't set user yet, return response for OTP verification
         // Don't store tokens - they will be stored after OTP verification
-        return { 
-          data: { user: authResponse.data.user, role: authResponse.data.user.role },
+        return {
+          ...authResponse,
           requiresOTP: true,
+          data: { ...authResponse.data, user: loggedInUser, role: loggedInUser.role },
         };
       }
       
       // OTP not required only if user doesn't have a phone number
       // Proceed with normal login
-      setUser(authResponse.data.user);
-      setUserRoleState(authResponse.data.user.role);
-      await AsyncStorage.setItem(ROLE_STORAGE_KEY, authResponse.data.user.role);
+      setUser(loggedInUser);
+      setUserRoleState(loggedInUser.role);
+      await AsyncStorage.setItem(ROLE_STORAGE_KEY, loggedInUser.role);
       
       // Create AI Assistant session after successful login
       try {
         const sessionResponse = await apiService.createAISession({
-          initiator_id: authResponse.data.user.id,
-          initiator_type: authResponse.data.user.role === "doctor" ? "doctor" : "customer",
+          initiator_id: loggedInUser.id,
+          initiator_type: loggedInUser.role === "doctor" ? "doctor" : "customer",
         });
         if (sessionResponse.success) {
           console.log('✅ AI Assistant session created:', sessionResponse.data.id);
@@ -216,7 +227,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.warn("Failed to create AI Assistant session:", sessionError);
       }
       
-      return { data: { user: authResponse.data.user, role: authResponse.data.user.role } };
+      return {
+        ...authResponse,
+        data: { ...authResponse.data, user: loggedInUser, role: loggedInUser.role },
+      };
     } catch (error) {
       console.error("Login error:", error);
       throw error;
@@ -282,16 +296,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       // Tokens are already stored by apiService.register
       console.log('✅ [AuthContext] Registration successful, setting user and role');
+      const registeredUser = authResponse.data.user;
+      if (!registeredUser) {
+        throw new Error("Registration response missing user");
+      }
       
-      setUser(authResponse.data.user);
-      setUserRoleState(authResponse.data.user.role);
-      await AsyncStorage.setItem(ROLE_STORAGE_KEY, authResponse.data.user.role);
+      setUser(registeredUser);
+      setUserRoleState(registeredUser.role);
+      await AsyncStorage.setItem(ROLE_STORAGE_KEY, registeredUser.role);
       
       // Create AI Assistant session after successful registration
       try {
         const sessionResponse = await apiService.createAISession({
-          initiator_id: authResponse.data.user.id,
-          initiator_type: authResponse.data.user.role === "doctor" ? "doctor" : "customer",
+          initiator_id: registeredUser.id,
+          initiator_type: registeredUser.role === "doctor" ? "doctor" : "customer",
         });
         if (sessionResponse.success) {
           console.log('✅ AI Assistant session created:', sessionResponse.data.id);

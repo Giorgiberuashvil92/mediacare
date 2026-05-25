@@ -139,6 +139,7 @@ export interface User {
   name: string;
   role: "doctor" | "patient";
   phone?: string;
+  idNumber?: string;
   profileImage?: string;
   doctorStatus?: "awaiting_schedule" | "active";
   isActive?: boolean;
@@ -153,6 +154,18 @@ export interface User {
 export interface LoginRequest {
   email: string;
   password: string;
+  userId?: string;
+}
+
+export interface LoginSelectableUser {
+  id: string;
+  email: string;
+  name: string;
+  role: "doctor" | "patient";
+  phone?: string;
+  idNumber?: string;
+  approvalStatus?: "pending" | "approved" | "rejected";
+  doctorStatus?: "awaiting_schedule" | "active";
 }
 
 export interface RegisterRequest {
@@ -176,8 +189,11 @@ export interface AuthResponse {
   success: boolean;
   message: string;
   requiresOTP?: boolean;
+  requiresUserSelection?: boolean;
   data: {
-    user: User;
+    user?: User;
+    users?: LoginSelectableUser[];
+    role?: string;
     token?: string; // Optional if requiresOTP is true
     refreshToken?: string; // Optional if requiresOTP is true
   };
@@ -416,7 +432,9 @@ class ApiService {
       if (parts.length !== 3) {
         return false;
       }
-      const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+      const payload = JSON.parse(
+        atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")),
+      );
       const sub = payload?.sub;
       if (typeof sub === "object" && sub !== null) {
         return false;
@@ -433,17 +451,14 @@ class ApiService {
   private async clearInvalidStoredTokens(): Promise<void> {
     const accessToken = await AsyncStorage.getItem("accessToken");
     if (accessToken && !this.isValidAccessToken(accessToken)) {
-      console.warn(
-        "🔐 [AuthDebug] Removing invalid accessToken from storage",
-        { tokenLength: accessToken.length },
-      );
+      console.warn("🔐 [AuthDebug] Removing invalid accessToken from storage", {
+        tokenLength: accessToken.length,
+      });
       await AsyncStorage.multiRemove(["accessToken", "refreshToken", "user"]);
     }
   }
 
-  private async getAuthHeaders(
-    includeAuth = true,
-  ): Promise<HeadersInit> {
+  private async getAuthHeaders(includeAuth = true): Promise<HeadersInit> {
     if (includeAuth) {
       await this.clearInvalidStoredTokens();
     }
@@ -572,6 +587,17 @@ class ApiService {
       body: JSON.stringify(credentials),
     });
 
+    if (data.requiresUserSelection) {
+      console.log(
+        "👥 [ApiService] Multiple users matched login credentials - waiting for selection",
+      );
+      return data;
+    }
+
+    if (!data.data.user) {
+      throw new Error("Login response missing user");
+    }
+
     logger.auth.loginSuccess(data.data.user);
 
     // Store tokens only if OTP is NOT required
@@ -651,6 +677,10 @@ class ApiService {
 
     const data = await this.handleResponse<AuthResponse>(response);
 
+    if (!data.data.user) {
+      throw new Error("Registration response missing user");
+    }
+
     logger.auth.registerSuccess(data.data.user);
 
     // Store tokens only if they exist
@@ -712,6 +742,7 @@ class ApiService {
   async verifyLoginOTP(
     email: string,
     verificationCode: string,
+    userId?: string,
   ): Promise<AuthResponse> {
     if (USE_MOCK_API) {
       // In mock mode, always succeed
@@ -752,7 +783,7 @@ class ApiService {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ email, verificationCode }),
+      body: JSON.stringify({ email, verificationCode, userId }),
     });
 
     const data = await this.handleResponse<AuthResponse>(response);
@@ -2606,12 +2637,11 @@ class ApiService {
         url: response.url,
       });
 
-      if (
-        response.status === 401 &&
-        retryOn401 &&
-        includeAuth
-      ) {
-        const errorBody = await response.clone().json().catch(() => ({}));
+      if (response.status === 401 && retryOn401 && includeAuth) {
+        const errorBody = await response
+          .clone()
+          .json()
+          .catch(() => ({}));
         const errorMessage = String(
           (errorBody as { message?: string }).message || "",
         ).toLowerCase();
@@ -2834,7 +2864,8 @@ class ApiService {
     // ALWAYS use external API for session creation (NOT our backend)
     // HERA Backend API - External AI Assistant Service
     // HERA XXI Organization: https://hera-youth.ge
-    const EXTERNAL_API_URL = "https://hapttic-hera.click";
+    const EXTERNAL_API_URL =
+      "https://telemedicine-app-production-347c.up.railway.app";
     const API_KEY = "hera-api-key";
 
     console.log("🚀 [createAISession] Using EXTERNAL API (NOT backend):", {

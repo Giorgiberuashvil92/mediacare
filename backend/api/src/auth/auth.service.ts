@@ -430,28 +430,85 @@ export class AuthService {
   }
 
   async login(loginDto: LoginDto) {
-    const { email, password } = loginDto;
+    const { email, password, userId } = loginDto;
+    const normalizedEmail = email.trim();
 
     console.log('🔐 [AuthService] Login request received:', {
-      email,
+      email: normalizedEmail,
       hasPassword: !!password,
+      hasSelectedUser: !!userId,
     });
 
-    const user = await this.userModel.findOne({ email });
-    if (!user) {
-      console.log('❌ [AuthService] User not found for email:', email);
+    const users = await this.userModel.find({ email: normalizedEmail });
+    if (!users.length) {
+      console.log(
+        '❌ [AuthService] User not found for email:',
+        normalizedEmail,
+      );
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-      console.log('❌ [AuthService] Invalid password for email:', email);
+    const passwordMatchedUsers: UserDocument[] = [];
+    for (const candidate of users) {
+      const isPasswordValid = await bcrypt.compare(
+        password,
+        candidate.password,
+      );
+      if (isPasswordValid) {
+        passwordMatchedUsers.push(candidate);
+      }
+    }
+
+    if (!passwordMatchedUsers.length) {
+      console.log(
+        '❌ [AuthService] Invalid password for email:',
+        normalizedEmail,
+      );
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    if (!user.isActive) {
-      console.log('❌ [AuthService] Account is deactivated for email:', email);
+    const activeUsers = passwordMatchedUsers.filter(
+      (candidate) => candidate.isActive,
+    );
+    if (!activeUsers.length) {
+      console.log(
+        '❌ [AuthService] Account is deactivated for email:',
+        normalizedEmail,
+      );
       throw new UnauthorizedException('Account is deactivated');
+    }
+
+    if (!userId && activeUsers.length > 1) {
+      console.log('👥 [AuthService] Multiple login users found:', {
+        email: normalizedEmail,
+        count: activeUsers.length,
+      });
+
+      return {
+        success: true,
+        message: 'User selection required',
+        requiresUserSelection: true,
+        requiresOTP: false,
+        data: {
+          users: activeUsers.map((candidate) =>
+            this.buildSelectableLoginUser(candidate),
+          ),
+        },
+      };
+    }
+
+    const user = userId
+      ? activeUsers.find(
+          (candidate) => (candidate._id as string).toString() === userId,
+        )
+      : activeUsers[0];
+
+    if (!user) {
+      console.log('❌ [AuthService] Selected user not valid for login:', {
+        email: normalizedEmail,
+        userId,
+      });
+      throw new UnauthorizedException('Invalid credentials');
     }
 
     console.log('✅ [AuthService] User found and password valid:', {
@@ -485,17 +542,7 @@ export class AuthService {
           message: 'OTP verification required',
           requiresOTP: true,
           data: {
-            user: {
-              id: (user._id as string).toString(),
-              role: user.role,
-              name: user.name,
-              email: user.email,
-              phone: user.phone,
-              isVerified: user.isVerified,
-              approvalStatus: user.approvalStatus,
-              isActive: user.isActive,
-              doctorStatus: user.doctorStatus,
-            },
+            user: this.buildAuthUser(user),
             // No token yet - will be provided after OTP verification
           },
         };
@@ -532,17 +579,7 @@ export class AuthService {
       message: 'Login successful',
       requiresOTP: false,
       data: {
-        user: {
-          id: (user._id as string).toString(),
-          role: user.role,
-          name: user.name,
-          email: user.email,
-          phone: user.phone,
-          isVerified: user.isVerified,
-          approvalStatus: user.approvalStatus,
-          isActive: user.isActive,
-          doctorStatus: user.doctorStatus,
-        },
+        user: this.buildAuthUser(user),
         token: tokens.accessToken,
         refreshToken: tokens.refreshToken,
       },
@@ -552,29 +589,46 @@ export class AuthService {
   /**
    * Verify OTP and complete login
    */
-  async verifyLoginOTP(email: string, verificationCode: string) {
+  async verifyLoginOTP(
+    email: string,
+    verificationCode: string,
+    userId?: string,
+  ) {
+    const normalizedEmail = email.trim();
     console.log('🔐 [AuthService] verifyLoginOTP called:', {
-      email,
+      email: normalizedEmail,
+      hasSelectedUser: !!userId,
       verificationCodeLength: verificationCode.length,
       verificationCode: verificationCode.replace(/\d/g, '*'), // Mask code for security
     });
 
-    const user = await this.userModel.findOne({ email });
+    const query: Record<string, unknown> = { email: normalizedEmail };
+    if (userId) {
+      if (!mongoose.Types.ObjectId.isValid(userId)) {
+        throw new UnauthorizedException('User not found');
+      }
+      query._id = userId;
+    }
+
+    const user = await this.userModel.findOne(query);
     if (!user) {
-      console.log('❌ [AuthService] User not found for email:', email);
+      console.log('❌ [AuthService] User not found for OTP login:', {
+        email: normalizedEmail,
+        userId,
+      });
       throw new UnauthorizedException('User not found');
     }
 
     if (!user.phone || !user.phone.trim()) {
       console.log('❌ [AuthService] Phone number not found for user:', {
-        email,
+        email: normalizedEmail,
         userId: (user._id as string).toString(),
       });
       throw new BadRequestException('Phone number not found for this user');
     }
 
     console.log('📱 [AuthService] Verifying OTP for user:', {
-      email,
+      email: normalizedEmail,
       phone: user.phone.trim(),
       userId: (user._id as string).toString(),
     });
@@ -595,7 +649,7 @@ export class AuthService {
 
       if (!verificationResult.verified) {
         console.log('❌ [AuthService] OTP verification failed:', {
-          email,
+          email: normalizedEmail,
           phone: user.phone.trim(),
           message: verificationResult.message,
         });
@@ -614,17 +668,7 @@ export class AuthService {
       success: true,
       message: 'Login successful',
       data: {
-        user: {
-          id: (user._id as string).toString(),
-          role: user.role,
-          name: user.name,
-          email: user.email,
-          phone: user.phone,
-          isVerified: user.isVerified,
-          approvalStatus: user.approvalStatus,
-          isActive: user.isActive,
-          doctorStatus: user.doctorStatus,
-        },
+        user: this.buildAuthUser(user),
         token: tokens.accessToken,
         refreshToken: tokens.refreshToken,
       },
@@ -638,6 +682,34 @@ export class AuthService {
     });
 
     return response;
+  }
+
+  private buildAuthUser(user: UserDocument) {
+    return {
+      id: (user._id as string).toString(),
+      role: user.role,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      idNumber: user.idNumber,
+      isVerified: user.isVerified,
+      approvalStatus: user.approvalStatus,
+      isActive: user.isActive,
+      doctorStatus: user.doctorStatus,
+    };
+  }
+
+  private buildSelectableLoginUser(user: UserDocument) {
+    return {
+      id: (user._id as string).toString(),
+      role: user.role,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      idNumber: user.idNumber,
+      approvalStatus: user.approvalStatus,
+      doctorStatus: user.doctorStatus,
+    };
   }
 
   // DEV ONLY: Generate token for admin without password

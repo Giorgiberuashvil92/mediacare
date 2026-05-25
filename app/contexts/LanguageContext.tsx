@@ -83,6 +83,19 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "auth.login.error.invalidCredentials": "არასწორი ელ-ფოსტა ან პაროლი",
     "auth.login.error.userNotFound": "მომხმარებელი არ მოიძებნა",
     "auth.login.error.invalidEmail": "არასწორი ელ-ფოსტის ფორმატი",
+    "auth.login.userSelection.title": "აირჩიეთ ანგარიში",
+    "auth.login.userSelection.subtitle":
+      "ამ ელ. ფოსტით რამდენიმე ანგარიში მოიძებნა. აირჩიეთ რომლით გსურთ შესვლა.",
+    "auth.login.userSelection.role.doctor": "ექიმი",
+    "auth.login.userSelection.role.patient": "პაციენტი",
+    "auth.login.userSelection.idNumber.label": "პირადი ნომერი",
+    "auth.login.userSelection.idNumber.missing":
+      "პირადი ნომერი არ არის მითითებული",
+    "auth.login.userSelection.phone": "ტელეფონი",
+    "auth.login.userSelection.defaultName": "მომხმარებელი",
+    "auth.login.userSelection.cancel": "გაუქმება",
+    "auth.login.error.userSelectionMissing": "მომხმარებლების სია ვერ მოიძებნა",
+    "auth.login.error.userDataMissing": "მომხმარებლის მონაცემები ვერ მოიძებნა",
 
     // Auth - Forgot password
     "auth.forgotPassword.title": "დაგავიწყდა პაროლი?",
@@ -1098,6 +1111,19 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
       "Incorrect email address or password",
     "auth.login.error.userNotFound": "User not found",
     "auth.login.error.invalidEmail": "Invalid email format",
+    "auth.login.userSelection.title": "Choose an account",
+    "auth.login.userSelection.subtitle":
+      "Several accounts were found with this email. Choose which one you want to log in with.",
+    "auth.login.userSelection.role.doctor": "Doctor",
+    "auth.login.userSelection.role.patient": "Patient",
+    "auth.login.userSelection.idNumber.label": "Personal ID",
+    "auth.login.userSelection.idNumber.missing":
+      "Personal ID is not specified",
+    "auth.login.userSelection.phone": "Phone",
+    "auth.login.userSelection.defaultName": "User",
+    "auth.login.userSelection.cancel": "Cancel",
+    "auth.login.error.userSelectionMissing": "User list was not found",
+    "auth.login.error.userDataMissing": "User data was not found",
 
     // Auth - Forgot password
     "auth.forgotPassword.title": "Forgot password?",
@@ -2109,6 +2135,18 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
       "Неверный адрес эл. почты или пароль",
     "auth.login.error.userNotFound": "Пользователь не найден",
     "auth.login.error.invalidEmail": "Неверный формат эл. почты",
+    "auth.login.userSelection.title": "Выберите аккаунт",
+    "auth.login.userSelection.subtitle":
+      "С этой эл. почтой найдено несколько аккаунтов. Выберите, с каким аккаунтом войти.",
+    "auth.login.userSelection.role.doctor": "Врач",
+    "auth.login.userSelection.role.patient": "Пациент",
+    "auth.login.userSelection.idNumber.label": "Личный номер",
+    "auth.login.userSelection.idNumber.missing": "Личный номер не указан",
+    "auth.login.userSelection.phone": "Телефон",
+    "auth.login.userSelection.defaultName": "Пользователь",
+    "auth.login.userSelection.cancel": "Отмена",
+    "auth.login.error.userSelectionMissing": "Список пользователей не найден",
+    "auth.login.error.userDataMissing": "Данные пользователя не найдены",
 
     // Auth - Forgot password
     "auth.forgotPassword.title": "Забыли пароль?",

@@ -84,7 +84,11 @@ export class AuthController {
 
   @Post('verify-login-otp')
   async verifyLoginOTP(@Body() dto: VerifyLoginOTPDto) {
-    return this.authService.verifyLoginOTP(dto.email, dto.verificationCode);
+    return this.authService.verifyLoginOTP(
+      dto.email,
+      dto.verificationCode,
+      dto.userId,
+    );
   }
 
   @Post('forgot-password')

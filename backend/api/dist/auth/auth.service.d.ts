@@ -46,11 +46,32 @@ export declare class AuthService {
                 name: string;
                 email: string;
                 phone: string;
+                idNumber: string;
                 isVerified: boolean;
                 approvalStatus: ApprovalStatus;
-                isActive: true;
+                isActive: boolean;
                 doctorStatus: import("../schemas/user.schema").DoctorStatus;
             };
+        };
+    } | {
+        success: boolean;
+        message: string;
+        requiresUserSelection: boolean;
+        requiresOTP: boolean;
+        data: {
+            users: {
+                id: string;
+                role: UserRole;
+                name: string;
+                email: string;
+                phone: string;
+                idNumber: string;
+                approvalStatus: ApprovalStatus;
+                doctorStatus: import("../schemas/user.schema").DoctorStatus;
+            }[];
+            user?: undefined;
+            token?: undefined;
+            refreshToken?: undefined;
         };
     } | {
         success: boolean;
@@ -63,16 +84,19 @@ export declare class AuthService {
                 name: string;
                 email: string;
                 phone: string;
+                idNumber: string;
                 isVerified: boolean;
                 approvalStatus: ApprovalStatus;
-                isActive: true;
+                isActive: boolean;
                 doctorStatus: import("../schemas/user.schema").DoctorStatus;
             };
             token: string;
             refreshToken: string;
+            users?: undefined;
         };
+        requiresUserSelection?: undefined;
     }>;
-    verifyLoginOTP(email: string, verificationCode: string): Promise<{
+    verifyLoginOTP(email: string, verificationCode: string, userId?: string): Promise<{
         success: boolean;
         message: string;
         data: {
@@ -82,6 +106,7 @@ export declare class AuthService {
                 name: string;
                 email: string;
                 phone: string;
+                idNumber: string;
                 isVerified: boolean;
                 approvalStatus: ApprovalStatus;
                 isActive: boolean;
@@ -91,6 +116,8 @@ export declare class AuthService {
             refreshToken: string;
         };
     }>;
+    private buildAuthUser;
+    private buildSelectableLoginUser;
     getDevAdminToken(): Promise<{
         success: boolean;
         message: string;

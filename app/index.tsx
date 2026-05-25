@@ -56,7 +56,7 @@ export default function SplashScreen() {
     return (
       <View style={styles.container}>
         <Image
-          source={require("../assets/images/splash-icon.png")}
+          source={require("../assets/images/WhatsApp Image 2026-05-22 at 14.04.27.jpeg")}
           style={styles.logo}
         />
         <Text style={styles.appName}>Medicare</Text>

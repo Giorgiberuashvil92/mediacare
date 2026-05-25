@@ -1,4 +1,10 @@
-import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
+import {
+  IsEmail,
+  IsMongoId,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 
 export class VerifyLoginOTPDto {
   @IsEmail()
@@ -8,4 +14,8 @@ export class VerifyLoginOTPDto {
   @IsString()
   @IsNotEmpty()
   verificationCode: string;
+
+  @IsOptional()
+  @IsMongoId()
+  userId?: string;
 }
