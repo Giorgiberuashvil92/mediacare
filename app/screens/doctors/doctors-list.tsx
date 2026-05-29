@@ -1,5 +1,9 @@
 import { apiService } from "@/app/_services/api";
 import { useFavorites } from "@/app/contexts/FavoritesContext";
+import { useLanguage } from "@/app/contexts/LanguageContext";
+import {
+  getDoctorDisplayName
+} from "@/app/utils/doctorNameLabel";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
@@ -35,6 +39,8 @@ const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
   return {
     id: doctor.id, // Keep as string (MongoDB ObjectId)
     name: doctor.name || "",
+    nameEn: doctor.nameEn,
+    nameRu: doctor.nameRu,
     specialization: doctor.specialization || "",
     rating: doctor.rating || 0,
     reviewCount: doctor.reviewCount || 0,
@@ -53,6 +59,7 @@ const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
 };
 
 export default function DoctorsListScreen() {
+  const { language } = useLanguage();
   const { specialty, symptom } = useLocalSearchParams<{
     specialty: string;
     symptom: string;
@@ -108,10 +115,12 @@ export default function DoctorsListScreen() {
     }
   };
 
-  // Filter doctors by specialty and search query (for client-side filtering if needed)
   const filteredDoctors = useMemo(() => {
-    return doctors;
-  }, [doctors]);
+    return doctors.map((doctor) => ({
+      ...doctor,
+      name: getDoctorDisplayName(doctor, language),
+    }));
+  }, [doctors, language]);
 
   const handleGoBack = () => {
     router.back();

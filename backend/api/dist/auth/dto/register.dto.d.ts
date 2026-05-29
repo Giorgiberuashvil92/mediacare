@@ -2,6 +2,8 @@ import { Gender, UserRole } from '../../schemas/user.schema';
 export declare class RegisterDto {
     role: UserRole;
     name: string;
+    nameEn?: string;
+    nameRu?: string;
     email: string;
     password: string;
     phone: string;

@@ -98,9 +98,10 @@ export class ProfileService {
       updateData.name = updateProfileDto.name;
     }
     if (updateProfileDto.email !== undefined) {
-      // Check if email is already taken by another user
+      // Email can be shared across roles, but not within the same role.
       const existingUser = await this.userModel.findOne({
         email: updateProfileDto.email,
+        role: user.role,
         _id: { $ne: userId },
       });
       if (existingUser) {
@@ -109,7 +110,18 @@ export class ProfileService {
       updateData.email = updateProfileDto.email;
     }
     if (updateProfileDto.phone !== undefined) {
-      updateData.phone = updateProfileDto.phone;
+      const nextPhone = updateProfileDto.phone.trim();
+      if (nextPhone && nextPhone !== user.phone?.trim()) {
+        const existingPhoneUser = await this.userModel.findOne({
+          phone: nextPhone,
+          role: user.role,
+          _id: { $ne: userId },
+        });
+        if (existingPhoneUser) {
+          throw new UnauthorizedException('Phone number already in use');
+        }
+      }
+      updateData.phone = nextPhone;
     }
     if (updateProfileDto.idNumber !== undefined) {
       updateData.idNumber = updateProfileDto.idNumber;

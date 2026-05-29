@@ -16,6 +16,14 @@ export class UpdateDoctorDto {
   @IsOptional()
   name?: string;
 
+  @IsString()
+  @IsOptional()
+  nameEn?: string;
+
+  @IsString()
+  @IsOptional()
+  nameRu?: string;
+
   @IsEmail()
   @IsOptional()
   email?: string;

@@ -4,7 +4,7 @@ import * as DocumentPicker from "expo-document-picker";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -16,6 +16,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useLanguage } from "@/app/contexts/LanguageContext";
+import { getDoctorDisplayName } from "@/app/utils/doctorNameLabel";
 
 // Helper function to map backend doctor to app format
 const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
@@ -33,6 +35,8 @@ const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
   return {
     id: doctor.id,
     name: doctor.name || "",
+    nameEn: doctor.nameEn,
+    nameRu: doctor.nameRu,
     specialization: doctor.specialization || "",
     rating: doctor.rating || 0,
     reviewCount: doctor.reviewCount || 0,
@@ -50,6 +54,7 @@ const MakeAppointment = () => {
     paymentMethod,
     appointmentType: appointmentTypeParam,
   } = useLocalSearchParams();
+  const { language } = useLanguage();
   const [doctor, setDoctor] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -101,6 +106,14 @@ const MakeAppointment = () => {
       setLoading(false);
     }
   };
+
+  const displayDoctor = useMemo(
+    () =>
+      doctor
+        ? { ...doctor, name: getDoctorDisplayName(doctor, language) }
+        : null,
+    [doctor, language],
+  );
 
   const handleFilePick = async () => {
     try {
@@ -406,7 +419,7 @@ const MakeAppointment = () => {
             </View>
             <View style={styles.doctorInfo}>
               <View style={styles.doctorNameRow}>
-                <Text style={styles.doctorName}>{doctor.name}</Text>
+                <Text style={styles.doctorName}>{displayDoctor?.name}</Text>
                 <View style={styles.ratingContainer}>
                   {[...Array(5)].map((_, index) => (
                     <Ionicons

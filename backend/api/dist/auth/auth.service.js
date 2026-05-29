@@ -369,26 +369,15 @@ let AuthService = class AuthService {
             console.log('❌ [AuthService] User not found for email:', normalizedEmail);
             throw new common_1.UnauthorizedException('Invalid credentials');
         }
-        const passwordMatchedUsers = [];
-        for (const candidate of users) {
-            const isPasswordValid = await bcrypt.compare(password, candidate.password);
-            if (isPasswordValid) {
-                passwordMatchedUsers.push(candidate);
-            }
-        }
-        if (!passwordMatchedUsers.length) {
-            console.log('❌ [AuthService] Invalid password for email:', normalizedEmail);
-            throw new common_1.UnauthorizedException('Invalid credentials');
-        }
-        const activeUsers = passwordMatchedUsers.filter((candidate) => candidate.isActive);
-        if (!activeUsers.length) {
+        const loginCandidates = users.filter((candidate) => candidate.isActive || candidate.role === user_schema_1.UserRole.DOCTOR);
+        if (!loginCandidates.length) {
             console.log('❌ [AuthService] Account is deactivated for email:', normalizedEmail);
             throw new common_1.UnauthorizedException('Account is deactivated');
         }
-        if (!userId && activeUsers.length > 1) {
+        if (!userId && loginCandidates.length > 1) {
             console.log('👥 [AuthService] Multiple login users found:', {
                 email: normalizedEmail,
-                count: activeUsers.length,
+                count: loginCandidates.length,
             });
             return {
                 success: true,
@@ -396,17 +385,33 @@ let AuthService = class AuthService {
                 requiresUserSelection: true,
                 requiresOTP: false,
                 data: {
-                    users: activeUsers.map((candidate) => this.buildSelectableLoginUser(candidate)),
+                    users: loginCandidates.map((candidate) => this.buildSelectableLoginUser(candidate)),
                 },
             };
         }
         const user = userId
-            ? activeUsers.find((candidate) => candidate._id.toString() === userId)
-            : activeUsers[0];
+            ? loginCandidates.find((candidate) => candidate._id.toString() === userId)
+            : loginCandidates[0];
         if (!user) {
             console.log('❌ [AuthService] Selected user not valid for login:', {
                 email: normalizedEmail,
                 userId,
+            });
+            throw new common_1.UnauthorizedException('Invalid credentials');
+        }
+        if (!user.isActive && user.role !== user_schema_1.UserRole.DOCTOR) {
+            console.log('❌ [AuthService] Selected account is deactivated:', {
+                email: normalizedEmail,
+                userId: user._id.toString(),
+                role: user.role,
+            });
+            throw new common_1.UnauthorizedException('Account is deactivated');
+        }
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) {
+            console.log('❌ [AuthService] Invalid password for selected user:', {
+                email: normalizedEmail,
+                userId: user._id.toString(),
             });
             throw new common_1.UnauthorizedException('Invalid credentials');
         }
@@ -680,27 +685,54 @@ let AuthService = class AuthService {
         };
     }
     async forgotPassword(forgotPasswordDto) {
-        const { phone } = forgotPasswordDto;
+        const { phone, userId } = forgotPasswordDto;
         console.log('🔐 [AuthService] Forgot password request received:', {
             phone,
+            hasSelectedUser: !!userId,
         });
         const cleanPhone = phone
             .replace(/\s+/g, '')
             .replace(/^\+995/, '')
             .replace(/^0/, '');
-        const user = await this.userModel.findOne({
+        const phoneQuery = {
             $or: [
                 { phone: cleanPhone },
                 { phone: `+995${cleanPhone}` },
                 { phone: `0${cleanPhone}` },
             ],
-        });
-        if (!user) {
+        };
+        const users = await this.userModel.find(phoneQuery);
+        const resetCandidates = users.filter((candidate) => candidate.isActive || candidate.role === user_schema_1.UserRole.DOCTOR);
+        if (!resetCandidates.length) {
             console.log('⚠️ [AuthService] User not found for phone (not revealing):', cleanPhone);
             return {
                 success: true,
                 message: 'თუ ტელეფონის ნომერი არსებობს, ვერიფიკაციის კოდი გაიგზავნა SMS-ით',
             };
+        }
+        if (!userId && resetCandidates.length > 1) {
+            console.log('👥 [AuthService] Multiple reset users found:', {
+                phone: cleanPhone,
+                count: resetCandidates.length,
+            });
+            return {
+                success: true,
+                message: 'User selection required',
+                requiresUserSelection: true,
+                data: {
+                    users: resetCandidates.map((candidate) => this.buildSelectableLoginUser(candidate)),
+                },
+            };
+        }
+        const user = userId
+            ? resetCandidates.find((candidate) => candidate._id.toString() === userId)
+            : resetCandidates[0];
+        if (!user) {
+            console.log('❌ [AuthService] Selected reset user not valid:', {
+                phone: cleanPhone,
+                userId,
+            });
+            throw new common_1.UnauthorizedException('Invalid phone number');
         }
         try {
             await this.phoneVerificationService.sendVerificationCode(phone);
@@ -719,21 +751,30 @@ let AuthService = class AuthService {
         }
     }
     async resetPassword(resetPasswordDto) {
-        const { phone, newPassword } = resetPasswordDto;
+        const { phone, newPassword, userId } = resetPasswordDto;
         console.log('🔐 [AuthService] Reset password request received:', {
             phone,
+            hasSelectedUser: !!userId,
         });
         const cleanPhone = phone
             .replace(/\s+/g, '')
             .replace(/^\+995/, '')
             .replace(/^0/, '');
-        const user = await this.userModel.findOne({
+        const phoneQuery = {
             $or: [
                 { phone: cleanPhone },
                 { phone: `+995${cleanPhone}` },
                 { phone: `0${cleanPhone}` },
             ],
-        });
+        };
+        const users = await this.userModel.find(phoneQuery);
+        const resetCandidates = users.filter((candidate) => candidate.isActive || candidate.role === user_schema_1.UserRole.DOCTOR);
+        if (resetCandidates.length > 1 && !userId) {
+            throw new common_1.BadRequestException('გთხოვთ აირჩიოთ ანგარიში');
+        }
+        const user = userId
+            ? resetCandidates.find((candidate) => candidate._id.toString() === userId)
+            : resetCandidates[0];
         if (!user) {
             throw new common_1.UnauthorizedException('Invalid phone number');
         }

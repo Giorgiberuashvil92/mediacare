@@ -1,10 +1,12 @@
 import { apiService } from "@/app/_services/api";
 import AppointmentScheduler from "@/app/components/ui/appointmentScheduler";
 import { useFavorites } from "@/app/contexts/FavoritesContext";
+import { useLanguage } from "@/app/contexts/LanguageContext";
+import { getDoctorDisplayName } from "@/app/utils/doctorNameLabel";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -35,6 +37,8 @@ const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
   return {
     id: doctor.id, // Keep as string (MongoDB ObjectId)
     name: doctor.name || "",
+    nameEn: doctor.nameEn,
+    nameRu: doctor.nameRu,
     specialization: doctor.specialization || "",
     rating: doctor.rating || 0,
     reviewCount: doctor.reviewCount || 0,
@@ -71,6 +75,7 @@ const DoctorDetail = () => {
     followUpAppointmentId?: string;
     followUp?: string;
   }>();
+  const { language } = useLanguage();
   const [doctor, setDoctor] = useState<any>(null);
   console.log("🏥 Frontend doctor object:", doctor);
   console.log("🏥 Frontend doctor availability:", doctor?.availability);
@@ -137,6 +142,14 @@ const DoctorDetail = () => {
     }
   };
 
+  const displayDoctor = useMemo(
+    () =>
+      doctor
+        ? { ...doctor, name: getDoctorDisplayName(doctor, language) }
+        : null,
+    [doctor, language],
+  );
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -178,7 +191,7 @@ const DoctorDetail = () => {
                 ? "განმეორებითი ვიზიტის დაჯავშნა"
                 : "ჯავშნის გაკეთება"}
             </Text>
-            <Text style={styles.schedulerSubtitle}>{doctor.name}</Text>
+            <Text style={styles.schedulerSubtitle}>{displayDoctor!.name}</Text>
           </View>
           <View style={{ width: 36 }} />
         </View>
@@ -232,7 +245,7 @@ const DoctorDetail = () => {
           {/* Rating above name */}
 
           <View style={styles.nameRow}>
-            <Text style={styles.doctorName}>{doctor.name}</Text>
+            <Text style={styles.doctorName}>{displayDoctor!.name}</Text>
           </View>
           <Text style={styles.specialty}>{doctor.specialization}</Text>
           {doctor.about && <Text style={styles.languages}>{doctor.about}</Text>}

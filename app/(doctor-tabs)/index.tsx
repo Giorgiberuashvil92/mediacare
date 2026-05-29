@@ -28,6 +28,7 @@ export default function DoctorDashboard() {
   const { user } = useAuth();
   const { t, language } = useLanguage();
   const router = useRouter();
+  const displayName = user?.name?.trim() || t("settings.role.doctor");
   const locale =
     language === "ka" ? "ka-GE" : language === "ru" ? "ru-RU" : "en-US";
 
@@ -400,7 +401,7 @@ export default function DoctorDashboard() {
         <View style={styles.header}>
           <View>
             <Text style={styles.greeting}>{t("doctor.dashboard.greeting")}</Text>
-            <Text style={styles.headerName}>{user?.name || "Dr. Cook"}</Text>
+            <Text style={styles.headerName}>{displayName}</Text>
           </View>
           <TouchableOpacity style={styles.notificationButton}>
             <Ionicons name="notifications-outline" size={24} color="#1F2937" />

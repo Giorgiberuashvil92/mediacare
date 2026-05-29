@@ -2,7 +2,7 @@ import { apiService } from "@/app/_services/api";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -14,10 +14,14 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useLanguage } from "@/app/contexts/LanguageContext";
+import { getDoctorDisplayName } from "@/app/utils/doctorNameLabel";
 
 interface Doctor {
   id: string;
   name: string;
+  nameEn?: string;
+  nameRu?: string;
   specialization: string;
   rating: number;
   reviewCount: number;
@@ -38,6 +42,7 @@ const SYMPTOM_CATEGORIES = [
 ];
 
 export default function AdvisorScreen() {
+  const { language } = useLanguage();
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
   const [customSymptom, setCustomSymptom] = useState("");
   const [recommendedDoctors, setRecommendedDoctors] = useState<Doctor[]>([]);
@@ -97,6 +102,8 @@ export default function AdvisorScreen() {
           return {
             id: doctorId,
             name: advisor.name || doctor.name || "",
+            nameEn: doctor.nameEn,
+            nameRu: doctor.nameRu,
             specialization: advisor.specialization || doctor.specialization || "",
             rating: doctor.rating || 0,
             reviewCount: doctor.reviewCount || 0,
@@ -135,6 +142,8 @@ export default function AdvisorScreen() {
             return {
               id: doctor.id,
               name: doctor.name || "",
+              nameEn: doctor.nameEn,
+              nameRu: doctor.nameRu,
               specialization: doctor.specialization || "",
               rating: doctor.rating || 0,
               reviewCount: doctor.reviewCount || 0,
@@ -170,6 +179,15 @@ export default function AdvisorScreen() {
     setRecommendedDoctors([]);
     setStep("symptoms");
   };
+
+  const displayDoctors = useMemo(
+    () =>
+      recommendedDoctors.map((doctor) => ({
+        ...doctor,
+        name: getDoctorDisplayName(doctor, language),
+      })),
+    [recommendedDoctors, language],
+  );
 
   return (
     <View style={styles.container}>
@@ -336,9 +354,9 @@ export default function AdvisorScreen() {
             </View>
 
             {/* Doctors List */}
-            {recommendedDoctors.length > 0 ? (
+            {displayDoctors.length > 0 ? (
               <View style={styles.doctorsList}>
-                {recommendedDoctors.map((doctor) => (
+                {displayDoctors.map((doctor) => (
                   <TouchableOpacity
                     key={doctor.id}
                     style={styles.doctorCard}

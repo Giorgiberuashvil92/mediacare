@@ -17,6 +17,10 @@ export interface User {
   id: string;
   role: "patient" | "doctor" | "admin";
   name: string;
+  /** ინგლისური სახელი (ექიმი) */
+  nameEn?: string;
+  /** რუსული სახელი (ექიმი) */
+  nameRu?: string;
   email: string;
   phone?: string;
   idNumber?: string; // Personal ID number (პირადი ნომერი)

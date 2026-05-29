@@ -1,5 +1,7 @@
 import { apiService } from "@/app/_services/api";
 import { useAuth } from "@/app/contexts/AuthContext";
+import { useLanguage } from "@/app/contexts/LanguageContext";
+import { getDoctorDisplayName } from "@/app/utils/doctorNameLabel";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
@@ -30,6 +32,7 @@ interface Message {
 export default function ChatScreen() {
   const { doctorId } = useLocalSearchParams<{ doctorId: string }>();
   const { user } = useAuth();
+  const { language } = useLanguage();
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(true);
@@ -158,7 +161,9 @@ export default function ChatScreen() {
                 <View style={styles.onlineIndicator} />
               </View>
               <View style={styles.headerText}>
-                <Text style={styles.doctorName}>{doctor.name}</Text>
+                <Text style={styles.doctorName}>
+                  {getDoctorDisplayName(doctor, language)}
+                </Text>
                 <Text style={styles.doctorSpecialty}>
                   {doctor.specialization || "ექიმი"}
                 </Text>

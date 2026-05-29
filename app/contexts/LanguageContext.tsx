@@ -40,7 +40,6 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "identomat.success.completed":
       "IDENTOMAT-ით იდენტიფიკაცია წარმატებით დასრულდა",
 
-    // OTP Modal
     "otp.title": "ტელეფონის ნომრის დადასტურება",
     "otp.subtitle": "შეიყვანეთ SMS კოდი",
     "otp.notReceived": "კოდი არ მიიღეთ? სცადეთ თავიდან",
@@ -83,9 +82,8 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "auth.login.error.invalidCredentials": "არასწორი ელ-ფოსტა ან პაროლი",
     "auth.login.error.userNotFound": "მომხმარებელი არ მოიძებნა",
     "auth.login.error.invalidEmail": "არასწორი ელ-ფოსტის ფორმატი",
-    "auth.login.userSelection.title": "აირჩიეთ ანგარიში",
-    "auth.login.userSelection.subtitle":
-      "ამ ელ. ფოსტით რამდენიმე ანგარიში მოიძებნა. აირჩიეთ რომლით გსურთ შესვლა.",
+    "auth.login.userSelection.title": "აირჩიე ანგარიში",
+    "auth.login.userSelection.subtitle": "აირჩიე რომელი ანგარიშით გსურს შესვლა",
     "auth.login.userSelection.role.doctor": "ექიმი",
     "auth.login.userSelection.role.patient": "პაციენტი",
     "auth.login.userSelection.idNumber.label": "პირადი ნომერი",
@@ -130,10 +128,15 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "auth.forgotPassword.error.reset": "ვერ მოხერხდა პაროლის შეცვლა",
     "auth.forgotPassword.otp.title": "ტელეფონის ნომრის დადასტურება",
     "auth.forgotPassword.otp.subtitle": "შეიყვანეთ SMS კოდი",
+    "auth.forgotPassword.userSelection.title": "აირჩიეთ პროფილი",
+    "auth.forgotPassword.userSelection.subtitle":
+      "ამ ტელეფონის ნომრით ექიმისა და პაციენტის პროფილები მოიძებნა. აირჩიეთ რომელი პროფილის პაროლი გსურთ შეცვალოთ.",
 
     // Auth - Register
     "auth.register.title.doctor": "ექიმის რეგისტრაცია",
     "auth.register.title.patient": "შექმენი ანგარიში",
+    "auth.register.title.subtitle":
+      "მიიღე სამედიცინო მომსახურეობა სახლიდან გაუსვლელად",
     "auth.register.title.foreignPatient": "უცხოელი პაციენტის რეგისტრაცია",
     "auth.register.subtitle.doctor":
       "შემოგვიერთდი როგორც სამედიცინო მომსახურების მიმწოდებელი",
@@ -152,22 +155,22 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "auth.register.email.label": "ელ. ფოსტა",
     "auth.register.email.placeholder": "შეიყვანე ელ. ფოსტა",
     "auth.register.idNumber.label": "პირადი ნომერი",
-    "auth.register.idNumber.label.passport": "ID",
+    "auth.register.idNumber.label.passport": "პასპორტის ნომერი",
     "auth.register.idNumber.placeholder": "პირადი ნომერი",
-    "auth.register.idNumber.placeholder.passport": "ID",
+    "auth.register.idNumber.placeholder.passport": "შეიყვანე პასპორტის ნომერი",
     "auth.register.dob.label": "დაბადების თარიღი",
     "auth.register.dob.placeholder": "აირჩიე",
     "auth.register.nationality.label": "მოქალაქეობა",
-    "auth.register.nationality.georgian": "ქართველი",
+    "auth.register.nationality.georgian": "საქართველო",
     "auth.register.nationality.georgianSub": "საქართველო",
-    "auth.register.nationality.nonGeorgian": "არაქართველი",
+    "auth.register.nationality.nonGeorgian": "სხვა",
     "auth.register.nationality.nonGeorgianSub": "სხვა",
     "auth.register.address.label": "ფაქტობრივი მისამართი",
     "auth.register.address.placeholder": "ქალაქი, რეგიონი, უბანი",
     "auth.register.passportInfo.title": "ინფორმაცია",
     "auth.register.passportInfo.message": "გთხოვთ ჩაწერეთ პასპორტის ნომერი",
     "auth.register.passportInfo.ok": "გასაგებია",
-    "auth.register.phone.label": "ტელეფონი",
+    "auth.register.phone.label": "ტელეფონი ნომერი",
     "auth.register.phone.placeholder": "+995 5XX XX XX XX",
     "auth.register.password.label": "პაროლი",
     "auth.register.password.placeholder": "••••••••••",
@@ -175,7 +178,7 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "auth.register.confirmPassword.placeholder": "••••••••••",
     "auth.register.profile.label": "პროფილის ფოტო",
     "auth.register.profile.placeholder": "ატვირთე",
-    "auth.register.profile.upload": "ატვირთე",
+    "auth.register.profile.upload": "ატვირთე საქმიანი ფოტო",
     "auth.register.profile.change": "შეცვალე ფოტო",
     "auth.register.profile.remove": "წაშლა",
     "auth.register.profile.uploading": "სურათი იტვირთება...",
@@ -230,7 +233,7 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "doctor.gender.other": "სხვა",
     "doctor.about.label": "შესახებ",
     "doctor.about.placeholder": "",
-    "doctor.license.label": "სამედიცინო ლიცენზია (PDF)",
+    "doctor.license.label": "სამედიცინო სერტიფიკატი (PDF)",
     "doctor.license.placeholder": "ატვირთე",
     "doctor.license.success": "✓ ფაილი წარმატებით აიტვირთა",
     "doctor.license.uploading": "იტვირთება...",
@@ -812,6 +815,7 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "helpCenter.contact.workingHours": "ადმინისტრაციის სამუშაო საათები",
 
     // Doctor dashboard
+
     "doctor.dashboard.quickActions.title": "სწრაფი მოქმედებები",
     "doctor.dashboard.schedule.title": "დღევანდელი განრიგი",
     "doctor.dashboard.quickActions.homeVisit": "ბინაზე",
@@ -835,6 +839,7 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "doctor.dashboard.noHoursSelected": "საათები არ არის არჩეული",
     "doctor.dashboard.viewMoreDays": "ყველას ნახვა ({{count}} დამატებითი)",
     "doctor.dashboard.videoConsultations": "ვიდეო კონსულტაციები",
+    "doctor.dashboard.seeAll": "ყველას ნახვა",
     "doctor.dashboard.homeVisits": "ბინაზე ვიზიტები",
     "doctor.dashboard.appointmentsCount": "{{count}} ჯავშანი",
     "doctor.dashboard.availableCount": "{{count}} თავისუფალი",
@@ -1035,16 +1040,16 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
       "მომეცი დეტალური ინფორმაცია [დაავადების სახელი]-ის შესახებ.",
 
     // Role selection
-    "roleSelection.title": "აირჩიე შენი როლი",
+    "roleSelection.title": "აირჩიე შენი პროფილი",
     "roleSelection.subtitle.authenticated":
       "აირჩიე რომელი ნაწილი გინდა გამოიყენო",
     "roleSelection.subtitle.guest": "აირჩიე რომელი პროფილით დავიწყოთ",
-    "roleSelection.doctor.title": "მე ვარ ექიმი",
+    "roleSelection.doctor.title": "ექიმი",
     "roleSelection.doctor.description":
       "შემოუერთდი როგორც სამედიცინო მომსახურების მიმწოდებელი",
-    "roleSelection.patient.title": "მე ვარ პაციენტი",
+    "roleSelection.patient.title": "პაციენტი",
     "roleSelection.patient.description": "მოძებნე ექიმი და დაჯავშნე ვიზიტი",
-    "roleSelection.continue": "გასაგრძელებლად",
+    "roleSelection.continue": "გაგრძელება",
     "roleSelection.login.question": "უკვე გაქვს ანგარიში? ",
     "roleSelection.login.action": "შესვლა",
     "roleSelection.alert.selectRole": "გთხოვ აირჩიო როლი",
@@ -1111,14 +1116,13 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
       "Incorrect email address or password",
     "auth.login.error.userNotFound": "User not found",
     "auth.login.error.invalidEmail": "Invalid email format",
-    "auth.login.userSelection.title": "Choose an account",
+    "auth.login.userSelection.title": "Select Account",
     "auth.login.userSelection.subtitle":
-      "Several accounts were found with this email. Choose which one you want to log in with.",
+      "Select the account you want to sign in with",
     "auth.login.userSelection.role.doctor": "Doctor",
     "auth.login.userSelection.role.patient": "Patient",
     "auth.login.userSelection.idNumber.label": "Personal ID",
-    "auth.login.userSelection.idNumber.missing":
-      "Personal ID is not specified",
+    "auth.login.userSelection.idNumber.missing": "Personal ID is not specified",
     "auth.login.userSelection.phone": "Phone",
     "auth.login.userSelection.defaultName": "User",
     "auth.login.userSelection.cancel": "Cancel",
@@ -1158,10 +1162,14 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "auth.forgotPassword.error.reset": "Failed to change password",
     "auth.forgotPassword.otp.title": "Phone number confirmation",
     "auth.forgotPassword.otp.subtitle": "Enter SMS code",
+    "auth.forgotPassword.userSelection.title": "Choose a profile",
+    "auth.forgotPassword.userSelection.subtitle":
+      "Doctor and patient profiles were found with this phone number. Choose which profile password you want to change.",
 
     // Auth - Register
     "auth.register.title.doctor": "Register as a doctor",
     "auth.register.title.patient": "Create an account",
+    "auth.register.title.subtitle": "Access to medical services from home",
     "auth.register.title.foreignPatient": "Foreign patient registration",
     "auth.register.subtitle.doctor":
       "Join our platform as a healthcare provider",
@@ -1180,9 +1188,9 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "auth.register.email.label": "e-mail",
     "auth.register.email.placeholder": "Enter your e-mail",
     "auth.register.idNumber.label": "ID",
-    "auth.register.idNumber.label.passport": "ID",
+    "auth.register.idNumber.label.passport": "Passport number",
     "auth.register.idNumber.placeholder": "ID",
-    "auth.register.idNumber.placeholder.passport": "ID",
+    "auth.register.idNumber.placeholder.passport": "Enter passport number",
     "auth.register.dob.label": "Date of birth",
     "auth.register.dob.placeholder": "Select",
     "auth.register.nationality.label": "Citizenship",
@@ -1203,7 +1211,7 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "auth.register.confirmPassword.placeholder": "••••••••••",
     "auth.register.profile.label": "Profile photo",
     "auth.register.profile.placeholder": "Upload",
-    "auth.register.profile.upload": "Upload",
+    "auth.register.profile.upload": "Upload professional photo",
     "auth.register.profile.change": "Change photo",
     "auth.register.profile.remove": "Remove",
     "auth.register.profile.uploading": "Uploading image...",
@@ -1224,7 +1232,6 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "auth.register.tos.cancelButton": "Cancel",
     "auth.register.tos.validationRequired":
       "You must agree to Medcompass Terms of Service and Privacy Policy to complete registration.",
-
     "auth.register.validation.fillAll": "Please fill in all required fields",
     "auth.register.validation.specialization":
       "Please choose at least one specialty",
@@ -1258,7 +1265,7 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "doctor.gender.other": "Other",
     "doctor.about.label": "About",
     "doctor.about.placeholder": "",
-    "doctor.license.label": "Medical license (PDF)",
+    "doctor.license.label": "Medical Certificate (PDF)",
     "doctor.license.placeholder": "Upload",
     "doctor.license.success": "✓ File uploaded successfully",
     "doctor.license.uploading": "Uploading...",
@@ -1320,6 +1327,7 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "doctor.laboratory.namePlaceholder": "Name & Surname",
     "doctor.laboratory.searchExamination": "Search examination...",
     "doctor.laboratory.save": "Save",
+    "doctor.dashboard.seeAll": "See All",
     "doctor.laboratory.confirm": "Confirm",
     "doctor.laboratory.prescribe": "Prescribe",
     "doctor.laboratory.total": "Total:",
@@ -2033,7 +2041,7 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "home.services.title": "My Services",
     "home.services.video.title": "Doctor Video consultation",
     "home.services.homeVisit.title": "Doctor Home Visit",
-    "home.services.lab.title": "Medical examinations & Lab",
+    "home.services.lab.title": "Medical Examinations & Lab",
 
     // Profile — language
     "profile.language.title": "Application language",
@@ -2058,19 +2066,19 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
       "Give me detailed information about disease [name].",
 
     // Role selection
-    "roleSelection.title": "Choose your role",
+    "roleSelection.title": "Choose your profile",
     "roleSelection.subtitle.authenticated":
       "Choose which part of the app you want to use",
     "roleSelection.subtitle.guest":
       "Choose which profile you want to start with",
-    "roleSelection.doctor.title": "I am a doctor",
+    "roleSelection.doctor.title": "Doctor",
     "roleSelection.doctor.description": "Join as a healthcare service provider",
-    "roleSelection.patient.title": "I am a patient",
+    "roleSelection.patient.title": "Patient",
     "roleSelection.patient.description":
       "Find a doctor and book an appointment",
     "roleSelection.continue": "Continue",
     "roleSelection.login.question": "Already have an account? ",
-    "roleSelection.login.action": "Log in",
+    "roleSelection.login.action": "Sign in",
     "roleSelection.alert.selectRole": "Please select a role",
   },
   ru: {
@@ -2135,9 +2143,9 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
       "Неверный адрес эл. почты или пароль",
     "auth.login.error.userNotFound": "Пользователь не найден",
     "auth.login.error.invalidEmail": "Неверный формат эл. почты",
-    "auth.login.userSelection.title": "Выберите аккаунт",
+    "auth.login.userSelection.title": "Выберите Аккаунт ",
     "auth.login.userSelection.subtitle":
-      "С этой эл. почтой найдено несколько аккаунтов. Выберите, с каким аккаунтом войти.",
+      "Выберите аккаунт, с которым хотите войти",
     "auth.login.userSelection.role.doctor": "Врач",
     "auth.login.userSelection.role.patient": "Пациент",
     "auth.login.userSelection.idNumber.label": "Личный номер",
@@ -2180,10 +2188,14 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "auth.forgotPassword.error.reset": "Не удалось изменить пароль",
     "auth.forgotPassword.otp.title": "Подтверждение номера телефона",
     "auth.forgotPassword.otp.subtitle": "Введите SMS-код",
+    "auth.forgotPassword.userSelection.title": "Выберите профиль",
+    "auth.forgotPassword.userSelection.subtitle":
+      "С этим номером телефона найдены профили врача и пациента. Выберите, для какого профиля изменить пароль.",
 
     // Auth - Register
     "auth.register.title.doctor": "Регистрация врача",
     "auth.register.title.patient": "Создать аккаунт",
+    "auth.register.title.subtitle": "Медицинские услуги, не выходя из дома.",
     "auth.register.title.foreignPatient": "Регистрация иностранного пациента",
     "auth.register.subtitle.doctor":
       "Присоединяйтесь к платформе как поставщик медицинских услуг",
@@ -2203,9 +2215,9 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "auth.register.email.label": "Адрес электронной почты",
     "auth.register.email.placeholder": "Введите адрес электронной почты",
     "auth.register.idNumber.label": "ID",
-    "auth.register.idNumber.label.passport": "ID",
+    "auth.register.idNumber.label.passport": "Номер паспорта",
     "auth.register.idNumber.placeholder": "ID",
-    "auth.register.idNumber.placeholder.passport": "ID",
+    "auth.register.idNumber.placeholder.passport": "Введите номер паспорта",
     "auth.register.dob.label": "Дата рождения",
     "auth.register.dob.placeholder": "Выберите",
     "auth.register.nationality.label": "Гражданство",
@@ -2226,7 +2238,7 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "auth.register.confirmPassword.placeholder": "••••••••••",
     "auth.register.profile.label": "Фото профиля",
     "auth.register.profile.placeholder": "Загрузить",
-    "auth.register.profile.upload": "Загрузить",
+    "auth.register.profile.upload": "Загрузить профессиональное фото",
     "auth.register.profile.change": "Изменить фото",
     "auth.register.profile.remove": "Удалить",
     "auth.register.profile.uploading": "Загрузка изображения...",
@@ -2283,7 +2295,7 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "doctor.gender.other": "Другое",
     "doctor.about.label": "О враче",
     "doctor.about.placeholder": "",
-    "doctor.license.label": "Лицензия врача (PDF)",
+    "doctor.license.label": "Сертификат врача (PDF)",
     "doctor.license.placeholder": "Загрузить",
     "doctor.license.success": "✓ Файл успешно загружен",
     "doctor.license.uploading": "Загрузка...",
@@ -2345,6 +2357,7 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "doctor.laboratory.namePlaceholder": "Имя и фамилия",
     "doctor.laboratory.searchExamination": "Поиск исследования...",
     "doctor.laboratory.save": "Сохранить",
+    "doctor.laboratory.seeAll": "Посмотреть все",
     "doctor.laboratory.confirm": "Подтвердить",
     "doctor.laboratory.prescribe": "Назначить",
     "doctor.laboratory.total": "Итого:",
@@ -3088,18 +3101,18 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
       "Дай мне подробную информацию о [название болезни].",
 
     // Role selection
-    "roleSelection.title": "Выберите роль",
+    "roleSelection.title": "Выберите профиль",
     "roleSelection.subtitle.authenticated":
       "Выберите, какую часть приложения вы хотите использовать",
     "roleSelection.subtitle.guest": "Выберите, с какого профиля начать",
-    "roleSelection.doctor.title": "Я врач",
+    "roleSelection.doctor.title": "Врач",
     "roleSelection.doctor.description":
       "Присоединяйтесь как поставщик медицинских услуг",
-    "roleSelection.patient.title": "Я пациент",
+    "roleSelection.patient.title": "Пациент",
     "roleSelection.patient.description": "Найдите врача и запишитесь на приём",
     "roleSelection.continue": "Продолжить",
     "roleSelection.login.question": "Уже есть аккаунт? ",
-    "roleSelection.login.action": "Войти",
+    "roleSelection.login.action": "Вход",
     "roleSelection.alert.selectRole": "Пожалуйста, выберите роль",
   },
 };

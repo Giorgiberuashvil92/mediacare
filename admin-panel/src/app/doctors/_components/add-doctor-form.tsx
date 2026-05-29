@@ -16,6 +16,8 @@ export function AddDoctorForm({ onSuccess, onCancel }: AddDoctorFormProps) {
   const [success, setSuccess] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: "",
+    nameEn: "",
+    nameRu: "",
     email: "",
     password: "",
     phone: "",
@@ -129,6 +131,8 @@ export function AddDoctorForm({ onSuccess, onCancel }: AddDoctorFormProps) {
       const registerData = {
         role: "doctor" as const,
         name: formData.name,
+        nameEn: formData.nameEn.trim() || undefined,
+        nameRu: formData.nameRu.trim() || undefined,
         email: formData.email,
         password: formData.password,
         phone: formData.phone || undefined,
@@ -154,6 +158,8 @@ export function AddDoctorForm({ onSuccess, onCancel }: AddDoctorFormProps) {
 
         setFormData({
           name: "",
+          nameEn: "",
+          nameRu: "",
           email: "",
           password: "",
           phone: "",
@@ -215,6 +221,36 @@ export function AddDoctorForm({ onSuccess, onCancel }: AddDoctorFormProps) {
               required
             />
 
+            <InputGroup
+              className="w-full sm:w-1/2"
+              type="text"
+              name="nameEn"
+              label="სახელი (ინგლისურად)"
+              placeholder="Dr. George Beridze"
+              value={formData.nameEn}
+              handleChange={handleChange}
+              icon={<UserIcon />}
+              iconPosition="left"
+              height="sm"
+            />
+          </div>
+
+          <div className="mb-5.5 flex flex-col gap-5.5 sm:flex-row">
+            <InputGroup
+              className="w-full sm:w-1/2"
+              type="text"
+              name="nameRu"
+              label="სახელი (რუსულად)"
+              placeholder="Доктор Георгий Беридзе"
+              value={formData.nameRu}
+              handleChange={handleChange}
+              icon={<UserIcon />}
+              iconPosition="left"
+              height="sm"
+            />
+          </div>
+
+          <div className="mb-5.5 flex flex-col gap-5.5 sm:flex-row">
             <InputGroup
               className="w-full sm:w-1/2"
               type="email"

@@ -49,6 +49,8 @@ export class AdminService {
     if (search) {
       filter.$or = [
         { name: { $regex: search, $options: 'i' } },
+        { nameEn: { $regex: search, $options: 'i' } },
+        { nameRu: { $regex: search, $options: 'i' } },
         { email: { $regex: search, $options: 'i' } },
         { phone: { $regex: search, $options: 'i' } },
       ];
@@ -118,6 +120,8 @@ export class AdminService {
         updatedAt: user.updatedAt,
         // Doctor specific fields
         ...(user.role === UserRole.DOCTOR && {
+          nameEn: user.nameEn,
+          nameRu: user.nameRu,
           specialization: user.specialization,
           degrees: user.degrees,
           experience: user.experience,
@@ -719,6 +723,8 @@ export class AdminService {
         updatedAt: user.updatedAt,
         // Doctor specific fields
         ...(user.role === UserRole.DOCTOR && {
+          nameEn: user.nameEn,
+          nameRu: user.nameRu,
           specialization: user.specialization,
           degrees: user.degrees,
           experience: user.experience,
@@ -741,23 +747,27 @@ export class AdminService {
 
   // Create new user
   async createUser(createUserDto: CreateUserDto) {
-    // Check if email already exists
+    // Email can be shared across roles, but not within the same role.
     const existingUser = await this.userModel.findOne({
       email: createUserDto.email,
+      role: createUserDto.role,
     });
 
     if (existingUser) {
-      throw new BadRequestException('Email already exists');
+      throw new BadRequestException('Email already exists for this role');
     }
 
-    // Check if phone already exists
+    // Phone can be shared across roles, but not within the same role.
     if (createUserDto.phone) {
       const existingPhoneUser = await this.userModel.findOne({
-        phone: createUserDto.phone,
+        phone: createUserDto.phone.trim(),
+        role: createUserDto.role,
       });
 
       if (existingPhoneUser) {
-        throw new BadRequestException('Phone number already exists');
+        throw new BadRequestException(
+          'Phone number already exists for this role',
+        );
       }
     }
 
@@ -771,7 +781,7 @@ export class AdminService {
       name: createUserDto.name,
       email: createUserDto.email,
       password: hashedPassword,
-      phone: createUserDto.phone,
+      phone: createUserDto.phone.trim(),
       idNumber: createUserDto.idNumber,
       address: createUserDto.address,
       gender: createUserDto.gender,
@@ -824,14 +834,41 @@ export class AdminService {
       throw new NotFoundException('User not found');
     }
 
-    // Check if email is being changed and if it's already taken
-    if (updateUserDto.email && updateUserDto.email !== user.email) {
+    const nextEmail = updateUserDto.email ?? user.email;
+    const nextRole = updateUserDto.role ?? user.role;
+    const nextPhone =
+      updateUserDto.phone !== undefined
+        ? updateUserDto.phone.trim()
+        : user.phone;
+
+    // Email can be shared across roles, but not within the same role.
+    if (nextEmail !== user.email || nextRole !== user.role) {
       const existingUser = await this.userModel.findOne({
-        email: updateUserDto.email,
+        email: nextEmail,
+        role: nextRole,
+        _id: { $ne: user._id },
       });
 
       if (existingUser) {
-        throw new BadRequestException('Email already exists');
+        throw new BadRequestException('Email already exists for this role');
+      }
+    }
+
+    // Phone can be shared across roles, but not within the same role.
+    if (
+      nextPhone &&
+      (nextPhone !== user.phone?.trim() || nextRole !== user.role)
+    ) {
+      const existingPhoneUser = await this.userModel.findOne({
+        phone: nextPhone,
+        role: nextRole,
+        _id: { $ne: user._id },
+      });
+
+      if (existingPhoneUser) {
+        throw new BadRequestException(
+          'Phone number already exists for this role',
+        );
       }
     }
 
@@ -841,7 +878,7 @@ export class AdminService {
     if (updateUserDto.name) updateData.name = updateUserDto.name;
     if (updateUserDto.email) updateData.email = updateUserDto.email;
     if (updateUserDto.phone !== undefined)
-      updateData.phone = updateUserDto.phone;
+      updateData.phone = updateUserDto.phone.trim();
     if (updateUserDto.idNumber !== undefined)
       updateData.idNumber = updateUserDto.idNumber;
     if (updateUserDto.address !== undefined)

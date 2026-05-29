@@ -5,6 +5,10 @@ import {
   getSpecializationDisplayName,
   getSpecializationLabelByName,
 } from "@/app/utils/specializationLabel";
+import {
+  doctorNameSearchText,
+  getDoctorDisplayName,
+} from "@/app/utils/doctorNameLabel";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
@@ -70,6 +74,8 @@ const mapDoctorFromAPI = (
   return {
     id: doctor.id, // Keep as string (MongoDB ObjectId)
     name: doctor.name || "",
+    nameEn: doctor.nameEn,
+    nameRu: doctor.nameRu,
     specialization: doctor.specialization || "",
     rating: doctor.rating || 0,
     reviewCount: doctor.reviewCount || 0,
@@ -198,8 +204,17 @@ const Doctor = () => {
   };
 
   // Filter doctors
+  const localizedDoctors = useMemo(
+    () =>
+      doctors.map((doctor) => ({
+        ...doctor,
+        name: getDoctorDisplayName(doctor, language),
+      })),
+    [doctors, language],
+  );
+
   const filteredDoctors = useMemo(() => {
-    let filtered = doctors;
+    let filtered = localizedDoctors;
 
     // Filter by specialty
     if (selectedFilter !== "all") {
@@ -232,28 +247,32 @@ const Doctor = () => {
 
     // Filter by search query
     if (searchQuery) {
+      const q = searchQuery.toLowerCase();
       filtered = filtered.filter(
         (doctor) =>
-          doctor.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          doctor.specialization
-            ?.toLowerCase()
-            .includes(searchQuery.toLowerCase()),
+          doctorNameSearchText(doctor).includes(q) ||
+          doctor.specialization?.toLowerCase().includes(q),
       );
     }
 
-    if (__DEV__ && doctors.length > 0) {
+    if (__DEV__ && localizedDoctors.length > 0) {
       console.log("🏥 [DoctorTab] after filters:", {
         selectedFilter,
         selectedAppointmentType,
         searchQuery,
-        before: doctors.length,
+        before: localizedDoctors.length,
         after: filtered.length,
         names: filtered.map((d) => d.name),
       });
     }
 
     return filtered;
-  }, [doctors, selectedFilter, selectedAppointmentType, searchQuery]);
+  }, [
+    localizedDoctors,
+    selectedFilter,
+    selectedAppointmentType,
+    searchQuery,
+  ]);
 
   const handleToggleFavorite = (doctor: (typeof doctors)[0]) => {
     if (isFavorite(doctor.id)) {

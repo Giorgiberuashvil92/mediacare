@@ -150,6 +150,24 @@ export declare class AuthService {
     forgotPassword(forgotPasswordDto: ForgotPasswordDto): Promise<{
         success: boolean;
         message: string;
+        requiresUserSelection?: undefined;
+        data?: undefined;
+    } | {
+        success: boolean;
+        message: string;
+        requiresUserSelection: boolean;
+        data: {
+            users: {
+                id: string;
+                role: UserRole;
+                name: string;
+                email: string;
+                phone: string;
+                idNumber: string;
+                approvalStatus: ApprovalStatus;
+                doctorStatus: import("../schemas/user.schema").DoctorStatus;
+            }[];
+        };
     }>;
     resetPassword(resetPasswordDto: ResetPasswordDto): Promise<{
         success: boolean;

@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useLanguage } from "../../contexts/LanguageContext";
 
 interface SeeAllProps {
   title: string;
@@ -8,6 +9,7 @@ interface SeeAllProps {
 }
 
 const SeeAll = ({ title, route }: SeeAllProps) => {
+  const { t } = useLanguage();
   const handleSeeAll = () => {
     if (route) {
       router.push(route as any);
@@ -18,7 +20,7 @@ const SeeAll = ({ title, route }: SeeAllProps) => {
     <View style={styles.container}>
       <Text style={styles.title}>{title}</Text>
       <TouchableOpacity onPress={handleSeeAll}>
-        <Text style={styles.seeAll}>ყველას ნახვა</Text>
+        <Text style={styles.seeAll}> {t("doctor.dashboard.seeAll")} </Text>
       </TouchableOpacity>
     </View>
   );

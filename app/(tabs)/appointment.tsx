@@ -26,6 +26,7 @@ import {
   formatAppointmentDateLong,
   formatAppointmentTime,
 } from "../utils/appointmentDateTime";
+import { getDoctorDisplayName } from "../utils/doctorNameLabel";
 
 interface PatientAppointment {
   id: string;
@@ -77,6 +78,7 @@ const mapAppointmentFromAPI = (
   appointment: any,
   apiBaseUrl: string,
   doctorFallback: string,
+  language: "ka" | "en" | "ru",
 ): PatientAppointment => {
   // Handle populated doctorId (object) or non-populated doctorId (string/ObjectId)
   let doctor: any = {};
@@ -163,7 +165,7 @@ const mapAppointmentFromAPI = (
 
   return {
     id: appointment._id || appointment.id || "",
-    doctorName: doctor.name || doctorFallback,
+    doctorName: getDoctorDisplayName(doctor, language, doctorFallback),
     doctorSpecialty: doctor.specialization || "",
     date: appointmentDate,
     time: appointment.appointmentTime || "",
@@ -410,7 +412,7 @@ const Appointment = () => {
     } else {
       setLoading(false);
     }
-  }, [isAuthenticated, user?.id, user?.role]);
+  }, [isAuthenticated, user?.id, user?.role, language]);
 
   // Update filterType from params
   useEffect(() => {
@@ -475,6 +477,7 @@ const Appointment = () => {
             appointment,
             apiBaseUrl,
             t("appointments.common.doctor"),
+            language,
           ),
         );
         console.log(

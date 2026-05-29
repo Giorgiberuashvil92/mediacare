@@ -46,7 +46,15 @@ __decorate([
     __metadata("design:type", String)
 ], User.prototype, "name", void 0);
 __decorate([
-    (0, mongoose_1.Prop)({ required: true, unique: true }),
+    (0, mongoose_1.Prop)(),
+    __metadata("design:type", String)
+], User.prototype, "nameEn", void 0);
+__decorate([
+    (0, mongoose_1.Prop)(),
+    __metadata("design:type", String)
+], User.prototype, "nameRu", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ required: true }),
     __metadata("design:type", String)
 ], User.prototype, "email", void 0);
 __decorate([
@@ -209,4 +217,11 @@ exports.User = User = __decorate([
     (0, mongoose_1.Schema)({ timestamps: true })
 ], User);
 exports.UserSchema = mongoose_1.SchemaFactory.createForClass(User);
+exports.UserSchema.index({ email: 1, role: 1 }, { unique: true });
+exports.UserSchema.index({ phone: 1, role: 1 }, {
+    unique: true,
+    partialFilterExpression: {
+        phone: { $exists: true, $type: 'string', $gt: '' },
+    },
+});
 //# sourceMappingURL=user.schema.js.map

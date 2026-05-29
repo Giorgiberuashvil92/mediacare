@@ -91,6 +91,26 @@ export function DoctorDetailsModal({
                     </label>
                     <p className="text-dark dark:text-white">{doctor.name}</p>
                   </div>
+                  {doctor.nameEn ? (
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-dark-4 dark:text-dark-6">
+                        სახელი (ინგლისურად)
+                      </label>
+                      <p className="text-dark dark:text-white">
+                        {doctor.nameEn}
+                      </p>
+                    </div>
+                  ) : null}
+                  {doctor.nameRu ? (
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-dark-4 dark:text-dark-6">
+                        სახელი (რუსულად)
+                      </label>
+                      <p className="text-dark dark:text-white">
+                        {doctor.nameRu}
+                      </p>
+                    </div>
+                  ) : null}
                   <div>
                     <label className="mb-1 block text-sm font-medium text-dark-4 dark:text-dark-6">
                       ელ. ფოსტა

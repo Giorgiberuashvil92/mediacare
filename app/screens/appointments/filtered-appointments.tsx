@@ -215,7 +215,6 @@ export default function FilteredAppointmentsScreen() {
     return diff >= -oneHourInMs;
   };
 
-  // კონსულტაციის დრო + 1 საათი გავიდა — ღილაკი ვაჩვენოთ არა, ტექსტი "დრო უკვე გავიდა"
   const isConsultationTimePassed = (appointment: PatientAppointment) => {
     if (
       appointment.status !== "scheduled" &&
@@ -457,7 +456,10 @@ export default function FilteredAppointmentsScreen() {
                         const errorMessage =
                           err.message ||
                           t("doctor.appointments.operationFailed");
-                        Alert.alert(t("appointments.common.error"), errorMessage);
+                        Alert.alert(
+                          t("appointments.common.error"),
+                          errorMessage,
+                        );
                       }
                     },
                   },
@@ -554,7 +556,6 @@ export default function FilteredAppointmentsScreen() {
         />
       )}
 
-      {/* Consultation Time Modal */}
       <Modal
         visible={showConsultationTimeModal}
         transparent={true}

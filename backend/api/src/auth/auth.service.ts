@@ -448,29 +448,10 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const passwordMatchedUsers: UserDocument[] = [];
-    for (const candidate of users) {
-      const isPasswordValid = await bcrypt.compare(
-        password,
-        candidate.password,
-      );
-      if (isPasswordValid) {
-        passwordMatchedUsers.push(candidate);
-      }
-    }
-
-    if (!passwordMatchedUsers.length) {
-      console.log(
-        '❌ [AuthService] Invalid password for email:',
-        normalizedEmail,
-      );
-      throw new UnauthorizedException('Invalid credentials');
-    }
-
-    const activeUsers = passwordMatchedUsers.filter(
-      (candidate) => candidate.isActive,
+    const loginCandidates = users.filter(
+      (candidate) => candidate.isActive || candidate.role === UserRole.DOCTOR,
     );
-    if (!activeUsers.length) {
+    if (!loginCandidates.length) {
       console.log(
         '❌ [AuthService] Account is deactivated for email:',
         normalizedEmail,
@@ -478,10 +459,12 @@ export class AuthService {
       throw new UnauthorizedException('Account is deactivated');
     }
 
-    if (!userId && activeUsers.length > 1) {
+    // If one email belongs to multiple active accounts, let the user choose
+    // the account first. Password validation happens after selection.
+    if (!userId && loginCandidates.length > 1) {
       console.log('👥 [AuthService] Multiple login users found:', {
         email: normalizedEmail,
-        count: activeUsers.length,
+        count: loginCandidates.length,
       });
 
       return {
@@ -490,7 +473,7 @@ export class AuthService {
         requiresUserSelection: true,
         requiresOTP: false,
         data: {
-          users: activeUsers.map((candidate) =>
+          users: loginCandidates.map((candidate) =>
             this.buildSelectableLoginUser(candidate),
           ),
         },
@@ -498,15 +481,33 @@ export class AuthService {
     }
 
     const user = userId
-      ? activeUsers.find(
+      ? loginCandidates.find(
           (candidate) => (candidate._id as string).toString() === userId,
         )
-      : activeUsers[0];
+      : loginCandidates[0];
 
     if (!user) {
       console.log('❌ [AuthService] Selected user not valid for login:', {
         email: normalizedEmail,
         userId,
+      });
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (!user.isActive && user.role !== UserRole.DOCTOR) {
+      console.log('❌ [AuthService] Selected account is deactivated:', {
+        email: normalizedEmail,
+        userId: (user._id as string).toString(),
+        role: user.role,
+      });
+      throw new UnauthorizedException('Account is deactivated');
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      console.log('❌ [AuthService] Invalid password for selected user:', {
+        email: normalizedEmail,
+        userId: (user._id as string).toString(),
       });
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -883,10 +884,11 @@ export class AuthService {
   }
 
   async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
-    const { phone } = forgotPasswordDto;
+    const { phone, userId } = forgotPasswordDto;
 
     console.log('🔐 [AuthService] Forgot password request received:', {
       phone,
+      hasSelectedUser: !!userId,
     });
 
     // Normalize phone number
@@ -895,15 +897,20 @@ export class AuthService {
       .replace(/^\+995/, '')
       .replace(/^0/, '');
 
-    const user = await this.userModel.findOne({
+    const phoneQuery = {
       $or: [
         { phone: cleanPhone },
         { phone: `+995${cleanPhone}` },
         { phone: `0${cleanPhone}` },
       ],
-    });
+    };
 
-    if (!user) {
+    const users = await this.userModel.find(phoneQuery);
+    const resetCandidates = users.filter(
+      (candidate) => candidate.isActive || candidate.role === UserRole.DOCTOR,
+    );
+
+    if (!resetCandidates.length) {
       // Don't reveal if user exists or not for security
       console.log(
         '⚠️ [AuthService] User not found for phone (not revealing):',
@@ -914,6 +921,38 @@ export class AuthService {
         message:
           'თუ ტელეფონის ნომერი არსებობს, ვერიფიკაციის კოდი გაიგზავნა SMS-ით',
       };
+    }
+
+    if (!userId && resetCandidates.length > 1) {
+      console.log('👥 [AuthService] Multiple reset users found:', {
+        phone: cleanPhone,
+        count: resetCandidates.length,
+      });
+
+      return {
+        success: true,
+        message: 'User selection required',
+        requiresUserSelection: true,
+        data: {
+          users: resetCandidates.map((candidate) =>
+            this.buildSelectableLoginUser(candidate),
+          ),
+        },
+      };
+    }
+
+    const user = userId
+      ? resetCandidates.find(
+          (candidate) => (candidate._id as string).toString() === userId,
+        )
+      : resetCandidates[0];
+
+    if (!user) {
+      console.log('❌ [AuthService] Selected reset user not valid:', {
+        phone: cleanPhone,
+        userId,
+      });
+      throw new UnauthorizedException('Invalid phone number');
     }
 
     // Send OTP code via SMS using phone verification service
@@ -940,10 +979,11 @@ export class AuthService {
   }
 
   async resetPassword(resetPasswordDto: ResetPasswordDto) {
-    const { phone, newPassword } = resetPasswordDto;
+    const { phone, newPassword, userId } = resetPasswordDto;
 
     console.log('🔐 [AuthService] Reset password request received:', {
       phone,
+      hasSelectedUser: !!userId,
     });
 
     // Normalize phone number
@@ -952,13 +992,28 @@ export class AuthService {
       .replace(/^\+995/, '')
       .replace(/^0/, '');
 
-    const user = await this.userModel.findOne({
+    const phoneQuery = {
       $or: [
         { phone: cleanPhone },
         { phone: `+995${cleanPhone}` },
         { phone: `0${cleanPhone}` },
       ],
-    });
+    };
+
+    const users = await this.userModel.find(phoneQuery);
+    const resetCandidates = users.filter(
+      (candidate) => candidate.isActive || candidate.role === UserRole.DOCTOR,
+    );
+
+    if (resetCandidates.length > 1 && !userId) {
+      throw new BadRequestException('გთხოვთ აირჩიოთ ანგარიში');
+    }
+
+    const user = userId
+      ? resetCandidates.find(
+          (candidate) => (candidate._id as string).toString() === userId,
+        )
+      : resetCandidates[0];
 
     if (!user) {
       throw new UnauthorizedException('Invalid phone number');

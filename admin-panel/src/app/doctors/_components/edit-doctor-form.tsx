@@ -23,6 +23,8 @@ export function EditDoctorForm({
 
   const [formData, setFormData] = useState({
     name: doctor.name || "",
+    nameEn: doctor.nameEn || "",
+    nameRu: doctor.nameRu || "",
     email: doctor.email || "",
     phone: doctor.phone || "",
     idNumber: doctor.idNumber || "",
@@ -140,6 +142,8 @@ export function EditDoctorForm({
 
       const updateData: any = {
         name: formData.name.trim(),
+        nameEn: formData.nameEn.trim(),
+        nameRu: formData.nameRu.trim(),
         email: formData.email.trim(),
         phone: formData.phone.trim() || undefined,
         idNumber: formData.idNumber.trim() || undefined,
@@ -252,6 +256,32 @@ export function EditDoctorForm({
               required
             />
 
+            <InputGroup
+              className="w-full sm:w-1/2"
+              type="text"
+              name="nameEn"
+              label="სახელი (ინგლისურად)"
+              placeholder="Dr. George Beridze"
+              value={formData.nameEn}
+              handleChange={handleChange}
+              height="sm"
+            />
+          </div>
+
+          <div className="mb-5.5 flex flex-col gap-5.5 sm:flex-row">
+            <InputGroup
+              className="w-full sm:w-1/2"
+              type="text"
+              name="nameRu"
+              label="სახელი (რუსულად)"
+              placeholder="Доктор Георгий Беридзе"
+              value={formData.nameRu}
+              handleChange={handleChange}
+              height="sm"
+            />
+          </div>
+
+          <div className="mb-5.5 flex flex-col gap-5.5 sm:flex-row">
             <InputGroup
               className="w-full sm:w-1/2"
               type="email"

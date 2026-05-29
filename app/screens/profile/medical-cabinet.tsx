@@ -15,6 +15,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../../contexts/AuthContext";
+import { useLanguage } from "../../contexts/LanguageContext";
+import { getDoctorDisplayName } from "../../utils/doctorNameLabel";
 
 interface VisitRecord {
   id: string;
@@ -28,6 +30,7 @@ type TabType = "records" | "personal-info";
 
 export default function MedicalCabinetScreen() {
   const { user } = useAuth();
+  const { language } = useLanguage();
   const [activeTab, setActiveTab] = useState<TabType>("personal-info");
   const [selectedGender, setSelectedGender] = useState<string>("");
   const [birthDate, setBirthDate] = useState<string>("");
@@ -53,7 +56,7 @@ export default function MedicalCabinetScreen() {
     if (activeTab === "personal-info" && user?.id) {
       loadProfile();
     }
-  }, [activeTab, user?.id]);
+  }, [activeTab, user?.id, language]);
 
   const loadProfile = async () => {
     try {
@@ -100,7 +103,7 @@ export default function MedicalCabinetScreen() {
           return {
             id: apt._id || apt.id || "",
             date: apt.appointmentDate || "",
-            doctorName: doctor.name || "ექიმი",
+            doctorName: getDoctorDisplayName(doctor, language, "ექიმი"),
             doctorSpecialty: doctor.specialization || "",
             appointmentId: apt._id || apt.id || "",
           };

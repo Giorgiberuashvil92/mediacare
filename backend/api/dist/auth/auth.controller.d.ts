@@ -151,6 +151,24 @@ export declare class AuthController {
     forgotPassword(dto: ForgotPasswordDto): Promise<{
         success: boolean;
         message: string;
+        requiresUserSelection?: undefined;
+        data?: undefined;
+    } | {
+        success: boolean;
+        message: string;
+        requiresUserSelection: boolean;
+        data: {
+            users: {
+                id: string;
+                role: import("../schemas/user.schema").UserRole;
+                name: string;
+                email: string;
+                phone: string;
+                idNumber: string;
+                approvalStatus: import("../schemas/user.schema").ApprovalStatus;
+                doctorStatus: import("../schemas/user.schema").DoctorStatus;
+            }[];
+        };
     }>;
     resetPassword(dto: ResetPasswordDto): Promise<{
         success: boolean;

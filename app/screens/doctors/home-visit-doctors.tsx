@@ -1,9 +1,14 @@
 import { apiService } from "@/app/_services/api";
 import { useFavorites } from "@/app/contexts/FavoritesContext";
+import { useLanguage } from "@/app/contexts/LanguageContext";
+import {
+  doctorNameSearchText,
+  getDoctorDisplayName,
+} from "@/app/utils/doctorNameLabel";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -30,6 +35,8 @@ const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
   return {
     id: doctor.id,
     name: doctor.name || "",
+    nameEn: doctor.nameEn,
+    nameRu: doctor.nameRu,
     specialization: doctor.specialization || "",
     rating: doctor.rating || 0,
     reviewCount: doctor.reviewCount || 0,
@@ -43,6 +50,7 @@ const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
 };
 
 export default function HomeVisitDoctorsScreen() {
+  const { language } = useLanguage();
   const [doctors, setDoctors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -109,12 +117,19 @@ export default function HomeVisitDoctorsScreen() {
     }
   };
 
-  const filteredDoctors = doctors.filter((doctor) =>
-    searchQuery
-      ? doctor.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        doctor.specialization?.toLowerCase().includes(searchQuery.toLowerCase())
-      : true,
-  );
+  const filteredDoctors = useMemo(() => {
+    const localized = doctors.map((doctor) => ({
+      ...doctor,
+      name: getDoctorDisplayName(doctor, language),
+    }));
+    if (!searchQuery) return localized;
+    const q = searchQuery.toLowerCase();
+    return localized.filter(
+      (doctor) =>
+        doctorNameSearchText(doctor).includes(q) ||
+        doctor.specialization?.toLowerCase().includes(q),
+    );
+  }, [doctors, language, searchQuery]);
 
   const handleDoctorPress = (doctorId: string) => {
     router.push({

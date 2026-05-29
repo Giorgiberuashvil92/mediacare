@@ -23,7 +23,6 @@ const reset_password_dto_1 = require("./dto/reset-password.dto");
 const send_verification_code_dto_1 = require("./dto/send-verification-code.dto");
 const verify_login_otp_dto_1 = require("./dto/verify-login-otp.dto");
 const verify_phone_dto_1 = require("./dto/verify-phone.dto");
-const jwt_auth_guard_1 = require("./guards/jwt-auth.guard");
 const phone_verification_service_1 = require("./phone-verification.service");
 let AuthController = class AuthController {
     constructor(authService, phoneVerificationService) {
@@ -112,7 +111,6 @@ __decorate([
 ], AuthController.prototype, "refreshToken", null);
 __decorate([
     (0, common_1.Post)('logout'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [refresh_token_dto_1.RefreshTokenDto]),

@@ -2,6 +2,8 @@ import { apiService } from "@/app/_services/api";
 import DoctorFilters, {
   DoctorFilterOption,
 } from "@/app/components/shared/doctorFilters";
+import { useLanguage } from "@/app/contexts/LanguageContext";
+import { getDoctorDisplayName } from "@/app/utils/doctorNameLabel";
 import Fontisto from "@expo/vector-icons/Fontisto";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
@@ -29,6 +31,8 @@ const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
   return {
     id: doctor.id || doctor._id,
     name: doctor.name || "",
+    nameEn: doctor.nameEn,
+    nameRu: doctor.nameRu,
     specialization: doctor.specialization || "",
     rating: doctor.rating || 0,
     reviewCount: doctor.reviewCount || 0,
@@ -43,6 +47,7 @@ const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
 };
 
 const TopDoctors = () => {
+  const { language } = useLanguage();
   const [selectedFilter, setSelectedFilter] = useState("all");
   const [doctors, setDoctors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -151,20 +156,29 @@ useEffect(() => {
   }
 }, [filterOptions, selectedFilter]);
 
+  const localizedDoctors = useMemo(
+    () =>
+      doctors.map((doctor) => ({
+        ...doctor,
+        name: getDoctorDisplayName(doctor, language),
+      })),
+    [doctors, language],
+  );
+
   const filteredDoctors = useMemo(() => {
     if (selectedFilter === "all") {
-      return doctors;
+      return localizedDoctors;
     }
 
     const target = selectedFilter.toLowerCase();
-    return doctors.filter((doctor) =>
+    return localizedDoctors.filter((doctor) =>
       doctor.specialization
         ?.toLowerCase()
         .split(",")
         .map((spec) => spec.trim())
         .some((spec) => spec.includes(target)),
     );
-  }, [selectedFilter, doctors]);
+  }, [selectedFilter, localizedDoctors]);
 
   const groupedDoctors = useMemo(() => {
     const groups: Record<string, any[]> = {};

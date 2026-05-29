@@ -34,7 +34,15 @@ export class User {
   @Prop({ required: true })
   name: string;
 
-  @Prop({ required: true, unique: true })
+  /** ინგლისური სახელი (ექიმებისთვის, EN ენაზე ჩვენებისთვის) */
+  @Prop()
+  nameEn?: string;
+
+  /** რუსული სახელი (ექიმებისთვის, RU ენაზე ჩვენებისთვის) */
+  @Prop()
+  nameRu?: string;
+
+  @Prop({ required: true })
   email: string;
 
   @Prop({ required: true })
@@ -164,3 +172,14 @@ export class User {
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
+
+UserSchema.index({ email: 1, role: 1 }, { unique: true });
+UserSchema.index(
+  { phone: 1, role: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      phone: { $exists: true, $type: 'string', $gt: '' },
+    },
+  },
+);

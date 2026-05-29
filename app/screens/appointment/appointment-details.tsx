@@ -1,10 +1,16 @@
 import { apiService } from "@/app/_services/api";
+import { useLanguage } from "@/app/contexts/LanguageContext";
+import {
+  formatAppointmentDate,
+  formatAppointmentTime,
+} from "@/app/utils/appointmentDateTime";
+import { getDoctorDisplayName } from "@/app/utils/doctorNameLabel";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as DocumentPicker from "expo-document-picker";
 import { Image } from "expo-image";
 import * as Linking from "expo-linking";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -15,10 +21,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import {
-  formatAppointmentDate,
-  formatAppointmentTime,
-} from "@/app/utils/appointmentDateTime";
 
 // Helper function to map backend doctor to app format
 const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
@@ -36,6 +38,8 @@ const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
   return {
     id: doctor.id,
     name: doctor.name || "",
+    nameEn: doctor.nameEn,
+    nameRu: doctor.nameRu,
     specialization: doctor.specialization || "",
     rating: doctor.rating || 0,
     reviewCount: doctor.reviewCount || 0,
@@ -55,6 +59,7 @@ const AppointmentDetails = () => {
     patientName,
     problem,
   } = useLocalSearchParams();
+  const { language } = useLanguage();
   const [doctor, setDoctor] = useState<any>(null);
   const [appointment, setAppointment] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -124,6 +129,14 @@ const AppointmentDetails = () => {
       setLoading(false);
     }
   };
+
+  const displayDoctor = useMemo(
+    () =>
+      doctor
+        ? { ...doctor, name: getDoctorDisplayName(doctor, language) }
+        : null,
+    [doctor, language],
+  );
 
   const handleUploadDocument = async () => {
     if (!appointmentId) return;
@@ -324,7 +337,7 @@ const AppointmentDetails = () => {
                 <Image source={doctor.image} style={styles.doctorImage} />
               ) : (
                 <Text style={styles.doctorInitials}>
-                  {doctor.name
+                  {displayDoctor!.name
                     .split(" ")
                     .map((n: string) => n[0])
                     .join("")}
@@ -332,7 +345,7 @@ const AppointmentDetails = () => {
               )}
             </View>
             <View style={styles.doctorInfo}>
-              <Text style={styles.doctorName}>{doctor.name}</Text>
+              <Text style={styles.doctorName}>{displayDoctor!.name}</Text>
               <Text style={styles.specialty}>{doctor.specialization}</Text>
               <Text style={styles.degrees}>{doctor.degrees}</Text>
               <View style={styles.ratingContainer}>

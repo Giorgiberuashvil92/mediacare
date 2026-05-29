@@ -450,6 +450,8 @@ export class DoctorsService {
       return {
         id: (doctor._id as string).toString(),
         name: doctor.name,
+        nameEn: doctor.nameEn,
+        nameRu: doctor.nameRu,
         email: doctor.email,
         phone: doctor.phone,
         idNumber: doctor.idNumber,
@@ -574,6 +576,8 @@ export class DoctorsService {
     const responseData = {
       id: (doctor._id as string).toString(),
       name: doctor.name,
+      nameEn: doctor.nameEn,
+      nameRu: doctor.nameRu,
       email: doctor.email,
       phone: doctor.phone,
       idNumber: doctor.idNumber,
@@ -1197,10 +1201,11 @@ export class DoctorsService {
       homeVisitFee: doctor.homeVisitFee,
     });
 
-    // Check if email is already taken by another user
+    // Email can be shared across roles, but not by another doctor.
     if (updateDoctorDto.email && updateDoctorDto.email !== doctor.email) {
       const existingUser = await this.userModel.findOne({
         email: updateDoctorDto.email,
+        role: UserRole.DOCTOR,
         _id: { $ne: new mongoose.Types.ObjectId(doctorId) },
       });
       if (existingUser) {
@@ -1208,15 +1213,37 @@ export class DoctorsService {
       }
     }
 
+    if (updateDoctorDto.phone !== undefined) {
+      const nextPhone = updateDoctorDto.phone.trim();
+      if (nextPhone && nextPhone !== doctor.phone?.trim()) {
+        const existingPhoneUser = await this.userModel.findOne({
+          phone: nextPhone,
+          role: UserRole.DOCTOR,
+          _id: { $ne: new mongoose.Types.ObjectId(doctorId) },
+        });
+        if (existingPhoneUser) {
+          throw new BadRequestException('Phone number already in use');
+        }
+      }
+    }
+
     // Update fields
     if (updateDoctorDto.name !== undefined) {
       doctor.name = updateDoctorDto.name;
+    }
+    if (updateDoctorDto.nameEn !== undefined) {
+      const trimmed = updateDoctorDto.nameEn.trim();
+      doctor.nameEn = trimmed || undefined;
+    }
+    if (updateDoctorDto.nameRu !== undefined) {
+      const trimmed = updateDoctorDto.nameRu.trim();
+      doctor.nameRu = trimmed || undefined;
     }
     if (updateDoctorDto.email !== undefined) {
       doctor.email = updateDoctorDto.email;
     }
     if (updateDoctorDto.phone !== undefined) {
-      doctor.phone = updateDoctorDto.phone;
+      doctor.phone = updateDoctorDto.phone.trim();
     }
     if (updateDoctorDto.idNumber !== undefined) {
       doctor.idNumber = updateDoctorDto.idNumber;

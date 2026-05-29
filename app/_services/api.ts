@@ -1202,9 +1202,13 @@ class ApiService {
     });
   }
 
-  async forgotPassword(phone: string): Promise<{
+  async forgotPassword(phone: string, userId?: string): Promise<{
     success: boolean;
     message?: string;
+    requiresUserSelection?: boolean;
+    data?: {
+      users?: LoginSelectableUser[];
+    };
   }> {
     if (USE_MOCK_API) {
       return Promise.resolve({
@@ -1218,15 +1222,24 @@ class ApiService {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ phone }),
+      body: JSON.stringify({ phone, userId }),
     });
 
-    return this.handleResponse<{ success: boolean; message?: string }>(
-      response,
-    );
+    return this.handleResponse<{
+      success: boolean;
+      message?: string;
+      requiresUserSelection?: boolean;
+      data?: {
+        users?: LoginSelectableUser[];
+      };
+    }>(response);
   }
 
-  async resetPassword(data: { phone: string; newPassword: string }): Promise<{
+  async resetPassword(data: {
+    phone: string;
+    newPassword: string;
+    userId?: string;
+  }): Promise<{
     success: boolean;
     message?: string;
   }> {

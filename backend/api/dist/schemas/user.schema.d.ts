@@ -22,6 +22,8 @@ export declare enum Gender {
 export declare class User {
     role: UserRole;
     name: string;
+    nameEn?: string;
+    nameRu?: string;
     email: string;
     password: string;
     phone?: string;

@@ -6,8 +6,8 @@ import {
   parseMisPrintFormDocuments,
 } from "@/lib/mis-print-forms/html";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Image as ExpoImage } from "expo-image";
 import * as FileSystem from "expo-file-system/legacy";
+import { Image as ExpoImage } from "expo-image";
 import { useFocusEffect, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -31,6 +31,7 @@ import {
   formatAppointmentDateLong,
   formatAppointmentTime,
 } from "../utils/appointmentDateTime";
+import { getDoctorDisplayName } from "../utils/doctorNameLabel";
 
 function normalizeAppointmentId(raw: unknown): string {
   if (raw == null || raw === "") return "";
@@ -233,7 +234,7 @@ const History = () => {
     } else {
       setLoading(false);
     }
-  }, [isAuthenticated, user?.id, user?.role]);
+  }, [isAuthenticated, user?.id, user?.role, language]);
 
   const runMisPrintFormsSync = useCallback(() => {
     if (!isAuthenticated || !user?.id || apiService.isMockMode()) return;
@@ -428,6 +429,7 @@ const History = () => {
               appointment,
               apiBaseUrl,
               t("history.unknownDoctor"),
+              language,
             );
             console.log("📋 [History] Mapped visit:", {
               id: visit?.id,
@@ -1598,6 +1600,7 @@ const mapAppointmentToVisit = (
   appointment: any,
   apiBaseUrl: string,
   doctorFallback: string,
+  language: "ka" | "en" | "ru",
 ) => {
   if (!appointment) {
     return null;
@@ -1703,7 +1706,7 @@ const mapAppointmentToVisit = (
       normalizeAppointmentId(appointment.id) ||
       Math.random().toString(36).slice(2),
     doctorId: doctorId,
-    doctorName: doctor?.name || doctorFallback,
+    doctorName: getDoctorDisplayName(doctor, language, doctorFallback),
     doctorSpecialty: doctor?.specialization || doctor?.speciality || "",
     doctorImage,
     date: appointmentDate,
@@ -2350,7 +2353,7 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins-SemiBold",
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 12,
     fontFamily: "Poppins-Bold",
     color: "#1F2937",
   },
@@ -2741,7 +2744,7 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 10,
     fontFamily: "Poppins-Medium",
     color: "#1F2937",
     marginLeft: 10,

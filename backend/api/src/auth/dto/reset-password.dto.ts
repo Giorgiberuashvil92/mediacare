@@ -1,4 +1,10 @@
-import { IsNotEmpty, IsString, MinLength } from 'class-validator';
+import {
+  IsMongoId,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MinLength,
+} from 'class-validator';
 
 export class ResetPasswordDto {
   @IsString()
@@ -9,4 +15,8 @@ export class ResetPasswordDto {
   @IsNotEmpty()
   @MinLength(6)
   newPassword: string;
+
+  @IsOptional()
+  @IsMongoId()
+  userId?: string;
 }

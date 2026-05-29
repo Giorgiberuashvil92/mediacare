@@ -12,6 +12,8 @@ const FAVORITES_STORAGE_KEY = "@medicare_favorites";
 export interface Doctor {
   id: number;
   name: string;
+  nameEn?: string;
+  nameRu?: string;
   specialization: string;
   rating: number;
   reviewCount?: number;

@@ -4,7 +4,7 @@ import * as DocumentPicker from "expo-document-picker";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -26,11 +26,15 @@ import { apiService, Specialization } from "../../_services/api";
 import OTPModal from "../../components/ui/OTPModal";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../contexts/LanguageContext";
+import {
+  getSpecializationDisplayName,
+  getSpecializationLabelByName,
+} from "../../utils/specializationLabel";
 import { showToast } from "../../utils/toast";
 
 export default function RegisterScreen() {
   const { userRole, register } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const params = useLocalSearchParams();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -1624,6 +1628,16 @@ export default function RegisterScreen() {
 
   const isDoctor = selectedRole === "doctor";
 
+  const selectedSpecializationsLabel = useMemo(
+    () =>
+      selectedSpecializations
+        .map((name) =>
+          getSpecializationLabelByName(name, specializations, language),
+        )
+        .join(", "),
+    [selectedSpecializations, specializations, language],
+  );
+
   const profileKey = (suffix: string) =>
     t(
       isDoctor ? `doctor.profile.${suffix}` : `auth.register.profile.${suffix}`,
@@ -1634,9 +1648,6 @@ export default function RegisterScreen() {
       return (
         <>
           <Text style={styles.title}>{t("auth.register.title.doctor")}</Text>
-          <Text style={[styles.subtitle, styles.subtitleStandalone]}>
-            {t("auth.register.subtitle.doctor")}
-          </Text>
         </>
       );
     }
@@ -1653,12 +1664,8 @@ export default function RegisterScreen() {
 
     return (
       <>
-        <Text style={styles.title}>{t("auth.register.title.patient")}</Text>
         <Text style={styles.subtitle}>
-          {t("auth.register.subtitle.patient")}
-        </Text>
-        <Text style={styles.subtitleDescription}>
-          {t("auth.register.subtitle.patientDescription")}
+          {/* {t("auth.register.subtitle.doctor")} */}
         </Text>
       </>
     );
@@ -1666,69 +1673,36 @@ export default function RegisterScreen() {
 
   const renderProfileImageSection = () => (
     <View style={styles.inputContainer}>
-      <Text style={styles.label}>{profileKey("label")}</Text>
+      {/* <Text style={styles.label}>{profileKey("label")}</Text> */}
       <View style={styles.profileUploadCard}>
         <TouchableOpacity
-          style={styles.profileAvatarButton}
+          style={[
+            styles.profileUploadPill,
+            uploadingProfileImage && styles.profileUploadPillDisabled,
+          ]}
           onPress={handleProfileImagePick}
           disabled={uploadingProfileImage}
           activeOpacity={0.85}
         >
-          <View style={styles.profileAvatarWrapper}>
-            <View
-              style={[
-                styles.profileAvatarRing,
-                profileImage && styles.profileAvatarRingFilled,
-              ]}
-            >
-              {profileImage?.uri ? (
-                <Image
-                  source={{ uri: profileImage.uri }}
-                  style={styles.profileAvatarImage}
-                  contentFit="cover"
-                />
-              ) : (
-                <View style={styles.profileAvatarEmpty}>
-                  <Ionicons name="person" size={40} color="#94A3B8" />
-                  <Text style={styles.profileAvatarPlaceholder}>
-                    {profileKey("placeholder")}
-                  </Text>
-                </View>
-              )}
-            </View>
-            <View style={styles.profileAvatarBadge}>
-              {uploadingProfileImage ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <Ionicons name="camera" size={18} color="#FFFFFF" />
-              )}
-            </View>
-          </View>
+          {uploadingProfileImage ? (
+            <ActivityIndicator size="small" color="#111827" />
+          ) : (
+            <Ionicons name="cloud-upload-outline" size={20} color="#111827" />
+          )}
+          <Text style={styles.profileUploadPillText}>
+            {uploadingProfileImage
+              ? profileKey("uploading")
+              : t("auth.register.profile.upload")}
+          </Text>
         </TouchableOpacity>
 
-        {uploadingProfileImage ? (
-          <Text style={styles.profileUploadStatus}>
-            {profileKey("uploading")}
-          </Text>
-        ) : (
-          <TouchableOpacity
-            onPress={handleProfileImagePick}
-            disabled={uploadingProfileImage}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.profileUploadAction}>
-              {profileImage ? profileKey("change") : profileKey("upload")}
-            </Text>
-          </TouchableOpacity>
-        )}
-
-        {profileImage?.name && !uploadingProfileImage ? (
+        {/* {profileImage?.name && !uploadingProfileImage ? (
           <Text style={styles.profileFileName} numberOfLines={1}>
             {profileImage.name}
           </Text>
-        ) : null}
+        ) : null} */}
 
-        <Text style={styles.profileHint}>{profileKey("hint")}</Text>
+        {/* <Text style={styles.profileHint}>{profileKey("hint")}</Text>  */}
 
         {profileImage && !uploadingProfileImage ? (
           <TouchableOpacity
@@ -1800,15 +1774,6 @@ export default function RegisterScreen() {
                         <View style={styles.nationalityTextBlock}>
                           <Text
                             style={[
-                              styles.nationalityText,
-                              nationality === "georgian" &&
-                                styles.nationalityTextSelected,
-                            ]}
-                          >
-                            {t("auth.register.nationality.georgian")}
-                          </Text>
-                          <Text
-                            style={[
                               styles.nationalityTextSub,
                               nationality === "georgian" &&
                                 styles.nationalityTextSubSelected,
@@ -1845,15 +1810,6 @@ export default function RegisterScreen() {
                           >
                             {t("auth.register.nationality.nonGeorgian")}
                           </Text>
-                          <Text
-                            style={[
-                              styles.nationalityTextSub,
-                              nationality === "non-georgian" &&
-                                styles.nationalityTextSubSelected,
-                            ]}
-                          >
-                            {t("auth.register.nationality.nonGeorgianSub")}
-                          </Text>
                         </View>
                       </TouchableOpacity>
                     </View>
@@ -1875,18 +1831,16 @@ export default function RegisterScreen() {
                             : t("auth.register.scanId.label")}{" "}
                         *
                       </Text>
-                      {!isDoctor && (
-                        <TouchableOpacity
-                          onPress={() => setShowScanInfoModal(true)}
-                          style={styles.infoButton}
-                        >
-                          <Ionicons
-                            name="information-circle"
-                            size={20}
-                            color="#06B6D4"
-                          />
-                        </TouchableOpacity>
-                      )}
+                      <TouchableOpacity
+                        onPress={() => setShowScanInfoModal(true)}
+                        style={styles.infoButton}
+                      >
+                        <Ionicons
+                          name="information-circle"
+                          size={20}
+                          color="#06B6D4"
+                        />
+                      </TouchableOpacity>
                     </View>
                     {((!isDoctor && nationality !== null) || isDoctor) && (
                       <TouchableOpacity
@@ -2068,6 +2022,39 @@ export default function RegisterScreen() {
                             >
                               {idNumber ||
                                 t("auth.register.idNumber.placeholder")}
+                            </Text>
+                          </View>
+                        </View>
+                      </>
+                    )}
+                    {!isDoctor && nationality === "non-georgian" && (
+                      <>
+                        <Text style={styles.subLabel}>
+                          {t("auth.register.idNumber.label.passport")}
+                        </Text>
+                        <View style={styles.idNumberRow}>
+                          <View
+                            style={[
+                              styles.inputWrapper,
+                              styles.idNumberInputWrapper,
+                            ]}
+                          >
+                            <Ionicons
+                              name="card-outline"
+                              size={20}
+                              color="#9CA3AF"
+                              style={styles.inputIcon}
+                            />
+                            <Text
+                              style={[
+                                styles.input,
+                                !idNumber && styles.inputPlaceholder,
+                              ]}
+                            >
+                              {idNumber ||
+                                t(
+                                  "auth.register.idNumber.placeholder.passport",
+                                )}
                             </Text>
                           </View>
                         </View>
@@ -2351,9 +2338,6 @@ export default function RegisterScreen() {
                                 style={styles.multiSelectIcon}
                               />
                               <View style={styles.multiSelectTextContainer}>
-                                <Text style={styles.multiSelectLabel}>
-                                  {t("doctor.specialization.selectPlaceholder")}
-                                </Text>
                                 <Text
                                   style={[
                                     styles.multiSelectValue,
@@ -2362,11 +2346,7 @@ export default function RegisterScreen() {
                                   ]}
                                   numberOfLines={1}
                                 >
-                                  {selectedSpecializations.length > 0
-                                    ? selectedSpecializations.join(", ")
-                                    : t(
-                                        "doctor.specialization.selectPlaceholder",
-                                      )}
+                                  {selectedSpecializationsLabel}
                                 </Text>
                               </View>
                               <Ionicons
@@ -2479,7 +2459,6 @@ export default function RegisterScreen() {
                         </TouchableOpacity>
                       </View>
 
-                      {/* Gender Selection */}
                       <View style={styles.inputContainer}>
                         <Text style={styles.label}>
                           {t("doctor.gender.label")} *
@@ -2737,15 +2716,6 @@ export default function RegisterScreen() {
 
                   {/* Terms of Service / Privacy Policy notice + checkbox */}
                   <View style={styles.tosInlineContainer}>
-                    <Text style={styles.tosInlineText}>
-                      {t("auth.register.tos.inlineText") + " "}
-                      <Text
-                        style={styles.tosInlineLink}
-                        onPress={() => setTosModalVisible(true)}
-                      >
-                        {t("auth.register.tos.readMore")}
-                      </Text>
-                    </Text>
                     <TouchableOpacity
                       style={styles.tosCheckboxRow}
                       onPress={() => {
@@ -2794,9 +2764,6 @@ export default function RegisterScreen() {
 
                   {/* Signin Link */}
                   <View style={styles.signinContainer}>
-                    <Text style={styles.signinText}>
-                      {t("auth.register.signin.question")}
-                    </Text>
                     <TouchableOpacity onPress={handleSignin}>
                       <Text style={styles.signinLink}>
                         {t("auth.register.signin.action")}
@@ -2875,9 +2842,9 @@ export default function RegisterScreen() {
               </Text>
               <TouchableOpacity
                 onPress={() => setTosModalVisible(false)}
-                style={styles.modalCloseButton}
+                style={[styles.modalCloseButton, styles.modalCheckButton]}
               >
-                <Ionicons name="close" size={20} color="#1F2937" />
+                <Ionicons name="checkmark" size={20} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
 
@@ -2885,7 +2852,6 @@ export default function RegisterScreen() {
               <Text style={styles.tosModalDescription}>
                 {t("auth.register.tos.description")}
               </Text>
-              {/* აქ შეგიძლია შემდეგში ჩაანაცვლო რეალური ტექსტით ან HTML-rendered დოკუმენტით */}
             </ScrollView>
           </View>
         </View>
@@ -2936,7 +2902,7 @@ export default function RegisterScreen() {
                           isSelected && styles.modalItemTextSelected,
                         ]}
                       >
-                        {spec.name}
+                        {getSpecializationDisplayName(spec, language)}
                       </Text>
                       {spec.description ? (
                         <Text style={styles.modalItemDescription}>
@@ -3291,9 +3257,9 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 20,
     fontFamily: "Poppins-Regular",
-    color: "#6B7280",
+    color: "#1F2937",
     textAlign: "center",
     marginBottom: 8,
     paddingHorizontal: 8,
@@ -3409,9 +3375,9 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   nationalityTextSub: {
-    fontSize: 12,
-    fontFamily: "Poppins-Regular",
-    color: "#9CA3AF",
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#6B7280",
     textAlign: "center",
   },
   nationalityTextSubSelected: {
@@ -3620,13 +3586,36 @@ const styles = StyleSheet.create({
   },
   profileUploadCard: {
     alignItems: "center",
-    paddingVertical: 20,
+    paddingVertical: 28,
     paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    borderRadius: 16,
-    backgroundColor: "#F8FAFC",
-    gap: 8,
+    backgroundColor: "#FFFFFF",
+    gap: 10,
+  },
+  profileUploadPill: {
+    minWidth: 232,
+    minHeight: 56,
+    borderRadius: 28,
+    backgroundColor: "#FFFFFF",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingHorizontal: 24,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.22,
+    shadowRadius: 18,
+    elevation: 12,
+  },
+  profileUploadPillDisabled: {
+    opacity: 0.7,
+  },
+  profileUploadPillText: {
+    fontSize: 14,
+    fontFamily: "Poppins-SemiBold",
+    color: "#111827",
+    letterSpacing: 0.3,
+    textTransform: "uppercase",
   },
   profileAvatarButton: {
     marginBottom: 4,
@@ -3769,6 +3758,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  modalCheckButton: {
+    backgroundColor: "#20BEB8",
+  },
   modalContent: {
     paddingVertical: 20,
   },
@@ -3891,7 +3883,8 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 11,
     fontFamily: "Poppins-Regular",
-    color: "#4B5563",
+    color: "#06B6D4",
+    borderColor: "#06B6D4",
     lineHeight: 14,
   },
   tosModalActions: {

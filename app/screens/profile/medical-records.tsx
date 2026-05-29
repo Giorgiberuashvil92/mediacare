@@ -12,6 +12,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../../contexts/AuthContext";
+import { useLanguage } from "../../contexts/LanguageContext";
+import { getDoctorDisplayName } from "../../utils/doctorNameLabel";
 
 interface VisitRecord {
   id: string;
@@ -23,6 +25,7 @@ interface VisitRecord {
 
 export default function MedicalRecordsScreen() {
   const { user } = useAuth();
+  const { language } = useLanguage();
   const [patientVisits, setPatientVisits] = useState<VisitRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +35,7 @@ export default function MedicalRecordsScreen() {
       loadMedicalRecords();
     }
      
-  }, [user?.id]);
+  }, [user?.id, language]);
 
   const loadMedicalRecords = async () => {
     try {
@@ -53,7 +56,7 @@ export default function MedicalRecordsScreen() {
           return {
             id: apt._id || apt.id || "",
             date: apt.appointmentDate || "",
-            doctorName: doctor.name || "ექიმი",
+            doctorName: getDoctorDisplayName(doctor, language, "ექიმი"),
             doctorSpecialty: doctor.specialization || "",
             appointmentId: apt._id || apt.id || "",
           };

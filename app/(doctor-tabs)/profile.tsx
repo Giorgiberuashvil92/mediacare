@@ -57,6 +57,8 @@ export default function DoctorProfile() {
   };
 
   const profileStatus = getProfileStatus();
+  const displayName = user?.name?.trim() || t("settings.role.doctor");
+  const displayEmail = user?.email?.trim();
 
   useEffect(() => {
     loadProfileData();
@@ -217,9 +219,7 @@ export default function DoctorProfile() {
               </View>
             )}
             <View style={styles.nameWithStatusRow}>
-              <Text style={styles.profileName}>
-                {user?.name || "Dr. Stefin Cook"}
-              </Text>
+              <Text style={styles.profileName}>{displayName}</Text>
               {/* Active/Passive Status Badge */}
               <TouchableOpacity
                 onPress={() => setStatusModalVisible(true)}
@@ -252,9 +252,9 @@ export default function DoctorProfile() {
                 </Text>
               </TouchableOpacity>
             </View>
-            <Text style={styles.profileEmail}>
-              {user?.email || "doctor@medicare.ge"}
-            </Text>
+            {displayEmail && (
+              <Text style={styles.profileEmail}>{displayEmail}</Text>
+            )}
             {doctorProfile?.specialization && (
               <View style={styles.profileBadge}>
                 <MaterialCommunityIcons

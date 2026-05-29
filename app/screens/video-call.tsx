@@ -27,7 +27,9 @@ import {
   createAgoraRtcEngine,
 } from "react-native-agora";
 import { apiService } from "../_services/api";
+import { useLanguage } from "../contexts/LanguageContext";
 import { setCallOverlayState } from "../utils/callOverlayStore";
+import { getDoctorDisplayName } from "../utils/doctorNameLabel";
 
 /**
  * ვიდეო კონსულტაციის გვერდი - Agora Video SDK
@@ -38,6 +40,7 @@ import { setCallOverlayState } from "../utils/callOverlayStore";
 export default function VideoCallScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const { language } = useLanguage();
 
   // Keep screen awake during video call
   useKeepAwake("video-call");
@@ -98,10 +101,7 @@ export default function VideoCallScreen() {
         const patientId = String(
           patient?._id || patient?.id || appointment.patientId || "",
         );
-        const doctorName =
-          typeof doctor?.name === "string" && doctor.name.trim()
-            ? doctor.name.trim()
-            : "";
+        const doctorName = getDoctorDisplayName(doctor, language);
         const patientName =
           typeof patient?.name === "string" && patient.name.trim()
             ? patient.name.trim()
@@ -132,7 +132,7 @@ export default function VideoCallScreen() {
     };
 
     resolveCallParticipantNames();
-  }, [appointmentId, params.doctorName, params.patientName]);
+  }, [appointmentId, params.doctorName, params.patientName, language]);
 
   const recoverMediaAfterInterruption = useCallback(async () => {
     if (!engineRef.current || !isJoined) return;

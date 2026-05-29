@@ -805,7 +805,7 @@ export class AppointmentsService {
       .find({
         patientId: new mongoose.Types.ObjectId(patientId),
       })
-      .populate('doctorId', '_id name specialization profileImage')
+      .populate('doctorId', '_id name nameEn nameRu specialization profileImage')
       .sort({ appointmentDate: -1 })
       .lean();
 
@@ -992,7 +992,7 @@ export class AppointmentsService {
     appointment = await this.appointmentModel
       .findById(appointment._id)
       .populate('patientId', 'name email phone')
-      .populate('doctorId', 'name specialization');
+      .populate('doctorId', 'name nameEn nameRu specialization');
     if (!appointment) {
       throw new NotFoundException('Appointment not found');
     }
@@ -1103,7 +1103,7 @@ export class AppointmentsService {
     appointment = await this.appointmentModel
       .findById(appointment._id)
       .populate('patientId', 'name email phone')
-      .populate('doctorId', 'name specialization');
+      .populate('doctorId', 'name nameEn nameRu specialization');
     if (!appointment) {
       throw new NotFoundException('Appointment not found');
     }
@@ -1178,14 +1178,14 @@ export class AppointmentsService {
     if (mongoose.Types.ObjectId.isValid(appointmentId)) {
       appointment = await this.appointmentModel
         .findById(new mongoose.Types.ObjectId(appointmentId))
-        .populate('doctorId', '_id name specialization profileImage')
+        .populate('doctorId', '_id name nameEn nameRu specialization profileImage')
         .populate('patientId', 'name email phone')
         .lean();
     } else {
       // If not ObjectId, try to find by appointmentNumber
       appointment = await this.appointmentModel
         .findOne({ appointmentNumber: appointmentId })
-        .populate('doctorId', '_id name specialization profileImage')
+        .populate('doctorId', '_id name nameEn nameRu specialization profileImage')
         .populate('patientId', 'name email phone')
         .lean();
     }

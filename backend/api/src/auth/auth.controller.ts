@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
@@ -8,7 +8,6 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { SendVerificationCodeDto } from './dto/send-verification-code.dto';
 import { VerifyLoginOTPDto } from './dto/verify-login-otp.dto';
 import { VerifyPhoneDto } from './dto/verify-phone.dto';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { PhoneVerificationService } from './phone-verification.service';
 
 @Controller('auth')
@@ -61,7 +60,6 @@ export class AuthController {
   }
 
   @Post('logout')
-  @UseGuards(JwtAuthGuard)
   async logout(@Body() refreshTokenDto: RefreshTokenDto) {
     return this.authService.logout(refreshTokenDto.refreshToken);
   }

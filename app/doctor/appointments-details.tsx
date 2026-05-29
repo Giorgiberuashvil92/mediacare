@@ -18,9 +18,11 @@ import {
   getStatusLabel,
 } from "../../assets/data/doctorDashboard";
 import { apiService } from "../_services/api";
+import { useLanguage } from "../contexts/LanguageContext";
 
 export default function AppointmentsDetails() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [consultations, setConsultations] = useState<Consultation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -62,15 +64,13 @@ export default function AppointmentsDetails() {
     inProgress: consultations.filter((c) => c.status === "in-progress").length,
     cancelled: consultations.filter((c) => c.status === "cancelled").length,
     uncompleted: consultations.filter(
-      (c) => c.status !== "completed" && c.status !== "cancelled"
+      (c) => c.status !== "completed" && c.status !== "cancelled",
     ).length,
   };
 
   // Calculate percentages
   const appointmentCompletionRate =
-    stats.total > 0
-      ? Math.round((stats.completed / stats.total) * 100)
-      : 0;
+    stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
 
   if (loading) {
     return (
@@ -128,9 +128,7 @@ export default function AppointmentsDetails() {
               >
                 <Ionicons name="checkmark-circle" size={24} color="#10B981" />
               </View>
-              <Text style={styles.appointmentStatValue}>
-                {stats.completed}
-              </Text>
+              <Text style={styles.appointmentStatValue}>{stats.completed}</Text>
               <Text style={styles.appointmentStatLabel}>დასრულებული</Text>
             </View>
             <View style={styles.appointmentStatItem}>
@@ -198,9 +196,7 @@ export default function AppointmentsDetails() {
                 style={styles.statusGradient}
               >
                 <Ionicons name="checkmark-circle" size={32} color="#FFFFFF" />
-                <Text style={styles.statusValue}>
-                  {stats.completed}
-                </Text>
+                <Text style={styles.statusValue}>{stats.completed}</Text>
                 <Text style={styles.statusLabel}>დასრულებული</Text>
                 <Text style={styles.statusPercentage}>
                   {stats.total > 0
@@ -216,9 +212,7 @@ export default function AppointmentsDetails() {
                 style={styles.statusGradient}
               >
                 <Ionicons name="time" size={32} color="#FFFFFF" />
-                <Text style={styles.statusValue}>
-                  {stats.inProgress}
-                </Text>
+                <Text style={styles.statusValue}>{stats.inProgress}</Text>
                 <Text style={styles.statusLabel}>მიმდინარე</Text>
                 <Text style={styles.statusPercentage}>
                   {stats.total > 0
@@ -234,9 +228,7 @@ export default function AppointmentsDetails() {
                 style={styles.statusGradient}
               >
                 <Ionicons name="close-circle" size={32} color="#FFFFFF" />
-                <Text style={styles.statusValue}>
-                  {stats.uncompleted}
-                </Text>
+                <Text style={styles.statusValue}>{stats.uncompleted}</Text>
                 <Text style={styles.statusLabel}>შეუსრულებელი</Text>
                 <Text style={styles.statusPercentage}>
                   {stats.total > 0
@@ -252,11 +244,17 @@ export default function AppointmentsDetails() {
         {/* Recent Appointments */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>ბოლო დანიშვნები</Text>
+            <Text style={styles.sectionTitle}>
+              {" "}
+              {t("doctor.dashboard.lastAppointments")}{" "}
+            </Text>
             <TouchableOpacity
               onPress={() => router.push("/(doctor-tabs)/appointments")}
             >
-              <Text style={styles.viewAll}>ყველას ნახვა</Text>
+              <Text style={styles.viewAll}>
+                {" "}
+                {t("doctor.dashboard.seeAll")}{" "}
+              </Text>
             </TouchableOpacity>
           </View>
           <View style={styles.appointmentsCard}>
@@ -269,88 +267,88 @@ export default function AppointmentsDetails() {
               </View>
             ) : (
               consultations.slice(0, 8).map((consultation, index) => (
-              <View key={consultation.id}>
-                <View style={styles.appointmentItem}>
-                  <View
-                    style={[
-                      styles.appointmentIcon,
-                      {
-                        backgroundColor: `${getStatusColor(
-                          consultation.status
-                        )}20`,
-                      },
-                    ]}
-                  >
-                    <Ionicons
-                      name={
-                        consultation.status === "completed"
-                          ? "checkmark-done"
-                          : consultation.status === "in-progress"
-                          ? "time"
-                          : consultation.status === "cancelled"
-                          ? "close"
-                          : "calendar"
-                      }
-                      size={20}
-                      color={getStatusColor(consultation.status)}
-                    />
-                  </View>
-                  <View style={styles.appointmentInfo}>
-                    <Text style={styles.appointmentPatient}>
-                      {consultation.patientName}
-                    </Text>
-                    <Text style={styles.appointmentDetails}>
-                      {consultation.date} • {consultation.time} •{" "}
-                      {consultation.patientAge} წლის
-                    </Text>
-                    <Text style={styles.appointmentType}>
-                      {getConsultationTypeLabel(consultation.type)}
-                    </Text>
-                    {consultation.symptoms && (
-                      <Text style={styles.appointmentSymptoms}>
-                        {consultation.symptoms}
-                      </Text>
-                    )}
-                  </View>
-                  <View style={styles.appointmentRight}>
+                <View key={consultation.id}>
+                  <View style={styles.appointmentItem}>
                     <View
                       style={[
-                        styles.statusBadge,
+                        styles.appointmentIcon,
                         {
                           backgroundColor: `${getStatusColor(
-                            consultation.status
+                            consultation.status,
                           )}20`,
                         },
                       ]}
                     >
-                      <Text
+                      <Ionicons
+                        name={
+                          consultation.status === "completed"
+                            ? "checkmark-done"
+                            : consultation.status === "in-progress"
+                              ? "time"
+                              : consultation.status === "cancelled"
+                                ? "close"
+                                : "calendar"
+                        }
+                        size={20}
+                        color={getStatusColor(consultation.status)}
+                      />
+                    </View>
+                    <View style={styles.appointmentInfo}>
+                      <Text style={styles.appointmentPatient}>
+                        {consultation.patientName}
+                      </Text>
+                      <Text style={styles.appointmentDetails}>
+                        {consultation.date} • {consultation.time} •{" "}
+                        {consultation.patientAge} წლის
+                      </Text>
+                      <Text style={styles.appointmentType}>
+                        {getConsultationTypeLabel(consultation.type)}
+                      </Text>
+                      {consultation.symptoms && (
+                        <Text style={styles.appointmentSymptoms}>
+                          {consultation.symptoms}
+                        </Text>
+                      )}
+                    </View>
+                    <View style={styles.appointmentRight}>
+                      <View
                         style={[
-                          styles.statusText,
-                          { color: getStatusColor(consultation.status) },
+                          styles.statusBadge,
+                          {
+                            backgroundColor: `${getStatusColor(
+                              consultation.status,
+                            )}20`,
+                          },
                         ]}
                       >
-                        {getStatusLabel(consultation.status)}
+                        <Text
+                          style={[
+                            styles.statusText,
+                            { color: getStatusColor(consultation.status) },
+                          ]}
+                        >
+                          {getStatusLabel(consultation.status)}
+                        </Text>
+                      </View>
+                      <Text style={styles.appointmentFee}>
+                        ₾{consultation.fee}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.paymentStatus,
+                          {
+                            color: consultation.isPaid ? "#10B981" : "#F59E0B",
+                          },
+                        ]}
+                      >
+                        {consultation.isPaid ? "გადახდილი" : "მოსალოდნელი"}
                       </Text>
                     </View>
-                    <Text style={styles.appointmentFee}>
-                      ₾{consultation.fee}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.paymentStatus,
-                        {
-                          color: consultation.isPaid ? "#10B981" : "#F59E0B",
-                        },
-                      ]}
-                    >
-                      {consultation.isPaid ? "გადახდილი" : "მოსალოდნელი"}
-                    </Text>
                   </View>
+                  {index < Math.min(7, consultations.length - 1) && (
+                    <View style={styles.appointmentDivider} />
+                  )}
                 </View>
-                {index < Math.min(7, consultations.length - 1) && (
-                  <View style={styles.appointmentDivider} />
-                )}
-              </View>
               ))
             )}
           </View>
@@ -362,9 +360,7 @@ export default function AppointmentsDetails() {
           <View style={styles.insightsGrid}>
             <View style={styles.insightCard}>
               <Ionicons name="calendar" size={32} color="#06B6D4" />
-              <Text style={styles.insightValue}>
-                {stats.total}
-              </Text>
+              <Text style={styles.insightValue}>{stats.total}</Text>
               <Text style={styles.insightLabel}>სულ დანიშვნები</Text>
             </View>
             <View style={styles.insightCard}>
@@ -376,16 +372,12 @@ export default function AppointmentsDetails() {
             </View>
             <View style={styles.insightCard}>
               <Ionicons name="time" size={32} color="#F59E0B" />
-              <Text style={styles.insightValue}>
-                {stats.inProgress}
-              </Text>
+              <Text style={styles.insightValue}>{stats.inProgress}</Text>
               <Text style={styles.insightLabel}>მიმდინარე</Text>
             </View>
             <View style={styles.insightCard}>
               <Ionicons name="close-circle" size={32} color="#EF4444" />
-              <Text style={styles.insightValue}>
-                {stats.uncompleted}
-              </Text>
+              <Text style={styles.insightValue}>{stats.uncompleted}</Text>
               <Text style={styles.insightLabel}>შეუსრულებელი</Text>
             </View>
           </View>

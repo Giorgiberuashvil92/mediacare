@@ -19,6 +19,14 @@ export class RegisterDto {
   @IsNotEmpty()
   name: string;
 
+  @IsString()
+  @IsOptional()
+  nameEn?: string;
+
+  @IsString()
+  @IsOptional()
+  nameRu?: string;
+
   @IsEmail()
   @IsNotEmpty()
   email: string;

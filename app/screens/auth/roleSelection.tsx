@@ -49,11 +49,6 @@ export default function RoleSelectionScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>{t("roleSelection.title")}</Text>
-          <Text style={styles.subtitle}>
-            {isAuthenticated
-              ? t("roleSelection.subtitle.authenticated")
-              : t("roleSelection.subtitle.guest")}
-          </Text>
         </View>
 
         {/* Role Cards */}
@@ -67,28 +62,29 @@ export default function RoleSelectionScreen() {
             onPress={() => setSelectedRole("doctor")}
           >
             <View style={styles.roleCardHeader}>
-              <View
-                style={[
-                  styles.iconContainer,
-                  selectedRole === "doctor" && styles.iconContainerSelected,
-                ]}
-              >
-                <Ionicons
-                  name="medical"
-                  size={40}
-                  color={selectedRole === "doctor" ? "#20BEB8" : "#6B7280"}
-                />
+              <View style={styles.roleCardContent}>
+                <View
+                  style={[
+                    styles.iconContainer,
+                    selectedRole === "doctor" && styles.iconContainerSelected,
+                  ]}
+                >
+                  <Ionicons
+                    name="medkit-outline"
+                    size={40}
+                    color={selectedRole === "doctor" ? "#20BEB8" : "#6B7280"}
+                  />
+                </View>
+                <View style={styles.roleTextContainer}>
+                  <Text style={styles.roleTitle}>
+                    {t("roleSelection.doctor.title")}
+                  </Text>
+                </View>
               </View>
               {selectedRole === "doctor" && (
                 <Ionicons name="checkmark-circle" size={28} color="#20BEB8" />
               )}
             </View>
-            <Text style={styles.roleTitle}>
-              {t("roleSelection.doctor.title")}
-            </Text>
-            <Text style={styles.roleDescription}>
-              {t("roleSelection.doctor.description")}
-            </Text>
           </TouchableOpacity>
 
           {/* Patient Card */}
@@ -100,28 +96,29 @@ export default function RoleSelectionScreen() {
             onPress={() => setSelectedRole("patient")}
           >
             <View style={styles.roleCardHeader}>
-              <View
-                style={[
-                  styles.iconContainer,
-                  selectedRole === "patient" && styles.iconContainerSelected,
-                ]}
-              >
-                <Ionicons
-                  name="person"
-                  size={40}
-                  color={selectedRole === "patient" ? "#20BEB8" : "#6B7280"}
-                />
+              <View style={styles.roleCardContent}>
+                <View
+                  style={[
+                    styles.iconContainer,
+                    selectedRole === "patient" && styles.iconContainerSelected,
+                  ]}
+                >
+                  <Ionicons
+                    name="person"
+                    size={40}
+                    color={selectedRole === "patient" ? "#20BEB8" : "#6B7280"}
+                  />
+                </View>
+                <View style={styles.roleTextContainer}>
+                  <Text style={styles.roleTitle}>
+                    {t("roleSelection.patient.title")}
+                  </Text>
+                </View>
               </View>
               {selectedRole === "patient" && (
                 <Ionicons name="checkmark-circle" size={28} color="#20BEB8" />
               )}
             </View>
-            <Text style={styles.roleTitle}>
-              {t("roleSelection.patient.title")}
-            </Text>
-            <Text style={styles.roleDescription}>
-              {t("roleSelection.patient.description")}
-            </Text>
           </TouchableOpacity>
         </View>
 
@@ -142,9 +139,6 @@ export default function RoleSelectionScreen() {
         {/* Login Link - only show if not authenticated */}
         {!isAuthenticated && (
           <View style={styles.loginContainer}>
-            <Text style={styles.loginText}>
-              {t("roleSelection.login.question")}
-            </Text>
             <TouchableOpacity
               onPress={() => router.push("/screens/auth/login")}
             >
@@ -180,12 +174,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     textAlign: "center",
   },
-  subtitle: {
-    fontSize: 16,
-    fontFamily: "Poppins-Regular",
-    color: "#6B7280",
-    textAlign: "center",
-  },
   roleCardsContainer: {
     gap: 16,
     marginBottom: 32,
@@ -205,7 +193,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 16,
+  },
+  roleCardContent: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    marginRight: 12,
   },
   iconContainer: {
     width: 80,
@@ -217,6 +210,10 @@ const styles = StyleSheet.create({
   },
   iconContainerSelected: {
     backgroundColor: "#E0F7F5",
+  },
+  roleTextContainer: {
+    flex: 1,
+    marginLeft: 16,
   },
   roleTitle: {
     fontSize: 22,

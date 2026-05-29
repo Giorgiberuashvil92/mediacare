@@ -50,6 +50,7 @@ import {
 import AIAssistantBannerGraphic from "../components/ui/AIAssistantBannerGraphic";
 import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
+import { getDoctorDisplayName } from "../utils/doctorNameLabel";
 
 function MessageLikeIcon({
   size = 20,
@@ -242,7 +243,7 @@ interface SelectedImageType {
 
 export default function AIAssistantScreen() {
   const { user } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const insets = useSafeAreaInsets();
 
   const suggestedPrompts = useMemo(
@@ -1113,7 +1114,7 @@ export default function AIAssistantScreen() {
                                 )}
                                 <View style={styles.doctorRecommendationInfo}>
                                   <Text style={styles.doctorRecommendationName}>
-                                    {doctor.name || "ექიმი"}
+                                    {getDoctorDisplayName(doctor, language, "ექიმი")}
                                   </Text>
                                   {doctor.specialization && (
                                     <Text

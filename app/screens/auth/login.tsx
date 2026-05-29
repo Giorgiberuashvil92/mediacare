@@ -13,16 +13,13 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { apiService, LoginSelectableUser } from "../../_services/api";
 import OTPModal from "../../components/ui/OTPModal";
 import { useAuth } from "../../contexts/AuthContext";
-import {
-  SupportedLanguage,
-  useLanguage,
-} from "../../contexts/LanguageContext";
+import { SupportedLanguage, useLanguage } from "../../contexts/LanguageContext";
 import { showToast } from "../../utils/toast";
 
 export default function LoginScreen() {
@@ -38,7 +35,9 @@ export default function LoginScreen() {
   const [showOTPModal, setShowOTPModal] = useState(false);
   const [pendingLoginEmail, setPendingLoginEmail] = useState<string>("");
   const [pendingLoginUserId, setPendingLoginUserId] = useState<string>("");
-  const [duplicateUsers, setDuplicateUsers] = useState<LoginSelectableUser[]>([]);
+  const [duplicateUsers, setDuplicateUsers] = useState<LoginSelectableUser[]>(
+    [],
+  );
   const [showUserSelectionModal, setShowUserSelectionModal] = useState(false);
   const [skipOtpAfterSelection, setSkipOtpAfterSelection] = useState(false);
 
@@ -71,7 +70,10 @@ export default function LoginScreen() {
     loadRememberedEmail();
   }, []);
 
-  const persistRememberedEmail = async (nextRememberMe: boolean, nextEmail: string) => {
+  const persistRememberedEmail = async (
+    nextRememberMe: boolean,
+    nextEmail: string,
+  ) => {
     try {
       if (nextRememberMe && nextEmail.trim()) {
         await AsyncStorage.setItem(REMEMBER_EMAIL_KEY, nextEmail.trim());
@@ -169,7 +171,9 @@ export default function LoginScreen() {
     resetDuplicateSelection();
   };
 
-  const handleSelectDuplicateUser = async (selectedUser: LoginSelectableUser) => {
+  const handleSelectDuplicateUser = async (
+    selectedUser: LoginSelectableUser,
+  ) => {
     try {
       setIsLoading(true);
       const authResponse = await loginContext({
@@ -205,11 +209,14 @@ export default function LoginScreen() {
     try {
       setIsLoading(true);
       await persistRememberedEmail(rememberMe, email);
-      const authResponse = await loginContext({ email: email.trim(), password });
+      const authResponse = await loginContext({
+        email: email.trim(),
+        password,
+      });
       await completeSelectedLogin(authResponse);
     } catch (error) {
       let errorMessage = t("auth.login.error.default");
-      
+
       if (error instanceof Error) {
         if (error.message.includes("Invalid credentials")) {
           errorMessage = t("auth.login.error.invalidCredentials");
@@ -221,7 +228,7 @@ export default function LoginScreen() {
           errorMessage = error.message;
         }
       }
-      
+
       showToast.auth.loginError(errorMessage);
     } finally {
       setIsLoading(false);
@@ -236,19 +243,23 @@ export default function LoginScreen() {
 
     try {
       setIsLoading(true);
-      
+
       // If authResponse is already provided from OTPModal, use it directly
       // Otherwise, verify OTP again (for backward compatibility)
       let finalAuthResponse = authResponse;
       if (!finalAuthResponse) {
-        console.log("⚠️ [Login] AuthResponse not provided, verifying OTP again...");
+        console.log(
+          "⚠️ [Login] AuthResponse not provided, verifying OTP again...",
+        );
         finalAuthResponse = await apiService.verifyLoginOTP(
           pendingLoginEmail!,
           code,
           pendingLoginUserId || undefined,
-      );
+        );
       } else {
-        console.log("✅ [Login] Using authResponse from OTPModal, skipping duplicate verification");
+        console.log(
+          "✅ [Login] Using authResponse from OTPModal, skipping duplicate verification",
+        );
       }
 
       // Complete login in AuthContext (tokens are already stored by verifyLoginOTP or will be stored in completeLoginAfterOTP)
@@ -271,9 +282,7 @@ export default function LoginScreen() {
       navigateByRole(role);
     } catch (error) {
       const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "OTP ვერიფიკაცია ვერ მოხერხდა";
+        error instanceof Error ? error.message : "OTP ვერიფიკაცია ვერ მოხერხდა";
       showToast.error(errorMessage, "შეცდომა");
     } finally {
       setIsLoading(false);
@@ -322,9 +331,7 @@ export default function LoginScreen() {
       navigateByRole(role);
     } catch (error) {
       const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "OTP გამოტოვება ვერ მოხერხდა";
+        error instanceof Error ? error.message : "OTP გამოტოვება ვერ მოხერხდა";
       showToast.error(errorMessage, "შეცდომა");
     } finally {
       setIsLoading(false);
@@ -344,14 +351,20 @@ export default function LoginScreen() {
     try {
       setIsLoading(true);
       await persistRememberedEmail(rememberMe, email);
-      const authResponse = await loginContext({ email: email.trim(), password });
+      const authResponse = await loginContext({
+        email: email.trim(),
+        password,
+      });
       await completeSelectedLogin(authResponse, undefined, true);
     } catch (err) {
       let errorMessage = t("auth.login.error.default");
       if (err instanceof Error) {
-        if (err.message.includes("Invalid credentials")) errorMessage = t("auth.login.error.invalidCredentials");
-        else if (err.message.includes("User not found")) errorMessage = t("auth.login.error.userNotFound");
-        else if (err.message.includes("Invalid email")) errorMessage = t("auth.login.error.invalidEmail");
+        if (err.message.includes("Invalid credentials"))
+          errorMessage = t("auth.login.error.invalidCredentials");
+        else if (err.message.includes("User not found"))
+          errorMessage = t("auth.login.error.userNotFound");
+        else if (err.message.includes("Invalid email"))
+          errorMessage = t("auth.login.error.invalidEmail");
         else errorMessage = err.message;
       }
       showToast.auth.loginError(errorMessage);
@@ -547,7 +560,6 @@ export default function LoginScreen() {
                 </TouchableOpacity>
 
                 {/* Phone Login Option */}
-               
 
                 {showPhoneLogin && (
                   <View style={styles.phoneLoginContainer}>
@@ -592,9 +604,6 @@ export default function LoginScreen() {
                 )}
 
                 <View style={styles.signupContainerInline}>
-                  <Text style={styles.signupText}>
-                    {t("auth.login.signup.question")}
-                  </Text>
                   <TouchableOpacity onPress={handleSignup}>
                     <Text style={styles.signupLink}>
                       {t("auth.login.signup.action")}
@@ -975,9 +984,9 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   signupContainerInline: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
     marginTop: 16,
     marginBottom: 16,
   },

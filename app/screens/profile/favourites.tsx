@@ -1,8 +1,10 @@
 import { useFavorites } from "@/app/contexts/FavoritesContext";
+import { useLanguage } from "@/app/contexts/LanguageContext";
+import { getDoctorDisplayName } from "@/app/utils/doctorNameLabel";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   FlatList,
   Modal,
@@ -14,7 +16,16 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function FavouritesScreen() {
+  const { language } = useLanguage();
   const { favoriteDoctors, removeFromFavorites } = useFavorites();
+  const localizedFavorites = useMemo(
+    () =>
+      favoriteDoctors.map((doctor) => ({
+        ...doctor,
+        name: getDoctorDisplayName(doctor, language),
+      })),
+    [favoriteDoctors, language],
+  );
   const [selectedDoctor, setSelectedDoctor] = useState<any>(null);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
 
@@ -109,9 +120,9 @@ export default function FavouritesScreen() {
       </View>
 
       {/* Doctors List */}
-      {favoriteDoctors.length > 0 ? (
+      {localizedFavorites.length > 0 ? (
         <FlatList
-          data={favoriteDoctors}
+          data={localizedFavorites}
           renderItem={renderDoctorCard}
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={styles.listContainer}
