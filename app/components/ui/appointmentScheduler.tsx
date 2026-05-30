@@ -1,4 +1,6 @@
 import { apiService } from "@/app/_services/api";
+import { useLanguage } from "@/app/contexts/LanguageContext";
+import { formatAppointmentWeekday } from "@/app/utils/appointmentDateTime";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
@@ -22,19 +24,9 @@ interface DayAvailability {
   type?: "video" | "home-visit"; // Backend-იდან მოდის type ველი
 }
 
-interface Review {
-  id: number;
-  reviewerName: string;
-  reviewDate: string;
-  rating: number;
-  comment: string;
-}
-
 interface AppointmentSchedulerProps {
   workingHours: string;
   availability: DayAvailability[];
-  totalReviews: number;
-  reviews: Review[];
   doctorId?: string;
   initialMode?: "video" | "home-visit";
   lockMode?: boolean;
@@ -45,14 +37,13 @@ interface AppointmentSchedulerProps {
 const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
   workingHours,
   availability,
-  totalReviews,
-  reviews,
   doctorId,
   initialMode = "video",
   lockMode = false,
   followUpAppointmentId,
   isFollowUp = false,
 }) => {
+  const { t } = useLanguage();
   const isTwentyFourSeven = workingHours?.includes("24");
   const [mode, setMode] = useState<"video" | "home-visit">(initialMode);
   const [selectedDate, setSelectedDate] = useState<string>(
@@ -83,21 +74,8 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
   const getCurrentMonth = () => {
     if (!selectedDate) return "";
     const date = new Date(selectedDate);
-    const months = [
-      "იანვარი",
-      "თებერვალი",
-      "მარტი",
-      "აპრილი",
-      "მაისი",
-      "ივნისი",
-      "ივლისი",
-      "აგვისტო",
-      "სექტემბერი",
-      "ოქტომბერი",
-      "ნოემბერი",
-      "დეკემბერი",
-    ];
-    return `${months[date.getMonth()]} ${date.getFullYear()}`;
+    const monthKey = `doctor.revenue.month.${String(date.getMonth() + 1).padStart(2, "0")}`;
+    return `${t(monthKey)} ${date.getFullYear()}`;
   };
 
   const currentMonth = getCurrentMonth();
@@ -332,7 +310,7 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
 
       {/* Schedule Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>განრიგი</Text>
+        <Text style={styles.sectionTitle}>{t("appointment.booking.schedule")}</Text>
 
         {/* Mode selector pills */}
         <View style={styles.modeRow}>
@@ -355,7 +333,7 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
                 mode === "video" && styles.modePillTextActive,
               ]}
             >
-              ვიდეო
+              {t("doctors.filter.video")}
             </Text>
           </TouchableOpacity>
 
@@ -378,7 +356,7 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
                 mode === "home-visit" && styles.modePillTextActive,
               ]}
             >
-              ბინაზე
+              {t("doctors.filter.visit")}
             </Text>
           </TouchableOpacity>
         </View>
@@ -411,7 +389,7 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
                   selectedDate === day.date && styles.selectedDayText,
                 ]}
               >
-                {day.dayOfWeek}
+                {formatAppointmentWeekday(day.date, t)}
               </Text>
               <Text
                 style={[
@@ -428,7 +406,7 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
 
       {/* Time Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>დრო</Text>
+        <Text style={styles.sectionTitle}>{t("todayAppointment.time")}</Text>
         <ScrollView
           style={styles.timeGridScroll}
           contentContainerStyle={styles.timeGridContainer}
@@ -471,28 +449,6 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
         </ScrollView>
       </View>
 
-      {/* Reviews Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>შეფასებები ({totalReviews})</Text>
-        {reviews.map((review) => (
-          <View key={review.id} style={styles.reviewCard}>
-            <View style={styles.reviewHeader}>
-              <View style={styles.avatar} />
-              <View style={styles.reviewInfo}>
-                <Text style={styles.reviewerName}>{review.reviewerName}</Text>
-                <Text style={styles.reviewDate}>{review.reviewDate}</Text>
-              </View>
-            </View>
-            <View style={styles.ratingContainer}>
-              {[...Array(5)].map((_, index) => (
-                <Ionicons key={index} name="star" size={16} color="#FFD700" />
-              ))}
-            </View>
-            <Text style={styles.reviewComment}>{review.comment}</Text>
-          </View>
-        ))}
-      </View>
-
       {/* Book Appointment Button */}
       <TouchableOpacity
         style={[
@@ -514,8 +470,8 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
 
             if (!response.success || !response.data) {
               Alert.alert(
-                "შეცდომა",
-                "ექიმის განრიგის გადამოწმება ვერ მოხერხდა. გთხოვთ სცადოთ თავიდან.",
+                t("appointments.common.error"),
+                t("doctors.booking.scheduleCheckFailed"),
               );
               return;
             }
@@ -546,8 +502,8 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
 
             if (!availableSlots.includes(selectedTime)) {
               Alert.alert(
-                "დრო დაკავებულია",
-                "არჩეული დრო ძალაში აღარ არის. გთხოვთ აირჩიოთ სხვა დრო.",
+                t("doctors.booking.timeUnavailable"),
+                t("doctors.booking.timeUnavailableMessage"),
               );
               return;
             }
@@ -568,11 +524,11 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
 
                 if (followUpResponse.success) {
                   Alert.alert(
-                    "წარმატება",
-                    "განმეორებითი ვიზიტი წარმატებით დაჯავშნა!",
+                    t("appointments.common.success"),
+                    t("doctors.booking.followUpSuccess"),
                     [
                       {
-                        text: "კარგი",
+                        text: t("doctor.patients.ok"),
                         onPress: () => {
                           router.back();
                         },
@@ -581,9 +537,9 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
                   );
                 } else {
                   Alert.alert(
-                    "შეცდომა",
+                    t("appointments.common.error"),
                     followUpResponse.message ||
-                      "განმეორებითი ვიზიტის დაჯავშნა ვერ მოხერხდა",
+                      t("doctors.booking.followUpFailed"),
                   );
                 }
               } catch (error: any) {
@@ -592,8 +548,8 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
                   error,
                 );
                 Alert.alert(
-                  "შეცდომა",
-                  error.message || "განმეორებითი ვიზიტის დაჯავშნა ვერ მოხერხდა",
+                  t("appointments.common.error"),
+                  error.message || t("doctors.booking.followUpFailed"),
                 );
               }
               return;
@@ -605,8 +561,8 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
 
               if (!doctorResponse.success || !doctorResponse.data) {
                 Alert.alert(
-                  "შეცდომა",
-                  "ექიმის ინფორმაციის მიღება ვერ მოხერხდა. გთხოვთ სცადოთ თავიდან.",
+                  t("appointments.common.error"),
+                  t("doctors.booking.doctorInfoFailed"),
                 );
                 return;
               }
@@ -765,8 +721,8 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
             } catch (doctorError) {
               console.error("Failed to get doctor info:", doctorError);
               Alert.alert(
-                "შეცდომა",
-                "ექიმის ინფორმაციის მიღება ვერ მოხერხდა. გთხოვთ სცადოთ თავიდან.",
+                t("appointments.common.error"),
+                t("doctors.booking.doctorInfoFailed"),
               );
             }
           } catch (error) {
@@ -775,13 +731,15 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
               error,
             );
             Alert.alert(
-              "შეცდომა",
-              "ვერ მოხერხდა დროის გადამოწმება. გთხოვთ სცადოთ თავიდან.",
+              t("appointments.common.error"),
+              t("doctors.booking.validateFailed"),
             );
           }
         }}
       >
-        <Text style={styles.bookButtonText}>ჯავშნის გაკეთება</Text>
+        <Text style={styles.bookButtonText}>
+          {t("doctors.detail.makeAppointment")}
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -943,48 +901,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 4,
     right: 4,
-  },
-  reviewCard: {
-    marginBottom: 16,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E5E5",
-  },
-  reviewHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#E5E5E5",
-    marginRight: 12,
-  },
-  reviewInfo: {
-    flex: 1,
-  },
-  reviewerName: {
-    fontSize: 16,
-    fontFamily: "Poppins-SemiBold",
-    color: "#333333",
-    marginBottom: 2,
-  },
-  reviewDate: {
-    fontSize: 14,
-    fontFamily: "Poppins-Regular",
-    color: "#666666",
-  },
-  ratingContainer: {
-    flexDirection: "row",
-    marginBottom: 8,
-  },
-  reviewComment: {
-    fontSize: 14,
-    fontFamily: "Poppins-Regular",
-    color: "#666666",
-    lineHeight: 20,
   },
   bookButton: {
     backgroundColor: "#06B6D4",

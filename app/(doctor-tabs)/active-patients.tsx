@@ -157,7 +157,12 @@ export default function ActivePatientsScreen() {
               type: apt.type === "home-visit" ? "home-visit" : "video",
               isFollowUp: !!apt.isFollowUp,
               problem: apt.symptoms || undefined,
-              visitAddress: apt.visitAddress,
+              visitAddress:
+                (typeof apt.visitAddress === "string" &&
+                  apt.visitAddress.trim()) ||
+                (typeof apt.patientDetails?.address === "string" &&
+                  apt.patientDetails.address.trim()) ||
+                undefined,
               // ფორმა IV–100 HIS mis-print-forms-ზე (PDF არ ითვლება)
               hasForm100: hasForm100ForVisitCompletion({
                 misForm100AvailableAt: apt.misForm100AvailableAt,
@@ -337,14 +342,17 @@ export default function ActivePatientsScreen() {
               </Text>
             </View>
 
-            {!isVideoType && item.visitAddress && (
+            {!isVideoType && item.visitAddress ? (
               <View style={styles.addressRow}>
-                <Ionicons name="location-outline" size={12} color="#10B981" />
-                <Text style={styles.addressText} numberOfLines={1}>
-                  {item.visitAddress}
-                </Text>
+                <Ionicons name="location-outline" size={14} color="#10B981" />
+                <View style={styles.addressContent}>
+                  <Text style={styles.addressLabel}>
+                    {t("doctor.appointments.visitAddress")}
+                  </Text>
+                  <Text style={styles.addressText}>{item.visitAddress}</Text>
+                </View>
               </View>
-            )}
+            ) : null}
           </View>
         </View>
 
@@ -925,15 +933,24 @@ const styles = StyleSheet.create({
   },
   addressRow: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginTop: 4,
+    alignItems: "flex-start",
+    gap: 6,
+    marginTop: 6,
+  },
+  addressContent: {
+    flex: 1,
+  },
+  addressLabel: {
+    fontSize: 11,
+    fontFamily: "Poppins-Medium",
+    color: "#6B7280",
+    marginBottom: 2,
   },
   addressText: {
-    flex: 1,
-    fontSize: 12,
-    fontFamily: "Poppins-Medium",
+    fontSize: 13,
+    fontFamily: "Poppins-SemiBold",
     color: "#10B981",
+    lineHeight: 18,
   },
   statusBadge: {
     paddingHorizontal: 10,

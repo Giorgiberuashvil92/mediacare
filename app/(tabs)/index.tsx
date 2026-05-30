@@ -1,7 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -19,35 +19,39 @@ import AIAssistant from "../components/ui/AIAssistant";
 import Departments from "../components/ui/departments";
 import Header from "../components/ui/header";
 import Services from "../components/ui/services";
+import { useLanguage } from "../contexts/LanguageContext";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const SLIDER_WIDTH = SCREEN_WIDTH - 32; // 16px padding on each side
 
-const PROMOTIONAL_BANNERS = [
+const PROMO_BANNER_CONFIG = [
   {
     id: 1,
-    title: "ინსტრუმენტული კვლევები",
-    subtitle: "მალე შეგეძლებათ დაჯავშნოთ ვიზიტი შენთვის სასურველ კლინიკაში",
+    titleKey: "home.promo.instrumental.title",
+    subtitleKey: "home.promo.instrumental.subtitle",
     colors: ["#20BEB8", "#0EA5E9"],
     icon: "medical",
   },
   {
-    id: 2,
-    title: "ონლაინ კონსულტაცია",
-    subtitle: "დაჯავშნე ვიდეო კონსულტაცია და მიიღე ფასდაკლება",
-    colors: ["#10B981", "#059669"],
-    icon: "videocam",
-  },
-  {
     id: 3,
-    title: "ლაბორატორიული კვლევები",
-    subtitle: "მალე შესაძლებელი იქნება გამოიძახო ნებისმიერ მისამართზე ",
+    titleKey: "home.promo.laboratory.title",
+    subtitleKey: "home.promo.laboratory.subtitle",
     colors: ["#8B5CF6", "#7C3AED"],
     icon: "flask",
   },
-];
+] as const;
 
 export default function HomeScreen() {
+  const { t } = useLanguage();
+  const promotionalBanners = useMemo(
+    () =>
+      PROMO_BANNER_CONFIG.map((banner) => ({
+        ...banner,
+        title: t(banner.titleKey),
+        subtitle: t(banner.subtitleKey),
+      })),
+    [t],
+  );
   const [refreshing, setRefreshing] = useState(false);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
@@ -113,7 +117,7 @@ export default function HomeScreen() {
           <View style={styles.promoContainer}>
             <FlatList
               ref={flatListRef}
-              data={PROMOTIONAL_BANNERS}
+              data={promotionalBanners}
               renderItem={({ item }) => (
                 <View style={styles.slideContainer}>
                   <TouchableOpacity
@@ -133,7 +137,9 @@ export default function HomeScreen() {
                             {item.subtitle}
                           </Text>
                           <View style={styles.promoButton}>
-                            <Text style={styles.promoButtonText}>დეტალები</Text>
+                            <Text style={styles.promoButtonText}>
+                              {t("home.promo.details")}
+                            </Text>
                             <Ionicons
                               name="arrow-forward"
                               size={16}
@@ -166,7 +172,7 @@ export default function HomeScreen() {
 
             {/* Pagination Dots */}
             <View style={styles.paginationContainer}>
-              {PROMOTIONAL_BANNERS.map((_, index) => (
+              {promotionalBanners.map((_, index) => (
                 <View
                   key={index}
                   style={[

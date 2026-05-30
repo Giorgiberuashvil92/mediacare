@@ -119,6 +119,7 @@ export interface Consultation {
   isPaid: boolean; // გადახდილია
   diagnosis?: string; // დიაგნოზი
   symptoms?: string; // სიმპტომები
+  visitAddress?: string;
   consultationSummary?: ConsultationSummary;
   followUp?: FollowUpInfo;
   form100?: Form100Info;

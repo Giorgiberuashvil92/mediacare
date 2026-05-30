@@ -20,6 +20,7 @@ import { apiService, LoginSelectableUser } from "../../_services/api";
 import OTPModal from "../../components/ui/OTPModal";
 import { useAuth } from "../../contexts/AuthContext";
 import { SupportedLanguage, useLanguage } from "../../contexts/LanguageContext";
+import { getDoctorDisplayName } from "../../utils/doctorNameLabel";
 import { showToast } from "../../utils/toast";
 
 export default function LoginScreen() {
@@ -703,8 +704,11 @@ export default function LoginScreen() {
                 </View>
                 <View style={styles.userOptionContent}>
                   <Text style={styles.userOptionName}>
-                    {userOption.name ||
-                      t("auth.login.userSelection.defaultName")}
+                    {getDoctorDisplayName(
+                      userOption,
+                      language,
+                      t("auth.login.userSelection.defaultName"),
+                    )}
                   </Text>
                   <Text style={styles.userOptionMeta}>
                     {getRoleLabel(userOption.role)} •{" "}

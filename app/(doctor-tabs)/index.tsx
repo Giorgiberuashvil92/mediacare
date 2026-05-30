@@ -15,20 +15,23 @@ import type {
   Consultation,
   DoctorStatistics,
 } from "../../assets/data/doctorDashboard";
-import {
-  getStatusColor,
-} from "../../assets/data/doctorDashboard";
+import { getStatusColor } from "../../assets/data/doctorDashboard";
 import { apiService } from "../_services/api";
 import AIAssistant from "../components/ui/AIAssistant";
 import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useSchedule } from "../contexts/ScheduleContext";
+import { getDoctorDisplayName } from "../utils/doctorNameLabel";
 
 export default function DoctorDashboard() {
   const { user } = useAuth();
   const { t, language } = useLanguage();
   const router = useRouter();
-  const displayName = user?.name?.trim() || t("settings.role.doctor");
+  const displayName = getDoctorDisplayName(
+    user,
+    language,
+    t("settings.role.doctor"),
+  );
   const locale =
     language === "ka" ? "ka-GE" : language === "ru" ? "ru-RU" : "en-US";
 
@@ -400,7 +403,9 @@ export default function DoctorDashboard() {
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>{t("doctor.dashboard.greeting")}</Text>
+            <Text style={styles.greeting}>
+              {t("doctor.dashboard.greeting")}
+            </Text>
             <Text style={styles.headerName}>{displayName}</Text>
           </View>
           <TouchableOpacity style={styles.notificationButton}>
@@ -472,30 +477,19 @@ export default function DoctorDashboard() {
                   , {upcomingConsultation.time}
                 </Text>
 
-                <View style={styles.upcomingMetaRow}>
-                  <View style={styles.upcomingMetaPill}>
-                    <Ionicons
-                      name="time-outline"
-                      size={16}
-                      color={getTypeMeta(upcomingConsultation.type).color}
-                    />
-                    <Text style={styles.upcomingMetaText}>
-                      {upcomingConsultation.time}
-                    </Text>
-                  </View>
-                  <View style={styles.upcomingMetaPill}>
-                    <Ionicons
-                      name="person-outline"
-                      size={16}
-                      color={getTypeMeta(upcomingConsultation.type).color}
-                    />
-                    <Text style={styles.upcomingMetaText}>
-                      {upcomingConsultation.type === "home-visit"
-                        ? t("doctor.dashboard.type.homeVisitFull")
-                        : t("doctor.dashboard.type.online")}
-                    </Text>
-                  </View>
-                </View>
+                {upcomingConsultation.type === "home-visit" &&
+                  upcomingConsultation.visitAddress && (
+                    <View style={styles.upcomingAddressRow}>
+                      <Ionicons
+                        name="location-outline"
+                        size={16}
+                        color={getTypeMeta(upcomingConsultation.type).color}
+                      />
+                      <Text style={styles.upcomingAddressText}>
+                        {upcomingConsultation.visitAddress}
+                      </Text>
+                    </View>
+                  )}
               </View>
 
               <View style={styles.upcomingRight}>
@@ -555,7 +549,7 @@ export default function DoctorDashboard() {
                 {t("doctor.dashboard.quickActions.video")}
               </Text>
               <Text style={styles.quickActionSubLabel}>
-                {t("doctor.dashboard.quickActions.activePatients")}
+                {t("doctor.dashboard.quickActions.HomeactivePatients")}
               </Text>
             </TouchableOpacity>
 
@@ -572,11 +566,11 @@ export default function DoctorDashboard() {
                 <Ionicons name="flask" size={28} color="#FFFFFF" />
               </View>
               <Text style={styles.quickActionLabel}>
-                {t("doctor.dashboard.quickActions.laboratory")}
-              </Text>
-              <Text style={styles.quickActionSubLabel}>
                 {t("doctor.dashboard.quickActions.assignTests")}
               </Text>
+              {/* <Text style={styles.quickActionSubLabel}>
+                {t("doctor.dashboard.quickActions.assignTests")}
+              </Text> */}
             </TouchableOpacity>
           </View>
         </View>
@@ -749,8 +743,7 @@ export default function DoctorDashboard() {
                       })}{" "}
                       •{" "}
                       {tr("doctor.dashboard.availableCount", {
-                        count:
-                          todaySchedule.video?.availableSlots?.length || 0,
+                        count: todaySchedule.video?.availableSlots?.length || 0,
                       })}
                     </Text>
                   </View>
@@ -817,13 +810,27 @@ export default function DoctorDashboard() {
                           {tr("doctor.dashboard.yearsOld", {
                             age: consultation.patientAge,
                           })}{" "}
-                          • {getConsultationTypeLabelLocalized(consultation.type)}
+                          •{" "}
+                          {getConsultationTypeLabelLocalized(consultation.type)}
                         </Text>
                         {consultation.symptoms && (
                           <Text style={styles.consultationSymptoms}>
                             {consultation.symptoms}
                           </Text>
                         )}
+                        {consultation.type === "home-visit" &&
+                          consultation.visitAddress && (
+                            <View style={styles.consultationAddressRow}>
+                              <Ionicons
+                                name="location-outline"
+                                size={14}
+                                color="#10B981"
+                              />
+                              <Text style={styles.consultationAddressText}>
+                                {consultation.visitAddress}
+                              </Text>
+                            </View>
+                          )}
                       </View>
                       <View
                         style={[
@@ -946,7 +953,9 @@ export default function DoctorDashboard() {
                 router.push("/(doctor-tabs)/appointments?status=completed")
               }
             >
-              <Text style={styles.viewAll}>{t("doctor.dashboard.history")}</Text>
+              <Text style={styles.viewAll}>
+                {t("doctor.dashboard.history")}
+              </Text>
             </TouchableOpacity>
           </View>
           <View style={styles.activityCard}>
@@ -1143,6 +1152,19 @@ const styles = StyleSheet.create<any>({
     fontSize: 13,
     fontFamily: "Poppins-Regular",
     color: "#4B5563",
+  },
+  upcomingAddressRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+    marginTop: 8,
+  },
+  upcomingAddressText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: "Poppins-Medium",
+    color: "#374151",
+    lineHeight: 18,
   },
   upcomingMetaRow: {
     flexDirection: "row",
@@ -1836,6 +1858,19 @@ const styles = StyleSheet.create<any>({
     fontFamily: "Poppins-Regular",
     color: "#9CA3AF",
     fontStyle: "italic",
+  },
+  consultationAddressRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 4,
+    marginTop: 4,
+  },
+  consultationAddressText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: "Poppins-Medium",
+    color: "#10B981",
+    lineHeight: 16,
   },
   statusBadge: {
     alignSelf: "flex-start",

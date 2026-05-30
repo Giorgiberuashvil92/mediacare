@@ -1,8 +1,9 @@
 import { apiService } from "@/app/_services/api";
 import { useLanguage } from "@/app/contexts/LanguageContext";
+import { getTermDisplayContent } from "@/app/utils/termContentLabel";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -14,16 +15,12 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function CancellationTermsScreen() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [content, setContent] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadTerms();
-  }, []);
-
-  const loadTerms = async () => {
+  const loadTerms = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -36,17 +33,21 @@ export default function CancellationTermsScreen() {
 
       const response = await apiService.getTerms("cancellation");
       if (response.success && response.data) {
-        setContent(response.data.content || "");
+        setContent(getTermDisplayContent(response.data, language));
       } else {
-        setError("ტერმინების ჩატვირთვა ვერ მოხერხდა");
+        setError(t("terms.loadFailed"));
       }
     } catch (err: any) {
       console.error("Error loading cancellation terms:", err);
-      setError(err.message || "ტერმინების ჩატვირთვა ვერ მოხერხდა");
+      setError(err.message || t("terms.loadFailed"));
     } finally {
       setLoading(false);
     }
-  };
+  }, [language, t]);
+
+  useEffect(() => {
+    loadTerms();
+  }, [loadTerms]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -63,20 +64,22 @@ export default function CancellationTermsScreen() {
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#06B6D4" />
-          <Text style={styles.loadingText}>იტვირთება...</Text>
+          <Text style={styles.loadingText}>{t("terms.loading")}</Text>
         </View>
       ) : error ? (
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={loadTerms}>
-            <Text style={styles.retryButtonText}>ხელახლა ცდა</Text>
+            <Text style={styles.retryButtonText}>{t("terms.retry")}</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           <View style={styles.contentContainer}>
-            <Text style={styles.content}>{content || "ტერმინები ჯერ არ არის დამატებული."}</Text>
+            <Text style={styles.content}>
+              {content || t("terms.empty")}
+            </Text>
           </View>
         </ScrollView>
       )}
@@ -164,4 +167,3 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
 });
-

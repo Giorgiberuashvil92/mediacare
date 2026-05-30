@@ -30,6 +30,8 @@ export class TermsService {
         data: {
           type,
           content: '',
+          contentEn: '',
+          contentRu: '',
           updatedAt: null,
         },
       };
@@ -40,6 +42,8 @@ export class TermsService {
       data: {
         type: term.type,
         content: term.content,
+        contentEn: term.contentEn || '',
+        contentRu: term.contentRu || '',
         updatedAt: term['updatedAt'] || term['createdAt'],
       },
     };
@@ -61,6 +65,8 @@ export class TermsService {
         { type },
         {
           content: updateTermDto.content,
+          contentEn: updateTermDto.contentEn ?? '',
+          contentRu: updateTermDto.contentRu ?? '',
           isActive: true,
         },
         {
@@ -76,6 +82,8 @@ export class TermsService {
       data: {
         type: term.type,
         content: term.content,
+        contentEn: term.contentEn || '',
+        contentRu: term.contentRu || '',
         updatedAt: term['updatedAt'] || term['createdAt'],
       },
     };
@@ -88,6 +96,8 @@ export class TermsService {
       data: terms.map((term) => ({
         type: term.type,
         content: term.content,
+        contentEn: term.contentEn || '',
+        contentRu: term.contentRu || '',
         updatedAt: term['updatedAt'] || term['createdAt'],
       })),
     };

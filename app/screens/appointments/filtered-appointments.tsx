@@ -31,7 +31,6 @@ interface PatientAppointment {
   type: string;
   fee: string | number;
   doctorImage?: any;
-  visitAddress?: string;
   homeVisitCompletedAt?: string;
 }
 
@@ -64,7 +63,6 @@ const mapAppointmentFromAPI = (
     type: appointment.type || "video",
     fee: appointment.consultationFee || appointment.totalAmount || 0,
     doctorImage,
-    visitAddress: appointment.visitAddress,
     homeVisitCompletedAt: appointment.homeVisitCompletedAt,
   };
 };
@@ -232,7 +230,6 @@ export default function FilteredAppointmentsScreen() {
     return diff < -oneHourInMs;
   };
 
-  // Check if consultation time has not yet arrived (more than 30 minutes before)
   const isConsultationTimeNotYet = (appointment: PatientAppointment) => {
     if (
       appointment.status !== "scheduled" &&
@@ -320,20 +317,6 @@ export default function FilteredAppointmentsScreen() {
             </Text>
           </View>
         </View>
-
-        {item.type === "home-visit" && item.visitAddress ? (
-          <View style={styles.addressBlock}>
-            <View style={styles.addressLabelRow}>
-              <Ionicons name="location-outline" size={16} color="#6B7280" />
-              <Text style={styles.addressLabel}>
-                {t("appointments.address.label")}
-              </Text>
-            </View>
-            <Text style={styles.addressText} numberOfLines={2}>
-              {item.visitAddress}
-            </Text>
-          </View>
-        ) : null}
       </View>
 
       {item.type === "video" &&
@@ -692,26 +675,6 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins-Medium",
     color: "#1F2937",
     flexShrink: 1,
-  },
-  addressBlock: {
-    gap: 4,
-    paddingTop: 4,
-  },
-  addressLabelRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  addressLabel: {
-    fontSize: 13,
-    fontFamily: "Poppins-SemiBold",
-    color: "#374151",
-  },
-  addressText: {
-    fontSize: 13,
-    fontFamily: "Poppins-Regular",
-    color: "#6B7280",
-    paddingLeft: 22,
   },
   feeRow: {
     flexDirection: "row",

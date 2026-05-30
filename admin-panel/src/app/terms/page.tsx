@@ -9,7 +9,56 @@ type TermType = 'cancellation' | 'service' | 'privacy' | 'contract' | 'usage' | 
 interface Term {
   type: string;
   content: string;
+  contentEn?: string;
+  contentRu?: string;
   updatedAt?: string;
+}
+
+type TermContentValues = Pick<Term, 'content' | 'contentEn' | 'contentRu'>;
+
+function TermLanguageFields({
+  values,
+  onChange,
+}: {
+  values: TermContentValues;
+  onChange: (field: keyof TermContentValues, value: string) => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border border-stroke bg-white p-3">
+        <p className="mb-2 text-sm font-medium text-black">ქართული *</p>
+        <textarea
+          value={values.content}
+          onChange={(e) => onChange('content', e.target.value)}
+          rows={12}
+          className="w-full rounded border border-stroke bg-transparent px-4 py-2.5 text-black outline-none focus:border-primary"
+          placeholder="შეიყვანეთ ტერმინების კონტენტი (ქართული)..."
+        />
+      </div>
+
+      <div className="rounded-lg border border-stroke bg-white p-3">
+        <p className="mb-2 text-sm font-medium text-black">English</p>
+        <textarea
+          value={values.contentEn || ''}
+          onChange={(e) => onChange('contentEn', e.target.value)}
+          rows={12}
+          className="w-full rounded border border-stroke bg-transparent px-4 py-2.5 text-black outline-none focus:border-primary"
+          placeholder="Enter terms content (English)..."
+        />
+      </div>
+
+      <div className="rounded-lg border border-stroke bg-white p-3">
+        <p className="mb-2 text-sm font-medium text-black">Русский</p>
+        <textarea
+          value={values.contentRu || ''}
+          onChange={(e) => onChange('contentRu', e.target.value)}
+          rows={12}
+          className="w-full rounded border border-stroke bg-transparent px-4 py-2.5 text-black outline-none focus:border-primary"
+          placeholder="Введите текст условий (русский)..."
+        />
+      </div>
+    </div>
+  );
 }
 
 const termLabels: Record<TermType, string> = {
@@ -35,7 +84,11 @@ export default function TermsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingType, setEditingType] = useState<TermType | null>(null);
-  const [content, setContent] = useState('');
+  const [editContent, setEditContent] = useState<TermContentValues>({
+    content: '',
+    contentEn: '',
+    contentRu: '',
+  });
   const [submitting, setSubmitting] = useState(false);
 
   const loadTerms = async () => {
@@ -79,24 +132,32 @@ export default function TermsPage() {
 
   const handleEdit = (type: TermType) => {
     setEditingType(type);
-    setContent(terms[type].content);
+    setEditContent({
+      content: terms[type].content,
+      contentEn: terms[type].contentEn || '',
+      contentRu: terms[type].contentRu || '',
+    });
   };
 
   const handleCancel = () => {
     setEditingType(null);
-    setContent('');
+    setEditContent({ content: '', contentEn: '', contentRu: '' });
   };
 
   const handleSave = async (type: TermType) => {
-    if (!content.trim()) {
-      setError('კონტენტი არ შეიძლება იყოს ცარიელი');
+    if (!editContent.content.trim()) {
+      setError('ქართული კონტენტი არ შეიძლება იყოს ცარიელი');
       return;
     }
 
     try {
       setSubmitting(true);
       setError(null);
-      const response = await apiService.updateTerms(type, content.trim());
+      const response = await apiService.updateTerms(type, {
+        content: editContent.content.trim(),
+        contentEn: editContent.contentEn?.trim() || '',
+        contentRu: editContent.contentRu?.trim() || '',
+      });
       
       if (response.success) {
         setTerms((prev) => ({
@@ -104,7 +165,7 @@ export default function TermsPage() {
           [type]: response.data,
         }));
         setEditingType(null);
-        setContent('');
+        setEditContent({ content: '', contentEn: '', contentRu: '' });
       } else {
         setError('ტერმინის განახლება ვერ მოხერხდა');
       }
@@ -159,12 +220,11 @@ export default function TermsPage() {
 
               {editingType === type ? (
                 <div>
-                  <textarea
-                    value={content}
-                    onChange={(e) => setContent(e.target.value)}
-                    rows={15}
-                    className="w-full rounded border border-stroke bg-white px-4 py-3 text-sm text-black focus:border-primary focus:outline-none"
-                    placeholder="შეიყვანეთ ტერმინების კონტენტი..."
+                  <TermLanguageFields
+                    values={editContent}
+                    onChange={(field, value) =>
+                      setEditContent((prev) => ({ ...prev, [field]: value }))
+                    }
                   />
                   <div className="mt-4 flex gap-2">
                     <button
@@ -184,12 +244,33 @@ export default function TermsPage() {
                   </div>
                 </div>
               ) : (
-                <div>
+                <div className="space-y-3">
                   <div className="rounded border border-stroke bg-white p-4">
+                    <p className="mb-1 text-xs font-medium text-gray-500">ქართული</p>
                     <p className="whitespace-pre-wrap text-sm text-gray-700">
                       {terms[type].content || 'კონტენტი ჯერ არ არის დამატებული.'}
                     </p>
                   </div>
+                  {(terms[type].contentEn || terms[type].contentRu) && (
+                    <>
+                      {terms[type].contentEn && (
+                        <div className="rounded border border-stroke bg-white p-4">
+                          <p className="mb-1 text-xs font-medium text-gray-500">English</p>
+                          <p className="whitespace-pre-wrap text-sm text-gray-700">
+                            {terms[type].contentEn}
+                          </p>
+                        </div>
+                      )}
+                      {terms[type].contentRu && (
+                        <div className="rounded border border-stroke bg-white p-4">
+                          <p className="mb-1 text-xs font-medium text-gray-500">Русский</p>
+                          <p className="whitespace-pre-wrap text-sm text-gray-700">
+                            {terms[type].contentRu}
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  )}
                   {terms[type].updatedAt && (
                     <p className="mt-2 text-xs text-gray-500">
                       ბოლო განახლება: {new Date(terms[type].updatedAt!).toLocaleString('ka-GE')}

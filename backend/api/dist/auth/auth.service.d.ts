@@ -44,6 +44,8 @@ export declare class AuthService {
                 id: string;
                 role: UserRole;
                 name: string;
+                nameEn: string;
+                nameRu: string;
                 email: string;
                 phone: string;
                 idNumber: string;
@@ -63,6 +65,8 @@ export declare class AuthService {
                 id: string;
                 role: UserRole;
                 name: string;
+                nameEn: string;
+                nameRu: string;
                 email: string;
                 phone: string;
                 idNumber: string;
@@ -82,6 +86,8 @@ export declare class AuthService {
                 id: string;
                 role: UserRole;
                 name: string;
+                nameEn: string;
+                nameRu: string;
                 email: string;
                 phone: string;
                 idNumber: string;
@@ -104,6 +110,8 @@ export declare class AuthService {
                 id: string;
                 role: UserRole;
                 name: string;
+                nameEn: string;
+                nameRu: string;
                 email: string;
                 phone: string;
                 idNumber: string;
@@ -161,6 +169,8 @@ export declare class AuthService {
                 id: string;
                 role: UserRole;
                 name: string;
+                nameEn: string;
+                nameRu: string;
                 email: string;
                 phone: string;
                 idNumber: string;

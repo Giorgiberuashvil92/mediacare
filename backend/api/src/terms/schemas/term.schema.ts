@@ -23,6 +23,12 @@ export class Term {
   @Prop({ required: true, type: String })
   content: string;
 
+  @Prop({ type: String, default: '' })
+  contentEn?: string;
+
+  @Prop({ type: String, default: '' })
+  contentRu?: string;
+
   @Prop({ default: true })
   isActive: boolean;
 }

@@ -39,6 +39,8 @@ export class ProfileService {
         id: (user._id as string).toString(),
         role: user.role,
         name: user.name,
+        nameEn: user.nameEn ?? null,
+        nameRu: user.nameRu ?? null,
         email: user.email,
         phone: user.phone ?? null,
         idNumber: user.idNumber ?? null,

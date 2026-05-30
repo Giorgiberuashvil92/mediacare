@@ -46,6 +46,8 @@ export interface User {
   videoConsultationFee?: number; // ვიდეო კონსულტაციის ფასი
   homeVisitFee?: number; // ბინაზე ვიზიტის ფასი
   about?: string;
+  aboutEn?: string;
+  aboutRu?: string;
   location?: string;
   rating?: number;
   reviewCount?: number;
@@ -59,8 +61,10 @@ export interface User {
   identomatDocumentFrontImage?: string; // Document front image URL from Identomat
   identomatDocumentBackImage?: string; // Document back image URL from Identomat
   identomatFullData?: any; // Full Identomat response data for admin panel
-  /** ადმინის ჩანაწერი ექიმის შესახებ დეტალურად (ახალი) */
+  /** ადმინის ჩანაწერი ექიმის შესახებ (აპში ჩანს „ექიმის შესახებ“) */
   adminNotes?: string;
+  adminNotesEn?: string;
+  adminNotesRu?: string;
 }
 
 export interface LoginRequest {
@@ -913,7 +917,13 @@ class ApiService {
       | "doctor-cancellation"
       | "doctor-service",
   ): Promise<
-    ApiResponse<{ type: string; content: string; updatedAt?: string }>
+    ApiResponse<{
+      type: string;
+      content: string;
+      contentEn?: string;
+      contentRu?: string;
+      updatedAt?: string;
+    }>
   > {
     const response = await fetch(`${this.baseURL}/terms/${type}`, {
       method: "GET",
@@ -921,7 +931,13 @@ class ApiService {
     });
 
     return this.handleResponse<
-      ApiResponse<{ type: string; content: string; updatedAt?: string }>
+      ApiResponse<{
+        type: string;
+        content: string;
+        contentEn?: string;
+        contentRu?: string;
+        updatedAt?: string;
+      }>
     >(response);
   }
 
@@ -934,21 +950,41 @@ class ApiService {
       | "usage"
       | "doctor-cancellation"
       | "doctor-service",
-    content: string,
-  ): Promise<ApiResponse<{ type: string; content: string }>> {
+    data: { content: string; contentEn?: string; contentRu?: string },
+  ): Promise<
+    ApiResponse<{
+      type: string;
+      content: string;
+      contentEn?: string;
+      contentRu?: string;
+    }>
+  > {
     const response = await fetch(`${this.baseURL}/terms/${type}`, {
       method: "PUT",
       headers: this.getHeaders(),
-      body: JSON.stringify({ content }),
+      body: JSON.stringify(data),
     });
 
-    return this.handleResponse<ApiResponse<{ type: string; content: string }>>(
-      response,
-    );
+    return this.handleResponse<
+      ApiResponse<{
+        type: string;
+        content: string;
+        contentEn?: string;
+        contentRu?: string;
+      }>
+    >(response);
   }
 
   async getAllTerms(): Promise<
-    ApiResponse<{ type: string; content: string; updatedAt?: string }[]>
+    ApiResponse<
+      {
+        type: string;
+        content: string;
+        contentEn?: string;
+        contentRu?: string;
+        updatedAt?: string;
+      }[]
+    >
   > {
     const response = await fetch(`${this.baseURL}/terms`, {
       method: "GET",
@@ -956,7 +992,15 @@ class ApiService {
     });
 
     return this.handleResponse<
-      ApiResponse<{ type: string; content: string; updatedAt?: string }[]>
+      ApiResponse<
+        {
+          type: string;
+          content: string;
+          contentEn?: string;
+          contentRu?: string;
+          updatedAt?: string;
+        }[]
+      >
     >(response);
   }
 

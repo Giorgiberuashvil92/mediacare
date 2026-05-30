@@ -1,5 +1,6 @@
 import { apiService } from "@/app/_services/api";
 import { useLanguage } from "@/app/contexts/LanguageContext";
+import { isStrongPassword } from "@/app/utils/passwordValidation";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import React, { useState } from "react";
@@ -24,6 +25,8 @@ export default function SecurityScreen() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const newPasswordIsStrong = isStrongPassword(newPassword);
+
   const handleChangePassword = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
       Alert.alert(
@@ -33,10 +36,10 @@ export default function SecurityScreen() {
       return;
     }
 
-    if (newPassword.length < 8) {
+    if (!isStrongPassword(newPassword)) {
       Alert.alert(
         t("settings.security.error.title"),
-        t("settings.security.error.minLength"),
+        t("settings.security.error.weakPassword"),
       );
       return;
     }
@@ -144,6 +147,14 @@ export default function SecurityScreen() {
                 />
               </TouchableOpacity>
             </View>
+            <Text style={styles.hintText}>
+              {t("settings.security.newPasswordHint")}
+            </Text>
+            {newPassword.length > 0 && newPasswordIsStrong && (
+              <Text style={styles.strengthLabel}>
+                {t("settings.security.strengthStrong")}
+              </Text>
+            )}
           </View>
 
           <View style={styles.inputContainer}>
@@ -238,6 +249,19 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: "Poppins-Regular",
     color: "#1F2937",
+  },
+  hintText: {
+    marginTop: 8,
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+    lineHeight: 18,
+  },
+  strengthLabel: {
+    marginTop: 6,
+    fontSize: 12,
+    fontFamily: "Poppins-SemiBold",
+    color: "#10B981",
   },
   saveButton: {
     backgroundColor: "#06B6D4",

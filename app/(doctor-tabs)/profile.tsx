@@ -19,6 +19,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
+import { getDoctorDisplayName } from "../utils/doctorNameLabel";
 import { showToast } from "../utils/toast";
 
 export default function DoctorProfile() {
@@ -57,7 +58,11 @@ export default function DoctorProfile() {
   };
 
   const profileStatus = getProfileStatus();
-  const displayName = user?.name?.trim() || t("settings.role.doctor");
+  const displayName = getDoctorDisplayName(
+    user,
+    language,
+    t("settings.role.doctor"),
+  );
   const displayEmail = user?.email?.trim();
 
   useEffect(() => {
@@ -177,8 +182,7 @@ export default function DoctorProfile() {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>{t("settings.title")}</Text>
-          <Text style={styles.subtitle}>{t("doctor.profile.pageSubtitle")}</Text>
+          <Text style={styles.title}>{t("editProfile.title")}</Text>
         </View>
 
         {/* Profile Card */}
@@ -305,9 +309,6 @@ export default function DoctorProfile() {
 
         {/* Language — იგივე ეკრანი, რაც პაციენტის პარამეტრებში */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            {t("doctor.profile.section.languageRegion")}
-          </Text>
           <View style={styles.menuCard}>
             <TouchableOpacity
               style={styles.menuItem}
@@ -334,9 +335,6 @@ export default function DoctorProfile() {
 
         {/* Help & Support */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            {t("doctor.profile.section.support")}
-          </Text>
           <View style={styles.menuCard}>
             <TouchableOpacity
               style={styles.menuItem}
@@ -404,9 +402,6 @@ export default function DoctorProfile() {
 
         {/* Collaboration Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            {t("doctor.profile.section.collaboration")}
-          </Text>
           <View style={styles.menuCard}>
             <TouchableOpacity
               style={styles.menuItem}

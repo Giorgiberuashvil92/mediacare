@@ -39,6 +39,8 @@ export declare class AuthController {
                 id: string;
                 role: import("../schemas/user.schema").UserRole;
                 name: string;
+                nameEn: string;
+                nameRu: string;
                 email: string;
                 phone: string;
                 idNumber: string;
@@ -58,6 +60,8 @@ export declare class AuthController {
                 id: string;
                 role: import("../schemas/user.schema").UserRole;
                 name: string;
+                nameEn: string;
+                nameRu: string;
                 email: string;
                 phone: string;
                 idNumber: string;
@@ -77,6 +81,8 @@ export declare class AuthController {
                 id: string;
                 role: import("../schemas/user.schema").UserRole;
                 name: string;
+                nameEn: string;
+                nameRu: string;
                 email: string;
                 phone: string;
                 idNumber: string;
@@ -136,6 +142,8 @@ export declare class AuthController {
                 id: string;
                 role: import("../schemas/user.schema").UserRole;
                 name: string;
+                nameEn: string;
+                nameRu: string;
                 email: string;
                 phone: string;
                 idNumber: string;
@@ -162,6 +170,8 @@ export declare class AuthController {
                 id: string;
                 role: import("../schemas/user.schema").UserRole;
                 name: string;
+                nameEn: string;
+                nameRu: string;
                 email: string;
                 phone: string;
                 idNumber: string;

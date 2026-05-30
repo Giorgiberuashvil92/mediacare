@@ -3,6 +3,7 @@ import AppointmentScheduler from "@/app/components/ui/appointmentScheduler";
 import { useFavorites } from "@/app/contexts/FavoritesContext";
 import { useLanguage } from "@/app/contexts/LanguageContext";
 import { getDoctorDisplayName } from "@/app/utils/doctorNameLabel";
+import { getDoctorLocalizedText } from "@/app/utils/doctorLocalizedText";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
@@ -54,7 +55,11 @@ const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
       : undefined,
     followUpFee: doctor.followUpFee ? `${doctor.followUpFee} ₾` : undefined,
     about: doctor.about || "",
-    adminNotes: doctor.adminNotes || "", // ადმინის ჩანაწერი — ჩანს „ექიმის შესახებ“-ის მაგივრად
+    aboutEn: doctor.aboutEn,
+    aboutRu: doctor.aboutRu,
+    adminNotes: doctor.adminNotes || "",
+    adminNotesEn: doctor.adminNotesEn,
+    adminNotesRu: doctor.adminNotesRu,
     workingHours: doctor.workingHours || "24/7",
     availability: doctor.availability || [],
     totalReviews: doctor.reviewCount || 0,
@@ -75,7 +80,7 @@ const DoctorDetail = () => {
     followUpAppointmentId?: string;
     followUp?: string;
   }>();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const [doctor, setDoctor] = useState<any>(null);
   console.log("🏥 Frontend doctor object:", doctor);
   console.log("🏥 Frontend doctor availability:", doctor?.availability);
@@ -132,30 +137,35 @@ const DoctorDetail = () => {
         setDoctor(mappedDoctor);
       } else {
         setDoctor(null);
-        setError("ექიმი არ მოიძებნა");
+        setError(t("doctors.notFound.title"));
       }
     } catch (err: any) {
-      setError(err.message || "ექიმის ჩატვირთვა ვერ მოხერხდა");
+      setError(err.message || t("doctors.detail.loadError"));
       setDoctor(null);
     } finally {
       setLoading(false);
     }
   };
 
-  const displayDoctor = useMemo(
-    () =>
-      doctor
-        ? { ...doctor, name: getDoctorDisplayName(doctor, language) }
-        : null,
-    [doctor, language],
-  );
+  const displayDoctor = useMemo(() => {
+    if (!doctor) return null;
+    const aboutShort = getDoctorLocalizedText(doctor, "about", language);
+    const aboutDetail =
+      getDoctorLocalizedText(doctor, "adminNotes", language) || aboutShort;
+    return {
+      ...doctor,
+      name: getDoctorDisplayName(doctor, language),
+      aboutShort,
+      aboutDetail,
+    };
+  }, [doctor, language]);
 
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#20BEB8" />
-          <Text style={styles.loadingText}>ექიმის ჩატვირთვა...</Text>
+          <Text style={styles.loadingText}>{t("doctors.detail.loading")}</Text>
         </View>
       </SafeAreaView>
     );
@@ -165,9 +175,11 @@ const DoctorDetail = () => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error || "ექიმი არ მოიძებნა"}</Text>
+          <Text style={styles.errorText}>
+            {error || t("doctors.notFound.title")}
+          </Text>
           <TouchableOpacity style={styles.retryButton} onPress={loadDoctor}>
-            <Text style={styles.retryButtonText}>ხელახლა ცდა</Text>
+            <Text style={styles.retryButtonText}>{t("doctors.retry")}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -188,8 +200,8 @@ const DoctorDetail = () => {
           <View style={styles.schedulerHeaderInfo}>
             <Text style={styles.schedulerTitle}>
               {followUp === "true"
-                ? "განმეორებითი ვიზიტის დაჯავშნა"
-                : "ჯავშნის გაკეთება"}
+                ? t("doctors.detail.followUpBooking")
+                : t("doctors.detail.makeAppointment")}
             </Text>
             <Text style={styles.schedulerSubtitle}>{displayDoctor!.name}</Text>
           </View>
@@ -204,8 +216,6 @@ const DoctorDetail = () => {
             <AppointmentScheduler
               workingHours={doctor.workingHours}
               availability={doctor.availability || []}
-              totalReviews={doctor.totalReviews || 0}
-              reviews={Array.isArray(doctor.reviews) ? doctor.reviews : []}
               doctorId={doctor.id}
               initialMode={
                 (appointmentType as "video" | "home-visit") || "video"
@@ -248,7 +258,9 @@ const DoctorDetail = () => {
             <Text style={styles.doctorName}>{displayDoctor!.name}</Text>
           </View>
           <Text style={styles.specialty}>{doctor.specialization}</Text>
-          {doctor.about && <Text style={styles.languages}>{doctor.about}</Text>}
+          {displayDoctor!.aboutShort ? (
+            <Text style={styles.languages}>{displayDoctor!.aboutShort}</Text>
+          ) : null}
         </View>
 
         {/* Compact Stats */}
@@ -256,8 +268,10 @@ const DoctorDetail = () => {
           <View style={styles.metaChip}>
             <Ionicons name="briefcase-outline" size={16} color="#4B5563" />
             <Text style={styles.metaValue}>
-              გამოცდილება:{" "}
-              {doctor.experience ? `${doctor.experience} წელი` : "-"}
+              {t("doctors.detail.experience")}:{" "}
+              {doctor.experience
+                ? `${doctor.experience} ${t("doctor.appointments.years")}`
+                : "-"}
             </Text>
           </View>
         </View>
@@ -265,12 +279,12 @@ const DoctorDetail = () => {
         {/* Price Card */}
 
         {/* About Doctor */}
-        {(doctor.adminNotes || doctor.about) && (
+        {displayDoctor!.aboutDetail ? (
           <View style={styles.aboutSection}>
-            <Text style={styles.aboutTitle}>ექიმის შესახებ</Text>
-            <Text style={styles.aboutText}>{doctor.adminNotes}</Text>
+            <Text style={styles.aboutTitle}>{t("doctors.detail.aboutTitle")}</Text>
+            <Text style={styles.aboutText}>{displayDoctor!.aboutDetail}</Text>
           </View>
-        )}
+        ) : null}
 
         {/* Payment Information */}
       </ScrollView>
@@ -292,7 +306,9 @@ const DoctorDetail = () => {
           style={[styles.actionButton, styles.appointmentButton]}
           onPress={() => setShowAppointmentScheduler(true)}
         >
-          <Text style={styles.buttonText}>ჯავშნის გაკეთება</Text>
+          <Text style={styles.buttonText}>
+            {t("doctors.detail.makeAppointment")}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -306,7 +322,9 @@ const DoctorDetail = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>განათლება და გამოცდილება</Text>
+              <Text style={styles.modalTitle}>
+                {t("doctors.detail.educationModalTitle")}
+              </Text>
               <TouchableOpacity
                 onPress={() => setShowEducationModal(false)}
                 style={styles.modalCloseButton}
@@ -317,15 +335,19 @@ const DoctorDetail = () => {
             <ScrollView style={styles.modalScrollView}>
               {doctor.degrees && (
                 <View style={styles.modalSection}>
-                  <Text style={styles.modalSectionTitle}>განათლება</Text>
+                  <Text style={styles.modalSectionTitle}>
+                    {t("doctors.detail.education")}
+                  </Text>
                   <Text style={styles.modalSectionText}>{doctor.degrees}</Text>
                 </View>
               )}
               {doctor.experience && (
                 <View style={styles.modalSection}>
-                  <Text style={styles.modalSectionTitle}>გამოცდილება</Text>
+                  <Text style={styles.modalSectionTitle}>
+                    {t("doctors.detail.experience")}
+                  </Text>
                   <Text style={styles.modalSectionText}>
-                    {doctor.experience} წელი
+                    {doctor.experience} {t("doctor.appointments.years")}
                   </Text>
                 </View>
               )}

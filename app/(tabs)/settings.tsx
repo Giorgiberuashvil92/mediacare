@@ -147,7 +147,9 @@ export default function SettingsScreen() {
             >
               <Ionicons name="document-text" size={20} color="#06B6D4" />
             </View>
-            <Text style={styles.menuText}>{t("settings.menu.medicalHistory")}</Text>
+            <Text style={styles.menuText}>
+              {t("settings.menu.medicalHistory")}
+            </Text>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity>
 
@@ -188,7 +190,9 @@ export default function SettingsScreen() {
             <View style={styles.menuIconContainer}>
               <Ionicons name="shield-checkmark" size={20} color="#06B6D4" />
             </View>
-            <Text style={styles.menuText}>{t("settings.menu.changePassword")}</Text>
+            <Text style={styles.menuText}>
+              {t("settings.menu.changePassword")}
+            </Text>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
           </TouchableOpacity>
 
@@ -346,7 +350,6 @@ export default function SettingsScreen() {
             <View style={styles.modalIconWrap}>
               <Ionicons name="time-outline" size={40} color="#06B6D4" />
             </View>
-            <Text style={styles.modalTitle}>{t("settings.comingSoon.title")}</Text>
             <Text style={styles.modalSubtitle}>
               {t("settings.comingSoon.message")}
             </Text>

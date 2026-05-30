@@ -1,4 +1,5 @@
 import { apiService } from "@/app/_services/api";
+import { useLanguage } from "@/app/contexts/LanguageContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -16,7 +17,7 @@ export default function ServiceTermsScreen() {
   const [content, setContent] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
+  const { t } = useLanguage();
   useEffect(() => {
     loadTerms();
   }, []);
@@ -49,30 +50,40 @@ export default function ServiceTermsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
           <Ionicons name="chevron-back" size={24} color="#1F2937" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>სერვისის პირობები</Text>
+        <Text style={styles.headerTitle}>{t("settings.menu.terms")}</Text>
         <View style={styles.placeholder} />
       </View>
 
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#06B6D4" />
-          <Text style={styles.loadingText}>იტვირთება...</Text>
+          <Text style={styles.loadingText}>{t("terms.service.loading")}</Text>
         </View>
       ) : error ? (
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={loadTerms}>
-            <Text style={styles.retryButtonText}>ხელახლა ცდა</Text>
+            <Text style={styles.retryButtonText}>
+              {t("terms.service.retry")}
+            </Text>
           </TouchableOpacity>
         </View>
       ) : (
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.contentContainer}>
-            <Text style={styles.content}>{content || "ტერმინები ჯერ არ არის დამატებული."}</Text>
+            <Text style={styles.content}>
+              {content || t("terms.service.noContent")}
+            </Text>
           </View>
         </ScrollView>
       )}
@@ -160,4 +171,3 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
 });
-

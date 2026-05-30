@@ -1,7 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useState } from "react";
-import { useLanguage } from "../../contexts/LanguageContext";
 import {
   Modal,
   ScrollView,
@@ -18,9 +17,13 @@ import Svg, {
   Stop,
   LinearGradient as SvgLinearGradient,
 } from "react-native-svg";
+import { useAuth } from "../../contexts/AuthContext";
+import { useLanguage } from "../../contexts/LanguageContext";
 
 export default function AIAssistant() {
   const { t } = useLanguage();
+  const { userRole } = useAuth();
+  const isDoctor = userRole === "doctor";
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showNewChatModal, setShowNewChatModal] = useState(false);
   const [newChatName, setNewChatName] = useState("");
@@ -53,9 +56,19 @@ export default function AIAssistant() {
         <View style={styles.card}>
           <View style={styles.cardContent}>
             <View style={styles.textContainer}>
-              <Text style={styles.title}>{t("home.aiAssistant.title")}</Text>
+              <Text style={styles.title}>
+                {t(
+                  isDoctor
+                    ? "home.aiAssistant.doctor.title"
+                    : "home.aiAssistant.title",
+                )}
+              </Text>
               <Text style={styles.description}>
-                {t("home.aiAssistant.description")}
+                {t(
+                  isDoctor
+                    ? "home.aiAssistant.doctor.description"
+                    : "home.aiAssistant.description",
+                )}
               </Text>
             </View>
             <View style={styles.iconContainer}>

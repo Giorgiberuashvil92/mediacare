@@ -1,4 +1,10 @@
 import { apiService, AppointmentType } from "@/app/_services/api";
+import { useLanguage } from "@/app/contexts/LanguageContext";
+import { getDoctorDisplayName } from "@/app/utils/doctorNameLabel";
+import {
+  formatAppointmentDateLong,
+  formatAppointmentTime,
+} from "@/app/utils/appointmentDateTime";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as DocumentPicker from "expo-document-picker";
 import { Image } from "expo-image";
@@ -16,8 +22,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useLanguage } from "@/app/contexts/LanguageContext";
-import { getDoctorDisplayName } from "@/app/utils/doctorNameLabel";
 
 // Helper function to map backend doctor to app format
 const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
@@ -54,11 +58,10 @@ const MakeAppointment = () => {
     paymentMethod,
     appointmentType: appointmentTypeParam,
   } = useLocalSearchParams();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const [doctor, setDoctor] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [promoCode, setPromoCode] = useState("");
   const [selectedPaymentMethod] = useState((paymentMethod as string) || "visa");
   const [appointmentType, setAppointmentType] = useState<AppointmentType>(
     (appointmentTypeParam as AppointmentType) || "video",
@@ -97,10 +100,10 @@ const MakeAppointment = () => {
         setDoctor(mappedDoctor);
       } else {
         setDoctor(null);
-        setError("ექიმი არ მოიძებნა");
+        setError(t("doctors.notFound.title"));
       }
     } catch (err: any) {
-      setError(err.message || "ექიმის ჩატვირთვა ვერ მოხერხდა");
+      setError(err.message || t("doctors.detail.loadError"));
       setDoctor(null);
     } finally {
       setLoading(false);
@@ -284,7 +287,7 @@ const MakeAppointment = () => {
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#20BEB8" />
-          <Text style={styles.loadingText}>ექიმის ჩატვირთვა...</Text>
+          <Text style={styles.loadingText}>{t("doctors.detail.loading")}</Text>
         </View>
       </SafeAreaView>
     );
@@ -294,9 +297,11 @@ const MakeAppointment = () => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error || "ექიმი არ მოიძებნა"}</Text>
+          <Text style={styles.errorText}>
+            {error || t("doctors.notFound.title")}
+          </Text>
           <TouchableOpacity style={styles.retryButton} onPress={loadDoctor}>
-            <Text style={styles.retryButtonText}>ხელახლა ცდა</Text>
+            <Text style={styles.retryButtonText}>{t("doctors.retry")}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -309,40 +314,26 @@ const MakeAppointment = () => {
       : parseFloat(String(doctor.consultationFee).replace(/[^\d.]/g, "")) || 0;
   const netAmount = consultationFee;
 
-  // Format the date and time for display
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const months = [
-      "იან",
-      "თებ",
-      "მარ",
-      "აპრ",
-      "მაი",
-      "ივნ",
-      "ივლ",
-      "აგვ",
-      "სექ",
-      "ოქტ",
-      "ნოე",
-      "დეკ",
-    ];
-    return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
-  };
-
-  const appointmentDateTime = `${formatDate(
+  const appointmentDateTime = `${formatAppointmentDateLong(
     selectedDate as string,
-  )} | ${selectedTime}`;
+    language,
+  )} | ${formatAppointmentTime(selectedTime as string)}`;
 
   const handleMakeAppointment = async () => {
     // Validate home visit address if needed
     if (appointmentType === "home-visit" && !visitAddress.trim()) {
-      Alert.alert("შეცდომა", "გთხოვთ მიუთითოთ ბინაზე ვიზიტის მისამართი");
+      Alert.alert(
+        t("appointments.common.error"),
+        t("appointment.make.addressRequired"),
+      );
       return;
     }
 
-    // Validate problem description
     if (!problemDescription.trim()) {
-      Alert.alert("შეცდომა", "გთხოვთ აღწეროთ პრობლემა");
+      Alert.alert(
+        t("appointments.common.error"),
+        t("appointment.make.complaintsRequired"),
+      );
       return;
     }
 
@@ -398,9 +389,8 @@ const MakeAppointment = () => {
           <Ionicons name="arrow-back" size={22} color="#0F172A" />
         </TouchableOpacity>
         <View style={styles.headerTitles}>
-          <Text style={styles.headerTitle}>ახალი ჯავშანი</Text>
-          <Text style={styles.headerSubtitle}>
-            აირჩიე ტიპი და დაადასტურე ვიზიტი
+          <Text style={styles.headerTitle}>
+            {t("doctors.detail.makeAppointment")}
           </Text>
         </View>
         <View style={styles.placeholder} />
@@ -418,19 +408,7 @@ const MakeAppointment = () => {
               <Image source={doctor.image} style={styles.doctorImage} />
             </View>
             <View style={styles.doctorInfo}>
-              <View style={styles.doctorNameRow}>
-                <Text style={styles.doctorName}>{displayDoctor?.name}</Text>
-                <View style={styles.ratingContainer}>
-                  {[...Array(5)].map((_, index) => (
-                    <Ionicons
-                      key={index}
-                      name="star"
-                      size={16}
-                      color="#FFD700"
-                    />
-                  ))}
-                </View>
-              </View>
+              <Text style={styles.doctorName}>{displayDoctor?.name}</Text>
               <Text style={styles.specialty}>{doctor.specialization}</Text>
               <Text style={styles.degrees}>{doctor.degrees}</Text>
               <View style={styles.dateTimeRow}>
@@ -512,8 +490,6 @@ const MakeAppointment = () => {
 
         {/* Appointment Type */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>კონსულტაციის ტიპი</Text>
-
           {isLockedType ? (
             <View style={styles.typeSelectorContainer}>
               <View style={[styles.typeChip, styles.typeChipActive]}>
@@ -528,8 +504,8 @@ const MakeAppointment = () => {
                 />
                 <Text style={[styles.typeChipText, styles.typeChipTextActive]}>
                   {appointmentType === "home-visit"
-                    ? "ბინაზე ვიზიტი"
-                    : "ვიდეო კონსულტაცია"}
+                    ? t("appointment.make.homeVisit")
+                    : t("appointments.type.videoConsultation")}
                 </Text>
               </View>
             </View>
@@ -553,7 +529,7 @@ const MakeAppointment = () => {
                     appointmentType === "video" && styles.typeChipTextActive,
                   ]}
                 >
-                  ვიდეო კონსულტაცია
+                  {t("appointments.type.videoConsultation")}
                 </Text>
               </TouchableOpacity>
 
@@ -578,7 +554,7 @@ const MakeAppointment = () => {
                       styles.typeChipTextActive,
                   ]}
                 >
-                  ბინაზე ვიზიტი
+                  {t("appointment.make.homeVisit")}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -586,10 +562,12 @@ const MakeAppointment = () => {
 
           {appointmentType === "home-visit" && (
             <View style={{ marginTop: 16 }}>
-              <Text style={styles.fieldLabel}>ვიზიტის მისამართი</Text>
+              <Text style={styles.fieldLabel}>
+                {t("appointment.make.homeAddress")}
+              </Text>
               <TextInput
                 style={styles.addressInput}
-                placeholder="მაგ: თბილისი, ჭავჭავაძის გამზირი 15, ბინა 12"
+                placeholder={t("appointment.make.homeAddressPlaceholder")}
                 placeholderTextColor="#9CA3AF"
                 value={visitAddress}
                 onChangeText={setVisitAddress}
@@ -601,13 +579,15 @@ const MakeAppointment = () => {
 
         {/* Problem Description Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>ჩივილები </Text>
+          <Text style={styles.sectionTitle}>
+            {t("appointment.make.complaints")}
+          </Text>
           <Text style={styles.sectionSubtitle}>
-            აღწერეთ თქვენი პრობლემა ან სიმპტომები დეტალურად
+            {t("appointment.make.complaintsHint")}
           </Text>
           <TextInput
             style={styles.problemInput}
-            placeholder="მაგ: თავის ტკივილი, ტემპერატურა, სხვა სიმპტომები..."
+            placeholder={t("appointment.make.complaintsPlaceholder")}
             placeholderTextColor="#9CA3AF"
             value={problemDescription}
             onChangeText={setProblemDescription}
@@ -620,10 +600,7 @@ const MakeAppointment = () => {
         {/* File Upload Section - რამდენიმე დოკუმენტი */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>
-            დოკუმენტების დამატება (არასავალდებულო)
-          </Text>
-          <Text style={styles.sectionSubtitle}>
-            შეგიძლიათ დაურთოთ რამდენიმე ფოტო ან დოკუმენტი (მაქს. {MAX_FILES})
+            {t("appointment.make.uploadFiles")}
           </Text>
 
           {uploadedFiles.length > 0 && (
@@ -680,36 +657,13 @@ const MakeAppointment = () => {
                   <Ionicons name="attach-outline" size={24} color="#0EA5E9" />
                   <Text style={styles.fileUploadButtonText}>
                     {uploadedFiles.length === 0
-                      ? "ფაილის არჩევა"
-                      : "კიდევ ფაილის დამატება"}
+                      ? t("appointment.make.selectFile")
+                      : t("appointment.make.addMoreFiles")}
                   </Text>
                 </>
               )}
             </TouchableOpacity>
           )}
-        </View>
-
-        {/* Payment Details */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>გადახდის დეტალები</Text>
-
-          <View style={styles.paymentRow}>
-            <Text style={styles.netAmountLabel}>საერთო თანხა</Text>
-            <Text style={styles.netAmountValue}>{netAmount} ₾</Text>
-          </View>
-
-          {/* <View style={styles.promoCodeContainer}>
-            <TextInput
-              style={styles.promoCodeInput}
-              placeholder="გაქვთ პრომო კოდი?"
-              placeholderTextColor="#999999"
-              value={promoCode}
-              onChangeText={setPromoCode}
-            />
-            <TouchableOpacity style={styles.applyButton}>
-              <Text style={styles.applyButtonText}>გამოყენება</Text>
-            </TouchableOpacity>
-          </View> */}
         </View>
 
         {/* Payment Method - Temporarily hidden, payment will be handled later */}
@@ -739,7 +693,9 @@ const MakeAppointment = () => {
           onPress={handleMakeAppointment}
           disabled={loading}
         >
-          <Text style={styles.makeAppointmentButtonText}>ჯავშნის გაკეთება</Text>
+          <Text style={styles.makeAppointmentButtonText}>
+            {t("doctors.detail.makeAppointment")}
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

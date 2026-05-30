@@ -338,7 +338,10 @@ export default function DoctorAppointments() {
       });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      Alert.alert(t("appointments.common.error"), msg || t("doctor.appointments.pdfActionFailed"));
+      Alert.alert(
+        t("appointments.common.error"),
+        msg || t("doctor.appointments.pdfActionFailed"),
+      );
     } finally {
       setMisPdfLoading(false);
     }
@@ -759,7 +762,10 @@ export default function DoctorAppointments() {
       });
     } catch (error: any) {
       console.error("Error opening file:", error);
-      Alert.alert(t("appointments.common.error"), error?.message || t("doctor.appointments.fileOpenFailed"));
+      Alert.alert(
+        t("appointments.common.error"),
+        error?.message || t("doctor.appointments.fileOpenFailed"),
+      );
     }
   };
 
@@ -818,7 +824,10 @@ export default function DoctorAppointments() {
       setDownloadingPreview(true);
       const canShare = await Sharing.isAvailableAsync();
       if (!canShare) {
-        Alert.alert(t("appointments.common.note"), t("appointments.documents.downloadUnavailable"));
+        Alert.alert(
+          t("appointments.common.note"),
+          t("appointments.documents.downloadUnavailable"),
+        );
         return;
       }
 
@@ -853,7 +862,10 @@ export default function DoctorAppointments() {
       });
     } catch (error) {
       console.error("[DoctorAppointments] Failed to download preview:", error);
-      Alert.alert(t("appointments.common.error"), t("appointments.documents.downloadFailed"));
+      Alert.alert(
+        t("appointments.common.error"),
+        t("appointments.documents.downloadFailed"),
+      );
     } finally {
       setDownloadingPreview(false);
     }
@@ -886,7 +898,10 @@ export default function DoctorAppointments() {
       setForm100File(asset);
     } catch (error) {
       console.error("Failed to pick Form 100 file", error);
-      Alert.alert(t("appointments.common.error"), t("doctor.appointments.form100UploadFailed"));
+      Alert.alert(
+        t("appointments.common.error"),
+        t("doctor.appointments.form100UploadFailed"),
+      );
     }
   };
 
@@ -961,7 +976,10 @@ export default function DoctorAppointments() {
       }
     } catch (error) {
       console.error("Patient documents picker error:", error);
-      Alert.alert(t("appointments.common.error"), t("doctor.appointments.filesPickFailed"));
+      Alert.alert(
+        t("appointments.common.error"),
+        t("doctor.appointments.filesPickFailed"),
+      );
     }
   };
 
@@ -993,7 +1011,8 @@ export default function DoctorAppointments() {
       const accepted: PendingPatientUploadAsset[] = [];
 
       result.assets.forEach((a, index) => {
-        const label = a.fileName || `${t("doctor.appointments.imageDefault")} ${index + 1}`;
+        const label =
+          a.fileName || `${t("doctor.appointments.imageDefault")} ${index + 1}`;
         const size = a.fileSize ?? undefined;
         if (size && size > APPOINTMENT_PATIENT_DOC_MAX_SIZE) {
           rejected.push(label);
@@ -1037,7 +1056,10 @@ export default function DoctorAppointments() {
       }
     } catch (error) {
       console.error("Gallery picker error:", error);
-      Alert.alert(t("appointments.common.error"), t("doctor.appointments.galleryOpenFailed"));
+      Alert.alert(
+        t("appointments.common.error"),
+        t("doctor.appointments.galleryOpenFailed"),
+      );
     }
   };
 
@@ -1572,9 +1594,7 @@ export default function DoctorAppointments() {
         console.warn("[DoctorAppointments] getMisPrintForms before save", e);
       }
       if (!hasForm100ForVisitCompletion(consultationForForm100Check)) {
-        alert(
-          t("doctor.appointments.form100Required"),
-        );
+        alert(t("doctor.appointments.form100Required"));
         return;
       }
     }
@@ -1831,9 +1851,7 @@ export default function DoctorAppointments() {
       resetAppointmentForm();
     } catch (error: any) {
       console.error("Failed to save appointment summary", error);
-      alert(
-        error?.message || t("doctor.appointments.savePrescriptionFailed"),
-      );
+      alert(error?.message || t("doctor.appointments.savePrescriptionFailed"));
     } finally {
       setSavingAppointment(false);
     }
@@ -2138,12 +2156,15 @@ export default function DoctorAppointments() {
                                     size={12}
                                     color="#EF4444"
                                   />
-                                  <Text style={styles.soonText}>{t("doctor.appointments.soon")}</Text>
+                                  <Text style={styles.soonText}>
+                                    {t("doctor.appointments.soon")}
+                                  </Text>
                                 </View>
                               )}
                           </View>
                           <Text style={styles.patientAge}>
-                            {consultation.patientAge} {t("doctor.appointments.yearsOld")} •{" "}
+                            {consultation.patientAge}{" "}
+                            {t("doctor.appointments.yearsOld")} •{" "}
                             {getLocalizedTypeLabel(consultation.type)}
                           </Text>
                         </View>
@@ -2258,6 +2279,21 @@ export default function DoctorAppointments() {
                           </Text>
                         </View>
                       )}
+                      {consultation.type === "home-visit" &&
+                        ((consultation as any).visitAddress ||
+                          consultation.patientDetails?.address) && (
+                          <View style={styles.infoRow}>
+                            <Ionicons
+                              name="location-outline"
+                              size={16}
+                              color="#10B981"
+                            />
+                            <Text style={styles.infoText}>
+                              {(consultation as any).visitAddress ||
+                                consultation.patientDetails?.address}
+                            </Text>
+                          </View>
+                        )}
                       {/* Symptoms and Diagnosis - Show only indicators if completed, full text if not completed */}
                       {consultation.status === "completed" ? (
                         <>
@@ -2417,7 +2453,8 @@ export default function DoctorAppointments() {
                                       </Text>
                                       {test.clinicName && (
                                         <Text style={styles.testNotes}>
-                                          {t("appointments.tests.clinic")}: {test.clinicName}
+                                          {t("appointments.tests.clinic")}:{" "}
+                                          {test.clinicName}
                                         </Text>
                                       )}
                                     </View>
@@ -2733,92 +2770,95 @@ export default function DoctorAppointments() {
                               styles.statusActionButtonComplete,
                             ]}
                             onPress={async () => {
-                            let merged: Consultation & Record<string, unknown> =
-                              consultation as Consultation &
-                                Record<string, unknown>;
-                            try {
-                              const ar = await apiService.getAppointmentById(
-                                consultation.id,
-                              );
-                              if (ar.success && ar.data) {
-                                merged = {
-                                  ...consultation,
-                                  ...(ar.data as Record<string, unknown>),
-                                } as Consultation & Record<string, unknown>;
-                              }
-                            } catch {
-                              /* ignore */
-                            }
-                            if (
-                              !hasForm100ForVisitCompletion(
-                                merged as Consultation,
-                              )
-                            ) {
-                              Alert.alert(
-                                t("doctor.appointments.form100HisTitle"),
-                                t("doctor.appointments.form100HisMessage"),
-                              );
-                              return;
-                            }
-                            const sid = String(
-                              (merged as any).misGeneratedServiceId ?? "",
-                            ).trim();
-                            if (!sid) {
+                              let merged: Consultation &
+                                Record<string, unknown> =
+                                consultation as Consultation &
+                                  Record<string, unknown>;
                               try {
-                                const response =
-                                  await apiService.completeConsultation(
-                                    consultation.id,
-                                  );
-                                if (response.success) {
-                                  Alert.alert(
-                                    t("appointments.common.success"),
-                                    t("doctor.appointments.markedAsConducted"),
-                                  );
-                                  setFilterStatus("completed");
-                                  router.setParams({
-                                    status: "completed",
-                                    appointmentId: undefined,
-                                  });
-                                  await fetchConsultations();
-                                } else {
+                                const ar = await apiService.getAppointmentById(
+                                  consultation.id,
+                                );
+                                if (ar.success && ar.data) {
+                                  merged = {
+                                    ...consultation,
+                                    ...(ar.data as Record<string, unknown>),
+                                  } as Consultation & Record<string, unknown>;
+                                }
+                              } catch {
+                                /* ignore */
+                              }
+                              if (
+                                !hasForm100ForVisitCompletion(
+                                  merged as Consultation,
+                                )
+                              ) {
+                                Alert.alert(
+                                  t("doctor.appointments.form100HisTitle"),
+                                  t("doctor.appointments.form100HisMessage"),
+                                );
+                                return;
+                              }
+                              const sid = String(
+                                (merged as any).misGeneratedServiceId ?? "",
+                              ).trim();
+                              if (!sid) {
+                                try {
+                                  const response =
+                                    await apiService.completeConsultation(
+                                      consultation.id,
+                                    );
+                                  if (response.success) {
+                                    Alert.alert(
+                                      t("appointments.common.success"),
+                                      t(
+                                        "doctor.appointments.markedAsConducted",
+                                      ),
+                                    );
+                                    setFilterStatus("completed");
+                                    router.setParams({
+                                      status: "completed",
+                                      appointmentId: undefined,
+                                    });
+                                    await fetchConsultations();
+                                  } else {
+                                    Alert.alert(
+                                      t("appointments.common.error"),
+                                      response.message ||
+                                        t(
+                                          "doctor.appointments.operationFailed",
+                                        ),
+                                    );
+                                  }
+                                } catch (err: any) {
                                   Alert.alert(
                                     t("appointments.common.error"),
-                                    response.message ||
-                                      t(
-                                        "doctor.appointments.operationFailed",
-                                      ),
+                                    err.message ||
+                                      t("doctor.appointments.operationFailed"),
                                   );
                                 }
-                              } catch (err: any) {
-                                Alert.alert(
-                                  t("appointments.common.error"),
-                                  err.message ||
-                                    t("doctor.appointments.operationFailed"),
-                                );
+                                return;
                               }
-                              return;
-                            }
-                            setPendingCompleteConsultation(
-                              merged as Consultation,
-                            );
-                            setShowMisCompletePreviewModal(true);
-                            await loadMisPrintFormsForConsultation(
-                              consultation.id,
-                            );
-                          }}
-                        >
-                          <Ionicons
-                            name="checkmark-circle"
-                            size={16}
-                            color="#10B981"
-                          />
-                          <Text
-                            style={styles.statusActionTextComplete}
-                            numberOfLines={1}
+                              setPendingCompleteConsultation(
+                                merged as Consultation,
+                              );
+                              setShowMisCompletePreviewModal(true);
+                              await loadMisPrintFormsForConsultation(
+                                consultation.id,
+                              );
+                            }}
                           >
-                            {t("doctor.appointments.conducted")}
-                          </Text>
-                        </TouchableOpacity>
+                            <Ionicons
+                              name="checkmark-circle"
+                              size={16}
+                              color="#10B981"
+                            />
+                            <Text
+                              style={styles.statusActionTextComplete}
+                              numberOfLines={1}
+                            >
+                              {t("doctor.appointments.conducted")}
+                            </Text>
+                          </TouchableOpacity>
                         )}
                     </View>
                   </View>
@@ -2841,7 +2881,9 @@ export default function DoctorAppointments() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{t("appointments.details.title")}</Text>
+              <Text style={styles.modalTitle}>
+                {t("appointments.details.title")}
+              </Text>
               <TouchableOpacity
                 onPress={() => setShowDetailsModal(false)}
                 style={styles.closeButton}
@@ -2878,7 +2920,9 @@ export default function DoctorAppointments() {
 
                   <View style={styles.patientInfoCard}>
                     <View style={styles.patientInfoRow}>
-                      <Text style={styles.patientInfoLabel}>{t("doctor.appointments.firstName")}</Text>
+                      <Text style={styles.patientInfoLabel}>
+                        {t("doctor.appointments.firstName")}
+                      </Text>
                       <Text style={styles.patientInfoValue}>
                         {(selectedConsultation as any).patientDetails?.name ||
                           selectedConsultation.patientName ||
@@ -2888,7 +2932,9 @@ export default function DoctorAppointments() {
 
                     {(selectedConsultation as any).patientDetails?.lastName && (
                       <View style={styles.patientInfoRow}>
-                        <Text style={styles.patientInfoLabel}>{t("doctor.appointments.lastName")}</Text>
+                        <Text style={styles.patientInfoLabel}>
+                          {t("doctor.appointments.lastName")}
+                        </Text>
                         <Text style={styles.patientInfoValue}>
                           {
                             (selectedConsultation as any).patientDetails
@@ -2915,7 +2961,9 @@ export default function DoctorAppointments() {
 
                     {(selectedConsultation as any).patientDetails?.address && (
                       <View style={styles.patientInfoRow}>
-                        <Text style={styles.patientInfoLabel}>{t("doctor.appointments.addressLabel")}</Text>
+                        <Text style={styles.patientInfoLabel}>
+                          {t("doctor.appointments.addressLabel")}
+                        </Text>
                         <Text style={styles.patientInfoValue}>
                           {(selectedConsultation as any).patientDetails.address}
                         </Text>
@@ -2930,7 +2978,9 @@ export default function DoctorAppointments() {
                         {((selectedConsultation as any).patientEmail ||
                           (selectedConsultation as any).patientId?.email) && (
                           <View style={styles.patientInfoRow}>
-                            <Text style={styles.patientInfoLabel}>{t("doctor.appointments.emailLabel")}</Text>
+                            <Text style={styles.patientInfoLabel}>
+                              {t("doctor.appointments.emailLabel")}
+                            </Text>
                             <Text style={styles.patientInfoValue}>
                               {(selectedConsultation as any).patientEmail ||
                                 (selectedConsultation as any).patientId?.email}
@@ -2943,28 +2993,37 @@ export default function DoctorAppointments() {
                 </View>
 
                 <View style={styles.detailSection}>
-                  <Text style={styles.detailLabel}>{t("doctor.appointments.patient")}</Text>
+                  <Text style={styles.detailLabel}>
+                    {t("doctor.appointments.patient")}
+                  </Text>
                   <Text style={styles.detailValue}>
                     {selectedConsultation.patientName}
                   </Text>
                 </View>
 
                 <View style={styles.detailSection}>
-                  <Text style={styles.detailLabel}>{t("doctor.appointments.age")}</Text>
+                  <Text style={styles.detailLabel}>
+                    {t("doctor.appointments.age")}
+                  </Text>
                   <Text style={styles.detailValue}>
-                    {selectedConsultation.patientAge} {t("doctor.appointments.years")}
+                    {selectedConsultation.patientAge}{" "}
+                    {t("doctor.appointments.years")}
                   </Text>
                 </View>
 
                 <View style={styles.detailSection}>
-                  <Text style={styles.detailLabel}>{t("appointments.details.dateTime")}</Text>
+                  <Text style={styles.detailLabel}>
+                    {t("appointments.details.dateTime")}
+                  </Text>
                   <Text style={styles.detailValue}>
                     {selectedConsultation.date} • {selectedConsultation.time}
                   </Text>
                 </View>
 
                 <View style={styles.detailSection}>
-                  <Text style={styles.detailLabel}>{t("appointments.details.type")}</Text>
+                  <Text style={styles.detailLabel}>
+                    {t("appointments.details.type")}
+                  </Text>
                   <Text style={styles.detailValue}>
                     {getLocalizedTypeLabel(selectedConsultation.type)}
                   </Text>
@@ -2973,7 +3032,9 @@ export default function DoctorAppointments() {
                 {selectedConsultation.type === "home-visit" &&
                   (selectedConsultation as any).visitAddress && (
                     <View style={styles.detailSection}>
-                      <Text style={styles.detailLabel}>{t("doctor.appointments.visitAddress")}</Text>
+                      <Text style={styles.detailLabel}>
+                        {t("doctor.appointments.visitAddress")}
+                      </Text>
                       <Text style={styles.detailValue}>
                         {(selectedConsultation as any).visitAddress}
                       </Text>
@@ -2982,7 +3043,9 @@ export default function DoctorAppointments() {
 
                 {selectedConsultation.symptoms && (
                   <View style={styles.detailSection}>
-                    <Text style={styles.detailLabel}>{t("doctor.appointments.symptoms")}</Text>
+                    <Text style={styles.detailLabel}>
+                      {t("doctor.appointments.symptoms")}
+                    </Text>
                     <Text style={styles.detailValue}>
                       {selectedConsultation.symptoms}
                     </Text>
@@ -3035,7 +3098,8 @@ export default function DoctorAppointments() {
                               </Text>
                               {test.resultFile?.name && (
                                 <Text style={styles.laboratoryTestMeta}>
-                                  {t("doctor.appointments.uploadedResult")} • {test.resultFile.name}
+                                  {t("doctor.appointments.uploadedResult")} •{" "}
+                                  {test.resultFile.name}
                                 </Text>
                               )}
                             </View>
@@ -3096,7 +3160,8 @@ export default function DoctorAppointments() {
                                 )}
                                 {test.resultFile?.name && (
                                   <Text style={styles.laboratoryTestMeta}>
-                                    {t("doctor.appointments.uploadedResult")} • {test.resultFile.name}
+                                    {t("doctor.appointments.uploadedResult")} •{" "}
+                                    {test.resultFile.name}
                                   </Text>
                                 )}
                               </View>
@@ -3159,7 +3224,9 @@ export default function DoctorAppointments() {
 
                 {selectedConsultation.form100?.pdfUrl && (
                   <View style={styles.detailSection}>
-                    <Text style={styles.detailLabel}>{t("doctor.appointments.form100Name")}</Text>
+                    <Text style={styles.detailLabel}>
+                      {t("doctor.appointments.form100Name")}
+                    </Text>
                     <TouchableOpacity
                       style={styles.viewFileButton}
                       onPress={() =>
@@ -3216,7 +3283,8 @@ export default function DoctorAppointments() {
                             style={styles.viewFileButtonText}
                             numberOfLines={1}
                           >
-                            {truncateFileName(doc.name) || t("doctor.appointments.viewFile")}
+                            {truncateFileName(doc.name) ||
+                              t("doctor.appointments.viewFile")}
                           </Text>
                           <Ionicons
                             name="open-outline"
@@ -3373,7 +3441,9 @@ export default function DoctorAppointments() {
                 style={styles.modalButton}
                 onPress={() => setShowDetailsModal(false)}
               >
-                <Text style={styles.modalButtonText}>{t("common.actions.close")}</Text>
+                <Text style={styles.modalButtonText}>
+                  {t("common.actions.close")}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -3418,9 +3488,6 @@ export default function DoctorAppointments() {
                   (selectedConsultation as any)?.misGeneratedServiceId ?? "",
                 ).trim() ? (
                   <View style={styles.misFormsWrap}>
-                    <Text style={styles.misFormsTitle}>
-                      {t("doctor.appointments.hisFormsTitle")}
-                    </Text>
                     {misHisLoading ? (
                       <View style={styles.misFormsLoadingBox}>
                         <ActivityIndicator color="#06B6D4" />
@@ -3703,7 +3770,10 @@ export default function DoctorAppointments() {
                           style={styles.scheduleButton}
                           onPress={async () => {
                             if (!user?.id) {
-                              Alert.alert(t("appointments.common.error"), t("doctor.appointments.doctorIdNotFound"));
+                              Alert.alert(
+                                t("appointments.common.error"),
+                                t("doctor.appointments.doctorIdNotFound"),
+                              );
                               return;
                             }
 
@@ -3880,7 +3950,9 @@ export default function DoctorAppointments() {
                           </Text>
                           <TextInput
                             style={styles.medicationDetailInput}
-                            placeholder={t("doctor.appointments.dosePlaceholder")}
+                            placeholder={t(
+                              "doctor.appointments.dosePlaceholder",
+                            )}
                             placeholderTextColor="#9CA3AF"
                             value={med.dosage}
                             onChangeText={(text) => {
@@ -3901,7 +3973,9 @@ export default function DoctorAppointments() {
                           </Text>
                           <TextInput
                             style={styles.medicationDetailInput}
-                            placeholder={t("doctor.appointments.frequencyPlaceholder")}
+                            placeholder={t(
+                              "doctor.appointments.frequencyPlaceholder",
+                            )}
                             placeholderTextColor="#9CA3AF"
                             value={med.frequency}
                             onChangeText={(text) => {
@@ -3922,7 +3996,9 @@ export default function DoctorAppointments() {
                           </Text>
                           <TextInput
                             style={styles.medicationDetailInput}
-                            placeholder={t("doctor.appointments.durationPlaceholder")}
+                            placeholder={t(
+                              "doctor.appointments.durationPlaceholder",
+                            )}
                             placeholderTextColor="#9CA3AF"
                             value={med.duration}
                             onChangeText={(text) => {
@@ -3999,7 +4075,8 @@ export default function DoctorAppointments() {
                             </Text>
                             {test.resultFile?.name && (
                               <Text style={styles.clinicNameText}>
-                                {t("doctor.appointments.uploadedResult")}: {test.resultFile.name}
+                                {t("doctor.appointments.uploadedResult")}:{" "}
+                                {test.resultFile.name}
                               </Text>
                             )}
                           </View>
@@ -4025,7 +4102,9 @@ export default function DoctorAppointments() {
                     {loadingLaboratoryData && (
                       <View style={styles.loadingContainer}>
                         <ActivityIndicator size="small" color="#06B6D4" />
-                        <Text style={styles.loadingText}>{t("doctor.appointments.loadingShort")}</Text>
+                        <Text style={styles.loadingText}>
+                          {t("doctor.appointments.loadingShort")}
+                        </Text>
                       </View>
                     )}
                   </View>
@@ -4107,7 +4186,9 @@ export default function DoctorAppointments() {
                           size={20}
                           color="#06B6D4"
                         />
-                        <Text style={styles.addMedicationText}>{t("doctor.appointments.gallery")}</Text>
+                        <Text style={styles.addMedicationText}>
+                          {t("doctor.appointments.gallery")}
+                        </Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -4148,9 +4229,6 @@ export default function DoctorAppointments() {
 
                 <View style={styles.formSection}>
                   <Text style={styles.formLabel}>
-                    {t("doctor.appointments.notes")}
-                  </Text>
-                  <Text style={styles.patientDocsHint}>
                     {t("doctor.appointments.notesHint")}
                   </Text>
                   <TextInput
@@ -4208,7 +4286,9 @@ export default function DoctorAppointments() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, styles.misPreviewModalContent]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{t("doctor.appointments.hisFormsBeforeComplete")}</Text>
+              <Text style={styles.modalTitle}>
+                {t("doctor.appointments.hisFormsBeforeComplete")}
+              </Text>
               <TouchableOpacity
                 onPress={() => {
                   setShowMisCompletePreviewModal(false);
@@ -4386,7 +4466,9 @@ export default function DoctorAppointments() {
                   setMisHisError(null);
                 }}
               >
-                <Text style={styles.modalButtonTextSecondary}>{t("common.actions.close")}</Text>
+                <Text style={styles.modalButtonTextSecondary}>
+                  {t("common.actions.close")}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[
@@ -4433,14 +4515,15 @@ export default function DoctorAppointments() {
                     } else {
                       Alert.alert(
                         t("appointments.common.error"),
-                        response.message || t("doctor.appointments.operationFailed"),
+                        response.message ||
+                          t("doctor.appointments.operationFailed"),
                       );
                     }
                   } catch (err: unknown) {
                     const msg =
                       err instanceof Error
                         ? err.message
-                         : t("doctor.appointments.operationFailed");
+                        : t("doctor.appointments.operationFailed");
                     Alert.alert(t("appointments.common.error"), msg);
                   }
                 }}
@@ -4464,7 +4547,8 @@ export default function DoctorAppointments() {
           <View style={styles.documentPreviewModalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {selectedDocumentPreview?.name || t("appointments.documents.viewTitle")}
+                {selectedDocumentPreview?.name ||
+                  t("appointments.documents.viewTitle")}
               </Text>
               <View style={styles.previewHeaderActions}>
                 <TouchableOpacity
@@ -4481,7 +4565,9 @@ export default function DoctorAppointments() {
                         size={16}
                         color="#FFFFFF"
                       />
-                      <Text style={styles.downloadButtonText}>{t("appointments.documents.download")}</Text>
+                      <Text style={styles.downloadButtonText}>
+                        {t("appointments.documents.download")}
+                      </Text>
                     </>
                   )}
                 </TouchableOpacity>
@@ -4526,7 +4612,9 @@ export default function DoctorAppointments() {
             <View style={styles.successModalIconContainer}>
               <Ionicons name="checkmark-circle" size={64} color="#10B981" />
             </View>
-            <Text style={styles.successModalTitle}>{t("doctor.appointments.saved")}</Text>
+            <Text style={styles.successModalTitle}>
+              {t("doctor.appointments.saved")}
+            </Text>
             <Text style={styles.successModalMessage}>
               {t("doctor.appointments.prescriptionSaved")}
             </Text>
@@ -4535,7 +4623,9 @@ export default function DoctorAppointments() {
                 style={[styles.successModalButton, { flex: 1 }]}
                 onPress={() => setShowSuccessModal(false)}
               >
-                <Text style={styles.successModalButtonText}>{t("doctor.appointments.done")}</Text>
+                <Text style={styles.successModalButtonText}>
+                  {t("doctor.appointments.done")}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>

@@ -70,6 +70,14 @@ export class UpdateDoctorDto {
 
   @IsString()
   @IsOptional()
+  aboutEn?: string;
+
+  @IsString()
+  @IsOptional()
+  aboutRu?: string;
+
+  @IsString()
+  @IsOptional()
   location?: string;
 
   @IsEnum(ApprovalStatus)
@@ -101,6 +109,14 @@ export class UpdateDoctorDto {
   @IsString()
   @IsOptional()
   adminNotes?: string;
+
+  @IsString()
+  @IsOptional()
+  adminNotesEn?: string;
+
+  @IsString()
+  @IsOptional()
+  adminNotesRu?: string;
 
   /** საჯარო რეიტინგი (აპში ვარსკვლავებით) — ადმინის მიერ */
   @IsOptional()

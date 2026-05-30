@@ -9,6 +9,7 @@ import {
   doctorNameSearchText,
   getDoctorDisplayName,
 } from "@/app/utils/doctorNameLabel";
+import { getDoctorLocalizedText } from "@/app/utils/doctorLocalizedText";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
@@ -87,7 +88,9 @@ const mapDoctorFromAPI = (
     feeSummary,
     consultationFee: baseFee || undefined,
     followUpFee: doctor.followUpFee ? `${doctor.followUpFee} ₾` : undefined,
-    about: doctor.about || "", // This is "working language" from onboarding
+    about: doctor.about || "",
+    aboutEn: doctor.aboutEn,
+    aboutRu: doctor.aboutRu,
     availabilityTypes: doctor.availabilityTypes || [], // Array of 'video' | 'home-visit'
   };
 };
@@ -209,6 +212,7 @@ const Doctor = () => {
       doctors.map((doctor) => ({
         ...doctor,
         name: getDoctorDisplayName(doctor, language),
+        about: getDoctorLocalizedText(doctor, "about", language),
       })),
     [doctors, language],
   );

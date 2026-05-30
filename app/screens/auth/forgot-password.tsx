@@ -18,6 +18,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { apiService, LoginSelectableUser } from "../../_services/api";
 import OTPModal from "../../components/ui/OTPModal";
 import { useLanguage } from "../../contexts/LanguageContext";
+import { isStrongPassword } from "../../utils/passwordValidation";
 import { showToast } from "../../utils/toast";
 
 export default function ForgotPasswordScreen() {
@@ -30,6 +31,7 @@ export default function ForgotPasswordScreen() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const newPasswordIsStrong = isStrongPassword(newPassword);
   const [resetUsers, setResetUsers] = useState<LoginSelectableUser[]>([]);
   const [selectedResetUserId, setSelectedResetUserId] = useState("");
   const [showAccountSelectionModal, setShowAccountSelectionModal] =
@@ -168,7 +170,7 @@ export default function ForgotPasswordScreen() {
       return;
     }
 
-    if (newPassword.length < 6) {
+    if (!isStrongPassword(newPassword)) {
       showToast.error(
         t("auth.forgotPassword.validation.passwordLength"),
         t("auth.forgotPassword.error.default"),
@@ -347,6 +349,14 @@ export default function ForgotPasswordScreen() {
                           />
                         </TouchableOpacity>
                       </View>
+                      <Text style={styles.passwordHint}>
+                        {t("settings.security.newPasswordHint")}
+                      </Text>
+                      {newPassword.length > 0 && newPasswordIsStrong && (
+                        <Text style={styles.passwordStrengthLabel}>
+                          {t("settings.security.strengthStrong")}
+                        </Text>
+                      )}
                     </View>
 
                     {/* Confirm Password Input */}
@@ -605,6 +615,19 @@ const styles = StyleSheet.create({
   submitButtonDisabled: {
     backgroundColor: "#9CA3AF",
     opacity: 0.7,
+  },
+  passwordHint: {
+    marginTop: 8,
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+    lineHeight: 18,
+  },
+  passwordStrengthLabel: {
+    marginTop: 6,
+    fontSize: 12,
+    fontFamily: "Poppins-SemiBold",
+    color: "#10B981",
   },
   resendButton: {
     alignItems: "center",

@@ -137,6 +137,8 @@ export interface User {
   id: string;
   email: string;
   name: string;
+  nameEn?: string;
+  nameRu?: string;
   role: "doctor" | "patient";
   phone?: string;
   idNumber?: string;
@@ -161,6 +163,8 @@ export interface LoginSelectableUser {
   id: string;
   email: string;
   name: string;
+  nameEn?: string;
+  nameRu?: string;
   role: "doctor" | "patient";
   phone?: string;
   idNumber?: string;
@@ -1202,7 +1206,10 @@ class ApiService {
     });
   }
 
-  async forgotPassword(phone: string, userId?: string): Promise<{
+  async forgotPassword(
+    phone: string,
+    userId?: string,
+  ): Promise<{
     success: boolean;
     message?: string;
     requiresUserSelection?: boolean;
@@ -1961,7 +1968,7 @@ class ApiService {
     if (USE_MOCK_API) {
       return Promise.resolve({
         success: true,
-        message: "გადაჯავშნის მოთხოვნა გაიგზავნა",
+        message: "გადაჯავშნის მოთხოვნა გაგზავნილია",
       });
     }
 
@@ -2792,7 +2799,13 @@ class ApiService {
       | "doctor-service",
   ): Promise<{
     success: boolean;
-    data: { content: string; type: string; updatedAt?: string };
+    data: {
+      content: string;
+      contentEn?: string;
+      contentRu?: string;
+      type: string;
+      updatedAt?: string;
+    };
   }> {
     if (USE_MOCK_API) {
       return Promise.resolve({
@@ -2810,22 +2823,34 @@ class ApiService {
   }
 
   async updateTerms(
-    type: "cancellation" | "service" | "privacy",
-    content: string,
+    type:
+      | "cancellation"
+      | "service"
+      | "privacy"
+      | "contract"
+      | "usage"
+      | "doctor-cancellation"
+      | "doctor-service",
+    data: { content: string; contentEn?: string; contentRu?: string },
   ): Promise<{
     success: boolean;
-    data: { content: string; type: string };
+    data: {
+      content: string;
+      contentEn?: string;
+      contentRu?: string;
+      type: string;
+    };
   }> {
     if (USE_MOCK_API) {
       return Promise.resolve({
         success: true,
-        data: { content, type },
+        data: { ...data, type },
       });
     }
 
     return this.apiCall(`/terms/${type}`, {
       method: "PUT",
-      body: JSON.stringify({ content }),
+      body: JSON.stringify(data),
     });
   }
 

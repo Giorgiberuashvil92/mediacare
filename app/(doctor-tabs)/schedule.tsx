@@ -1754,9 +1754,6 @@ export default function DoctorSchedule() {
             <Ionicons name="information-circle" size={24} color="#06B6D4" />
           </View>
           <View style={styles.instructionContent}>
-            <Text style={styles.instructionTitle}>
-              {t("doctor.schedule.howToUse")}
-            </Text>
             <Text style={styles.instructionText}>
               {t("doctor.schedule.instructionText")}
             </Text>
@@ -1849,7 +1846,9 @@ export default function DoctorSchedule() {
                     >
                       {today && (
                         <View style={styles.todayBadge}>
-                          <Text style={styles.todayBadgeText}>{t("doctor.schedule.today")}</Text>
+                          <Text style={styles.todayBadgeText}>
+                            {t("doctor.schedule.today")}
+                          </Text>
                         </View>
                       )}
                       <Text
@@ -2059,7 +2058,9 @@ export default function DoctorSchedule() {
                 <Ionicons name="hourglass" size={28} color="#FFFFFF" />
               </View>
               <View style={styles.floatingButtonTextContainer}>
-                <Text style={styles.floatingButtonText}>{t("doctor.schedule.saving")}</Text>
+                <Text style={styles.floatingButtonText}>
+                  {t("doctor.schedule.saving")}
+                </Text>
                 <Text style={styles.floatingButtonSubtext}>
                   {t("doctor.schedule.pleaseWait")}
                 </Text>
@@ -2101,8 +2102,12 @@ export default function DoctorSchedule() {
             <View style={styles.successIconContainer}>
               <Ionicons name="checkmark-circle" size={48} color="#10B981" />
             </View>
-            <Text style={styles.successTitle}>{t("doctor.schedule.saveSuccessTitle")}</Text>
-            <Text style={styles.successSubtitle}>{t("doctor.schedule.saveSuccessSubtitle")}</Text>
+            <Text style={styles.successTitle}>
+              {t("doctor.schedule.saveSuccessTitle")}
+            </Text>
+            <Text style={styles.successSubtitle}>
+              {t("doctor.schedule.saveSuccessSubtitle")}
+            </Text>
           </View>
         </View>
       )}
@@ -2117,7 +2122,9 @@ export default function DoctorSchedule() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{t("doctor.schedule.timeSelection")}</Text>
+              <Text style={styles.modalTitle}>
+                {t("doctor.schedule.timeSelection")}
+              </Text>
               <TouchableOpacity
                 style={styles.closeButton}
                 onPress={() => setShowTimeModal(false)}
@@ -2519,7 +2526,9 @@ export default function DoctorSchedule() {
                 style={styles.doneButton}
                 onPress={() => setShowTimeModal(false)}
               >
-                <Text style={styles.doneButtonText}>{t("doctor.schedule.confirm")}</Text>
+                <Text style={styles.doneButtonText}>
+                  {t("doctor.schedule.confirm")}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -2539,7 +2548,9 @@ export default function DoctorSchedule() {
               <View style={styles.clearModalIconContainer}>
                 <Ionicons name="alert-circle" size={32} color="#EF4444" />
               </View>
-              <Text style={styles.clearModalTitle}>{t("doctor.schedule.clearTitle")}</Text>
+              <Text style={styles.clearModalTitle}>
+                {t("doctor.schedule.clearTitle")}
+              </Text>
               <Text style={styles.clearModalText}>
                 {Object.keys(bookedSlots).length > 0
                   ? t("doctor.schedule.clearWithBooked")
@@ -2551,13 +2562,17 @@ export default function DoctorSchedule() {
                 style={styles.clearModalCancelButton}
                 onPress={() => setShowClearConfirmModal(false)}
               >
-                <Text style={styles.clearModalCancelText}>{t("doctor.schedule.cancel")}</Text>
+                <Text style={styles.clearModalCancelText}>
+                  {t("doctor.schedule.cancel")}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.clearModalConfirmButton}
                 onPress={handleClearSchedule}
               >
-                <Text style={styles.clearModalConfirmText}>{t("doctor.schedule.clear")}</Text>
+                <Text style={styles.clearModalConfirmText}>
+                  {t("doctor.schedule.clear")}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -2580,7 +2595,9 @@ export default function DoctorSchedule() {
               <View style={styles.clearModalIconContainer}>
                 <Ionicons name="alert-circle" size={32} color="#EF4444" />
               </View>
-              <Text style={styles.clearModalTitle}>{t("doctor.schedule.deleteDateTitle")}</Text>
+              <Text style={styles.clearModalTitle}>
+                {t("doctor.schedule.deleteDateTitle")}
+              </Text>
               <Text style={styles.clearModalText}>
                 {dateToDelete &&
                   (() => {
@@ -2609,7 +2626,9 @@ export default function DoctorSchedule() {
                   setDateToDelete(null);
                 }}
               >
-                <Text style={styles.clearModalCancelText}>{t("doctor.schedule.cancel")}</Text>
+                <Text style={styles.clearModalCancelText}>
+                  {t("doctor.schedule.cancel")}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.clearModalConfirmButton}
@@ -2642,7 +2661,9 @@ export default function DoctorSchedule() {
                   setDateToDelete(null);
                 }}
               >
-                <Text style={styles.clearModalConfirmText}>{t("doctor.schedule.delete")}</Text>
+                <Text style={styles.clearModalConfirmText}>
+                  {t("doctor.schedule.delete")}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>

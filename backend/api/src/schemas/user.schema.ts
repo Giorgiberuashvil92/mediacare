@@ -102,9 +102,15 @@ export class User {
   @Prop()
   contractDocument?: string; // Contract text content as string
 
-  /** ადმინის ჩანაწერი ექიმის შესახებ დეტალურად (მხოლოდ ადმინ პანელში) */
+  /** ადმინის ჩანაწერი ექიმის შესახებ დეტალურად (აპში „ექიმის შესახებ“) */
   @Prop()
   adminNotes?: string;
+
+  @Prop()
+  adminNotesEn?: string;
+
+  @Prop()
+  adminNotesRu?: string;
 
   @Prop()
   degrees?: string;
@@ -126,6 +132,12 @@ export class User {
 
   @Prop()
   about?: string;
+
+  @Prop()
+  aboutEn?: string;
+
+  @Prop()
+  aboutRu?: string;
 
   @Prop()
   location?: string;

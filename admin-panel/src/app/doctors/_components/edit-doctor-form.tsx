@@ -35,6 +35,8 @@ export function EditDoctorForm({
     degrees: doctor.degrees || "",
     experience: doctor.experience || "",
     about: doctor.about || "",
+    aboutEn: doctor.aboutEn || "",
+    aboutRu: doctor.aboutRu || "",
     location: doctor.location || "",
     consultationFee: doctor.consultationFee?.toString() || "",
     followUpFee: doctor.followUpFee?.toString() || "",
@@ -45,7 +47,9 @@ export function EditDoctorForm({
     gender: doctor.gender || "male",
     minWorkingDaysRequired: doctor.minWorkingDaysRequired?.toString() || "",
     contractDocument: (doctor as any).contractDocument || "",
-    adminNotes: (doctor as any).adminNotes || "",
+    adminNotes: doctor.adminNotes || "",
+    adminNotesEn: doctor.adminNotesEn || "",
+    adminNotesRu: doctor.adminNotesRu || "",
     rating:
       doctor.rating !== undefined && doctor.rating !== null
         ? String(doctor.rating)
@@ -155,12 +159,16 @@ export function EditDoctorForm({
         degrees: formData.degrees.trim() || undefined,
         experience: formData.experience.trim() || undefined,
         about: formData.about.trim() || undefined,
+        aboutEn: formData.aboutEn.trim() || undefined,
+        aboutRu: formData.aboutRu.trim() || undefined,
         location: formData.location.trim() || undefined,
         approvalStatus: formData.approvalStatus,
         isActive: formData.isActive,
         gender: formData.gender,
         contractDocument: formData.contractDocument.trim() || undefined,
         adminNotes: formData.adminNotes.trim() || undefined,
+        adminNotesEn: formData.adminNotesEn.trim() || undefined,
+        adminNotesRu: formData.adminNotesRu.trim() || undefined,
       };
 
       // Add license document URL if uploaded
@@ -497,34 +505,85 @@ export function EditDoctorForm({
 
           <div className="mb-5.5">
             <label className="mb-2.5 block text-sm font-medium text-dark dark:text-white">
-              ექიმის შესახებ
+              ექიმის შესახებ (ქართული)
             </label>
             <textarea
               name="about"
               value={formData.about}
               onChange={handleChange}
-              rows={6}
-              placeholder="დაწერე ექიმის შესახებ..."
+              rows={4}
+              placeholder="დაწერე ექიმის შესახებ ქართულად..."
+              className="w-full rounded-lg border border-stroke bg-transparent px-5 py-3 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
+            />
+          </div>
+          <div className="mb-5.5">
+            <label className="mb-2.5 block text-sm font-medium text-dark dark:text-white">
+              ექიმის შესახებ (ინგლისური)
+            </label>
+            <textarea
+              name="aboutEn"
+              value={formData.aboutEn}
+              onChange={handleChange}
+              rows={4}
+              placeholder="About the doctor in English..."
+              className="w-full rounded-lg border border-stroke bg-transparent px-5 py-3 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
+            />
+          </div>
+          <div className="mb-5.5">
+            <label className="mb-2.5 block text-sm font-medium text-dark dark:text-white">
+              ექიმის შესახებ (რუსული)
+            </label>
+            <textarea
+              name="aboutRu"
+              value={formData.aboutRu}
+              onChange={handleChange}
+              rows={4}
+              placeholder="О враче на русском..."
               className="w-full rounded-lg border border-stroke bg-transparent px-5 py-3 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
             />
           </div>
 
           <div className="mb-5.5">
             <label className="mb-2.5 block text-sm font-medium text-dark dark:text-white">
-              ახალი (დეტალურად ექიმის შესახებ)
+              ექიმის შესახებ — დეტალური ჩანაწერი (ქართული)
             </label>
             <textarea
               name="adminNotes"
               value={formData.adminNotes}
               onChange={handleChange}
-              rows={6}
-              placeholder="ჩვენ ვწერთ: დეტალური ჩანაწერი ექიმის შესახებ, ნოტები, შენიშვნები..."
+              rows={4}
+              placeholder="დეტალური ჩანაწერი ექიმის შესახებ..."
               className="w-full rounded-lg border border-stroke bg-transparent px-5 py-3 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
             />
             <p className="mt-2 text-xs text-dark-4 dark:text-dark-6">
-              მხოლოდ ადმინისთვის ხილული ველი — დეტალური ინფორმაცია/ნოტები ექიმის
-              შესახებ.
+              ეს ტექსტი პაციენტის აპში ჩანს „ექიმის შესახებ“ სექციაში.
             </p>
+          </div>
+          <div className="mb-5.5">
+            <label className="mb-2.5 block text-sm font-medium text-dark dark:text-white">
+              ექიმის შესახებ — დეტალური ჩანაწერი (ინგლისური)
+            </label>
+            <textarea
+              name="adminNotesEn"
+              value={formData.adminNotesEn}
+              onChange={handleChange}
+              rows={4}
+              placeholder="Detailed about text in English..."
+              className="w-full rounded-lg border border-stroke bg-transparent px-5 py-3 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
+            />
+          </div>
+          <div className="mb-5.5">
+            <label className="mb-2.5 block text-sm font-medium text-dark dark:text-white">
+              ექიმის შესახებ — დეტალური ჩანაწერი (რუსული)
+            </label>
+            <textarea
+              name="adminNotesRu"
+              value={formData.adminNotesRu}
+              onChange={handleChange}
+              rows={4}
+              placeholder="Подробно о враче на русском..."
+              className="w-full rounded-lg border border-stroke bg-transparent px-5 py-3 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
+            />
           </div>
 
           <div className="mb-5.5 flex flex-col gap-5.5 sm:flex-row">

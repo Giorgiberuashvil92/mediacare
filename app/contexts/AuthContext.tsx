@@ -17,6 +17,36 @@ import {
 } from "../_services/api";
 const ROLE_STORAGE_KEY = "@medicare_user_role";
 
+function profileToUser(profile: {
+  id: string;
+  email: string;
+  name: string;
+  nameEn?: string;
+  nameRu?: string;
+  role: "doctor" | "patient";
+  profileImage?: string;
+  doctorStatus?: "awaiting_schedule" | "active";
+  isActive?: boolean;
+  isVerified?: boolean;
+  approvalStatus?: "pending" | "approved" | "rejected";
+  phone?: string;
+}): User {
+  return {
+    id: profile.id,
+    email: profile.email,
+    name: profile.name,
+    nameEn: profile.nameEn,
+    nameRu: profile.nameRu,
+    role: profile.role,
+    profileImage: profile.profileImage,
+    doctorStatus: profile.doctorStatus,
+    isActive: profile.isActive,
+    isVerified: profile.isVerified,
+    approvalStatus: profile.approvalStatus,
+    phone: profile.phone,
+  };
+}
+
 export type UserRole = "doctor" | "patient" | null;
 
 interface AuthContextType {
@@ -109,18 +139,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const profileResponse = await apiService.getProfile();
         if (profileResponse.success && profileResponse.data) {
           const profile = profileResponse.data;
-          const currentUser: User = {
-            id: profile.id,
-            email: profile.email,
-            name: profile.name,
-            role: profile.role,
-            profileImage: profile.profileImage,
-            doctorStatus: profile.doctorStatus,
-            isActive: profile.isActive,
-            isVerified: profile.isVerified,
-            approvalStatus: profile.approvalStatus,
-            phone: profile.phone,
-          };
+          const currentUser = profileToUser(profile);
           setUser(currentUser);
           setUserRoleState(currentUser.role);
           await AsyncStorage.setItem("user", JSON.stringify(currentUser));
@@ -137,18 +156,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             const profileResponse = await apiService.getProfile();
             if (profileResponse.success && profileResponse.data) {
               const profile = profileResponse.data;
-              const currentUser: User = {
-                id: profile.id,
-                email: profile.email,
-                name: profile.name,
-                role: profile.role,
-                profileImage: profile.profileImage,
-                doctorStatus: profile.doctorStatus,
-                isActive: profile.isActive,
-                isVerified: profile.isVerified,
-                approvalStatus: profile.approvalStatus,
-                phone: profile.phone,
-              };
+              const currentUser = profileToUser(profile);
               setUser(currentUser);
               setUserRoleState(currentUser.role);
               await AsyncStorage.setItem("user", JSON.stringify(currentUser));
@@ -380,17 +388,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const profileResponse = await apiService.getProfile();
       if (profileResponse.success && profileResponse.data) {
-        const updatedUser: User = {
-          id: profileResponse.data.id,
-          email: profileResponse.data.email,
-          name: profileResponse.data.name,
-          role: profileResponse.data.role,
-          profileImage: profileResponse.data.profileImage,
-          doctorStatus: profileResponse.data.doctorStatus,
-          isActive: profileResponse.data.isActive,
-          isVerified: profileResponse.data.isVerified,
-          approvalStatus: profileResponse.data.approvalStatus,
-        };
+        const updatedUser = profileToUser(profileResponse.data);
         setUser(updatedUser);
         await AsyncStorage.setItem("user", JSON.stringify(updatedUser));
       }

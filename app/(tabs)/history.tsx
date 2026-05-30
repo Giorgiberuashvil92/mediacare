@@ -872,17 +872,12 @@ const History = () => {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>{t("history.tab.title")}</Text>
-          <Text style={styles.subtitle}>{t("history.tab.subtitle")}</Text>
         </View>
 
         {/* Search */}
 
         {/* Visits List */}
         <View style={styles.listSection}>
-          <Text style={styles.sectionTitle}>
-            {filteredVisits.length} {t("history.visitCount")}
-          </Text>
-
           {loading ? (
             <View style={styles.loadingState}>
               <ActivityIndicator size="large" color="#06B6D4" />

@@ -569,7 +569,32 @@ export default function EditProfileScreen() {
                 </View>
               </View>
 
-              {/* მისამართი */}
+              {/* მისამართი (პაციენტი) */}
+              {!isDoctor && (
+                <View style={styles.formItem}>
+                  <View style={styles.labelContainer}>
+                    <Ionicons
+                      name="location-outline"
+                      size={20}
+                      color="#06B6D4"
+                    />
+                    <Text style={styles.label}>{t("editProfile.address")}</Text>
+                  </View>
+                  <View
+                    style={[styles.input, styles.inputDisabled]}
+                    pointerEvents="none"
+                  >
+                    <TextInput
+                      style={[styles.textInput, styles.textInputDisabled]}
+                      placeholder={t("editProfile.placeholder.address")}
+                      placeholderTextColor="#9CA3AF"
+                      value={address}
+                      onChangeText={setAddress}
+                      editable={false}
+                    />
+                  </View>
+                </View>
+              )}
 
               {/* დაბადების თარიღი */}
               <View style={styles.formItem}>

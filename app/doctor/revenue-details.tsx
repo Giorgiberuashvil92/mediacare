@@ -55,9 +55,7 @@ interface DashboardStats {
   periodStats?: PeriodStats;
 }
 
-const WEEKDAY_KEYS = [
-  "mon", "tue", "wed", "thu", "fri", "sat", "sun",
-] as const;
+const WEEKDAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 
 function getCalendarGrid(year: number, month: number): (number | null)[] {
   const first = new Date(year, month - 1, 1);
@@ -150,7 +148,9 @@ export default function RevenueDetails() {
             {error || t("doctor.revenue.loadError")}
           </Text>
           <TouchableOpacity style={styles.retryButton} onPress={fetchStats}>
-            <Text style={styles.retryButtonText}>{t("doctor.revenue.retry")}</Text>
+            <Text style={styles.retryButtonText}>
+              {t("doctor.revenue.retry")}
+            </Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -173,13 +173,17 @@ export default function RevenueDetails() {
           >
             <Ionicons name="arrow-back" size={24} color="#1F2937" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t("doctor.profile.statistics")}</Text>
+          <Text style={styles.headerTitle}>
+            {t("doctor.profile.statistics")}
+          </Text>
           <View style={styles.placeholder} />
         </View>
 
         {/* პერიოდი — დან / მდე */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t("doctor.revenue.selectPeriod")}</Text>
+          <Text style={styles.sectionTitle}>
+            {t("doctor.revenue.selectPeriod")}
+          </Text>
           <View style={styles.periodRangeRow}>
             <TouchableOpacity
               style={styles.periodRangeField}
@@ -190,7 +194,9 @@ export default function RevenueDetails() {
                 setCalendarOpenFor("from");
               }}
             >
-              <Text style={styles.periodRangeLabel}>{t("doctor.revenue.from")}</Text>
+              <Text style={styles.periodRangeLabel}>
+                {t("doctor.revenue.from")}
+              </Text>
               <Text style={styles.periodRangeValue}>
                 {formatDateLabel(dateFrom)}
               </Text>
@@ -205,7 +211,9 @@ export default function RevenueDetails() {
                 setCalendarOpenFor("to");
               }}
             >
-              <Text style={styles.periodRangeLabel}>{t("doctor.revenue.to")}</Text>
+              <Text style={styles.periodRangeLabel}>
+                {t("doctor.revenue.to")}
+              </Text>
               <Text style={styles.periodRangeValue}>
                 {formatDateLabel(dateTo)}
               </Text>
@@ -352,11 +360,6 @@ export default function RevenueDetails() {
         <View style={[styles.section, { marginBottom: 24 }]}>
           <Text style={styles.sectionTitle}>{t("doctor.revenue.income")}</Text>
           <View style={styles.revenueCard}>
-            {periodLabel ? (
-              <Text style={styles.revenueLabel}>
-                {periodLabel} — {t("doctor.revenue.yourIncome")}
-              </Text>
-            ) : null}
             <Text style={styles.revenueValue}>
               ₾{(period?.totalEarnings ?? 0).toLocaleString()}
             </Text>

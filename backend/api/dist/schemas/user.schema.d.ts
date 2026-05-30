@@ -44,6 +44,8 @@ export declare class User {
     licenseDocument?: string;
     contractDocument?: string;
     adminNotes?: string;
+    adminNotesEn?: string;
+    adminNotesRu?: string;
     degrees?: string;
     experience?: string;
     consultationFee?: number;
@@ -51,6 +53,8 @@ export declare class User {
     videoConsultationFee?: number;
     homeVisitFee?: number;
     about?: string;
+    aboutEn?: string;
+    aboutRu?: string;
     location?: string;
     rating: number;
     reviewCount: number;

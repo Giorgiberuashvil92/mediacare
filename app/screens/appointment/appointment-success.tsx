@@ -1,41 +1,14 @@
+import { useLanguage } from "@/app/contexts/LanguageContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { router, useLocalSearchParams } from "expo-router";
+import { router } from "expo-router";
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const AppointmentSuccess = () => {
-  const params = useLocalSearchParams();
-  const {
-    doctorId,
-    appointmentId,
-    selectedDate,
-    selectedTime,
-    paymentMethod,
-    patientName,
-    problem,
-    appointmentNumber,
-  } = params;
-
+  const { t } = useLanguage();
   const handleBackToHome = () => {
     router.replace("/(tabs)");
-  };
-
-  const handleViewDetails = () => {
-    // Navigate to appointment details with all available params
-    // Use appointmentId (MongoDB ObjectId) if available, otherwise use appointmentNumber
-    router.push({
-      pathname: "/screens/appointment/appointment-details",
-      params: {
-        doctorId: doctorId as string,
-        appointmentId: (appointmentId as string) || (appointmentNumber as string) || "",
-        selectedDate: selectedDate as string,
-        selectedTime: selectedTime as string,
-        paymentMethod: paymentMethod as string,
-        patientName: patientName as string,
-        problem: problem as string,
-      },
-    });
   };
 
   return (
@@ -52,10 +25,7 @@ const AppointmentSuccess = () => {
         </View>
 
         {/* Success Text */}
-        <Text style={styles.successTitle}>ჯავშანი წარმატებით დაჯავშნა!</Text>
-        <Text style={styles.successMessage}>
-          თქვენი ჯავშანი წარმატებით დაჯავშნა. დეტალები შეგიძლიათ ნახოთ ჯავშნების ჩანართში.
-        </Text>
+        <Text style={styles.successTitle}>{t("appointment.success.title")}</Text>
 
         {/* Action Buttons */}
         <View style={styles.buttonContainer}>
@@ -63,7 +33,9 @@ const AppointmentSuccess = () => {
             style={styles.secondaryButton}
             onPress={handleBackToHome}
           >
-            <Text style={styles.secondaryButtonText}>მთავარზე დაბრუნება</Text>
+            <Text style={styles.secondaryButtonText}>
+              {t("appointment.success.backToHome")}
+            </Text>
           </TouchableOpacity>
 
        
@@ -128,15 +100,7 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins-Bold",
     color: "#333333",
     textAlign: "center",
-    marginBottom: 16,
-  },
-  successMessage: {
-    fontSize: 16,
-    fontFamily: "Poppins-Regular",
-    color: "#666666",
-    textAlign: "center",
-    lineHeight: 24,
-    marginBottom: 60,
+    marginBottom: 48,
   },
   buttonContainer: {
     flexDirection: "row",

@@ -1,5 +1,6 @@
 import { apiService, AppointmentType } from "@/app/_services/api";
 import { useAuth } from "@/app/contexts/AuthContext";
+import { useLanguage } from "@/app/contexts/LanguageContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
@@ -16,15 +17,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import WebView, { WebViewNavigation } from "react-native-webview";
 
-interface PaymentMethod {
-  id: string;
-  name: string;
-  icon: string;
-  color: string;
-}
-
 const PaymentMethods = () => {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const {
     doctorId,
     selectedDate,
@@ -48,30 +43,15 @@ const PaymentMethods = () => {
     uploadedFilePreview: (uploadedFile as string)?.slice(0, 150) ?? "",
   });
 
-  const [selectedMethod, setSelectedMethod] = useState<string>("card");
   const [loading, setLoading] = useState(false);
   const [showPaymentWebView, setShowPaymentWebView] = useState(false);
   const [paymentUrl, setPaymentUrl] = useState<string>("");
   const [paymentOrderId, setPaymentOrderId] = useState<string>("");
 
-  const paymentMethods: PaymentMethod[] = [
-    {
-      id: "card",
-      name: "საბანკო ბარათი",
-      icon: "card-outline",
-      color: "#0EA5E9",
-    },
-  ];
-
   const totalAmount = amount ? parseFloat(amount as string) : 0;
   const consultationFeeAmount = consultationFee
     ? parseFloat(consultationFee as string)
     : totalAmount / 1.05;
-  const vatAmount = Math.round(consultationFeeAmount * 0.05);
-
-  const handlePaymentMethodSelect = (methodId: string) => {
-    setSelectedMethod(methodId);
-  };
 
   const handlePayNow = async () => {
     if (!user) {
@@ -500,7 +480,7 @@ const PaymentMethods = () => {
         >
           <Ionicons name="arrow-back" size={24} color="#333333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>გადახდა</Text>
+        <Text style={styles.headerTitle}>{t("payment.title")}</Text>
         <View style={styles.placeholder} />
       </View>
 
@@ -510,92 +490,20 @@ const PaymentMethods = () => {
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
-        {/* Payment Summary */}
         <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>გადახდის დეტალები</Text>
-
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>კონსულტაციის საფასური</Text>
+            <Text style={styles.summaryLabel}>
+              {t("payment.consultationFee")}
+            </Text>
             <Text style={styles.summaryValue}>{consultationFeeAmount} ₾</Text>
           </View>
-        </View>
-
-        {/* Payment Methods Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>გადახდის მეთოდი</Text>
-          <Text style={styles.sectionSubtitle}>
-            აირჩიეთ თქვენთვის მოსახერხებელი გადახდის მეთოდი
-          </Text>
-
-          <View style={styles.paymentMethodsList}>
-            {paymentMethods.map((method) => (
-              <TouchableOpacity
-                key={method.id}
-                style={[
-                  styles.paymentMethodCard,
-                  selectedMethod === method.id &&
-                    styles.paymentMethodCardActive,
-                ]}
-                onPress={() => handlePaymentMethodSelect(method.id)}
-              >
-                <View style={styles.paymentMethodLeft}>
-                  <View
-                    style={[
-                      styles.paymentIcon,
-                      selectedMethod === method.id && {
-                        backgroundColor: method.color,
-                      },
-                      selectedMethod !== method.id && {
-                        backgroundColor: "#F3F4F6",
-                      },
-                    ]}
-                  >
-                    <Ionicons
-                      name={method.icon as any}
-                      size={24}
-                      color={
-                        selectedMethod === method.id ? "#FFFFFF" : "#6B7280"
-                      }
-                    />
-                  </View>
-                  <Text
-                    style={[
-                      styles.paymentMethodName,
-                      selectedMethod === method.id &&
-                        styles.paymentMethodNameActive,
-                    ]}
-                  >
-                    {method.name}
-                  </Text>
-                </View>
-                <View
-                  style={[
-                    styles.radioButton,
-                    selectedMethod === method.id && styles.radioButtonActive,
-                  ]}
-                >
-                  {selectedMethod === method.id && (
-                    <View style={styles.radioButtonSelected} />
-                  )}
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Security Info */}
-        <View style={styles.securityCard}>
-          <Ionicons name="shield-checkmark" size={20} color="#22C55E" />
-          <Text style={styles.securityText}>
-            ყველა გადახდა დაცულია და დაშიფრულია. თქვენი მონაცემები უსაფრთხოა.
-          </Text>
         </View>
       </ScrollView>
 
       {/* Pay Now Button */}
       <View style={styles.buttonContainer}>
         <View style={styles.amountDisplay}>
-          <Text style={styles.amountLabel}>გადასახდელი თანხა</Text>
+          <Text style={styles.amountLabel}>{t("payment.amountDue")}</Text>
           <Text style={styles.amountValue}>{totalAmount} ₾</Text>
         </View>
 
@@ -619,7 +527,7 @@ const PaymentMethods = () => {
                 style={{ marginRight: 8 }}
               />
               <Text style={styles.bookWithoutPaymentButtonText}>
-                გადახდის გარეშე ჯავშნის გაკეთება
+                {t("payment.bookWithoutPayment")}
               </Text>
             </>
           )}
@@ -640,7 +548,7 @@ const PaymentMethods = () => {
                 color="#FFFFFF"
                 style={{ marginRight: 8 }}
               />
-              <Text style={styles.payNowButtonText}>გადახდა</Text>
+              <Text style={styles.payNowButtonText}>{t("payment.pay")}</Text>
             </>
           )}
         </TouchableOpacity>

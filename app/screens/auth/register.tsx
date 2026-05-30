@@ -30,6 +30,7 @@ import {
   getSpecializationDisplayName,
   getSpecializationLabelByName,
 } from "../../utils/specializationLabel";
+import { isStrongPassword } from "../../utils/passwordValidation";
 import { showToast } from "../../utils/toast";
 
 export default function RegisterScreen() {
@@ -37,6 +38,7 @@ export default function RegisterScreen() {
   const { t, language } = useLanguage();
   const params = useLocalSearchParams();
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const selectedRole: "doctor" | "patient" = userRole || "patient";
@@ -46,6 +48,7 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const passwordIsStrong = isStrongPassword(password);
 
   // Doctor specific fields
   const [selectedSpecializations, setSelectedSpecializations] = useState<
@@ -942,11 +945,8 @@ export default function RegisterScreen() {
       }
     }
 
-    if (password.length < 6) {
-      console.log(
-        "❌ [Register] Password length validation failed:",
-        password.length,
-      );
+    if (!isStrongPassword(password)) {
+      console.log("❌ [Register] Password strength validation failed");
       showToast.error(
         t("auth.register.validation.passwordLength"),
         t("auth.register.error.default"),
@@ -954,10 +954,12 @@ export default function RegisterScreen() {
       return;
     }
 
-    // Password confirmation validation
     if (password !== confirmPassword) {
       console.log("❌ [Register] Password confirmation validation failed");
-      showToast.error("პაროლები არ ემთხვევა", "შეცდომა");
+      showToast.error(
+        t("auth.register.validation.passwordMismatch"),
+        t("auth.register.error.default"),
+      );
       return;
     }
 
@@ -2666,6 +2668,14 @@ export default function RegisterScreen() {
                         />
                       </TouchableOpacity>
                     </TouchableOpacity>
+                    <Text style={styles.passwordHint}>
+                      {t("settings.security.newPasswordHint")}
+                    </Text>
+                    {password.length > 0 && passwordIsStrong && (
+                      <Text style={styles.passwordStrengthLabel}>
+                        {t("settings.security.strengthStrong")}
+                      </Text>
+                    )}
                   </View>
 
                   {/* Confirm Password Input */}
@@ -2687,7 +2697,7 @@ export default function RegisterScreen() {
                       <TextInput
                         ref={confirmPasswordInputRef}
                         style={styles.input}
-                        secureTextEntry={!showPassword}
+                        secureTextEntry={!showConfirmPassword}
                         placeholder={t(
                           "auth.register.confirmPassword.placeholder",
                         )}
@@ -2700,12 +2710,16 @@ export default function RegisterScreen() {
                         keyboardType="default"
                       />
                       <TouchableOpacity
-                        onPress={() => setShowPassword(!showPassword)}
+                        onPress={() =>
+                          setShowConfirmPassword(!showConfirmPassword)
+                        }
                         style={styles.eyeIcon}
                       >
                         <Ionicons
                           name={
-                            showPassword ? "eye-off-outline" : "eye-outline"
+                            showConfirmPassword
+                              ? "eye-off-outline"
+                              : "eye-outline"
                           }
                           size={20}
                           color="#9CA3AF"
@@ -3583,6 +3597,21 @@ const styles = StyleSheet.create({
     color: "#10B981",
     marginTop: 4,
     marginLeft: 4,
+  },
+  passwordHint: {
+    marginTop: 8,
+    marginLeft: 4,
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+    lineHeight: 18,
+  },
+  passwordStrengthLabel: {
+    marginTop: 6,
+    marginLeft: 4,
+    fontSize: 12,
+    fontFamily: "Poppins-SemiBold",
+    color: "#10B981",
   },
   profileUploadCard: {
     alignItems: "center",

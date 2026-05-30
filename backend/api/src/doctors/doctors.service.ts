@@ -147,6 +147,7 @@ export class DoctorsService {
         apt.patientDetails?.problem ||
         apt.notes ||
         '',
+      visitAddress: apt.visitAddress || undefined,
       consultationSummary: Object.keys(consultationSummary).length
         ? {
             diagnosis: consultationSummary.diagnosis,
@@ -469,6 +470,8 @@ export class DoctorsService {
         videoConsultationFee: doctor.videoConsultationFee,
         homeVisitFee: doctor.homeVisitFee,
         about: doctor.about,
+        aboutEn: doctor.aboutEn,
+        aboutRu: doctor.aboutRu,
         dateOfBirth: doctor.dateOfBirth,
         gender: doctor.gender,
         licenseDocument: doctor.licenseDocument,
@@ -595,7 +598,11 @@ export class DoctorsService {
       videoConsultationFee: doctor.videoConsultationFee,
       homeVisitFee: doctor.homeVisitFee,
       about: doctor.about,
+      aboutEn: doctor.aboutEn,
+      aboutRu: doctor.aboutRu,
       adminNotes: (doctor as any).adminNotes,
+      adminNotesEn: (doctor as any).adminNotesEn,
+      adminNotesRu: (doctor as any).adminNotesRu,
       minWorkingDaysRequired: (doctor as any).minWorkingDaysRequired ?? 0,
       dateOfBirth: doctor.dateOfBirth,
       gender: doctor.gender,
@@ -1278,7 +1285,15 @@ export class DoctorsService {
       doctor.homeVisitFee = updateDoctorDto.homeVisitFee;
     }
     if (updateDoctorDto.about !== undefined) {
-      doctor.about = updateDoctorDto.about;
+      doctor.about = updateDoctorDto.about.trim() || undefined;
+    }
+    if (updateDoctorDto.aboutEn !== undefined) {
+      const trimmed = updateDoctorDto.aboutEn.trim();
+      doctor.aboutEn = trimmed || undefined;
+    }
+    if (updateDoctorDto.aboutRu !== undefined) {
+      const trimmed = updateDoctorDto.aboutRu.trim();
+      doctor.aboutRu = trimmed || undefined;
     }
     if (updateDoctorDto.location !== undefined) {
       doctor.location = updateDoctorDto.location;
@@ -1303,7 +1318,15 @@ export class DoctorsService {
       doctor.contractDocument = updateDoctorDto.contractDocument;
     }
     if (updateDoctorDto.adminNotes !== undefined) {
-      doctor.adminNotes = updateDoctorDto.adminNotes;
+      doctor.adminNotes = updateDoctorDto.adminNotes.trim() || undefined;
+    }
+    if (updateDoctorDto.adminNotesEn !== undefined) {
+      const trimmed = updateDoctorDto.adminNotesEn.trim();
+      (doctor as any).adminNotesEn = trimmed || undefined;
+    }
+    if (updateDoctorDto.adminNotesRu !== undefined) {
+      const trimmed = updateDoctorDto.adminNotesRu.trim();
+      (doctor as any).adminNotesRu = trimmed || undefined;
     }
     if (updateDoctorDto.rating !== undefined) {
       doctor.rating = updateDoctorDto.rating;
@@ -2350,6 +2373,7 @@ export class DoctorsService {
         status: apt.status || 'scheduled',
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         symptoms: apt.patientDetails?.problem || apt.notes || '',
+        visitAddress: apt.visitAddress || undefined,
       };
     });
 

@@ -73,6 +73,27 @@ export const formatAppointmentDate = (dateStr: string): string => {
   return `${day}.${month}.${year}`;
 };
 
+const WEEKDAY_KEYS = [
+  "doctor.schedule.weekday.sunday",
+  "doctor.schedule.weekday.monday",
+  "doctor.schedule.weekday.tuesday",
+  "doctor.schedule.weekday.wednesday",
+  "doctor.schedule.weekday.thursday",
+  "doctor.schedule.weekday.friday",
+  "doctor.schedule.weekday.saturday",
+] as const;
+
+/** Weekday label from YYYY-MM-DD (ignores API dayOfWeek — always localized). */
+export const formatAppointmentWeekday = (
+  dateStr: string,
+  t: (key: string) => string,
+): string => {
+  const parts = parseYmd(dateStr);
+  if (!parts) return "";
+  const date = new Date(parts.year, parts.month - 1, parts.day);
+  return t(WEEKDAY_KEYS[date.getDay()]);
+};
+
 export const formatAppointmentTime = (timeStr: string): string => {
   if (!timeStr) return "";
   const parts = timeStr.split(":");

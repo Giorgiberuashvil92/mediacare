@@ -7,7 +7,6 @@ import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
 import { useEffect, useState } from "react";
-import { WebView } from "react-native-webview";
 import {
   ActivityIndicator,
   Alert,
@@ -20,6 +19,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { WebView } from "react-native-webview";
 import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import {
@@ -336,7 +336,11 @@ const Appointment = () => {
     string | null
   >(null);
 
-  const isImageDocument = (doc?: { url?: string; type?: string; name?: string }) => {
+  const isImageDocument = (doc?: {
+    url?: string;
+    type?: string;
+    name?: string;
+  }) => {
     if (!doc?.url) return false;
     const byMime = (doc.type || "").toLowerCase();
     if (byMime.startsWith("image/")) return true;
@@ -1575,26 +1579,35 @@ const Appointment = () => {
                     </TouchableOpacity>
 
                     <View style={styles.appointmentBody}>
-                      <View style={styles.infoRow}>
-                        <Ionicons
-                          name="calendar-outline"
-                          size={16}
-                          color="#6B7280"
-                        />
-                        <Text style={styles.infoText}>
-                          {formatDisplayDate(appointment.date)}
-                        </Text>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 8,
+                        }}
+                      >
+                        <View style={styles.infoRow}>
+                          <Ionicons
+                            name="calendar-outline"
+                            size={16}
+                            color="#6B7280"
+                          />
+                          <Text style={styles.infoText}>
+                            {formatDisplayDate(appointment.date)}
+                          </Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Ionicons
+                            name="time-outline"
+                            size={16}
+                            color="#6B7280"
+                          />
+                          <Text style={styles.infoText}>
+                            {formatAppointmentTime(appointment.time)}
+                          </Text>
+                        </View>
                       </View>
-                      <View style={styles.infoRow}>
-                        <Ionicons
-                          name="time-outline"
-                          size={16}
-                          color="#6B7280"
-                        />
-                        <Text style={styles.infoText}>
-                          {formatAppointmentTime(appointment.time)}
-                        </Text>
-                      </View>
+
                       {appointment.diagnosis && (
                         <View style={styles.diagnosisRow}>
                           <Ionicons
@@ -2604,7 +2617,11 @@ const Appointment = () => {
                     <ActivityIndicator size="small" color="#FFFFFF" />
                   ) : (
                     <>
-                      <Ionicons name="download-outline" size={16} color="#FFFFFF" />
+                      <Ionicons
+                        name="download-outline"
+                        size={16}
+                        color="#FFFFFF"
+                      />
                       <Text style={styles.downloadButtonText}>
                         {t("appointments.documents.download")}
                       </Text>

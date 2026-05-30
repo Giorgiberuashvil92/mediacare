@@ -9,6 +9,7 @@ import {
   formatAppointmentDate,
   formatAppointmentTime,
 } from "../../utils/appointmentDateTime";
+import { getDoctorDisplayName } from "../../utils/doctorNameLabel";
 
 interface PatientAppointment {
   id: string;
@@ -27,7 +28,12 @@ interface PatientAppointment {
   // API response fields
   appointmentDate?: string;
   appointmentTime?: string;
-  doctorId?: any;
+  doctorId?: {
+    name?: string;
+    nameEn?: string;
+    nameRu?: string;
+    specialization?: string;
+  };
   patientDetails?: any;
   formattedDate?: string; // Formatted date in YYYY-MM-DD format (local timezone)
 }
@@ -35,7 +41,25 @@ interface PatientAppointment {
 const TodayAppointment = () => {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+
+  const doctorFallback = t("appointments.common.doctor");
+
+  const resolveDoctorDisplayName = (apt: PatientAppointment) => {
+    const raw =
+      typeof apt.doctorId === "object" && apt.doctorId != null
+        ? apt.doctorId
+        : { name: apt.doctorName };
+    return getDoctorDisplayName(
+      {
+        name: raw.name ?? "",
+        nameEn: raw.nameEn,
+        nameRu: raw.nameRu,
+      },
+      language,
+      doctorFallback,
+    );
+  };
   const [showModal, setShowModal] = useState(false);
   const [todayAppointments, setTodayAppointments] = useState<
     PatientAppointment[]
@@ -176,6 +200,7 @@ const TodayAppointment = () => {
   }
 
   const appointment = todayAppointments[0];
+  const displayDoctorName = resolveDoctorDisplayName(appointment);
 
   const isVideoConsultation = (() => {
     const t = appointment.type;
@@ -278,11 +303,7 @@ const TodayAppointment = () => {
           </Text>
           <View style={styles.infoRow}>
             <Ionicons name="medical" size={16} color="#FFFFFF" />
-            <Text style={styles.doctorName}>
-              {appointment.doctorName ||
-                appointment.doctorId?.name ||
-                t("appointments.common.doctor")}
-            </Text>
+            <Text style={styles.doctorName}>{displayDoctorName}</Text>
           </View>
           <View style={styles.infoRow}>
             <Ionicons name="calendar-outline" size={16} color="#FFFFFF" />
@@ -333,11 +354,7 @@ const TodayAppointment = () => {
                     <Text style={styles.detailLabel}>
                       {t("appointments.common.doctor")}
                     </Text>
-                    <Text style={styles.detailValue}>
-                      {appointment.doctorName ||
-                        appointment.doctorId?.name ||
-                        t("appointments.common.doctor")}
-                    </Text>
+                    <Text style={styles.detailValue}>{displayDoctorName}</Text>
                     <Text style={styles.detailSubValue}>
                       {appointment.doctorSpecialty ||
                         appointment.doctorId?.specialization ||
@@ -395,19 +412,12 @@ const TodayAppointment = () => {
                     if (!appointmentId) {
                       return;
                     }
-                    const doctorName =
-                      appointment.doctorName ||
-                      (typeof appointment.doctorId === "object" &&
-                      appointment.doctorId != null
-                        ? (appointment.doctorId as { name?: string }).name
-                        : undefined) ||
-                      t("appointments.common.doctor");
                     setShowModal(false);
                     router.push({
                       pathname: "/screens/video-call",
                       params: {
                         appointmentId,
-                        doctorName: String(doctorName),
+                        doctorName: displayDoctorName,
                         roomName: `medicare-${appointmentId}`,
                       },
                     });

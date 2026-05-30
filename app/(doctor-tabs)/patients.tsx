@@ -1407,7 +1407,6 @@ export default function DoctorPatients() {
         <View style={styles.header}>
           <View>
             <Text style={styles.title}>{t("doctor.patients.title")}</Text>
-            <Text style={styles.subtitle}>{t("doctor.patients.subtitle")}</Text>
           </View>
         </View>
 
@@ -1664,16 +1663,32 @@ export default function DoctorPatients() {
                           </Text>
                         </View>
                       ) : null}
+                      {((consultation as any).patientEmail ||
+                        (consultation as any).patientId?.email) && (
+                        <View style={styles.infoRow}>
+                          <Ionicons
+                            name="mail-outline"
+                            size={16}
+                            color="#6B7280"
+                          />
+                          <Text style={styles.infoText}>
+                            {(consultation as any).patientEmail ||
+                              (consultation as any).patientId?.email}
+                          </Text>
+                        </View>
+                      )}
                       {consultation.type === "home-visit" &&
-                        (consultation as any).visitAddress && (
-                          <View style={styles.symptomsRow}>
+                        ((consultation as any).visitAddress ||
+                          consultation.patientDetails?.address) && (
+                          <View style={styles.infoRow}>
                             <Ionicons
-                              name="home-outline"
+                              name="location-outline"
                               size={16}
-                              color="#6B7280"
+                              color="#10B981"
                             />
-                            <Text style={styles.symptomsText}>
-                              {(consultation as any).visitAddress}
+                            <Text style={styles.infoText}>
+                              {(consultation as any).visitAddress ||
+                                consultation.patientDetails?.address}
                             </Text>
                           </View>
                         )}
@@ -1819,6 +1834,20 @@ export default function DoctorPatients() {
                                 </Text>
                               </View>
                             )}
+
+                            {consultation.type === "home-visit" &&
+                              ((consultation as any).visitAddress ||
+                                consultation.patientDetails?.address) && (
+                                <View style={styles.patientInfoRow}>
+                                  <Text style={styles.patientInfoLabel}>
+                                    {t("doctor.appointments.visitAddress")}
+                                  </Text>
+                                  <Text style={styles.patientInfoValue}>
+                                    {(consultation as any).visitAddress ||
+                                      consultation.patientDetails?.address}
+                                  </Text>
+                                </View>
+                              )}
                           </View>
                         </View>
                       )}
@@ -2728,9 +2757,6 @@ export default function DoctorPatients() {
                 {((selectedConsultation as any)?.isFollowUp === true ||
                   hasMisFormsSource(selectedConsultation)) && (
                   <View style={styles.misFormsWrap}>
-                    <Text style={styles.misFormsTitle}>
-                      {t("doctor.appointments.hisFormsTitle")}
-                    </Text>
                     {misHisLoading ? (
                       <View style={styles.misFormsLoadingBox}>
                         <ActivityIndicator color="#06B6D4" />
