@@ -1,8 +1,9 @@
+import { getApiBaseUrl } from '@/lib/api-base-url';
 import { ADMIN_DEV_TOKEN } from '@/lib/dev-token';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://mediacare-production.up.railway.app';
+const API_BASE_URL = getApiBaseUrl();
 
 export async function GET() {
   try {

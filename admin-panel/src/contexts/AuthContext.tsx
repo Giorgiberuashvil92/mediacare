@@ -85,39 +85,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [router]);
 
   const login = async (email: string, password: string) => {
-    console.log('🔐 [Auth] Starting login...');
     try {
       const response: AuthResponse = await apiService.login({ email, password });
-      console.log('🔐 [Auth] Login response:', response.success);
-      
+
       if (response.success && response.data.user) {
-        console.log('🔐 [Auth] Setting user data...');
         setUser(response.data.user);
         localStorage.setItem('user', JSON.stringify(response.data.user));
-        
-        // Store tokens
+
         if (response.data.token) {
-          console.log('🔐 [Auth] Storing token...');
           localStorage.setItem('accessToken', response.data.token);
           apiService.setToken(response.data.token);
-          // Also store in cookie for middleware and server-side access
-          const isSecure = typeof window !== 'undefined' && window.location.protocol === 'https:';
+          const isSecure =
+            typeof window !== 'undefined' && window.location.protocol === 'https:';
           document.cookie = `accessToken=${response.data.token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax${isSecure ? '; Secure' : ''}`;
-          console.log('🔐 [Auth] Cookie set, isSecure:', isSecure);
         }
         if (response.data.refreshToken) {
           localStorage.setItem('refreshToken', response.data.refreshToken);
         }
-        
-        console.log('🔐 [Auth] Redirecting to /...');
+
         router.push('/');
       } else {
-        console.log('🔐 [Auth] Login failed - no user in response');
         throw new Error('Login failed - invalid response');
       }
-    } catch (error: any) {
-      console.error('🔐 [Auth] Login error:', error);
-      throw new Error(error.message || 'Login failed');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Login failed';
+      throw new Error(message);
     }
   };
 

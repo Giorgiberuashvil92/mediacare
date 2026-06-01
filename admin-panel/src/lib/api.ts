@@ -1,8 +1,8 @@
 // API Service for Medicare Admin Panel
 import { ADMIN_DEV_TOKEN } from "./dev-token";
+import { getApiBaseUrl } from "./api-base-url";
 
-// დროებით: ლოკალური API (production: https://mediacare-production.up.railway.app)
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4001";
+const API_BASE_URL = getApiBaseUrl();
 
 // DEVELOPMENT MODE: Skip auth and use static token (from dev-token.ts)
 const DISABLE_AUTH = true;

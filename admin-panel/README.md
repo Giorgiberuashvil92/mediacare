@@ -48,7 +48,18 @@ Overview and stats use an admin JWT. Get a token:
 curl https://mediacare-production.up.railway.app/auth/dev-token
 ```
 
-Put the `token` value into `src/lib/dev-token.ts` as `ADMIN_DEV_TOKEN`, then push. Refresh when it expires (24h).
+Put the `token` value into `src/lib/dev-token.ts` as `ADMIN_DEV_TOKEN`, then push. Dev access token defaults to **30 days** (refresh **60 days**) — see `DEV_TOKEN_ACCESS_EXPIRES_IN` / `DEV_TOKEN_REFRESH_EXPIRES_IN` on the API. Re-run curl after deploy or when it expires.
+
+### Vercel deployment
+
+Production builds use `https://mediacare-production.up.railway.app` when `NEXT_PUBLIC_API_URL` is not set.
+
+In **Vercel → Project → Settings → Environment Variables**:
+
+- Either **omit** `NEXT_PUBLIC_API_URL` (recommended), or set it to `https://mediacare-production.up.railway.app`
+- Do **not** set `NEXT_PUBLIC_API_URL` to `http://localhost:4001` on Vercel — login will fail with `ERR_CONNECTION_REFUSED`
+
+After changing env vars, redeploy the project.
 
 ## Highlighted Features
 **200+ Next.js Dashboard Ul Components and Templates** - includes a variety of prebuilt **Ul elements, components, pages, and examples** crafted with a high-quality design.

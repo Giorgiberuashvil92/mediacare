@@ -1,8 +1,7 @@
 "use client";
 import { EmailIcon, PasswordIcon } from "@/assets/icons";
 import { useAuth } from "@/contexts/AuthContext";
-import Link from "next/link";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import InputGroup from "../FormElements/InputGroup";
 import { Checkbox } from "../FormElements/checkbox";
 
@@ -17,10 +16,6 @@ export default function SigninWithPassword() {
   const [error, setError] = useState<string | null>(null);
   const { login } = useAuth();
 
-  useEffect(() => {
-    console.log('📝 [SigninWithPassword] Component mounted!');
-  }, []);
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setData({
       ...data,
@@ -30,23 +25,22 @@ export default function SigninWithPassword() {
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    console.log('🚀 [Form] handleSubmit called!');
     e.preventDefault();
-    console.log('🚀 [Form] preventDefault called, email:', data.email);
     setError(null);
     setLoading(true);
 
     try {
-      console.log('🚀 [Form] Calling login...');
       await login(data.email, data.password);
-      console.log('🚀 [Form] Login completed!');
-      // router.push is already called inside login function
-    } catch (err: any) {
-      console.error('🚀 [Form] Login error:', err);
-      setError(err.message || 'Login failed. Please check your credentials.');
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Login failed. Please check your credentials.";
+      const friendly =
+        message === "Failed to fetch"
+          ? "Cannot reach API. Check NEXT_PUBLIC_API_URL on Vercel (use Railway URL, not localhost)."
+          : message;
+      setError(friendly);
       setLoading(false);
     }
-    // Don't set loading to false on success - page will redirect
   };
 
   return (
@@ -75,7 +69,7 @@ export default function SigninWithPassword() {
         autoComplete="current-password"
       />
 
-      <div className="mb-6 flex items-center justify-between gap-2 py-2 font-medium">
+      <div className="mb-6 py-2 font-medium">
         <Checkbox
           label="Remember me"
           name="remember"
@@ -89,13 +83,6 @@ export default function SigninWithPassword() {
             })
           }
         />
-
-        <Link
-          href="/auth/forgot-password"
-          className="hover:text-primary dark:text-white dark:hover:text-primary"
-        >
-          Forgot Password?
-        </Link>
       </div>
 
       {error && (
@@ -108,7 +95,6 @@ export default function SigninWithPassword() {
         <button
           type="submit"
           disabled={loading}
-          onClick={() => console.log('🔘 [Button] Sign In clicked!')}
           className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-primary p-4 font-medium text-white transition hover:bg-opacity-90 disabled:opacity-50"
         >
           Sign In
