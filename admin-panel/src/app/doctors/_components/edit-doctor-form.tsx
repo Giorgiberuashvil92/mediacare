@@ -38,6 +38,8 @@ export function EditDoctorForm({
     aboutEn: doctor.aboutEn || "",
     aboutRu: doctor.aboutRu || "",
     location: doctor.location || "",
+    locationEn: doctor.locationEn || "",
+    locationRu: doctor.locationRu || "",
     consultationFee: doctor.consultationFee?.toString() || "",
     followUpFee: doctor.followUpFee?.toString() || "",
     videoConsultationFee: doctor.videoConsultationFee?.toString() || "",
@@ -162,6 +164,8 @@ export function EditDoctorForm({
         aboutEn: formData.aboutEn.trim() || undefined,
         aboutRu: formData.aboutRu.trim() || undefined,
         location: formData.location.trim() || undefined,
+        locationEn: formData.locationEn.trim() || undefined,
+        locationRu: formData.locationRu.trim() || undefined,
         approvalStatus: formData.approvalStatus,
         isActive: formData.isActive,
         gender: formData.gender,
@@ -405,9 +409,9 @@ export function EditDoctorForm({
             />
           </div>
 
-          <div className="mb-5.5 flex flex-col gap-5.5 sm:flex-row">
+          <div className="mb-5.5">
             <InputGroup
-              className="w-full sm:w-1/2"
+              className="w-full"
               type="text"
               name="experience"
               label="გამოცდილება (წლები)"
@@ -416,16 +420,45 @@ export function EditDoctorForm({
               handleChange={handleChange}
               height="sm"
             />
+          </div>
 
-            <InputGroup
-              className="w-full sm:w-1/2"
-              type="text"
+          <div className="mb-5.5">
+            <label className="mb-2.5 block text-sm font-medium text-dark dark:text-white">
+              მისამართი / მდებარეობა (ქართული)
+            </label>
+            <textarea
               name="location"
-              label="მდებარეობა"
-              placeholder="მაგ., თბილისი, საქართველო"
               value={formData.location}
-              handleChange={handleChange}
-              height="sm"
+              onChange={handleChange}
+              rows={2}
+              placeholder="მაგ., თბილისი, საქართველო"
+              className="w-full rounded-lg border border-stroke bg-transparent px-5 py-3 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
+            />
+          </div>
+          <div className="mb-5.5">
+            <label className="mb-2.5 block text-sm font-medium text-dark dark:text-white">
+              მისამართი / მდებარეობა (ინგლისური)
+            </label>
+            <textarea
+              name="locationEn"
+              value={formData.locationEn}
+              onChange={handleChange}
+              rows={2}
+              placeholder="Tbilisi, Georgia..."
+              className="w-full rounded-lg border border-stroke bg-transparent px-5 py-3 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
+            />
+          </div>
+          <div className="mb-5.5">
+            <label className="mb-2.5 block text-sm font-medium text-dark dark:text-white">
+              მისამართი / მდებარეობა (რუსული)
+            </label>
+            <textarea
+              name="locationRu"
+              value={formData.locationRu}
+              onChange={handleChange}
+              rows={2}
+              placeholder="Тбилиси, Грузия..."
+              className="w-full rounded-lg border border-stroke bg-transparent px-5 py-3 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
             />
           </div>
 

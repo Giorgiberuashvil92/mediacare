@@ -44,6 +44,14 @@ export class CreateUserDto {
   address?: string;
 
   @IsOptional()
+  @IsString()
+  addressEn?: string;
+
+  @IsOptional()
+  @IsString()
+  addressRu?: string;
+
+  @IsOptional()
   dateOfBirth?: string;
 
   @IsOptional()
@@ -76,4 +84,12 @@ export class CreateUserDto {
   @IsOptional()
   @IsString()
   location?: string;
+
+  @IsOptional()
+  @IsString()
+  locationEn?: string;
+
+  @IsOptional()
+  @IsString()
+  locationRu?: string;
 }

@@ -20,6 +20,7 @@ import { apiService, LoginSelectableUser } from "../../_services/api";
 import OTPModal from "../../components/ui/OTPModal";
 import { useAuth } from "../../contexts/AuthContext";
 import { SupportedLanguage, useLanguage } from "../../contexts/LanguageContext";
+import { isReviewLoginCredentials } from "../../constants/reviewLogin";
 import { getDoctorDisplayName } from "../../utils/doctorNameLabel";
 import { showToast } from "../../utils/toast";
 
@@ -40,8 +41,6 @@ export default function LoginScreen() {
     [],
   );
   const [showUserSelectionModal, setShowUserSelectionModal] = useState(false);
-  const [skipOtpAfterSelection, setSkipOtpAfterSelection] = useState(false);
-
   const { login: loginContext, completeLoginAfterOTP } = useAuth();
   const { language, setLanguage, t } = useLanguage();
 
@@ -111,7 +110,6 @@ export default function LoginScreen() {
   const resetDuplicateSelection = () => {
     setDuplicateUsers([]);
     setShowUserSelectionModal(false);
-    setSkipOtpAfterSelection(false);
   };
 
   const navigateByRole = (role: string) => {
@@ -125,7 +123,6 @@ export default function LoginScreen() {
   const completeSelectedLogin = async (
     authResponse: any,
     selectedUserId?: string,
-    bypassOTP = false,
   ) => {
     if (authResponse.requiresUserSelection) {
       const users = authResponse.data.users ?? [];
@@ -134,7 +131,6 @@ export default function LoginScreen() {
       }
 
       setDuplicateUsers(users);
-      setSkipOtpAfterSelection(bypassOTP);
       setShowUserSelectionModal(true);
       return;
     }
@@ -145,16 +141,17 @@ export default function LoginScreen() {
     }
 
     const loginUserId = selectedUserId ?? loginUser.id;
+    const reviewLogin = isReviewLoginCredentials(email.trim(), password);
 
-    if (loginUser.phone && loginUser.phone.trim()) {
-      if (bypassOTP) {
+    if (authResponse.requiresOTP) {
+      if (reviewLogin || authResponse.skipOtp) {
         const verifyResponse = await apiService.verifyLoginOTP(
-          loginUser.email,
+          loginUser.email || email.trim(),
           "000000",
           loginUserId,
         );
         await completeLoginAfterOTP(verifyResponse);
-        showToast.info("შესვლა OTP-ის გარეშე", "ინფორმაცია");
+        showToast.auth.loginSuccess(loginUser.name || "მომხმარებელო");
         navigateByRole(verifyResponse.data.user?.role ?? loginUser.role);
         resetDuplicateSelection();
         return;
@@ -162,7 +159,7 @@ export default function LoginScreen() {
 
       setPendingLoginEmail(loginUser.email || email.trim());
       setPendingLoginUserId(loginUserId);
-      setPhone(loginUser.phone);
+      setPhone(loginUser.phone || "");
       setShowOTPModal(true);
       return;
     }
@@ -184,11 +181,7 @@ export default function LoginScreen() {
       });
 
       setShowUserSelectionModal(false);
-      await completeSelectedLogin(
-        authResponse,
-        selectedUser.id,
-        skipOtpAfterSelection,
-      );
+      await completeSelectedLogin(authResponse, selectedUser.id);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : t("auth.login.error.default");
@@ -356,7 +349,7 @@ export default function LoginScreen() {
         email: email.trim(),
         password,
       });
-      await completeSelectedLogin(authResponse, undefined, true);
+      await completeSelectedLogin(authResponse);
     } catch (err) {
       let errorMessage = t("auth.login.error.default");
       if (err instanceof Error) {
@@ -748,8 +741,8 @@ export default function LoginScreen() {
           resetDuplicateSelection();
         }}
         onVerified={handleOTPVerified}
-        onSkip={handleSkipOTP}
-        showSkipButton={true}
+        onSkip={__DEV__ ? handleSkipOTP : undefined}
+        showSkipButton={__DEV__}
         isLoginOTP={true}
         loginEmail={pendingLoginEmail}
         loginUserId={pendingLoginUserId || undefined}

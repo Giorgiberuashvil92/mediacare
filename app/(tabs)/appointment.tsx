@@ -26,7 +26,9 @@ import {
   formatAppointmentDateLong,
   formatAppointmentTime,
 } from "../utils/appointmentDateTime";
+import { getConsultationTypeLabel } from "../utils/consultationTypeLabel";
 import { getDoctorDisplayName } from "../utils/doctorNameLabel";
+import { truncateDisplayFileName } from "../utils/fileNameDisplay";
 
 interface PatientAppointment {
   id: string;
@@ -236,19 +238,9 @@ const Appointment = () => {
     type: string,
     isFollowUp?: boolean,
   ) => {
-    if (isFollowUp === true) return t("appointments.type.followUp");
-    switch (type) {
-      case "video":
-        return t("appointments.type.videoConsultation");
-      case "home-visit":
-        return t("appointments.type.homeVisit");
-      case "consultation":
-        return t("appointments.type.consultation");
-      case "emergency":
-        return t("appointments.type.emergency");
-      default:
-        return type;
-    }
+    if (type === "consultation") return t("appointments.type.consultation");
+    if (type === "emergency") return t("appointments.type.emergency");
+    return getConsultationTypeLabel(type, isFollowUp, t);
   };
 
   const formatTimeCount = (count: number, unitKey: string) =>
@@ -1689,11 +1681,7 @@ const Appointment = () => {
                   {/* Expanded Details */}
                   {isExpanded && (
                     <View style={styles.expandedSection}>
-                      {/* დანიშნულება — ფაილის ატვირთვა */}
                       <View style={styles.detailSection}>
-                        <Text style={styles.detailSectionTitle}>
-                          {t("appointments.details.prescription")}
-                        </Text>
                         <TouchableOpacity
                           style={[
                             styles.uploadDocButton,
@@ -2603,9 +2591,14 @@ const Appointment = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.documentPreviewModalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {selectedDocumentPreview?.name ||
-                  t("appointments.documents.viewTitle")}
+              <Text
+                style={styles.modalTitle}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {selectedDocumentPreview?.name
+                  ? truncateDisplayFileName(selectedDocumentPreview.name, 20)
+                  : t("appointments.documents.viewTitle")}
               </Text>
               <View style={styles.previewHeaderActions}>
                 <TouchableOpacity
@@ -3340,7 +3333,10 @@ const styles = StyleSheet.create({
     borderBottomColor: "#E5E7EB",
   },
   modalTitle: {
-    fontSize: 20,
+    flex: 1,
+    minWidth: 0,
+    marginRight: 8,
+    fontSize: 16,
     fontFamily: "Poppins-Bold",
     color: "#1F2937",
   },

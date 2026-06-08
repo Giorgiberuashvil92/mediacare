@@ -71,7 +71,13 @@ export class User {
   profileImage?: string;
 
   @Prop()
-  address?: string; // Address as string (can be extended to object later if needed)
+  address?: string;
+
+  @Prop()
+  addressEn?: string;
+
+  @Prop()
+  addressRu?: string;
 
   @Prop()
   identificationDocument?: string; // File path/URL for identification document (PDF or Image) - for patients and doctors
@@ -141,6 +147,12 @@ export class User {
 
   @Prop()
   location?: string;
+
+  @Prop()
+  locationEn?: string;
+
+  @Prop()
+  locationRu?: string;
 
   @Prop({ default: 0 })
   rating: number;

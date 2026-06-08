@@ -354,9 +354,6 @@ const Doctor = () => {
         {doctor.about && (
           <Text style={styles.doctorLanguages}>{doctor.about}</Text>
         )}
-        {doctor.location && (
-          <Text style={styles.doctorLocation}>{doctor.location}</Text>
-        )}
         <View style={styles.ratingFeeRow}>
           <View style={styles.ratingRowCompact}>
             <Ionicons name="star" size={16} color="#F59E0B" />

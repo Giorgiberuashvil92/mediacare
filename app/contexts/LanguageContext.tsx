@@ -458,6 +458,8 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "appointments.status.confirmed": "დადასტურებული",
     "appointments.status.videoEnded": "ვიდეო დასრულებულია",
     "appointments.type.followUp": "განმეორებითი",
+    "appointments.type.followUpVideo": "განმეორებითი ვიდეო კონსულტაცია",
+    "appointments.type.followUpHomeVisit": "განმეორებითი ვიზიტი ბინაზე",
     "appointments.type.videoConsultation": "ვიდეო კონსულტაცია",
     "appointments.type.homeVisit": "ვიზიტი ბინაზე",
     "appointments.type.consultation": "კონსულტაცია",
@@ -872,6 +874,7 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "todayAppointment.modalTitle": "დღევანდელი ჯავშანი",
     "todayAppointment.date": "თარიღი",
     "todayAppointment.time": "დრო",
+    "todayAppointment.consultationType": "კონსულტაციის ტიპი",
     "todayAppointment.viewAll": "ყველა ჯავშნის ნახვა",
     "patient.lab.title": "დიაგნოსტიკური კვლევები",
     "patient.lab.subtitle": "ანალიზები და ლაბორატორიული ტესტები",
@@ -931,7 +934,7 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "doctor.schedule.legendRed": "პაციენტის მიერ დაჯავშნილი",
     "doctor.schedule.legendYellowHome": " — ვადა გასული დრო ან ბინაზე არჩეული",
     "doctor.schedule.legendYellowVideo": " ვადა გასული დრო ან ონლაინზე არჩეული",
-    "doctor.schedule.legendWhite": "თეთრი — თავისუფალი დრო",
+    "doctor.schedule.legendWhite": "თავისუფალი დრო",
     "doctor.schedule.confirm": "დადასტურება",
     "doctor.schedule.selectAll": "ყველას არჩევა",
     "doctor.schedule.deselectAll": "ყველას მოხსნა",
@@ -1032,8 +1035,10 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "doctors.booking.timeUnavailable": "დრო დაკავებულია",
     "doctors.booking.timeUnavailableMessage":
       "არჩეული დრო ძალაში აღარ არის. გთხოვთ აირჩიოთ სხვა დრო.",
-    "doctors.booking.followUpSuccess": "განმეორებითი ვიზიტი წარმატებით დაჯავშნა!",
-    "doctors.booking.followUpFailed": "განმეორებითი ვიზიტის დაჯავშნა ვერ მოხერხდა",
+    "doctors.booking.followUpSuccess":
+      "განმეორებითი ვიზიტი წარმატებით დაჯავშნა!",
+    "doctors.booking.followUpFailed":
+      "განმეორებითი ვიზიტის დაჯავშნა ვერ მოხერხდა",
     "doctors.booking.doctorInfoFailed":
       "ექიმის ინფორმაციის მიღება ვერ მოხერხდა. გთხოვთ სცადოთ თავიდან.",
     "doctors.booking.validateFailed":
@@ -1044,8 +1049,7 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "appointment.make.homeAddressPlaceholder":
       "მაგ: თბილისი, ჭავჭავაძის გამზირი 15, ბინა 12",
     "appointment.make.complaints": "ჩივილები",
-    "appointment.make.complaintsHint":
-      "აღწერეთ თქვენი ჩივილები, რა გაწუხებთ",
+    "appointment.make.complaintsHint": "აღწერეთ თქვენი ჩივილები, რა გაწუხებთ",
     "appointment.make.complaintsPlaceholder":
       "მაგ: თავის ტკივილი, ტემპერატურა, სხვა სიმპტომები...",
     "appointment.make.uploadFiles": "დოკუმენტების ატვირთვა",
@@ -1060,6 +1064,10 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "payment.bookWithoutPayment": "გადახდის გარეშე ჯავშნის გაკეთება",
     "appointment.success.title": "წარმატებით დაიჯავშნა",
     "appointment.success.backToHome": "მთავარ გვერძე დაბრუნება",
+
+    // Home — header
+    "home.header.greetingAuthenticated": "გამარჯობა!",
+    "home.header.greetingGuest": "მოგესალმებით!",
 
     // Home — quick services
     "home.services.title": "ჩემი სერვისები",
@@ -1564,6 +1572,8 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "appointments.status.confirmed": "Confirmed",
     "appointments.status.videoEnded": "Video Consultation Ended",
     "appointments.type.followUp": "Follow-Up",
+    "appointments.type.followUpVideo": "Follow-Up Video Consultation",
+    "appointments.type.followUpHomeVisit": "Follow-Up Home Visit",
     "appointments.type.videoConsultation": "Video Consultation",
     "appointments.type.homeVisit": "Home Visit",
     "appointments.type.consultation": "Consultation",
@@ -1970,6 +1980,7 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "todayAppointment.modalTitle": "Today's Appointment",
     "todayAppointment.date": "Date",
     "todayAppointment.time": "Time",
+    "todayAppointment.consultationType": "Consultation Type",
     "todayAppointment.viewAll": "View All Appointments",
     "patient.lab.title": "Diagnostic Examinations",
     "patient.lab.subtitle": "Tests And Laboratory Analyses",
@@ -2162,6 +2173,10 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "payment.bookWithoutPayment": "Book Without Payment",
     "appointment.success.title": "Appointment Successful",
     "appointment.success.backToHome": "Back to Dashboard",
+
+    // Home — header
+    "home.header.greetingAuthenticated": "Hello!",
+    "home.header.greetingGuest": "Welcome!",
 
     // Home — quick services
     "home.services.title": "My Services",
@@ -2673,6 +2688,8 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "appointments.status.confirmed": "Подтверждён",
     "appointments.status.videoEnded": "Видеоконсультация Завершена",
     "appointments.type.followUp": "Повторный",
+    "appointments.type.followUpVideo": "Повторная Видеоконсультация",
+    "appointments.type.followUpHomeVisit": "Повторный Визит На Дом",
     "appointments.type.videoConsultation": "Видео Консультация",
     "appointments.type.homeVisit": "Визит Врача",
     "appointments.type.consultation": "Консультация",
@@ -3081,6 +3098,7 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "todayAppointment.modalTitle": "Запись На Сегодня",
     "todayAppointment.date": "Дата",
     "todayAppointment.time": "Время",
+    "todayAppointment.consultationType": "Тип Консультации",
     "todayAppointment.viewAll": "Показать Все Записи",
     "patient.lab.title": "Диагностические Исследования",
     "patient.lab.subtitle": "Анализы И Лабораторные Тесты",
@@ -3245,7 +3263,8 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "doctors.booking.timeUnavailableMessage":
       "Выбранное Время Больше Недоступно. Выберите Другое Время.",
     "doctors.booking.followUpSuccess": "Повторный Визит Успешно Записан!",
-    "doctors.booking.followUpFailed": "Не Удалось Записаться на Повторный Визит",
+    "doctors.booking.followUpFailed":
+      "Не Удалось Записаться на Повторный Визит",
     "doctors.booking.doctorInfoFailed":
       "Не Удалось Загрузить Информацию о Враче. Попробуйте Снова.",
     "doctors.booking.validateFailed":
@@ -3256,8 +3275,7 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "appointment.make.homeAddressPlaceholder":
       "Напр. Тбилиси, пр. Чавчавадзе 15, кв. 12",
     "appointment.make.complaints": "Симптомы Пациента",
-    "appointment.make.complaintsHint":
-      "Опишите Ваши Жалобы, Что Вас Беспокоит",
+    "appointment.make.complaintsHint": "Опишите Ваши Жалобы, Что Вас Беспокоит",
     "appointment.make.complaintsPlaceholder":
       "Напр. Головная Боль, Температура, Другие Симптомы...",
     "appointment.make.uploadFiles": "Загрузить Файлы",
@@ -3272,6 +3290,10 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "payment.bookWithoutPayment": "Записаться Без Оплаты",
     "appointment.success.title": "Запись Успешно Создана",
     "appointment.success.backToHome": "Главная Страница",
+
+    // Home — header
+    "home.header.greetingAuthenticated": "Здравствуйте!",
+    "home.header.greetingGuest": "Добро пожаловать!",
 
     // Home — quick services
     "home.services.title": "Мои Сервисы",

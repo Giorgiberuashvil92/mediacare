@@ -27,7 +27,9 @@ export interface User {
   dateOfBirth?: string;
   gender?: "male" | "female" | "other";
   profileImage?: string;
-  address?: string; // Address for patients
+  address?: string;
+  addressEn?: string;
+  addressRu?: string;
   identificationDocument?: string; // პირადობა/პასპორტი PDF path or URL
   isVerified: boolean;
   isActive: boolean;
@@ -49,6 +51,8 @@ export interface User {
   aboutEn?: string;
   aboutRu?: string;
   location?: string;
+  locationEn?: string;
+  locationRu?: string;
   rating?: number;
   reviewCount?: number;
   isTopRated?: boolean;

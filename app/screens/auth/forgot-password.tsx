@@ -10,12 +10,12 @@ import {
   StatusBar,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { apiService, LoginSelectableUser } from "../../_services/api";
+import { HintTextInput } from "../../components/ui/HintTextInput";
 import OTPModal from "../../components/ui/OTPModal";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { isStrongPassword } from "../../utils/passwordValidation";
@@ -279,12 +279,11 @@ export default function ForgotPasswordScreen() {
                           color="#9CA3AF"
                           style={styles.inputIcon}
                         />
-                        <TextInput
+                        <HintTextInput
                           style={styles.input}
                           placeholder={t(
                             "auth.forgotPassword.phone.placeholder",
                           )}
-                          placeholderTextColor="#9CA3AF"
                           value={phone}
                           onChangeText={setPhone}
                           keyboardType="phone-pad"
@@ -326,11 +325,12 @@ export default function ForgotPasswordScreen() {
                           color="#9CA3AF"
                           style={styles.inputIcon}
                         />
-                        <TextInput
+                        <HintTextInput
                           style={styles.input}
                           secureTextEntry={!showPassword}
-                          placeholder="••••••••"
-                          placeholderTextColor="#9CA3AF"
+                          placeholder={t(
+                            "auth.forgotPassword.newPassword.label",
+                          )}
                           value={newPassword}
                           onChangeText={setNewPassword}
                           autoCapitalize="none"
@@ -371,11 +371,12 @@ export default function ForgotPasswordScreen() {
                           color="#9CA3AF"
                           style={styles.inputIcon}
                         />
-                        <TextInput
+                        <HintTextInput
                           style={styles.input}
                           secureTextEntry={!showConfirmPassword}
-                          placeholder="••••••••"
-                          placeholderTextColor="#9CA3AF"
+                          placeholder={t(
+                            "auth.forgotPassword.confirmPassword.label",
+                          )}
                           value={confirmPassword}
                           onChangeText={setConfirmPassword}
                           autoCapitalize="none"
@@ -592,9 +593,12 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
+    minWidth: 0,
     fontSize: 16,
     fontFamily: "Poppins-Regular",
     color: "#1F2937",
+    textAlign: "left",
+    letterSpacing: 0,
   },
   eyeIcon: {
     padding: 4,

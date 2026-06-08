@@ -1,4 +1,5 @@
 import { apiService } from "@/app/_services/api";
+import { HintTextInput } from "@/app/components/ui/HintTextInput";
 import { useLanguage } from "@/app/contexts/LanguageContext";
 import { isStrongPassword } from "@/app/utils/passwordValidation";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -9,7 +10,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -103,17 +103,21 @@ export default function SecurityScreen() {
         <View style={styles.placeholder} />
       </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.section}>
           <View style={styles.inputContainer}>
             <View style={styles.passwordInput}>
-              <TextInput
-                style={styles.textInput}
+              <HintTextInput
                 placeholder={t("settings.security.currentPassword")}
-                placeholderTextColor="#9CA3AF"
                 secureTextEntry={!showCurrentPassword}
                 value={currentPassword}
                 onChangeText={setCurrentPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
+                textContentType="password"
               />
               <TouchableOpacity
                 onPress={() => setShowCurrentPassword(!showCurrentPassword)}
@@ -129,13 +133,14 @@ export default function SecurityScreen() {
 
           <View style={styles.inputContainer}>
             <View style={styles.passwordInput}>
-              <TextInput
-                style={styles.textInput}
+              <HintTextInput
                 placeholder={t("settings.security.newPassword")}
-                placeholderTextColor="#9CA3AF"
                 secureTextEntry={!showNewPassword}
                 value={newPassword}
                 onChangeText={setNewPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
+                textContentType="newPassword"
               />
               <TouchableOpacity
                 onPress={() => setShowNewPassword(!showNewPassword)}
@@ -159,13 +164,14 @@ export default function SecurityScreen() {
 
           <View style={styles.inputContainer}>
             <View style={styles.passwordInput}>
-              <TextInput
-                style={styles.textInput}
+              <HintTextInput
                 placeholder={t("settings.security.repeatNewPassword")}
-                placeholderTextColor="#9CA3AF"
                 secureTextEntry={!showConfirmPassword}
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
+                textContentType="newPassword"
               />
               <TouchableOpacity
                 onPress={() => setShowConfirmPassword(!showConfirmPassword)}
@@ -185,7 +191,9 @@ export default function SecurityScreen() {
             disabled={loading}
           >
             <Text style={styles.saveButtonText}>
-              {loading ? t("settings.security.saving") : t("settings.security.save")}
+              {loading
+                ? t("settings.security.saving")
+                : t("settings.security.save")}
             </Text>
           </TouchableOpacity>
         </View>
@@ -243,12 +251,7 @@ const styles = StyleSheet.create({
     borderColor: "#E5E7EB",
     paddingHorizontal: 16,
     paddingVertical: 12,
-  },
-  textInput: {
-    flex: 1,
-    fontSize: 15,
-    fontFamily: "Poppins-Regular",
-    color: "#1F2937",
+    gap: 12,
   },
   hintText: {
     marginTop: 8,

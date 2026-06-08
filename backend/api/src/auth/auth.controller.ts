@@ -54,6 +54,12 @@ export class AuthController {
     return this.authService.login(loginDto);
   }
 
+  /** Public info for App Store review account (email only, no password). */
+  @Get('review-login')
+  getReviewLogin() {
+    return this.authService.getReviewLoginInfo();
+  }
+
   @Post('refresh')
   async refreshToken(@Body() refreshTokenDto: RefreshTokenDto) {
     return this.authService.refreshToken(refreshTokenDto.refreshToken);

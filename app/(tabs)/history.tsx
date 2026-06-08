@@ -31,7 +31,9 @@ import {
   formatAppointmentDateLong,
   formatAppointmentTime,
 } from "../utils/appointmentDateTime";
+import { getConsultationTypeLabel } from "../utils/consultationTypeLabel";
 import { getDoctorDisplayName } from "../utils/doctorNameLabel";
+import { truncateDisplayFileName } from "../utils/fileNameDisplay";
 
 function normalizeAppointmentId(raw: unknown): string {
   if (raw == null || raw === "") return "";
@@ -213,19 +215,9 @@ const History = () => {
     type: string,
     isFollowUp?: boolean,
   ) => {
-    if (isFollowUp === true) return t("appointments.type.followUp");
-    switch (type) {
-      case "video":
-        return t("appointments.type.videoConsultation");
-      case "home-visit":
-        return t("appointments.type.homeVisit");
-      case "consultation":
-        return t("appointments.type.consultation");
-      case "emergency":
-        return t("appointments.type.emergency");
-      default:
-        return type;
-    }
+    if (type === "consultation") return t("appointments.type.consultation");
+    if (type === "emergency") return t("appointments.type.emergency");
+    return getConsultationTypeLabel(type, isFollowUp, t);
   };
 
   useEffect(() => {
@@ -1413,9 +1405,14 @@ const History = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.documentPreviewModalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {selectedDocumentPreview?.name ||
-                  t("appointments.documents.viewTitle")}
+              <Text
+                style={styles.modalTitle}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {selectedDocumentPreview?.name
+                  ? truncateDisplayFileName(selectedDocumentPreview.name, 20)
+                  : t("appointments.documents.viewTitle")}
               </Text>
               <View style={styles.previewHeaderActions}>
                 <TouchableOpacity

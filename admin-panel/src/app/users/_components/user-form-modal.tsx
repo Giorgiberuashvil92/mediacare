@@ -35,6 +35,10 @@ export default function UserFormModal({
     phone: '',
     idNumber: '',
     address: '',
+    addressEn: '',
+    addressRu: '',
+    locationEn: '',
+    locationRu: '',
     dateOfBirth: '',
     gender: 'male' as 'male' | 'female' | 'other',
     isVerified: false,
@@ -91,6 +95,10 @@ export default function UserFormModal({
         phone: user.phone || '',
         idNumber: user.idNumber || '',
         address: user.address || '',
+        addressEn: user.addressEn || '',
+        addressRu: user.addressRu || '',
+        locationEn: user.locationEn || '',
+        locationRu: user.locationRu || '',
         dateOfBirth: formattedDateOfBirth,
         gender: user.gender || 'male',
         isVerified: user.isVerified || false,
@@ -117,6 +125,10 @@ export default function UserFormModal({
         phone: '',
         idNumber: '',
         address: '',
+        addressEn: '',
+        addressRu: '',
+        locationEn: '',
+        locationRu: '',
         dateOfBirth: '',
         gender: 'male',
         isVerified: false,
@@ -206,6 +218,8 @@ export default function UserFormModal({
         phone: formData.phone || undefined,
         idNumber: formData.idNumber || undefined,
         address: formData.address || undefined,
+        addressEn: formData.addressEn || undefined,
+        addressRu: formData.addressRu || undefined,
         dateOfBirth: formData.dateOfBirth || undefined,
         gender: formData.gender,
       };
@@ -240,6 +254,8 @@ export default function UserFormModal({
             : undefined;
           submitData.about = formData.about || undefined;
           submitData.location = formData.location || undefined;
+          submitData.locationEn = formData.locationEn || undefined;
+          submitData.locationRu = formData.locationRu || undefined;
         }
         await apiService.createUser(submitData);
       } else if (user) {
@@ -251,6 +267,8 @@ export default function UserFormModal({
             phone: formData.phone || undefined,
             idNumber: formData.idNumber || undefined,
             address: formData.address || undefined,
+            addressEn: formData.addressEn || undefined,
+            addressRu: formData.addressRu || undefined,
             dateOfBirth: formData.dateOfBirth || undefined,
             gender: formData.gender,
             isActive: formData.isActive,
@@ -458,15 +476,39 @@ export default function UserFormModal({
             />
           </div>
 
-          {/* Address (მისამართი) */}
+          {/* Address (პაციენტი — რეგისტრაციის მისამართი) */}
           <div>
             <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
-              მისამართი
+              მისამართი (ქართული)
             </label>
-            <input
-              type="text"
+            <textarea
               value={formData.address}
               onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              rows={2}
+              disabled={mode === 'edit' && formData.role !== 'patient'}
+              className={`w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary ${mode === 'edit' && formData.role !== 'patient' ? 'cursor-not-allowed opacity-70' : ''}`}
+            />
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
+              მისამართი (ინგლისური)
+            </label>
+            <textarea
+              value={formData.addressEn}
+              onChange={(e) => setFormData({ ...formData, addressEn: e.target.value })}
+              rows={2}
+              disabled={mode === 'edit' && formData.role !== 'patient'}
+              className={`w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary ${mode === 'edit' && formData.role !== 'patient' ? 'cursor-not-allowed opacity-70' : ''}`}
+            />
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
+              მისამართი (რუსული)
+            </label>
+            <textarea
+              value={formData.addressRu}
+              onChange={(e) => setFormData({ ...formData, addressRu: e.target.value })}
+              rows={2}
               disabled={mode === 'edit' && formData.role !== 'patient'}
               className={`w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary ${mode === 'edit' && formData.role !== 'patient' ? 'cursor-not-allowed opacity-70' : ''}`}
             />
@@ -896,12 +938,36 @@ export default function UserFormModal({
 
               <div>
                 <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
-                  მისამართი
+                  მისამართი / მდებარეობა (ქართული)
                 </label>
-                <input
-                  type="text"
+                <textarea
                   value={formData.location}
                   onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                  rows={2}
+                  disabled={mode === 'edit'}
+                  className={`w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary ${mode === 'edit' ? 'cursor-not-allowed opacity-70' : ''}`}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
+                  მისამართი / მდებარეობა (ინგლისური)
+                </label>
+                <textarea
+                  value={formData.locationEn}
+                  onChange={(e) => setFormData({ ...formData, locationEn: e.target.value })}
+                  rows={2}
+                  disabled={mode === 'edit'}
+                  className={`w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary ${mode === 'edit' ? 'cursor-not-allowed opacity-70' : ''}`}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
+                  მისამართი / მდებარეობა (რუსული)
+                </label>
+                <textarea
+                  value={formData.locationRu}
+                  onChange={(e) => setFormData({ ...formData, locationRu: e.target.value })}
+                  rows={2}
                   disabled={mode === 'edit'}
                   className={`w-full rounded-lg border border-stroke bg-transparent px-4 py-2 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary ${mode === 'edit' ? 'cursor-not-allowed opacity-70' : ''}`}
                 />

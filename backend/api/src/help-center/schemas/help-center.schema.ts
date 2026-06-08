@@ -51,6 +51,12 @@ export class ContactInfo {
   address?: string;
 
   @Prop()
+  addressEn?: string;
+
+  @Prop()
+  addressRu?: string;
+
+  @Prop()
   workingHours?: string;
 }
 

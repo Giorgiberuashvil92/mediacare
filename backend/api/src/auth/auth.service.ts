@@ -33,6 +33,7 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { PhoneVerificationService } from './phone-verification.service';
+import { getReviewLoginInfo, isReviewLoginEmail } from './review-login.config';
 
 @Injectable()
 export class AuthService {
@@ -519,6 +520,25 @@ export class AuthService {
       hasPhone: !!(user.phone && user.phone.trim()),
     });
 
+    if (this.shouldSkipLoginOtp(normalizedEmail)) {
+      console.log(
+        '⚠️ [AuthService] OTP bypass for review/demo account:',
+        normalizedEmail,
+      );
+      const tokens = await this.generateTokens((user._id as string).toString());
+      return {
+        success: true,
+        message: 'Login successful',
+        requiresOTP: false,
+        skipOtp: true,
+        data: {
+          user: this.buildAuthUser(user),
+          token: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+        },
+      };
+    }
+
     // Check if phone is verified (must be verified within last 30 minutes)
     // Only check if user has a phone number
     if (user.phone && user.phone.trim()) {
@@ -683,6 +703,29 @@ export class AuthService {
     });
 
     return response;
+  }
+
+  getReviewLoginInfo() {
+    return getReviewLoginInfo();
+  }
+
+  /** Review account + LOGIN_OTP_BYPASS_EMAILS skip OTP on login. */
+  private shouldSkipLoginOtp(email: string): boolean {
+    if (isReviewLoginEmail(email)) {
+      return true;
+    }
+
+    const raw = process.env.LOGIN_OTP_BYPASS_EMAILS ?? '';
+    if (!raw.trim()) {
+      return false;
+    }
+
+    const normalized = email.trim().toLowerCase();
+    return raw
+      .split(',')
+      .map((entry) => entry.trim().toLowerCase())
+      .filter(Boolean)
+      .includes(normalized);
   }
 
   private buildAuthUser(user: UserDocument) {

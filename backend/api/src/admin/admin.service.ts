@@ -112,6 +112,8 @@ export class AdminService {
         gender: user.gender,
         profileImage: user.profileImage,
         address: user.address,
+        addressEn: user.addressEn,
+        addressRu: user.addressRu,
         identificationDocument: user.identificationDocument,
         isVerified: user.isVerified || false,
         isActive: user.isActive !== undefined ? user.isActive : true,
@@ -129,7 +131,11 @@ export class AdminService {
           followUpFee: user.followUpFee,
           minWorkingDaysRequired: user.minWorkingDaysRequired ?? 0,
           about: user.about,
+          aboutEn: user.aboutEn,
+          aboutRu: user.aboutRu,
           location: user.location,
+          locationEn: user.locationEn,
+          locationRu: user.locationRu,
           rating: user.rating || 0,
           reviewCount: user.reviewCount || 0,
           licenseDocument: user.licenseDocument,
@@ -716,6 +722,8 @@ export class AdminService {
         gender: user.gender,
         profileImage: user.profileImage,
         address: user.address,
+        addressEn: user.addressEn,
+        addressRu: user.addressRu,
         isVerified: user.isVerified || false,
         isActive: user.isActive !== undefined ? user.isActive : true,
         approvalStatus: user.approvalStatus,
@@ -731,7 +739,11 @@ export class AdminService {
           consultationFee: user.consultationFee,
           followUpFee: user.followUpFee,
           about: user.about,
+          aboutEn: user.aboutEn,
+          aboutRu: user.aboutRu,
           location: user.location,
+          locationEn: user.locationEn,
+          locationRu: user.locationRu,
           rating: user.rating || 0,
           reviewCount: user.reviewCount || 0,
           licenseDocument: user.licenseDocument,
@@ -783,7 +795,9 @@ export class AdminService {
       password: hashedPassword,
       phone: createUserDto.phone.trim(),
       idNumber: createUserDto.idNumber,
-      address: createUserDto.address,
+      address: createUserDto.address?.trim() || undefined,
+      addressEn: createUserDto.addressEn?.trim() || undefined,
+      addressRu: createUserDto.addressRu?.trim() || undefined,
       gender: createUserDto.gender,
       isActive: isPatient ? (createUserDto.isActive ?? true) : true,
       isVerified: false,
@@ -805,7 +819,9 @@ export class AdminService {
       userData.consultationFee = createUserDto.consultationFee;
       userData.followUpFee = createUserDto.followUpFee;
       userData.about = createUserDto.about;
-      userData.location = createUserDto.location;
+      userData.location = createUserDto.location?.trim() || undefined;
+      userData.locationEn = createUserDto.locationEn?.trim() || undefined;
+      userData.locationRu = createUserDto.locationRu?.trim() || undefined;
     }
 
     const newUser = await this.userModel.create(userData);
@@ -882,7 +898,11 @@ export class AdminService {
     if (updateUserDto.idNumber !== undefined)
       updateData.idNumber = updateUserDto.idNumber;
     if (updateUserDto.address !== undefined)
-      updateData.address = updateUserDto.address;
+      updateData.address = updateUserDto.address?.trim() || undefined;
+    if (updateUserDto.addressEn !== undefined)
+      updateData.addressEn = updateUserDto.addressEn?.trim() || undefined;
+    if (updateUserDto.addressRu !== undefined)
+      updateData.addressRu = updateUserDto.addressRu?.trim() || undefined;
     if (updateUserDto.gender) updateData.gender = updateUserDto.gender;
     if (updateUserDto.profileImage)
       updateData.profileImage = updateUserDto.profileImage;
@@ -916,7 +936,11 @@ export class AdminService {
       if (updateUserDto.about !== undefined)
         updateData.about = updateUserDto.about;
       if (updateUserDto.location !== undefined)
-        updateData.location = updateUserDto.location;
+        updateData.location = updateUserDto.location?.trim() || undefined;
+      if (updateUserDto.locationEn !== undefined)
+        updateData.locationEn = updateUserDto.locationEn?.trim() || undefined;
+      if (updateUserDto.locationRu !== undefined)
+        updateData.locationRu = updateUserDto.locationRu?.trim() || undefined;
       // minWorkingDaysRequired - minimum working days doctor must have in next 2 weeks
       if (updateUserDto.minWorkingDaysRequired !== undefined) {
         updateData.minWorkingDaysRequired =

@@ -24,6 +24,8 @@ interface ContactInfo {
   email?: string;
   website?: string;
   address?: string;
+  addressEn?: string;
+  addressRu?: string;
   workingHours?: string;
 }
 
@@ -282,12 +284,32 @@ export default function HelpCenterPage() {
             />
           </div>
           <div>
-            <label className="mb-2.5 block text-black">მისამართი</label>
-            <input
-              type="text"
+            <label className="mb-2.5 block text-black">მისამართი (ქართული)</label>
+            <textarea
               value={contactInfo.address || ''}
               onChange={(e) => setContactInfo({ ...contactInfo, address: e.target.value })}
               placeholder="თბილისი, საქართველო"
+              rows={2}
+              className="w-full rounded border border-stroke bg-transparent px-4 py-2.5 text-black outline-none focus:border-primary"
+            />
+          </div>
+          <div>
+            <label className="mb-2.5 block text-black">მისამართი (ინგლისური)</label>
+            <textarea
+              value={contactInfo.addressEn || ''}
+              onChange={(e) => setContactInfo({ ...contactInfo, addressEn: e.target.value })}
+              placeholder="Tbilisi, Georgia"
+              rows={2}
+              className="w-full rounded border border-stroke bg-transparent px-4 py-2.5 text-black outline-none focus:border-primary"
+            />
+          </div>
+          <div>
+            <label className="mb-2.5 block text-black">მისამართი (რუსული)</label>
+            <textarea
+              value={contactInfo.addressRu || ''}
+              onChange={(e) => setContactInfo({ ...contactInfo, addressRu: e.target.value })}
+              placeholder="Тбилиси, Грузия"
+              rows={2}
               className="w-full rounded border border-stroke bg-transparent px-4 py-2.5 text-black outline-none focus:border-primary"
             />
           </div>

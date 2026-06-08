@@ -463,6 +463,8 @@ export class DoctorsService {
         profileImage: doctor.profileImage,
         degrees: doctor.degrees,
         location: doctor.location,
+        locationEn: doctor.locationEn,
+        locationRu: doctor.locationRu,
         patients: '100+', // This could be calculated from appointments
         experience: doctor.experience,
         consultationFee: doctor.consultationFee,
@@ -591,6 +593,8 @@ export class DoctorsService {
       profileImage: doctor.profileImage,
       degrees: doctor.degrees,
       location: doctor.location,
+      locationEn: doctor.locationEn,
+      locationRu: doctor.locationRu,
       patients: '100+',
       experience: doctor.experience,
       consultationFee: doctor.consultationFee,
@@ -1296,7 +1300,26 @@ export class DoctorsService {
       doctor.aboutRu = trimmed || undefined;
     }
     if (updateDoctorDto.location !== undefined) {
-      doctor.location = updateDoctorDto.location;
+      doctor.location = updateDoctorDto.location.trim() || undefined;
+    }
+    if (updateDoctorDto.locationEn !== undefined) {
+      const trimmed = updateDoctorDto.locationEn.trim();
+      doctor.locationEn = trimmed || undefined;
+    }
+    if (updateDoctorDto.locationRu !== undefined) {
+      const trimmed = updateDoctorDto.locationRu.trim();
+      doctor.locationRu = trimmed || undefined;
+    }
+    if (updateDoctorDto.address !== undefined) {
+      doctor.address = updateDoctorDto.address.trim() || undefined;
+    }
+    if (updateDoctorDto.addressEn !== undefined) {
+      const trimmed = updateDoctorDto.addressEn.trim();
+      doctor.addressEn = trimmed || undefined;
+    }
+    if (updateDoctorDto.addressRu !== undefined) {
+      const trimmed = updateDoctorDto.addressRu.trim();
+      doctor.addressRu = trimmed || undefined;
     }
     if (updateDoctorDto.approvalStatus !== undefined) {
       doctor.approvalStatus = updateDoctorDto.approvalStatus;

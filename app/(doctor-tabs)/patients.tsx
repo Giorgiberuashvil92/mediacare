@@ -42,6 +42,7 @@ import {
 import { apiService, Clinic, ShopProduct } from "../_services/api";
 import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
+import { truncateDisplayFileName } from "../utils/fileNameDisplay";
 
 interface Medication {
   name: string;
@@ -2644,9 +2645,14 @@ export default function DoctorPatients() {
         <View style={styles.modalOverlay}>
           <View style={styles.documentPreviewModalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {selectedDocumentPreview?.name ||
-                  t("appointments.documents.viewTitle")}
+              <Text
+                style={styles.modalTitle}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {selectedDocumentPreview?.name
+                  ? truncateDisplayFileName(selectedDocumentPreview.name, 20)
+                  : t("appointments.documents.viewTitle")}
               </Text>
               <View style={styles.previewHeaderActions}>
                 <TouchableOpacity

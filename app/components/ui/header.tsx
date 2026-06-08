@@ -13,10 +13,12 @@ import {
 import { apiService } from "../../_services/api";
 import { useAuth } from "../../contexts/AuthContext";
 import { useCart } from "../../contexts/CartContext";
+import { useLanguage } from "../../contexts/LanguageContext";
 
 const Header = () => {
   const { getTotalItems } = useCart();
   const { user, isAuthenticated } = useAuth();
+  const { t } = useLanguage();
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [isNotificationModalVisible, setIsNotificationModalVisible] =
     useState(false);
@@ -77,10 +79,14 @@ const Header = () => {
         />
         <View>
           <Text style={{ color: "#171717", fontFamily: "Poppins-Medium" }}>
-            {isAuthenticated ? "გამარჯობა!" : "მოგესალმებით!"}
+            {isAuthenticated
+              ? t("home.header.greetingAuthenticated")
+              : t("home.header.greetingGuest")}
           </Text>
           <Text style={{ fontFamily: "Poppins-SemiBold" }}>
-            {isAuthenticated && user ? user.name : "მომხმარებელი"}
+            {isAuthenticated && user
+              ? user.name
+              : t("settings.user.default")}
           </Text>
         </View>
       </TouchableOpacity>

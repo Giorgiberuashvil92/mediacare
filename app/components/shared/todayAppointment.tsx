@@ -9,6 +9,11 @@ import {
   formatAppointmentDate,
   formatAppointmentTime,
 } from "../../utils/appointmentDateTime";
+import {
+  getConsultationTypeIconName,
+  getConsultationTypeLabel,
+  normalizeAppointmentType,
+} from "../../utils/consultationTypeLabel";
 import { getDoctorDisplayName } from "../../utils/doctorNameLabel";
 
 interface PatientAppointment {
@@ -36,6 +41,7 @@ interface PatientAppointment {
   };
   patientDetails?: any;
   formattedDate?: string; // Formatted date in YYYY-MM-DD format (local timezone)
+  isFollowUp?: boolean;
 }
 
 const TodayAppointment = () => {
@@ -201,12 +207,15 @@ const TodayAppointment = () => {
 
   const appointment = todayAppointments[0];
   const displayDoctorName = resolveDoctorDisplayName(appointment);
+  const consultationType = normalizeAppointmentType(appointment.type);
+  const consultationTypeLabel = getConsultationTypeLabel(
+    appointment.type,
+    appointment.isFollowUp,
+    t,
+  );
+  const consultationTypeIcon = getConsultationTypeIconName(appointment.type);
 
-  const isVideoConsultation = (() => {
-    const t = appointment.type;
-    if (t == null || t === "") return true;
-    return String(t).toLowerCase() === "video";
-  })();
+  const isVideoConsultation = consultationType === "video";
 
   const isToday = true;
 
@@ -306,6 +315,14 @@ const TodayAppointment = () => {
             <Text style={styles.doctorName}>{displayDoctorName}</Text>
           </View>
           <View style={styles.infoRow}>
+            <Ionicons
+              name={consultationTypeIcon}
+              size={16}
+              color="#FFFFFF"
+            />
+            <Text style={styles.time}>{consultationTypeLabel}</Text>
+          </View>
+          <View style={styles.infoRow}>
             <Ionicons name="calendar-outline" size={16} color="#FFFFFF" />
             <Text style={styles.time}>
               {formatAppointmentDate(
@@ -360,6 +377,20 @@ const TodayAppointment = () => {
                         appointment.doctorId?.specialization ||
                         ""}
                     </Text>
+                  </View>
+                </View>
+
+                <View style={styles.detailRow}>
+                  <Ionicons
+                    name={consultationTypeIcon}
+                    size={20}
+                    color="#10B981"
+                  />
+                  <View style={styles.detailContent}>
+                    <Text style={styles.detailLabel}>
+                      {t("todayAppointment.consultationType")}
+                    </Text>
+                    <Text style={styles.detailValue}>{consultationTypeLabel}</Text>
                   </View>
                 </View>
 

@@ -77,12 +77,12 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  console.log('🔐 AuthProvider initialized');
+  console.log("🔐 AuthProvider initialized");
   const [user, setUser] = useState<User | null>(null);
   const [userRole, setUserRoleState] = useState<UserRole>(null);
   const [isLoading, setIsLoading] = useState(true);
-  
-  console.log('🔍 AuthProvider state:', { user: !!user, userRole, isLoading });
+
+  console.log("🔍 AuthProvider state:", { user: !!user, userRole, isLoading });
 
   useEffect(() => {
     loadUserData();
@@ -166,7 +166,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               return;
             }
           } catch (refreshError) {
-            console.warn("Session refresh failed, clearing auth state:", refreshError);
+            console.warn(
+              "Session refresh failed, clearing auth state:",
+              refreshError,
+            );
           }
         }
       }
@@ -185,12 +188,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const login = async (credentials: LoginRequest) => {
-    console.log('🔑 AuthProvider login called:', credentials.email);
+    console.log("🔑 AuthProvider login called:", credentials.email);
     try {
       setIsLoading(true);
-      console.log('📞 Calling apiService.login...');
+      console.log("📞 Calling apiService.login...");
       const authResponse = await apiService.login(credentials);
-      console.log('✅ Login response received:', authResponse);
+      console.log("✅ Login response received:", authResponse);
 
       if (authResponse.requiresUserSelection) {
         return authResponse;
@@ -200,7 +203,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (!loggedInUser) {
         throw new Error("Login response missing user");
       }
-      
+
       // ALWAYS require OTP if user has a phone number (after logout, force OTP)
       // Even if backend says requiresOTP: false, we still require OTP on frontend
       if (loggedInUser.phone && loggedInUser.phone.trim()) {
@@ -209,24 +212,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return {
           ...authResponse,
           requiresOTP: true,
-          data: { ...authResponse.data, user: loggedInUser, role: loggedInUser.role },
+          data: {
+            ...authResponse.data,
+            user: loggedInUser,
+            role: loggedInUser.role,
+          },
         };
       }
-      
+
       // OTP not required only if user doesn't have a phone number
       // Proceed with normal login
       setUser(loggedInUser);
       setUserRoleState(loggedInUser.role);
       await AsyncStorage.setItem(ROLE_STORAGE_KEY, loggedInUser.role);
-      
+
       // Create AI Assistant session after successful login
       try {
         const sessionResponse = await apiService.createAISession({
           initiator_id: loggedInUser.id,
-          initiator_type: loggedInUser.role === "doctor" ? "doctor" : "customer",
+          initiator_type:
+            loggedInUser.role === "doctor" ? "doctor" : "customer",
         });
         if (sessionResponse.success) {
-          console.log('✅ AI Assistant session created:', sessionResponse.data.id);
+          console.log(
+            "✅ AI Assistant session created:",
+            sessionResponse.data.id,
+          );
           // Store session ID for later use
           await AsyncStorage.setItem("ai_session_id", sessionResponse.data.id);
         }
@@ -234,10 +245,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Don't fail login if session creation fails
         console.warn("Failed to create AI Assistant session:", sessionError);
       }
-      
+
       return {
         ...authResponse,
-        data: { ...authResponse.data, user: loggedInUser, role: loggedInUser.role },
+        data: {
+          ...authResponse.data,
+          user: loggedInUser,
+          role: loggedInUser.role,
+        },
       };
     } catch (error) {
       console.error("Login error:", error);
@@ -253,41 +268,53 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const completeLoginAfterOTP = async (authResponse: any) => {
     try {
       setIsLoading(true);
-      
+
       // Store tokens if they exist (they should already be stored by verifyLoginOTP, but ensure they are)
       if (authResponse.data.token) {
         await AsyncStorage.setItem("accessToken", authResponse.data.token);
-        console.log('✅ [AuthContext] Access token stored');
+        console.log("✅ [AuthContext] Access token stored");
       }
       if (authResponse.data.refreshToken) {
-        await AsyncStorage.setItem("refreshToken", authResponse.data.refreshToken);
-        console.log('✅ [AuthContext] Refresh token stored');
+        await AsyncStorage.setItem(
+          "refreshToken",
+          authResponse.data.refreshToken,
+        );
+        console.log("✅ [AuthContext] Refresh token stored");
       }
       if (authResponse.data.user) {
-        await AsyncStorage.setItem("user", JSON.stringify(authResponse.data.user));
-        console.log('✅ [AuthContext] User data stored');
+        await AsyncStorage.setItem(
+          "user",
+          JSON.stringify(authResponse.data.user),
+        );
+        console.log("✅ [AuthContext] User data stored");
       }
-      
+
       setUser(authResponse.data.user);
       setUserRoleState(authResponse.data.user.role);
       await AsyncStorage.setItem(ROLE_STORAGE_KEY, authResponse.data.user.role);
-      console.log('✅ [AuthContext] User and role set in context');
-      
+      console.log("✅ [AuthContext] User and role set in context");
+
       // Create AI Assistant session after successful login
       try {
         const sessionResponse = await apiService.createAISession({
           initiator_id: authResponse.data.user.id,
-          initiator_type: authResponse.data.user.role === "doctor" ? "doctor" : "customer",
+          initiator_type:
+            authResponse.data.user.role === "doctor" ? "doctor" : "customer",
         });
         if (sessionResponse.success) {
-          console.log('✅ AI Assistant session created:', sessionResponse.data.id);
+          console.log(
+            "✅ AI Assistant session created:",
+            sessionResponse.data.id,
+          );
           await AsyncStorage.setItem("ai_session_id", sessionResponse.data.id);
         }
       } catch (sessionError) {
         console.warn("Failed to create AI Assistant session:", sessionError);
       }
-      
-      console.log('🎉 [AuthContext] Login completed successfully after OTP verification');
+
+      console.log(
+        "🎉 [AuthContext] Login completed successfully after OTP verification",
+      );
     } catch (error) {
       console.error("Error completing login after OTP:", error);
       throw error;
@@ -299,35 +326,41 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const register = async (userData: RegisterRequest) => {
     try {
       setIsLoading(true);
-      console.log('🔐 [AuthContext] Starting registration...');
+      console.log("🔐 [AuthContext] Starting registration...");
       const authResponse = await apiService.register(userData);
-      
+
       // Tokens are already stored by apiService.register
-      console.log('✅ [AuthContext] Registration successful, setting user and role');
+      console.log(
+        "✅ [AuthContext] Registration successful, setting user and role",
+      );
       const registeredUser = authResponse.data.user;
       if (!registeredUser) {
         throw new Error("Registration response missing user");
       }
-      
+
       setUser(registeredUser);
       setUserRoleState(registeredUser.role);
       await AsyncStorage.setItem(ROLE_STORAGE_KEY, registeredUser.role);
-      
+
       // Create AI Assistant session after successful registration
       try {
         const sessionResponse = await apiService.createAISession({
           initiator_id: registeredUser.id,
-          initiator_type: registeredUser.role === "doctor" ? "doctor" : "customer",
+          initiator_type:
+            registeredUser.role === "doctor" ? "doctor" : "customer",
         });
         if (sessionResponse.success) {
-          console.log('✅ AI Assistant session created:', sessionResponse.data.id);
+          console.log(
+            "✅ AI Assistant session created:",
+            sessionResponse.data.id,
+          );
           await AsyncStorage.setItem("ai_session_id", sessionResponse.data.id);
         }
       } catch (sessionError) {
         console.warn("Failed to create AI Assistant session:", sessionError);
       }
-      
-      console.log('🎉 [AuthContext] Registration completed successfully');
+
+      console.log("🎉 [AuthContext] Registration completed successfully");
     } catch (error) {
       console.error("Register error:", error);
       throw error;
@@ -342,7 +375,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       await apiService.logout();
       setUser(null);
       setUserRoleState(null);
-      
+
       // Clear all stored data to ensure OTP is required on next login
       await AsyncStorage.multiRemove([
         ROLE_STORAGE_KEY,
@@ -351,16 +384,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         "refreshToken",
         "user",
       ]);
-      
+
       // Also clear any other potential session data
       try {
         const allKeys = await AsyncStorage.getAllKeys();
-        const sessionKeys = allKeys.filter(key => 
-          key.includes("token") || 
-          key.includes("session") || 
-          key.includes("user") ||
-          key.includes("auth") ||
-          key === ROLE_STORAGE_KEY
+        const sessionKeys = allKeys.filter(
+          (key) =>
+            key.includes("token") ||
+            key.includes("session") ||
+            key.includes("user") ||
+            key.includes("auth") ||
+            key === ROLE_STORAGE_KEY,
         );
         if (sessionKeys.length > 0) {
           await AsyncStorage.multiRemove(sessionKeys);

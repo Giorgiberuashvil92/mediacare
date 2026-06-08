@@ -80,6 +80,26 @@ export class UpdateDoctorDto {
   @IsOptional()
   location?: string;
 
+  @IsString()
+  @IsOptional()
+  locationEn?: string;
+
+  @IsString()
+  @IsOptional()
+  locationRu?: string;
+
+  @IsString()
+  @IsOptional()
+  address?: string;
+
+  @IsString()
+  @IsOptional()
+  addressEn?: string;
+
+  @IsString()
+  @IsOptional()
+  addressRu?: string;
+
   @IsEnum(ApprovalStatus)
   @IsOptional()
   approvalStatus?: ApprovalStatus;

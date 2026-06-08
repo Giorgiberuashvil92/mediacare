@@ -38,6 +38,14 @@ export class UpdateUserDto {
   address?: string;
 
   @IsOptional()
+  @IsString()
+  addressEn?: string;
+
+  @IsOptional()
+  @IsString()
+  addressRu?: string;
+
+  @IsOptional()
   dateOfBirth?: string;
 
   @IsOptional()
@@ -84,6 +92,14 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   location?: string;
+
+  @IsOptional()
+  @IsString()
+  locationEn?: string;
+
+  @IsOptional()
+  @IsString()
+  locationRu?: string;
 
   // Minimum working days doctor must have scheduled in the next 2 weeks
   @IsOptional()

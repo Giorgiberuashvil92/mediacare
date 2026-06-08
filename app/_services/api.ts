@@ -193,6 +193,7 @@ export interface AuthResponse {
   success: boolean;
   message: string;
   requiresOTP?: boolean;
+  skipOtp?: boolean;
   requiresUserSelection?: boolean;
   data: {
     user?: User;
@@ -604,14 +605,7 @@ class ApiService {
 
     logger.auth.loginSuccess(data.data.user);
 
-    // Store tokens only if OTP is NOT required
-    // If OTP is required, tokens will be stored after OTP verification
-    // Also, if user has a phone number, always require OTP (force OTP after logout)
-    if (
-      !data.requiresOTP &&
-      (!data.data.user.phone || !data.data.user.phone.trim())
-    ) {
-      // Only store tokens if OTP is not required AND user doesn't have a phone
+    if (!data.requiresOTP) {
       if (data.data.token) {
         await AsyncStorage.setItem("accessToken", data.data.token);
       }
@@ -622,10 +616,8 @@ class ApiService {
         await AsyncStorage.setItem("user", JSON.stringify(data.data.user));
       }
     } else {
-      // OTP required or user has phone - don't store tokens yet
-      // They will be stored after OTP verification in verifyLoginOTP
       console.log(
-        "⚠️ [ApiService] OTP required or user has phone - not storing tokens yet",
+        "⚠️ [ApiService] OTP required — tokens will be stored after verification",
       );
     }
 

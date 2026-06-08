@@ -34,6 +34,8 @@ export declare class User {
     gender?: Gender;
     profileImage?: string;
     address?: string;
+    addressEn?: string;
+    addressRu?: string;
     identificationDocument?: string;
     licenseNumber?: string;
     isVerified: boolean;
@@ -56,6 +58,8 @@ export declare class User {
     aboutEn?: string;
     aboutRu?: string;
     location?: string;
+    locationEn?: string;
+    locationRu?: string;
     rating: number;
     reviewCount: number;
     isTopRated?: boolean;

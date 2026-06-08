@@ -16,6 +16,7 @@ import { apiService } from "../../_services/api";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { getFaqDisplayText } from "../../utils/faqLabel";
+import { getLocalizedText } from "../../utils/localizedText";
 
 interface FAQItem {
   question: string;
@@ -33,6 +34,8 @@ interface ContactInfo {
   email?: string;
   website?: string;
   address?: string;
+  addressEn?: string;
+  addressRu?: string;
   workingHours?: string;
 }
 
@@ -304,7 +307,15 @@ const HelpCenterScreen = () => {
               </TouchableOpacity>
             )}
 
-            {contactInfo.address && (
+            {(() => {
+              const addressDisplay = getLocalizedText(
+                contactInfo.address,
+                contactInfo.addressEn,
+                contactInfo.addressRu,
+                language,
+              );
+              if (!addressDisplay) return null;
+              return (
               <View style={styles.contactItem}>
                 <View style={styles.contactLeft}>
                   <View style={styles.contactIconContainer}>
@@ -318,13 +329,12 @@ const HelpCenterScreen = () => {
                     <Text style={styles.contactTitle}>
                       {t("helpCenter.contact.address")}
                     </Text>
-                    <Text style={styles.contactValue}>
-                      {contactInfo.address}
-                    </Text>
+                    <Text style={styles.contactValue}>{addressDisplay}</Text>
                   </View>
                 </View>
               </View>
-            )}
+              );
+            })()}
 
             {contactInfo.workingHours && (
               <View style={styles.contactItem}>

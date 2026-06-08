@@ -41,6 +41,7 @@ import {
   formatAppointmentDateLong,
   formatAppointmentTime,
 } from "../utils/appointmentDateTime";
+import { truncateDisplayFileName } from "../utils/fileNameDisplay";
 
 interface Medication {
   name: string;
@@ -4546,9 +4547,14 @@ export default function DoctorAppointments() {
         <View style={styles.modalOverlay}>
           <View style={styles.documentPreviewModalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {selectedDocumentPreview?.name ||
-                  t("appointments.documents.viewTitle")}
+              <Text
+                style={styles.modalTitle}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {selectedDocumentPreview?.name
+                  ? truncateDisplayFileName(selectedDocumentPreview.name, 20)
+                  : t("appointments.documents.viewTitle")}
               </Text>
               <View style={styles.previewHeaderActions}>
                 <TouchableOpacity

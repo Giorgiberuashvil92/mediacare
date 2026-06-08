@@ -68,6 +68,14 @@ export class ContactInfoDto {
 
   @IsString()
   @IsOptional()
+  addressEn?: string;
+
+  @IsString()
+  @IsOptional()
+  addressRu?: string;
+
+  @IsString()
+  @IsOptional()
   workingHours?: string;
 }
 

@@ -4,6 +4,7 @@ import { useFavorites } from "@/app/contexts/FavoritesContext";
 import { useLanguage } from "@/app/contexts/LanguageContext";
 import { getDoctorDisplayName } from "@/app/utils/doctorNameLabel";
 import { getDoctorLocalizedText } from "@/app/utils/doctorLocalizedText";
+import { getLocalizedText } from "@/app/utils/localizedText";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
@@ -48,6 +49,8 @@ const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
     image: imageSource,
     degrees: doctor.degrees || "",
     location: doctor.location || "",
+    locationEn: doctor.locationEn,
+    locationRu: doctor.locationRu,
     patients: doctor.patients || undefined,
     experience: doctor.experience || "",
     consultationFee: doctor.consultationFee
