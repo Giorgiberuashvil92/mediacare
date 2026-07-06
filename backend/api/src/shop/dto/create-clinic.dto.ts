@@ -23,4 +23,14 @@ export class CreateClinicDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  merchantId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  merchantName?: string;
 }

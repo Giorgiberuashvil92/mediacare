@@ -1,7 +1,7 @@
 {
   "cli": {
     "version": ">= 10.0.0",
-    "appVersionSource": "remote"
+    "appVersionSource": "local"
   },
   "build": {
     "preview": {
@@ -11,10 +11,12 @@
     },
     "production": {
       "ios": {
-        "simulator": false
+        "simulator": false,
+        "prebuildCommand": "npx expo prebuild --platform ios --no-install"
       },
       "android": {
-        "buildType": "apk"
+        "buildType": "app-bundle",
+        "autoIncrement": true
       }
     }
   },

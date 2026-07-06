@@ -304,6 +304,30 @@ export interface AIMessageFeedback {
   updated_at: string;
 }
 
+export interface AIMessageSource {
+  pmid: string;
+  title: string;
+  journal?: string | null;
+  year?: string | null;
+  url: string;
+}
+
+export interface AIMessageMetadata {
+  type?: string;
+  sources?: AIMessageSource[];
+  doctors?: {
+    id: string;
+    name: string;
+    specialization: string;
+    rating?: number;
+    reviewCount?: number;
+    image?: string;
+    consultationFee?: string;
+    [key: string]: any;
+  }[];
+  [key: string]: any;
+}
+
 export interface AIMessage {
   id: string;
   session_id: string;
@@ -312,20 +336,35 @@ export interface AIMessage {
   created_at: string;
   image_url?: string;
   feedback?: AIMessageFeedback | null;
-  // Additional metadata that AI might return (e.g., doctor recommendations)
-  metadata?: {
-    doctors?: {
-      id: string;
-      name: string;
-      specialization: string;
-      rating?: number;
-      reviewCount?: number;
-      image?: string;
-      consultationFee?: string;
-      [key: string]: any;
-    }[];
-    [key: string]: any;
+  metadata?: AIMessageMetadata;
+}
+
+export function normalizeAIMessageMetadata(
+  raw: unknown,
+): AIMessageMetadata | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+
+  const metadata = raw as AIMessageMetadata;
+  const sources = Array.isArray(metadata.sources)
+    ? metadata.sources.filter(
+        (source) => source && typeof source.url === "string" && source.title,
+      )
+    : undefined;
+  const hasSources = !!sources?.length;
+  const hasDoctors = !!metadata.doctors?.length;
+  const hasType = !!metadata.type;
+
+  if (!hasSources && !hasDoctors && !hasType) return undefined;
+
+  return {
+    ...metadata,
+    ...(hasSources ? { sources } : {}),
   };
+}
+
+export function normalizeAIMessage(message: AIMessage): AIMessage {
+  const metadata = normalizeAIMessageMetadata(message.metadata);
+  return metadata ? { ...message, metadata } : { ...message, metadata: undefined };
 }
 
 export interface SendMessageRequest {
@@ -3213,34 +3252,21 @@ class ApiService {
       const userMessage = messagesArray[0];
       const assistantMessage = messagesArray[1];
 
-      // Parse assistant message content to extract metadata (e.g., doctor recommendations)
-      // AI might return structured data in JSON format within the content
-      let assistantMetadata: any = undefined;
-      try {
-        // Try to parse content as JSON first (in case AI returns structured data)
-        const parsedContent = JSON.parse(assistantMessage.content);
-        if (parsedContent && typeof parsedContent === "object") {
-          // If content is JSON, extract metadata
-          assistantMetadata = parsedContent.metadata || parsedContent;
-          console.log(
-            "📋 [sendAIMessage] Extracted metadata from JSON content:",
-            assistantMetadata,
-          );
-        }
-      } catch {
-        // Content is not JSON, check if there's a metadata field in the response
-        if (assistantMessage.metadata) {
-          assistantMetadata = assistantMessage.metadata;
-          console.log(
-            "📋 [sendAIMessage] Found metadata in response:",
-            assistantMetadata,
-          );
-        }
+      let assistantMetadata = normalizeAIMessageMetadata(
+        assistantMessage.metadata,
+      );
 
-        // Also try to extract doctor recommendations from content if it's in a structured format
-        // This handles cases where AI returns doctor info in the content text
-        // Look for patterns that might indicate doctor recommendations
-        // (This is a fallback - ideally the API would return structured data)
+      if (!assistantMetadata) {
+        try {
+          const parsedContent = JSON.parse(assistantMessage.content);
+          if (parsedContent && typeof parsedContent === "object") {
+            assistantMetadata = normalizeAIMessageMetadata(
+              parsedContent.metadata || parsedContent,
+            );
+          }
+        } catch {
+          // Plain text content — no metadata to extract
+        }
       }
 
       return {
@@ -3346,7 +3372,7 @@ class ApiService {
 
       return {
         success: true,
-        data: messagesArray,
+        data: (messagesArray as AIMessage[]).map(normalizeAIMessage),
       };
     } catch (error: any) {
       console.error("❌ [getAIMessages] Exception:", error);
@@ -3484,6 +3510,7 @@ class ApiService {
     description: string;
     callbackUrl: string;
     captureMethod?: "AUTO" | "MANUAL";
+    doctorId?: string;
   }): Promise<{
     success: boolean;
     orderId?: string;
@@ -3509,6 +3536,7 @@ class ApiService {
           description: params.description,
           callbackUrl: params.callbackUrl,
           captureMethod: params.captureMethod || "AUTO",
+          doctorId: params.doctorId,
         }),
       });
 

@@ -45,6 +45,12 @@ export const NAV_DATA = [
         items: [],
       },
       {
+        title: "კლინიკები",
+        url: "/clinics",
+        icon: Icons.FourCircle,
+        items: [],
+      },
+      {
         title: "ლაბორატორია",
         url: "/medicine-shop",
         icon: Icons.FourCircle,

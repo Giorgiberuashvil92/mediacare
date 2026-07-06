@@ -48,9 +48,14 @@ import {
   apiService,
 } from "../_services/api";
 import AIAssistantBannerGraphic from "../components/ui/AIAssistantBannerGraphic";
+import AIConsentModal from "../components/ui/AIConsentModal";
+import AIMessageSources from "../components/ui/AIMessageSources";
 import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
+import { getAIConsent, saveAIConsent } from "../utils/aiConsentStorage";
 import { getDoctorDisplayName } from "../utils/doctorNameLabel";
+
+type AIConsentStatus = "loading" | "pending" | "accepted" | "declined";
 
 function MessageLikeIcon({
   size = 20,
@@ -298,6 +303,45 @@ export default function AIAssistantScreen() {
   const [likeBusyById, setLikeBusyById] = useState<Record<string, boolean>>({});
   const likeBusyIdsRef = useRef<Set<string>>(new Set());
   const scrollViewRef = useRef<ScrollView>(null);
+  const [consentStatus, setConsentStatus] =
+    useState<AIConsentStatus>("loading");
+  const [showConsentModal, setShowConsentModal] = useState(false);
+
+  const isChatEnabled = consentStatus === "accepted";
+
+  const loadConsentStatus = useCallback(async () => {
+    const record = await getAIConsent();
+    if (!record) {
+      setConsentStatus("pending");
+      setShowConsentModal(true);
+      return;
+    }
+
+    if (record.accepted) {
+      setConsentStatus("accepted");
+      setShowConsentModal(false);
+      return;
+    }
+
+    setConsentStatus("declined");
+    setShowConsentModal(false);
+  }, []);
+
+  useEffect(() => {
+    void loadConsentStatus();
+  }, [loadConsentStatus]);
+
+  const handleAcceptConsent = useCallback(async () => {
+    await saveAIConsent(true);
+    setConsentStatus("accepted");
+    setShowConsentModal(false);
+  }, []);
+
+  const handleDeclineConsent = useCallback(async () => {
+    await saveAIConsent(false);
+    setConsentStatus("declined");
+    setShowConsentModal(false);
+  }, []);
 
   const handleCopyMessage = useCallback(async (text: string) => {
     try {
@@ -719,6 +763,10 @@ export default function AIAssistantScreen() {
     const content = (textOverride ?? inputText.trim()) || "";
     if ((!content && !selectedImage) || isSending) return;
     if (!user?.id) return;
+    if (!isChatEnabled) {
+      setShowConsentModal(true);
+      return;
+    }
 
     try {
       setIsSending(true);
@@ -790,12 +838,14 @@ export default function AIAssistantScreen() {
     }
   };
 
-  // შემოთავაზებული კითხვა — მხოლოდ input-ში ჩაწერა
   const handlePromptSelect = (promptText: string) => {
+    if (!isChatEnabled) {
+      setShowConsentModal(true);
+      return;
+    }
     setInputText(promptText);
   };
 
-  // Handle session selection from history
   const handleSessionSelect = async (session: AISession) => {
     console.log("📋 [handleSessionSelect] Session selected:", session.id);
     setShowHistoryModal(false);
@@ -923,7 +973,13 @@ export default function AIAssistantScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.headerIconButton}
-              onPress={() => setShowHistoryModal(true)}
+              onPress={() => {
+                if (!isChatEnabled) {
+                  setShowConsentModal(true);
+                  return;
+                }
+                setShowHistoryModal(true);
+              }}
             >
               <Ionicons name="time-outline" size={22} color="#1F2937" />
             </TouchableOpacity>
@@ -1207,6 +1263,12 @@ export default function AIAssistantScreen() {
                           )}
                         </View>
                       )}
+
+                    {message.role === "assistant" &&
+                      message.metadata?.sources &&
+                      message.metadata.sources.length > 0 && (
+                        <AIMessageSources sources={message.metadata.sources} />
+                      )}
                   </View>
                 );
               })}
@@ -1253,36 +1315,52 @@ export default function AIAssistantScreen() {
                 </View>
               ) : null}
             </View>
+          ) : consentStatus === "declined" ? (
+            <View style={styles.consentDeclinedContainer}>
+              <Ionicons name="lock-closed-outline" size={48} color="#9CA3AF" />
+              <Text style={styles.consentDeclinedTitle}>
+                {t("aiAssistant.consent.declinedTitle")}
+              </Text>
+              <Text style={styles.consentDeclinedBody}>
+                {t("aiAssistant.consent.declinedBody")}
+              </Text>
+              <TouchableOpacity
+                style={styles.consentReviewButton}
+                onPress={() => setShowConsentModal(true)}
+              >
+                <Text style={styles.consentReviewButtonText}>
+                  {t("aiAssistant.consent.review")}
+                </Text>
+              </TouchableOpacity>
+            </View>
           ) : (
-            <>
-              {/* Suggested Prompts */}
-              <View style={styles.promptsSection}>
-                <View style={styles.promptsContainer}>
-                  {suggestedPrompts.map((prompt) => (
-                    <TouchableOpacity
-                      key={prompt.id}
-                      style={styles.promptCard}
-                      activeOpacity={0.7}
-                      onPress={() => handlePromptSelect(prompt.text)}
-                    >
-                      <Ionicons
-                        name="list-outline"
-                        size={18}
-                        color="#6B7280"
-                        style={styles.promptIcon}
-                      />
-                      <Text style={styles.promptText}>{prompt.text}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+            <View style={styles.promptsSection}>
+              <View style={styles.promptsContainer}>
+                {suggestedPrompts.map((prompt) => (
+                  <TouchableOpacity
+                    key={prompt.id}
+                    style={styles.promptCard}
+                    activeOpacity={0.7}
+                    onPress={() => handlePromptSelect(prompt.text)}
+                  >
+                    <Ionicons
+                      name="list-outline"
+                      size={18}
+                      color="#6B7280"
+                      style={styles.promptIcon}
+                    />
+                    <Text style={styles.promptText}>{prompt.text}</Text>
+                  </TouchableOpacity>
+                ))}
               </View>
-            </>
+            </View>
           )}
         </ScrollView>
 
         {/* Input Field — დამალულია უკუკავშირის მოდალისას, რომ კლავიატურამ ქვედა ზოლი არ აიწიოს */}
-        {negFeedbackMessageId === null ? (
+        {negFeedbackMessageId === null && isChatEnabled ? (
           <View style={styles.inputSection}>
+            <Text style={styles.inputReminder}>{t("aiAssistant.inputReminder")}</Text>
             <View style={styles.inputContainer}>
               <TouchableOpacity
                 style={styles.inputIconButton}
@@ -1342,6 +1420,12 @@ export default function AIAssistantScreen() {
           </View>
         ) : null}
       </KeyboardAvoidingView>
+
+      <AIConsentModal
+        visible={showConsentModal}
+        onAccept={handleAcceptConsent}
+        onDecline={handleDeclineConsent}
+      />
 
       {/* History Modal */}
       <Modal
@@ -2330,6 +2414,47 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Poppins-SemiBold",
     color: "#FFFFFF",
+  },
+  consentDeclinedContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 32,
+    paddingVertical: 48,
+    gap: 12,
+  },
+  consentDeclinedTitle: {
+    fontSize: 18,
+    fontFamily: "Poppins-Bold",
+    color: "#1F2937",
+    textAlign: "center",
+  },
+  consentDeclinedBody: {
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+    textAlign: "center",
+    lineHeight: 22,
+  },
+  consentReviewButton: {
+    marginTop: 8,
+    backgroundColor: "#6366F1",
+    borderRadius: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+  },
+  consentReviewButtonText: {
+    fontSize: 15,
+    fontFamily: "Poppins-SemiBold",
+    color: "#FFFFFF",
+  },
+  inputReminder: {
+    fontSize: 11,
+    fontFamily: "Poppins-Regular",
+    color: "#9CA3AF",
+    textAlign: "center",
+    marginBottom: 8,
+    paddingHorizontal: 8,
+    lineHeight: 16,
   },
   historyModalOverlay: {
     flex: 1,

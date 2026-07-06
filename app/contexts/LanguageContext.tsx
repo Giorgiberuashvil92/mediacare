@@ -1121,6 +1121,23 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "aiAssistant.doctor.prompt.procedure":
       "რა გართულებები აქვს სამედიცინო [პროცედურის/ჩარევის]",
 
+    // AI assistant — PubMed sources
+    "aiAssistant.sources.title": "წყაროები",
+    "aiAssistant.inputReminder":
+      "შეტყობინებები იგზავნება Anthropic-ში (AI პროვაიდერი) პასუხის გენერირებისთვის. არ არის პროფესიული სამედიცინო კონსულტაციის ჩანაცვლება.",
+
+    // AI assistant — data consent
+    "aiAssistant.consent.title": "დაწყებამდე: როგორ გამოიყენება თქვენი მონაცემები",
+    "aiAssistant.consent.body":
+      "Hera-ს AI ჯანმრთელობის ასისტენტი ხელოვნურ ინტელექტს იყენებს ზოგადი ჯანმრთელობის ინფორმაციის მისაწოდებლად. პასუხების გენერირებისთვის თქვენ მიერ გაგზავნილი შეტყობინებები — მათ შორის ჯანმრთელობის დეტალები ან ფაილები — გადაეცემა Anthropic-ს, აშშ-ში მდებარე მესამე მხარის AI პროვაიდერს, და საჯარო სამედიცინო მონაცემთა ბაზებს (PubMed/NCBI), რომლებიც გამოიყენება თითოეულ პასუხში მოხსენიებული წყაროების საპოვნელად.\n\nთქვენი შეტყობინებები მუშავდება პასუხის შესაქმნელად და არ გამოიყენება თქვენთვის რეკламისთვის. ასისტენტი მხოლოდ ზოგად ინფორმაციას აწვდის და არ არის ექიმი, დიაგნოზი ან მკურნალობა. სამედიცინო გადაწყვეტილებებისთვის მიმართეთ კვალიფიციურ სამედიცინო სპეციალისტს.\n\n„ვეთანხმები“-ს დაჭერით, თქვენ ეთანხმებით, რომ თქვენი შეტყობინებები აღნიშნულ სერვისებში გაიგზავნოს, როგორც ეს აღწერილია ჩვენს კონფიდენციალურობის პოლიტიკაში.",
+    "aiAssistant.consent.agree": "ვეთანხმები",
+    "aiAssistant.consent.decline": "ახლა არა",
+    "aiAssistant.consent.viewPrivacyPolicy": "კონფიდენციალურობის პოლიტიკის ნახვა",
+    "aiAssistant.consent.declinedTitle": "AI ასისტენტი მიუწვდომელია",
+    "aiAssistant.consent.declinedBody":
+      "AI ასისტენტის გამოსაყენებლად საჭიროა თანხმობა მონაცემების Anthropic-ში გადაცემაზე. დანარჩენი აპლიკაცია უცვლელად მუშაობს.",
+    "aiAssistant.consent.review": "თანხმობის გადახედვა",
+
     // Role selection
     "roleSelection.title": "აირჩიე შენი პროფილი",
     "roleSelection.subtitle.authenticated":
@@ -2228,6 +2245,23 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
       "What are the contraindications for [drug]?",
     "aiAssistant.doctor.prompt.procedure":
       "What are the complications of the medical [procedure/intervention]?",
+
+    // AI assistant — PubMed sources
+    "aiAssistant.sources.title": "Sources",
+    "aiAssistant.inputReminder":
+      "Messages are sent to Anthropic (AI provider) to generate responses. Not a substitute for professional medical advice.",
+
+    // AI assistant — data consent
+    "aiAssistant.consent.title": "Before you start: how your data is used",
+    "aiAssistant.consent.body":
+      "Hera's AI Health Assistant uses artificial intelligence to provide general health information. To generate answers, the messages you send — including any health details or files you share — are transmitted to Anthropic, a third-party AI provider based in the United States, and to public medical databases (PubMed/NCBI) used to find the sources cited in each answer.\n\nYour messages are processed to create a response and are not used to advertise to you. The assistant provides general information only and is not a doctor, diagnosis, or treatment. For medical decisions, consult a qualified healthcare professional.\n\nBy tapping \"I Agree\", you consent to your messages being sent to these services as described in our Privacy Policy.",
+    "aiAssistant.consent.agree": "I Agree",
+    "aiAssistant.consent.decline": "Not Now",
+    "aiAssistant.consent.viewPrivacyPolicy": "View Privacy Policy",
+    "aiAssistant.consent.declinedTitle": "AI Assistant Unavailable",
+    "aiAssistant.consent.declinedBody":
+      "To use the AI Health Assistant, you must consent to sending your messages to Anthropic. The rest of the app continues to work normally.",
+    "aiAssistant.consent.review": "Review Consent",
 
     // Role selection
     "roleSelection.title": "Choose Your Profile",
@@ -3345,6 +3379,23 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
       "Каковы противопоказания к применению [препарата]?",
     "aiAssistant.doctor.prompt.procedure":
       "Каковы осложнения медицинской [процедуры/вмешательства]?",
+
+    // AI assistant — PubMed sources
+    "aiAssistant.sources.title": "Источники",
+    "aiAssistant.inputReminder":
+      "Сообщения отправляются в Anthropic (поставщик AI) для генерации ответов. Не заменяет профессиональную медицинскую консультацию.",
+
+    // AI assistant — data consent
+    "aiAssistant.consent.title": "Перед началом: как используются ваши данные",
+    "aiAssistant.consent.body":
+      "AI-ассистент Hera использует искусственный интеллект для предоставления общей информации о здоровье. Для генерации ответов отправляемые вами сообщения — включая сведения о здоровье и файлы — передаются в Anthropic, стороннему AI-провайдеру из США, а также в публичные медицинские базы данных (PubMed/NCBI) для поиска источников, указанных в каждом ответе.\n\nВаши сообщения обрабатываются для создания ответа и не используются для рекламы. Ассистент предоставляет только общую информацию и не является врачом, диагнозом или лечением. Для медицинских решений обратитесь к квалифицированному специалисту.\n\nНажимая «Согласен», вы даёте согласие на отправку ваших сообщений этим сервисам, как описано в нашей Политике конфиденциальности.",
+    "aiAssistant.consent.agree": "Согласен",
+    "aiAssistant.consent.decline": "Не сейчас",
+    "aiAssistant.consent.viewPrivacyPolicy": "Политика конфиденциальности",
+    "aiAssistant.consent.declinedTitle": "AI-ассистент недоступен",
+    "aiAssistant.consent.declinedBody":
+      "Для использования AI-ассистента необходимо согласие на передачу данных в Anthropic. Остальная часть приложения работает как обычно.",
+    "aiAssistant.consent.review": "Просмотреть согласие",
 
     // Role selection
     "roleSelection.title": "Выберите Профиль",

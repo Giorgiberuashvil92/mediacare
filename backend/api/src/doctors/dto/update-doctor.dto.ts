@@ -5,9 +5,9 @@ import {
   IsInt,
   IsNumber,
   IsOptional,
+  IsString,
   Max,
   Min,
-  IsString,
 } from 'class-validator';
 import { ApprovalStatus, Gender } from '../../schemas/user.schema';
 
@@ -35,6 +35,11 @@ export class UpdateDoctorDto {
   @IsString()
   @IsOptional()
   idNumber?: string;
+
+  /** კლინიკის ID — null/"" უქმნის მიბმას */
+  @IsString()
+  @IsOptional()
+  clinicId?: string | null;
 
   @IsString()
   @IsOptional()

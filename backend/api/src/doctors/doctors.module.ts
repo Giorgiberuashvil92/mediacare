@@ -18,6 +18,7 @@ import {
   Availability,
   AvailabilitySchema,
 } from './schemas/availability.schema';
+import { Clinic, ClinicSchema } from '../shop/schemas/clinic.schema';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import {
       { name: Availability.name, schema: AvailabilitySchema },
       { name: Specialization.name, schema: SpecializationSchema },
       { name: Appointment.name, schema: AppointmentSchema },
+      { name: Clinic.name, schema: ClinicSchema },
     ]),
     UploadModule,
   ],

@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
 
 export type UserDocument = User & Document;
 
@@ -135,6 +135,10 @@ export class User {
 
   @Prop()
   homeVisitFee?: number; // ბინაზე ვიზიტის ფასი
+
+  /** კლინიკა/ორგანიზაცია — გადახდის merchantId-ისთვის */
+  @Prop({ type: Types.ObjectId, ref: 'Clinic' })
+  clinicId?: Types.ObjectId;
 
   @Prop()
   about?: string;

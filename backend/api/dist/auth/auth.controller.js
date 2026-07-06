@@ -62,6 +62,9 @@ let AuthController = class AuthController {
     async login(loginDto) {
         return this.authService.login(loginDto);
     }
+    getReviewLogin() {
+        return this.authService.getReviewLoginInfo();
+    }
     async refreshToken(refreshTokenDto) {
         return this.authService.refreshToken(refreshTokenDto.refreshToken);
     }
@@ -102,6 +105,12 @@ __decorate([
     __metadata("design:paramtypes", [login_dto_1.LoginDto]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "login", null);
+__decorate([
+    (0, common_1.Get)('review-login'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], AuthController.prototype, "getReviewLogin", null);
 __decorate([
     (0, common_1.Post)('refresh'),
     __param(0, (0, common_1.Body)()),

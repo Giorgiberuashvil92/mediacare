@@ -77,6 +77,32 @@ export declare class AuthService {
             token?: undefined;
             refreshToken?: undefined;
         };
+        skipOtp?: undefined;
+    } | {
+        success: boolean;
+        message: string;
+        requiresOTP: boolean;
+        skipOtp: boolean;
+        data: {
+            user: {
+                id: string;
+                role: UserRole;
+                name: string;
+                nameEn: string;
+                nameRu: string;
+                email: string;
+                phone: string;
+                idNumber: string;
+                isVerified: boolean;
+                approvalStatus: ApprovalStatus;
+                isActive: boolean;
+                doctorStatus: import("../schemas/user.schema").DoctorStatus;
+            };
+            token: string;
+            refreshToken: string;
+            users?: undefined;
+        };
+        requiresUserSelection?: undefined;
     } | {
         success: boolean;
         message: string;
@@ -101,6 +127,7 @@ export declare class AuthService {
             users?: undefined;
         };
         requiresUserSelection?: undefined;
+        skipOtp?: undefined;
     }>;
     verifyLoginOTP(email: string, verificationCode: string, userId?: string): Promise<{
         success: boolean;
@@ -124,6 +151,14 @@ export declare class AuthService {
             refreshToken: string;
         };
     }>;
+    getReviewLoginInfo(): {
+        success: boolean;
+        data: {
+            email: string;
+            skipOtp: boolean;
+        };
+    };
+    private shouldSkipLoginOtp;
     private buildAuthUser;
     private buildSelectableLoginUser;
     getDevAdminToken(): Promise<{

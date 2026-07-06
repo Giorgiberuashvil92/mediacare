@@ -72,6 +72,32 @@ export declare class AuthController {
             token?: undefined;
             refreshToken?: undefined;
         };
+        skipOtp?: undefined;
+    } | {
+        success: boolean;
+        message: string;
+        requiresOTP: boolean;
+        skipOtp: boolean;
+        data: {
+            user: {
+                id: string;
+                role: import("../schemas/user.schema").UserRole;
+                name: string;
+                nameEn: string;
+                nameRu: string;
+                email: string;
+                phone: string;
+                idNumber: string;
+                isVerified: boolean;
+                approvalStatus: import("../schemas/user.schema").ApprovalStatus;
+                isActive: boolean;
+                doctorStatus: import("../schemas/user.schema").DoctorStatus;
+            };
+            token: string;
+            refreshToken: string;
+            users?: undefined;
+        };
+        requiresUserSelection?: undefined;
     } | {
         success: boolean;
         message: string;
@@ -96,7 +122,15 @@ export declare class AuthController {
             users?: undefined;
         };
         requiresUserSelection?: undefined;
+        skipOtp?: undefined;
     }>;
+    getReviewLogin(): {
+        success: boolean;
+        data: {
+            email: string;
+            skipOtp: boolean;
+        };
+    };
     refreshToken(refreshTokenDto: RefreshTokenDto): Promise<{
         success: boolean;
         message: string;

@@ -58,6 +58,7 @@ const notification_schema_1 = require("../schemas/notification.schema");
 const refresh_token_schema_1 = require("../schemas/refresh-token.schema");
 const user_schema_1 = require("../schemas/user.schema");
 const phone_verification_service_1 = require("./phone-verification.service");
+const review_login_config_1 = require("./review-login.config");
 let AuthService = class AuthService {
     constructor(userModel, refreshTokenModel, jwtService, phoneVerificationService, misAuthService, notificationsService) {
         this.userModel = userModel;
@@ -421,6 +422,21 @@ let AuthService = class AuthService {
             phone: user.phone,
             hasPhone: !!(user.phone && user.phone.trim()),
         });
+        if (this.shouldSkipLoginOtp(normalizedEmail)) {
+            console.log('⚠️ [AuthService] OTP bypass for review/demo account:', normalizedEmail);
+            const tokens = await this.generateTokens(user._id.toString());
+            return {
+                success: true,
+                message: 'Login successful',
+                requiresOTP: false,
+                skipOtp: true,
+                data: {
+                    user: this.buildAuthUser(user),
+                    token: tokens.accessToken,
+                    refreshToken: tokens.refreshToken,
+                },
+            };
+        }
         if (user.phone && user.phone.trim()) {
             const isPhoneVerified = await this.phoneVerificationService.isPhoneVerified(user.phone.trim());
             console.log('📱 [AuthService] Phone verification check:', {
@@ -536,6 +552,24 @@ let AuthService = class AuthService {
             hasRefreshToken: !!response.data.refreshToken,
         });
         return response;
+    }
+    getReviewLoginInfo() {
+        return (0, review_login_config_1.getReviewLoginInfo)();
+    }
+    shouldSkipLoginOtp(email) {
+        if ((0, review_login_config_1.isReviewLoginEmail)(email)) {
+            return true;
+        }
+        const raw = process.env.LOGIN_OTP_BYPASS_EMAILS ?? '';
+        if (!raw.trim()) {
+            return false;
+        }
+        const normalized = email.trim().toLowerCase();
+        return raw
+            .split(',')
+            .map((entry) => entry.trim().toLowerCase())
+            .filter(Boolean)
+            .includes(normalized);
     }
     buildAuthUser(user) {
         return {

@@ -24,6 +24,7 @@ export class PaymentController {
       description: createPaymentDto.description,
       callbackUrl: createPaymentDto.callbackUrl,
       captureMethod: createPaymentDto.captureMethod,
+      doctorId: createPaymentDto.doctorId,
     });
   }
 

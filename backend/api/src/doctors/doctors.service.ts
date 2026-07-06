@@ -39,6 +39,7 @@ import {
   Availability,
   AvailabilityDocument,
 } from './schemas/availability.schema';
+import { Clinic, ClinicDocument } from '../shop/schemas/clinic.schema';
 
 @Injectable()
 export class DoctorsService {
@@ -48,6 +49,8 @@ export class DoctorsService {
     @InjectModel(User.name) private userModel: mongoose.Model<UserDocument>,
     @InjectModel(Availability.name)
     private availabilityModel: mongoose.Model<AvailabilityDocument>,
+    @InjectModel(Clinic.name)
+    private clinicModel: mongoose.Model<ClinicDocument>,
     @InjectModel(Specialization.name)
     private specializationModel: mongoose.Model<SpecializationDocument>,
     @InjectModel(Appointment.name)
@@ -572,6 +575,18 @@ export class DoctorsService {
 
     const reviews: any[] = [];
 
+    let clinicId: string | undefined;
+    let clinicName: string | undefined;
+    const doctorClinicId = (doctor as any).clinicId;
+    if (doctorClinicId) {
+      clinicId = doctorClinicId.toString();
+      const clinic = await this.clinicModel
+        .findById(doctorClinicId)
+        .select('name')
+        .lean();
+      clinicName = clinic?.name;
+    }
+
     console.log(
       '🏥 getDoctorById - formattedAvailability:',
       JSON.stringify(formattedAvailability, null, 2),
@@ -621,6 +636,8 @@ export class DoctorsService {
       identomatDocumentFrontImage: doctor.identomatDocumentFrontImage,
       identomatDocumentBackImage: doctor.identomatDocumentBackImage,
       identomatFullData: doctor.identomatFullData,
+      clinicId,
+      clinicName,
     };
 
     console.log('💰 [getDoctorById] Response data with fees:', {
@@ -1258,6 +1275,21 @@ export class DoctorsService {
     }
     if (updateDoctorDto.idNumber !== undefined) {
       doctor.idNumber = updateDoctorDto.idNumber;
+    }
+    if (updateDoctorDto.clinicId !== undefined) {
+      const rawClinicId = updateDoctorDto.clinicId;
+      if (!rawClinicId || rawClinicId === '') {
+        (doctor as any).clinicId = undefined;
+      } else {
+        if (!mongoose.Types.ObjectId.isValid(rawClinicId)) {
+          throw new BadRequestException('Invalid clinic ID format');
+        }
+        const clinic = await this.clinicModel.findById(rawClinicId);
+        if (!clinic) {
+          throw new NotFoundException('Clinic not found');
+        }
+        (doctor as any).clinicId = new mongoose.Types.ObjectId(rawClinicId);
+      }
     }
     if (updateDoctorDto.specialization !== undefined) {
       doctor.specialization = updateDoctorDto.specialization;

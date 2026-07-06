@@ -69,6 +69,9 @@ export interface User {
   adminNotes?: string;
   adminNotesEn?: string;
   adminNotesRu?: string;
+  /** მიბმული კლინიკა (გადახდის merchant-ისთვის) */
+  clinicId?: string;
+  clinicName?: string;
 }
 
 export interface LoginRequest {
@@ -153,6 +156,8 @@ export interface Clinic {
   phone?: string;
   email?: string;
   isActive: boolean;
+  merchantId?: string;
+  merchantName?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -1320,6 +1325,8 @@ class ApiService {
     phone?: string;
     email?: string;
     isActive?: boolean;
+    merchantId?: string;
+    merchantName?: string;
   }): Promise<ApiResponse<Clinic>> {
     const response = await fetch(`${this.baseURL}/admin/shop/clinics`, {
       method: "POST",

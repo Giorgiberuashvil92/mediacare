@@ -1,9 +1,18 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
 import * as crypto from 'crypto';
+import mongoose, { Model } from 'mongoose';
+import { User, UserDocument, UserRole } from '../schemas/user.schema';
+import { Clinic, ClinicDocument } from '../shop/schemas/clinic.schema';
 
 @Injectable()
 export class PaymentService {
   private readonly logger = new Logger(PaymentService.name);
+
+  constructor(
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(Clinic.name) private clinicModel: Model<ClinicDocument>,
+  ) {}
 
   // BOG Payment API credentials
   private readonly BOG_CLIENT_ID = '10003678'; // Public Key
@@ -42,6 +51,48 @@ PwIDAQAB
 
   private accessToken: string | null = null;
   private tokenExpiresAt: number = 0;
+
+  /**
+   * ექიმის კლინიკიდან merchantId-ის მიღება; fallback — default MEDEKSES merchant
+   */
+  async resolveMerchantIdForDoctor(doctorId?: string): Promise<string> {
+    if (!doctorId || !mongoose.Types.ObjectId.isValid(doctorId)) {
+      return this.BOG_MERCHANT_ID;
+    }
+
+    const doctor = await this.userModel
+      .findById(doctorId)
+      .select('clinicId role')
+      .lean();
+
+    if (!doctor || doctor.role !== UserRole.DOCTOR || !doctor.clinicId) {
+      return this.BOG_MERCHANT_ID;
+    }
+
+    const clinic = await this.clinicModel
+      .findById(doctor.clinicId)
+      .select('merchantId isActive name')
+      .lean();
+
+    if (!clinic?.merchantId?.trim()) {
+      this.logger.warn(
+        `⚠️ [BOG] Doctor ${doctorId} clinic "${clinic?.name || doctor.clinicId}" has no merchantId — using default`,
+      );
+      return this.BOG_MERCHANT_ID;
+    }
+
+    if (!clinic.isActive) {
+      this.logger.warn(
+        `⚠️ [BOG] Doctor ${doctorId} clinic "${clinic.name}" is inactive — using default merchant`,
+      );
+      return this.BOG_MERCHANT_ID;
+    }
+
+    this.logger.log(
+      `💳 [BOG] Using clinic merchant for doctor ${doctorId}: ${clinic.merchantId} (${clinic.name})`,
+    );
+    return clinic.merchantId.trim();
+  }
 
   /**
    * Get BOG access token (with caching)
@@ -113,6 +164,7 @@ PwIDAQAB
     successUrl?: string;
     failUrl?: string;
     captureMethod?: 'AUTO' | 'MANUAL';
+    doctorId?: string;
   }): Promise<{
     success: boolean;
     orderId: string;
@@ -122,12 +174,15 @@ PwIDAQAB
   }> {
     try {
       const token = await this.getAccessToken();
+      const merchantId = await this.resolveMerchantIdForDoctor(params.doctorId);
 
       this.logger.log('💳 [BOG] Creating payment order:', {
         amount: params.amount,
         currency: params.currency,
         orderId: params.orderId,
         description: params.description,
+        doctorId: params.doctorId,
+        merchantId,
       });
 
       // BOG Payment API endpoint - ecommerce/orders
@@ -187,7 +242,7 @@ PwIDAQAB
             {
               quantity: 1,
               unit_price: params.amount,
-              product_id: this.BOG_MERCHANT_ID, // Use merchant ID as product_id
+              product_id: merchantId,
             },
           ],
         },

@@ -18,6 +18,12 @@ export class Clinic {
   @Prop({ default: true })
   isActive: boolean;
 
+  @Prop({ trim: true })
+  merchantId?: string;
+
+  @Prop({ trim: true })
+  merchantName?: string;
+
   @Prop({ type: Object, default: {} })
   metadata?: Record<string, any>;
 }

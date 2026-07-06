@@ -28,4 +28,8 @@ export class CreatePaymentDto {
   @IsString()
   @IsOptional()
   captureMethod?: 'AUTO' | 'MANUAL';
+
+  @IsString()
+  @IsOptional()
+  doctorId?: string;
 }

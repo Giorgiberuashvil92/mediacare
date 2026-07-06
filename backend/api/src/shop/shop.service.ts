@@ -86,6 +86,32 @@ export class ShopService {
     private readonly clinicModel: Model<ClinicDocument>,
   ) {}
 
+  private formatClinic(clinic: {
+    _id: Types.ObjectId;
+    name: string;
+    address?: string;
+    phone?: string;
+    email?: string;
+    isActive: boolean;
+    merchantId?: string;
+    merchantName?: string;
+    createdAt?: Date;
+    updatedAt?: Date;
+  }) {
+    return {
+      id: clinic._id.toString(),
+      name: clinic.name,
+      address: clinic.address,
+      phone: clinic.phone,
+      email: clinic.email,
+      isActive: clinic.isActive,
+      merchantId: clinic.merchantId,
+      merchantName: clinic.merchantName,
+      createdAt: clinic.createdAt,
+      updatedAt: clinic.updatedAt,
+    };
+  }
+
   private normalizeObjectId(
     value?: Types.ObjectId | string | null,
   ): Types.ObjectId | null {
@@ -538,16 +564,18 @@ export class ShopService {
     };
     return {
       success: true,
-      data: {
-        id: (savedClinic._id as Types.ObjectId).toString(),
+      data: this.formatClinic({
+        _id: savedClinic._id as Types.ObjectId,
         name: savedClinic.name,
         address: savedClinic.address,
         phone: savedClinic.phone,
         email: savedClinic.email,
         isActive: savedClinic.isActive,
+        merchantId: savedClinic.merchantId,
+        merchantName: savedClinic.merchantName,
         createdAt: clinicDoc.createdAt,
         updatedAt: clinicDoc.updatedAt,
-      },
+      }),
     };
   }
 
@@ -564,16 +592,20 @@ export class ShopService {
 
     return {
       success: true,
-      data: clinics.map((clinic: any) => ({
-        id: (clinic._id as Types.ObjectId).toString(),
-        name: clinic.name,
-        address: clinic.address,
-        phone: clinic.phone,
-        email: clinic.email,
-        isActive: clinic.isActive,
-        createdAt: clinic.createdAt,
-        updatedAt: clinic.updatedAt,
-      })),
+      data: clinics.map((clinic: any) =>
+        this.formatClinic({
+          _id: clinic._id as Types.ObjectId,
+          name: clinic.name,
+          address: clinic.address,
+          phone: clinic.phone,
+          email: clinic.email,
+          isActive: clinic.isActive,
+          merchantId: clinic.merchantId,
+          merchantName: clinic.merchantName,
+          createdAt: clinic.createdAt,
+          updatedAt: clinic.updatedAt,
+        }),
+      ),
     };
   }
 
@@ -590,16 +622,18 @@ export class ShopService {
     const clinicDoc = clinic as any;
     return {
       success: true,
-      data: {
-        id: (clinicDoc._id as Types.ObjectId).toString(),
+      data: this.formatClinic({
+        _id: clinicDoc._id as Types.ObjectId,
         name: clinicDoc.name,
         address: clinicDoc.address,
         phone: clinicDoc.phone,
         email: clinicDoc.email,
         isActive: clinicDoc.isActive,
+        merchantId: clinicDoc.merchantId,
+        merchantName: clinicDoc.merchantName,
         createdAt: clinicDoc.createdAt,
         updatedAt: clinicDoc.updatedAt,
-      },
+      }),
     };
   }
 
@@ -624,16 +658,18 @@ export class ShopService {
     };
     return {
       success: true,
-      data: {
-        id: (clinic._id as Types.ObjectId).toString(),
+      data: this.formatClinic({
+        _id: clinic._id as Types.ObjectId,
         name: clinic.name,
         address: clinic.address,
         phone: clinic.phone,
         email: clinic.email,
         isActive: clinic.isActive,
+        merchantId: clinic.merchantId,
+        merchantName: clinic.merchantName,
         createdAt: clinicDoc.createdAt,
         updatedAt: clinicDoc.updatedAt,
-      },
+      }),
     };
   }
 

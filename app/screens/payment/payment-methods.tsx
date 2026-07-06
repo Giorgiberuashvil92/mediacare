@@ -96,6 +96,7 @@ const PaymentMethods = () => {
         description: `კონსულტაცია - ${selectedDate} ${selectedTime}`,
         callbackUrl: callbackUrl,
         captureMethod: "AUTO",
+        doctorId: doctorId as string,
       });
 
       if (!paymentResponse.success || !paymentResponse.paymentUrl) {

@@ -1,7 +1,7 @@
 "use client";
 
 import InputGroup from "@/components/FormElements/InputGroup";
-import { apiService, Specialization, User } from "@/lib/api";
+import { apiService, Clinic, Specialization, User } from "@/lib/api";
 import React, { useEffect, useState } from "react";
 
 interface EditDoctorFormProps {
@@ -18,6 +18,7 @@ export function EditDoctorForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [specializations, setSpecializations] = useState<Specialization[]>([]);
+  const [clinics, setClinics] = useState<Clinic[]>([]);
   const [loadingSpecializations, setLoadingSpecializations] = useState(true);
   const [licenseFile, setLicenseFile] = useState<File | null>(null);
 
@@ -60,6 +61,7 @@ export function EditDoctorForm({
       doctor.reviewCount !== undefined && doctor.reviewCount !== null
         ? String(doctor.reviewCount)
         : "",
+    clinicId: doctor.clinicId || "",
   });
 
   useEffect(() => {
@@ -77,6 +79,20 @@ export function EditDoctorForm({
       }
     };
     loadSpecializations();
+  }, []);
+
+  useEffect(() => {
+    const loadClinics = async () => {
+      try {
+        const response = await apiService.getClinics();
+        if (response.success) {
+          setClinics(response.data);
+        }
+      } catch (err: any) {
+        console.error("Failed to load clinics:", err);
+      }
+    };
+    loadClinics();
   }, []);
 
   const handleChange = (
@@ -173,6 +189,7 @@ export function EditDoctorForm({
         adminNotes: formData.adminNotes.trim() || undefined,
         adminNotesEn: formData.adminNotesEn.trim() || undefined,
         adminNotesRu: formData.adminNotesRu.trim() || undefined,
+        clinicId: formData.clinicId || null,
       };
 
       // Add license document URL if uploaded
@@ -460,6 +477,30 @@ export function EditDoctorForm({
               placeholder="Тбилиси, Грузия..."
               className="w-full rounded-lg border border-stroke bg-transparent px-5 py-3 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
             />
+          </div>
+
+          <div className="mb-5.5">
+            <label className="mb-2.5 block text-sm font-medium text-dark dark:text-white">
+              კლინიკა / ორგანიზაცია
+            </label>
+            <select
+              name="clinicId"
+              value={formData.clinicId}
+              onChange={handleChange}
+              className="w-full rounded-lg border border-stroke bg-transparent px-5 py-3 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
+            >
+              <option value="">— კლინიკა არ არის მიბმული —</option>
+              {clinics.map((clinic) => (
+                <option key={clinic.id} value={clinic.id}>
+                  {clinic.name}
+                  {clinic.merchantId ? ` (${clinic.merchantId})` : ""}
+                  {!clinic.isActive ? " [გამორთული]" : ""}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-dark-4 dark:text-dark-6">
+              გადახდის დროს გამოიყენება არჩეული კლინიკის BOG Merchant ID
+            </p>
           </div>
 
           <div className="mb-5.5 flex flex-col gap-5.5 sm:flex-row">
