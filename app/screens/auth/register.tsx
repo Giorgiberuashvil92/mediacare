@@ -10,7 +10,6 @@ import {
   Alert,
   KeyboardAvoidingView,
   Modal,
-  PermissionsAndroid,
   Platform,
   ScrollView,
   StatusBar,
@@ -26,11 +25,12 @@ import { apiService, Specialization } from "../../_services/api";
 import OTPModal from "../../components/ui/OTPModal";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../contexts/LanguageContext";
+import { ensureMediaLibraryAccess } from "../../utils/mediaLibraryPermission";
+import { isStrongPassword } from "../../utils/passwordValidation";
 import {
   getSpecializationDisplayName,
   getSpecializationLabelByName,
 } from "../../utils/specializationLabel";
-import { isStrongPassword } from "../../utils/passwordValidation";
 import { showToast } from "../../utils/toast";
 
 export default function RegisterScreen() {
@@ -301,176 +301,11 @@ export default function RegisterScreen() {
       console.log("📸 [ProfileImage] Setting uploading state to true");
       setUploadingProfileImage(true);
 
-      // Request permissions - Android specific handling
-      if (Platform.OS === "android") {
-        console.log(
-          "🤖 [ProfileImage] Android platform detected, checking permissions...",
-        );
-        try {
-          // Check if permission is already granted
-          const readPermission = await PermissionsAndroid.check(
-            PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES,
-          );
-          console.log(
-            "🤖 [ProfileImage] Android permission check result:",
-            readPermission,
-          );
-
-          if (!readPermission) {
-            console.log("🤖 [ProfileImage] Requesting Android permission...");
-            // Request permission
-            const granted = await PermissionsAndroid.request(
-              PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES,
-              {
-                title: "ფოტოებზე წვდომა",
-                message:
-                  "აპლიკაციას სჭირდება ფოტოებზე წვდომა პროფილის სურათის ასარჩევად",
-                buttonNeutral: "მოგვიანებით",
-                buttonNegative: "არა",
-                buttonPositive: "დიახ",
-              },
-            );
-            console.log(
-              "🤖 [ProfileImage] Android permission request result:",
-              granted,
-            );
-
-            if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-              console.log("❌ [ProfileImage] Android permission denied");
-              Alert.alert(
-                "წვდომა აკრძალულია",
-                "ფოტოებზე წვდომა საჭიროა. გთხოვთ ჩართოთ პარამეტრებში.",
-                [{ text: "კარგი" }],
-              );
-              return;
-            }
-            console.log("✅ [ProfileImage] Android permission granted");
-          } else {
-            console.log("✅ [ProfileImage] Android permission already granted");
-          }
-        } catch (androidPermError) {
-          console.error(
-            "❌ [ProfileImage] Android permission error:",
-            androidPermError,
-          );
-          console.error(
-            "❌ [ProfileImage] Error details:",
-            JSON.stringify(androidPermError, null, 2),
-          );
-          // Fallback to ImagePicker permission request
-        }
-      } else {
-        console.log("🍎 [ProfileImage] iOS platform detected");
-      }
-
-      // iOS: launchImageLibraryAsync automatically requests permissions
-      // Android: We already handled permissions above
-      // For iOS, we can skip explicit permission request and let launchImageLibraryAsync handle it
-      if (Platform.OS === "ios") {
-        console.log(
-          "🍎 [ProfileImage] iOS detected - skipping explicit permission request",
-        );
-        console.log(
-          "🍎 [ProfileImage] launchImageLibraryAsync will handle permissions automatically",
-        );
-      } else {
-        // Request permissions for Android (if not already granted)
-        console.log(
-          "📸 [ProfileImage] Requesting ImagePicker permissions for Android...",
-        );
-        console.log(
-          "📸 [ProfileImage] ImagePicker available:",
-          typeof ImagePicker !== "undefined",
-        );
-        console.log(
-          "📸 [ProfileImage] requestMediaLibraryPermissionsAsync available:",
-          typeof ImagePicker.requestMediaLibraryPermissionsAsync === "function",
-        );
-
-        let permission;
-        try {
-          console.log(
-            "📸 [ProfileImage] Calling requestMediaLibraryPermissionsAsync...",
-          );
-
-          // Add timeout for permission request (10 seconds)
-          const permissionPromise =
-            ImagePicker.requestMediaLibraryPermissionsAsync();
-          const permissionTimeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => {
-              console.error(
-                "⏱️ [ProfileImage] Permission request timeout (10s)",
-              );
-              reject(new Error("Permission request timeout"));
-            }, 10000);
-          });
-
-          permission = (await Promise.race([
-            permissionPromise,
-            permissionTimeoutPromise,
-          ])) as ImagePicker.MediaLibraryPermissionResponse;
-          console.log("✅ [ProfileImage] Permission request completed");
-          console.log(
-            "📸 [ProfileImage] ImagePicker permission result:",
-            JSON.stringify(permission, null, 2),
-          );
-          console.log(
-            "📸 [ProfileImage] Permission status:",
-            permission?.status,
-          );
-
-          if (!permission || permission.status !== "granted") {
-            console.log(
-              "❌ [ProfileImage] Permission not granted, status:",
-              permission?.status,
-            );
-            Alert.alert(
-              "წვდომა აკრძალულია",
-              "ფოტოებზე წვდომა საჭიროა. გთხოვთ ჩართოთ პარამეტრებში.",
-              [{ text: "კარგი" }],
-            );
-            return;
-          }
-        } catch (permError) {
-          console.error(
-            "❌ [ProfileImage] Permission request error:",
-            permError,
-          );
-          console.error("❌ [ProfileImage] Error type:", typeof permError);
-          console.error(
-            "❌ [ProfileImage] Error name:",
-            permError instanceof Error ? permError.name : "unknown",
-          );
-          console.error(
-            "❌ [ProfileImage] Error message:",
-            permError instanceof Error ? permError.message : "unknown",
-          );
-          console.error(
-            "❌ [ProfileImage] Error stack:",
-            permError instanceof Error ? permError.stack : "no stack",
-          );
-          try {
-            console.error(
-              "❌ [ProfileImage] Error details (JSON):",
-              JSON.stringify(
-                permError,
-                Object.getOwnPropertyNames(permError),
-                2,
-              ),
-            );
-          } catch (jsonError) {
-            console.error(
-              "❌ [ProfileImage] Could not stringify error:",
-              jsonError,
-            );
-          }
-          Alert.alert(
-            "შეცდომა",
-            "ფოტოებზე წვდომის მოთხოვნა ვერ მოხერხდა. გთხოვთ სცადოთ ხელახლა.",
-            [{ text: "კარგი" }],
-          );
-          return;
-        }
+      const hasAccess = await ensureMediaLibraryAccess({
+        message: "ფოტოებზე წვდომა საჭიროა. გთხოვთ ჩართოთ პარამეტრებში.",
+      });
+      if (!hasAccess) {
+        return;
       }
 
       console.log("✅ [ProfileImage] Ready to launch image picker...");
@@ -1136,10 +971,8 @@ export default function RegisterScreen() {
     try {
       setIdentomatLoading(true);
 
-      const COMPANY_KEY =
-        "699c6dc7915fc8ed730c5034_0c1c01bb7b27253e3abe4d2ab9c573ff0ca5931f";
+      const COMPANY_KEY = "6a992532bab4f5134e2b97c0";
 
-      // Step 3: Get IDENTOMAT result (basic data)
       const resultResponse = await fetch(
         "https://widget.identomat.com/external-api/result/",
         {
