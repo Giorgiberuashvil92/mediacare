@@ -851,16 +851,13 @@ export default function RegisterScreen() {
         registerData.profileImage = profileImage.url;
       }
 
-      // Add patient specific fields
       if (selectedRole === "patient") {
-        // Only add address if it's not empty
         if (address && address.trim()) {
           registerData.address = address.trim();
         }
         if (identificationDocument?.filePath) {
           registerData.identificationDocument = identificationDocument.filePath;
         }
-        // Add Identomat images if available
         if (isIdentomatVerified && identomatData) {
           if (identomatData.faceImage) {
             registerData.identomatFaceImage = identomatData.faceImage;
@@ -873,14 +870,12 @@ export default function RegisterScreen() {
             registerData.identomatDocumentBackImage =
               identomatData.documentBackImage;
           }
-          // Send full Identomat data for admin panel
           if (identomatData.fullData) {
             registerData.identomatFullData = identomatData.fullData;
           }
         }
       }
 
-      // Add doctor specific fields
       if (selectedRole === "doctor") {
         if (selectedSpecializations.length > 0) {
           registerData.specialization = selectedSpecializations.join(", ");
@@ -891,7 +886,6 @@ export default function RegisterScreen() {
         if (identificationDocument?.filePath) {
           registerData.identificationDocument = identificationDocument.filePath;
         }
-        // Add additional fields matching admin panel
         if (degrees && degrees.trim()) {
           registerData.degrees = degrees.trim();
         }
@@ -935,10 +929,8 @@ export default function RegisterScreen() {
 
       await register(registerData);
 
-      // Show success toast
       showToast.auth.registerSuccess(name.trim());
 
-      // Navigate based on role
       if (selectedRole === "doctor") {
         router.replace("/(doctor-tabs)");
       } else {
@@ -961,7 +953,6 @@ export default function RegisterScreen() {
     router.push("/screens/auth/login");
   };
 
-  // Handle IDENTOMAT result
   const handleIdentomatResult = async () => {
     if (!identomatSessionToken) {
       console.error("❌ [IDENTOMAT] No session token available");
@@ -996,37 +987,29 @@ export default function RegisterScreen() {
         "✅ [IDENTOMAT] Result data:",
         JSON.stringify(resultData, null, 2),
       );
-
-      // Step 4: Get IDENTOMAT images using /result/card-front/ and /result/card-back/ endpoints
-      // These endpoints return images directly (not JSON), so we need to upload them to Cloudinary
       let faceImage: string | null = null;
       let documentFrontImage: string | null = null;
       let documentBackImage: string | null = null;
 
-      // Helper function to upload image blob to Cloudinary
       const uploadImageToCloudinary = async (
         imageBlob: Blob,
         imageName: string,
       ): Promise<string | null> => {
         try {
-          // Convert blob to base64 for React Native
           const arrayBuffer = await imageBlob.arrayBuffer();
           const bytes = new Uint8Array(arrayBuffer);
 
-          // Convert bytes to base64 string manually (works in both web and React Native)
           let binary = "";
-          const chunkSize = 8192; // Process in chunks to avoid stack overflow
+          const chunkSize = 8192;
           for (let i = 0; i < bytes.byteLength; i += chunkSize) {
             const chunk = bytes.slice(i, i + chunkSize);
             binary += String.fromCharCode.apply(null, Array.from(chunk));
           }
 
-          // Use btoa if available (web), otherwise use manual base64 encoding
           let base64String: string;
           if (typeof btoa !== "undefined") {
             base64String = btoa(binary);
           } else {
-            // Manual base64 encoding for React Native
             const chars =
               "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
             let result = "";
@@ -1045,7 +1028,6 @@ export default function RegisterScreen() {
             base64String = result;
           }
 
-          // Create FormData for Cloudinary upload
           const formData = new FormData();
           const dataUri = `data:image/jpeg;base64,${base64String}`;
 
@@ -1096,7 +1078,6 @@ export default function RegisterScreen() {
         formData.append("company_key", COMPANY_KEY);
         formData.append("session_token", identomatSessionToken);
 
-        // Step 1: Get face image first (ჯერ სახე)
         try {
           const faceResponse = await fetch(
             "https://widget.identomat.com/external-api/result/face/",
@@ -1133,7 +1114,6 @@ export default function RegisterScreen() {
           console.warn("⚠️ [IDENTOMAT] Failed to get face image:", faceError);
         }
 
-        // Step 2: Get card front image (მერე წინა)
         try {
           const cardFrontResponse = await fetch(
             "https://widget.identomat.com/external-api/result/card-front/",
@@ -1146,7 +1126,6 @@ export default function RegisterScreen() {
           if (cardFrontResponse.ok) {
             const contentType = cardFrontResponse.headers.get("content-type");
             if (contentType && contentType.startsWith("image/")) {
-              // Response is an image, convert to blob and upload to Cloudinary
               const imageBlob = await cardFrontResponse.blob();
               console.log(
                 "✅ [IDENTOMAT] Card front image received, uploading to Cloudinary...",
@@ -1160,7 +1139,6 @@ export default function RegisterScreen() {
                 documentFrontImage ? "success" : "failed",
               );
             } else {
-              // Response might be JSON with error
               const errorData = await cardFrontResponse
                 .json()
                 .catch(() => null);
@@ -1241,9 +1219,6 @@ export default function RegisterScreen() {
         );
       }
 
-      // Extract data from IDENTOMAT response
-      // According to Identomat API docs: https://docs.identomat.com/developer-tools/api-reference
-      // The response contains a 'person' object with the extracted data
       const person = resultData.person || resultData;
 
       const wantsGeorgianIdentomatData = isDoctor || nationality === "georgian";
@@ -1263,8 +1238,6 @@ export default function RegisterScreen() {
         return pickFirstString(obj[key]);
       };
 
-      // Identomat result often includes document-field keys suffixed with locale,
-      // e.g. Given_Names_en_US / Surname_en_US; for Georgian docs this is commonly _ka_GE or _ka.
       const pickLocalizedDocField = (
         obj: any,
         baseKey: string,
@@ -1317,7 +1290,6 @@ export default function RegisterScreen() {
         ? extractGeorgianFromDocs()
         : { first: undefined, last: undefined, personal: undefined };
 
-      // Try to get personal_number from person object first, then fallback to root level
       const idNumber =
         geDoc.personal ||
         person.personal_number ||
@@ -1346,8 +1318,6 @@ export default function RegisterScreen() {
         resultData.lastName ||
         resultData.name?.last;
 
-      // Try to get date of birth from person object first, then fallback to root level
-      // Identomat returns birthday in format like "5/15/1985" or ISO format
       const dateOfBirth =
         person.birthday ||
         person.birthday_time ||
@@ -1360,7 +1330,6 @@ export default function RegisterScreen() {
         resultData.birthday;
 
       if (idNumber) {
-        // Populate form fields with IDENTOMAT data
         setIdNumber(idNumber);
 
         if (firstName && lastName) {
@@ -1385,12 +1354,10 @@ export default function RegisterScreen() {
         }
 
         setIsIdentomatVerified(true);
-        // Ensure idNumber is set in state for validation
         if (idNumber) {
           setIdNumber(idNumber);
         }
 
-        // If images were not found from face-document endpoint, try to extract from result data
         if (!faceImage) {
           faceImage =
             person.face_image ||
