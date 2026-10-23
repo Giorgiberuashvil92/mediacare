@@ -138,6 +138,9 @@ const USE_MOCK_API = false; // Changed to false to use real backend
 const HERA_API_URL = "https://telemedicine-app-production-347c.up.railway.app";
 const HERA_API_KEY = "hera-api-key";
 
+// 401 codes HERA uses for a login token that should be refreshed
+const HERA_TOKEN_ERRORS = ["token_expired", "invalid_token", "missing_token"];
+
 /** Turn a HERA (FastAPI) error body into a message we can show the user. */
 function heraErrorMessage(status: number, body: any): string {
   const detail = body?.detail;
@@ -154,41 +157,6 @@ function heraErrorMessage(status: number, body: any): string {
     return detail[0].msg;
   }
   return body?.message || `HTTP ${status}`;
-}
-
-async function heraRequest<T>(
-  path: string,
-  init: { method?: string; body?: unknown } = {},
-): Promise<T> {
-  const method = init.method ?? "GET";
-  // Sent so HERA can identify the user once it verifies login tokens
-  const token = await AsyncStorage.getItem("accessToken");
-
-  const response = await fetch(`${HERA_API_URL}${path}`, {
-    method,
-    headers: {
-      accept: "application/json",
-      "X-API-Key": HERA_API_KEY,
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init.body !== undefined
-        ? { "Content-Type": "application/json" }
-        : {}),
-    },
-    body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
-  });
-
-  if (__DEV__) {
-    console.log(`🤖 [HERA] ${method} ${path} → ${response.status}`);
-  }
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(heraErrorMessage(response.status, errorData));
-  }
-  if (response.status === 204) {
-    return undefined as T;
-  }
-  return response.json();
 }
 
 export interface User {
@@ -3004,12 +2972,57 @@ class ApiService {
     });
   }
 
+  private async heraRequest<T>(
+    path: string,
+    init: { method?: string; body?: unknown } = {},
+    retried = false,
+  ): Promise<T> {
+    const method = init.method ?? "GET";
+    // Lets HERA tie the request to the logged-in user
+    const token = await AsyncStorage.getItem("accessToken");
+
+    const response = await fetch(`${HERA_API_URL}${path}`, {
+      method,
+      headers: {
+        accept: "application/json",
+        "X-API-Key": HERA_API_KEY,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(init.body !== undefined
+          ? { "Content-Type": "application/json" }
+          : {}),
+      },
+      body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
+    });
+
+    if (__DEV__) {
+      console.log(`🤖 [HERA] ${method} ${path} → ${response.status}`);
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      // Expired or rejected login token: refresh it once and retry
+      if (
+        response.status === 401 &&
+        !retried &&
+        HERA_TOKEN_ERRORS.includes(errorData?.detail?.code) &&
+        (await this.tryRefreshSession())
+      ) {
+        return this.heraRequest<T>(path, init, true);
+      }
+      throw new Error(heraErrorMessage(response.status, errorData));
+    }
+    if (response.status === 204) {
+      return undefined as T;
+    }
+    return response.json();
+  }
+
   // AI Assistant - Sessions (HERA Backend API, not our backend)
   async createAISession(request: CreateSessionRequest): Promise<{
     success: boolean;
     data: AISession;
   }> {
-    const data = await heraRequest<AISession>("/sessions", {
+    const data = await this.heraRequest<AISession>("/sessions", {
       method: "POST",
       body: request,
     });
@@ -3036,7 +3049,7 @@ class ApiService {
     }
     const queryString = queryParams.toString();
 
-    const data = await heraRequest<AISession[]>(
+    const data = await this.heraRequest<AISession[]>(
       `/sessions${queryString ? `?${queryString}` : ""}`,
     );
     return { success: true, data };
@@ -3046,7 +3059,7 @@ class ApiService {
     success: boolean;
     data: AISession;
   }> {
-    const data = await heraRequest<AISession>(`/sessions/${sessionId}`);
+    const data = await this.heraRequest<AISession>(`/sessions/${sessionId}`);
     return { success: true, data };
   }
 
@@ -3072,7 +3085,7 @@ class ApiService {
       });
     }
 
-    const data = await heraRequest<AISession>(`/sessions/${sessionId}`, {
+    const data = await this.heraRequest<AISession>(`/sessions/${sessionId}`, {
       method: "PATCH",
       body: updates,
     });
@@ -3090,7 +3103,9 @@ class ApiService {
       });
     }
 
-    await heraRequest<void>(`/sessions/${sessionId}`, { method: "DELETE" });
+    await this.heraRequest<void>(`/sessions/${sessionId}`, {
+      method: "DELETE",
+    });
     return { success: true };
   }
 
@@ -3118,7 +3133,7 @@ class ApiService {
       (attachments ? "გთხოვთ, შეაფასოთ მიმაგრებული სურათი." : "");
 
     // HERA returns [user_message, assistant_message]
-    const messagesArray = await heraRequest<AIMessage[]>(
+    const messagesArray = await this.heraRequest<AIMessage[]>(
       `/sessions/${sessionId}/messages`,
       {
         method: "POST",
@@ -3189,7 +3204,7 @@ class ApiService {
     }
     queryParams.append("limit", (params?.limit ?? 100).toString());
 
-    const messagesArray = await heraRequest<AIMessage[]>(
+    const messagesArray = await this.heraRequest<AIMessage[]>(
       `/sessions/${sessionId}/messages?${queryParams.toString()}`,
     );
     return { success: true, data: messagesArray.map(normalizeAIMessage) };
@@ -3214,7 +3229,7 @@ class ApiService {
       }
     }
 
-    const data = await heraRequest<AIMessage>(
+    const data = await this.heraRequest<AIMessage>(
       `/sessions/${sessionId}/messages/${messageId}/feedback`,
       { method: "PUT", body: payload },
     );
@@ -3225,7 +3240,7 @@ class ApiService {
     sessionId: string,
     messageId: string,
   ): Promise<{ success: boolean; data: AIMessage }> {
-    const data = await heraRequest<AIMessage>(
+    const data = await this.heraRequest<AIMessage>(
       `/sessions/${sessionId}/messages/${messageId}/feedback`,
       { method: "DELETE" },
     );
