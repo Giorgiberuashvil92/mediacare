@@ -251,11 +251,18 @@ const SUGGESTED_PROMPT_KEYS = [
   },
 ] as const;
 
+// HERA accepts files up to ~5 MB (about 7M base64 characters)
+const MAX_IMAGE_BASE64_CHARS = 7_000_000;
+
+const isImageTooLarge = (base64?: string | null) =>
+  !!base64 && base64.length > MAX_IMAGE_BASE64_CHARS;
+
 interface SelectedImageType {
   uri: string;
   type?: string;
   name?: string;
   fileSize?: number;
+  base64?: string | null;
 }
 
 export default function AIAssistantScreen() {
@@ -596,15 +603,21 @@ export default function AIAssistantScreen() {
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
+        base64: true,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
+        if (isImageTooLarge(asset.base64)) {
+          Alert.alert("შეცდომა", "ფაილის ზომა არ უნდა აღემატებოდეს 5MB-ს");
+          return;
+        }
         setSelectedImage({
           uri: asset.uri,
           type: asset.mimeType || "image/jpeg",
           name: asset.fileName || `photo_${Date.now()}.jpg`,
           fileSize: asset.fileSize,
+          base64: asset.base64,
         });
       }
     } catch (error) {
@@ -625,14 +638,14 @@ export default function AIAssistantScreen() {
         aspect: [4, 3],
         quality: 0.8,
         selectionLimit: 1,
+        base64: true,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
 
-        // Validate file size (max 10MB)
-        if (asset.fileSize && asset.fileSize > 10 * 1024 * 1024) {
-          Alert.alert("შეცდომა", "ფაილის ზომა არ უნდა აღემატებოდეს 10MB-ს");
+        if (isImageTooLarge(asset.base64)) {
+          Alert.alert("შეცდომა", "ფაილის ზომა არ უნდა აღემატებოდეს 5MB-ს");
           return;
         }
 
@@ -641,6 +654,7 @@ export default function AIAssistantScreen() {
           type: asset.mimeType || "image/jpeg",
           name: asset.fileName || `photo_${Date.now()}.jpg`,
           fileSize: asset.fileSize,
+          base64: asset.base64,
         });
       }
     } catch (error) {
@@ -803,6 +817,7 @@ export default function AIAssistantScreen() {
               uri: selectedImage.uri,
               type: selectedImage.type || "image/jpeg",
               name: selectedImage.name || `photo_${Date.now()}.jpg`,
+              base64: selectedImage.base64 ?? undefined,
             }
           : undefined,
       });
@@ -836,6 +851,14 @@ export default function AIAssistantScreen() {
       setIsSending(false);
       setPendingSend(null);
     }
+  };
+
+  const startNewChat = () => {
+    setCurrentSession(null);
+    setMessages([]);
+    setInputText("");
+    setSelectedImage(null);
+    AsyncStorage.removeItem("ai_session_id");
   };
 
   const handlePromptSelect = (promptText: string) => {
@@ -935,38 +958,9 @@ export default function AIAssistantScreen() {
           <View style={styles.headerActions}>
             <TouchableOpacity
               style={styles.headerIconButton}
-              onPress={async () => {
-                // Create new session and start fresh
-                if (user?.id) {
-                  console.log("✍️ [headerNewChatButton] Creating new session");
-                  try {
-                    const sessionResponse = await apiService.createAISession({
-                      initiator_id: user.id,
-                      initiator_type:
-                        user.role === "doctor" ? "doctor" : "customer",
-                    });
-                    if (sessionResponse.success) {
-                      setCurrentSession(sessionResponse.data);
-                      await AsyncStorage.setItem(
-                        "ai_session_id",
-                        sessionResponse.data.id,
-                      );
-                      setMessages([]);
-                      setInputText("");
-                      setSelectedImage(null);
-                      console.log(
-                        "✅ [headerNewChatButton] New session created:",
-                        sessionResponse.data.id,
-                      );
-                    }
-                  } catch (error) {
-                    console.error(
-                      "❌ [headerNewChatButton] Error creating session:",
-                      error,
-                    );
-                    Alert.alert("შეცდომა", "ახალი სესიის შექმნა ვერ მოხერხდა");
-                  }
-                }
+              onPress={() => {
+                // Start fresh; the session is created with the first message
+                startNewChat();
               }}
             >
               <Ionicons name="create-outline" size={22} color="#1F2937" />
@@ -1360,7 +1354,9 @@ export default function AIAssistantScreen() {
         {/* Input Field — დამალულია უკუკავშირის მოდალისას, რომ კლავიატურამ ქვედა ზოლი არ აიწიოს */}
         {negFeedbackMessageId === null && isChatEnabled ? (
           <View style={styles.inputSection}>
-            <Text style={styles.inputReminder}>{t("aiAssistant.inputReminder")}</Text>
+            <Text style={styles.inputReminder}>
+              {t("aiAssistant.inputReminder")}
+            </Text>
             <View style={styles.inputContainer}>
               <TouchableOpacity
                 style={styles.inputIconButton}
@@ -1447,41 +1443,10 @@ export default function AIAssistantScreen() {
               <View style={styles.historyModalHeaderLeft}>
                 <TouchableOpacity
                   style={styles.historyNewChatButton}
-                  onPress={async () => {
-                    // Create new session and start fresh
-                    if (user?.id) {
-                      console.log("✍️ [newChatButton] Creating new session");
-                      try {
-                        const sessionResponse =
-                          await apiService.createAISession({
-                            initiator_id: user.id,
-                            initiator_type:
-                              user.role === "doctor" ? "doctor" : "customer",
-                          });
-                        if (sessionResponse.success) {
-                          setCurrentSession(sessionResponse.data);
-                          await AsyncStorage.setItem(
-                            "ai_session_id",
-                            sessionResponse.data.id,
-                          );
-                          setMessages([]);
-                          setShowHistoryModal(false);
-                          console.log(
-                            "✅ [newChatButton] New session created:",
-                            sessionResponse.data.id,
-                          );
-                        }
-                      } catch (error) {
-                        console.error(
-                          "❌ [newChatButton] Error creating session:",
-                          error,
-                        );
-                        Alert.alert(
-                          "შეცდომა",
-                          "ახალი სესიის შექმნა ვერ მოხერხდა",
-                        );
-                      }
-                    }
+                  onPress={() => {
+                    // Start fresh; the session is created with the first message
+                    startNewChat();
+                    setShowHistoryModal(false);
                   }}
                 >
                   <Ionicons name="create-outline" size={24} color="#6366F1" />
@@ -1519,10 +1484,11 @@ export default function AIAssistantScreen() {
                     onPress={() => handleSessionSelect(session)}
                   >
                     <View style={styles.historyItemContent}>
-                      <Text style={styles.historyItemTitle}>
-                        {session.status === "active"
-                          ? "აქტიური სესია"
-                          : "დასრულებული სესია"}
+                      <Text style={styles.historyItemTitle} numberOfLines={1}>
+                        {session.title ||
+                          (session.status === "active"
+                            ? "აქტიური სესია"
+                            : "დასრულებული სესია")}
                       </Text>
                       <Text style={styles.historyItemDate}>
                         {formatSessionDate(session.created_at)}
