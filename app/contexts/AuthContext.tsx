@@ -226,26 +226,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUserRoleState(loggedInUser.role);
       await AsyncStorage.setItem(ROLE_STORAGE_KEY, loggedInUser.role);
 
-      // Create AI Assistant session after successful login
-      try {
-        const sessionResponse = await apiService.createAISession({
-          initiator_id: loggedInUser.id,
-          initiator_type:
-            loggedInUser.role === "doctor" ? "doctor" : "customer",
-        });
-        if (sessionResponse.success) {
-          console.log(
-            "✅ AI Assistant session created:",
-            sessionResponse.data.id,
-          );
-          // Store session ID for later use
-          await AsyncStorage.setItem("ai_session_id", sessionResponse.data.id);
-        }
-      } catch (sessionError) {
-        // Don't fail login if session creation fails
-        console.warn("Failed to create AI Assistant session:", sessionError);
-      }
-
       return {
         ...authResponse,
         data: {
@@ -294,24 +274,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       await AsyncStorage.setItem(ROLE_STORAGE_KEY, authResponse.data.user.role);
       console.log("✅ [AuthContext] User and role set in context");
 
-      // Create AI Assistant session after successful login
-      try {
-        const sessionResponse = await apiService.createAISession({
-          initiator_id: authResponse.data.user.id,
-          initiator_type:
-            authResponse.data.user.role === "doctor" ? "doctor" : "customer",
-        });
-        if (sessionResponse.success) {
-          console.log(
-            "✅ AI Assistant session created:",
-            sessionResponse.data.id,
-          );
-          await AsyncStorage.setItem("ai_session_id", sessionResponse.data.id);
-        }
-      } catch (sessionError) {
-        console.warn("Failed to create AI Assistant session:", sessionError);
-      }
-
       console.log(
         "🎉 [AuthContext] Login completed successfully after OTP verification",
       );
@@ -341,24 +303,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(registeredUser);
       setUserRoleState(registeredUser.role);
       await AsyncStorage.setItem(ROLE_STORAGE_KEY, registeredUser.role);
-
-      // Create AI Assistant session after successful registration
-      try {
-        const sessionResponse = await apiService.createAISession({
-          initiator_id: registeredUser.id,
-          initiator_type:
-            registeredUser.role === "doctor" ? "doctor" : "customer",
-        });
-        if (sessionResponse.success) {
-          console.log(
-            "✅ AI Assistant session created:",
-            sessionResponse.data.id,
-          );
-          await AsyncStorage.setItem("ai_session_id", sessionResponse.data.id);
-        }
-      } catch (sessionError) {
-        console.warn("Failed to create AI Assistant session:", sessionError);
-      }
 
       console.log("🎉 [AuthContext] Registration completed successfully");
     } catch (error) {
