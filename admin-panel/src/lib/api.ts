@@ -2,6 +2,8 @@
 import { ADMIN_DEV_TOKEN } from "./dev-token";
 import { getApiBaseUrl } from "./api-base-url";
 
+const API_BASE_URL = getApiBaseUrl();
+
 // DEVELOPMENT MODE: Skip auth and use static token (from dev-token.ts)
 const DISABLE_AUTH = true;
 
@@ -193,16 +195,14 @@ export interface Notification {
 }
 
 class ApiService {
+  private baseURL: string;
   private token: string | null = null;
 
   constructor() {
+    this.baseURL = API_BASE_URL;
     if (typeof window !== "undefined") {
       this.token = localStorage.getItem("accessToken");
     }
-  }
-
-  private get baseURL(): string {
-    return getApiBaseUrl();
   }
 
   private getHeaders(): HeadersInit {
