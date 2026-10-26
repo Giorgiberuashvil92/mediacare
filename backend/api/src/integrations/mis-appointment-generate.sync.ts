@@ -9,6 +9,8 @@ export type MisAttachGenerateContext = {
   doctorPersonalId: string;
   /** MIS GenerateService: `YYYY-MM-DDTHH:mm:ss+04:00` */
   serviceDate: string;
+  /** კლინიკის Ambulatory base URL (ექიმის კლინიკიდან) */
+  ambulatoryBaseUrl?: string;
 };
 
 /**
@@ -31,14 +33,17 @@ export async function misAttachGeneratedServiceId(
     isFollowUp: appointment.isFollowUp === true,
   });
 
-  const genResult = await misAuthService.generateService({
-    ServiceID: serviceId,
-    PersonID: ctx.misPersonId,
-    ContractID: contractId,
-    MakeAutoPayment: true,
-    DoctorPersonalID: ctx.doctorPersonalId,
-    ServiceDate: ctx.serviceDate,
-  });
+  const genResult = await misAuthService.generateService(
+    {
+      ServiceID: serviceId,
+      PersonID: ctx.misPersonId,
+      ContractID: contractId,
+      MakeAutoPayment: true,
+      DoctorPersonalID: ctx.doctorPersonalId,
+      ServiceDate: ctx.serviceDate,
+    },
+    { ambulatoryBaseUrl: ctx.ambulatoryBaseUrl },
+  );
 
   if (!genResult.success || !genResult.serviceId) {
     await appointmentModel.findByIdAndDelete(appointment._id);

@@ -43,4 +43,9 @@ export class CreateClinicDto {
   @IsString()
   @MaxLength(300)
   bogClientSecret?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  misAmbulatoryBaseUrl?: string;
 }

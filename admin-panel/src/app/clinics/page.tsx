@@ -14,6 +14,7 @@ const defaultClinicForm = {
   merchantName: '',
   bogClientId: '',
   bogClientSecret: '',
+  misAmbulatoryBaseUrl: '',
 };
 
 export default function ClinicsPage() {
@@ -64,6 +65,8 @@ export default function ClinicsPage() {
         merchantName: clinicForm.merchantName.trim() || undefined,
         bogClientId: clinicForm.bogClientId.trim() || undefined,
         bogClientSecret: clinicForm.bogClientSecret.trim() || undefined,
+        misAmbulatoryBaseUrl:
+          clinicForm.misAmbulatoryBaseUrl.trim().replace(/\/$/, '') || undefined,
       };
 
       if (editingClinicId) {
@@ -96,6 +99,7 @@ export default function ClinicsPage() {
       merchantName: clinic.merchantName || '',
       bogClientId: clinic.bogClientId || '',
       bogClientSecret: '',
+      misAmbulatoryBaseUrl: clinic.misAmbulatoryBaseUrl || '',
     });
   };
 
@@ -274,6 +278,25 @@ export default function ClinicsPage() {
                         autoComplete="new-password"
                       />
                     </div>
+                    <div className="md:col-span-2">
+                      <label className={labelClass}>MIS Ambulatory API Base URL</label>
+                      <input
+                        type="url"
+                        value={clinicForm.misAmbulatoryBaseUrl}
+                        onChange={(e) =>
+                          setClinicForm({
+                            ...clinicForm,
+                            misAmbulatoryBaseUrl: e.target.value,
+                          })
+                        }
+                        placeholder="მაგ. http://192.168.1.254/MISNew/MIS.AmbulatoryTest.API"
+                        className={inputClass}
+                      />
+                      <p className="mt-1 text-xs text-dark-4">
+                        აქედან გაიგზავნება: AddOrUpdatePatient, GenerateService, GetFormsByServiceID.
+                        ექიმზე ამ კლინიკის მიბმისას გამოიყენება ეს endpoint.
+                      </p>
+                    </div>
                     <div className="flex items-center gap-2">
                       <input
                         id="clinic-active"
@@ -325,6 +348,7 @@ export default function ClinicsPage() {
                       <th className="p-3">Merchant ID</th>
                       <th className="p-3">Merchant სახელი</th>
                       <th className="p-3">BOG Credentials</th>
+                      <th className="p-3">MIS Ambulatory</th>
                       <th className="p-3">სტატუსი</th>
                       <th className="p-3 text-right">ქმედებები</th>
                     </tr>
@@ -332,7 +356,7 @@ export default function ClinicsPage() {
                   <tbody>
                     {clinics.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="p-6 text-center text-dark-4">
+                        <td colSpan={10} className="p-6 text-center text-dark-4">
                           კლინიკა არ მოიძებნა
                         </td>
                       </tr>
@@ -360,6 +384,12 @@ export default function ClinicsPage() {
                                 აკლია
                               </span>
                             )}
+                          </td>
+                          <td
+                            className="max-w-[220px] truncate p-3 font-mono text-xs"
+                            title={clinic.misAmbulatoryBaseUrl || undefined}
+                          >
+                            {clinic.misAmbulatoryBaseUrl || '—'}
                           </td>
                           <td className="p-3">
                             <span

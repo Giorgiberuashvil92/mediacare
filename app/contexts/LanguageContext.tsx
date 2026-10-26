@@ -3140,6 +3140,7 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     "doctor.dashboard.noHoursSelected": "Часы Не Выбраны",
     "doctor.dashboard.viewMoreDays": "Показать Все (Ещё {{count}})",
     "doctor.dashboard.videoConsultations": "Видеоконсультации",
+    "doctor.dashboard.seeAll": "Показать Все",
     "doctor.dashboard.homeVisits": "Визиты На Дом",
     "doctor.dashboard.appointmentsCount": "{{count}} Записей",
     "doctor.dashboard.availableCount": "{{count}} Свободно",

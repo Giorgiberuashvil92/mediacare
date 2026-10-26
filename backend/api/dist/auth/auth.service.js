@@ -304,6 +304,7 @@ let AuthService = class AuthService {
             const lastName = nameParts.length > 1
                 ? nameParts[nameParts.length - 1]
                 : savedUser.name || '';
+            const ambulatoryBaseUrl = await this.misAuthService.resolveAmbulatoryBaseUrlForDoctor(registerDto.appointmentDoctorId);
             const misSyncResult = await this.misAuthService.upsertPatient({
                 ID: null,
                 PersonalID: savedUser.idNumber || '',
@@ -330,7 +331,7 @@ let AuthService = class AuthService {
                 DateCreated: new Date().toISOString(),
                 DateChanged: new Date().toISOString(),
                 IsFromEMR: false,
-            });
+            }, { ambulatoryBaseUrl });
             if (!misSyncResult.success) {
                 await this.userModel.findByIdAndDelete(savedUser._id);
                 throw new common_1.BadRequestException('Patient sync to MIS failed. Registration cancelled.');

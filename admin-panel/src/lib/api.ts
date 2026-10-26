@@ -161,6 +161,8 @@ export interface Clinic {
   merchantName?: string;
   bogClientId?: string;
   hasBogCredentials?: boolean;
+  /** MIS Ambulatory API base, მაგ. http://host/MISNew/MIS.AmbulatoryTest.API */
+  misAmbulatoryBaseUrl?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -1340,6 +1342,7 @@ class ApiService {
     merchantName?: string;
     bogClientId?: string;
     bogClientSecret?: string;
+    misAmbulatoryBaseUrl?: string;
   }): Promise<ApiResponse<Clinic>> {
     const response = await fetch(`${this.baseURL}/admin/shop/clinics`, {
       method: "POST",

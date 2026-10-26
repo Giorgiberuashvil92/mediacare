@@ -17,6 +17,7 @@ export function EditDoctorForm({
 }: EditDoctorFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [specializations, setSpecializations] = useState<Specialization[]>([]);
   const [clinics, setClinics] = useState<Clinic[]>([]);
   const [loadingSpecializations, setLoadingSpecializations] = useState(true);
@@ -246,9 +247,32 @@ export function EditDoctorForm({
         fullUpdateData: updateData,
       });
 
+      setSuccessMessage(null);
       const response = await apiService.updateDoctor(doctor.id, updateData);
 
       if (response.success) {
+        const misSync = (response as any).misSync as
+          | {
+              attempted?: boolean;
+              success?: boolean;
+              message?: string;
+              personId?: string | null;
+            }
+          | undefined;
+
+        if (misSync?.attempted) {
+          const personPart = misSync.personId
+            ? ` (PersonID: ${misSync.personId})`
+            : "";
+          const misText = `${misSync.message || "MIS sync"}${personPart}`;
+          if (misSync.success) {
+            setSuccessMessage(`ექიმი განახლდა. ${misText}`);
+          } else {
+            setError(`ექიმი განახლდა, მაგრამ MIS შეცდომა: ${misText}`);
+          }
+        } else {
+          setSuccessMessage("ექიმი წარმატებით განახლდა");
+        }
         onSuccess?.();
       }
     } catch (err: any) {
@@ -268,6 +292,11 @@ export function EditDoctorForm({
         {error && (
           <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
             {error}
+          </div>
+        )}
+        {successMessage && (
+          <div className="mb-4 rounded-lg bg-green-50 p-3 text-sm text-green-700 dark:bg-green-900/20 dark:text-green-300">
+            {successMessage}
           </div>
         )}
 
@@ -499,7 +528,9 @@ export function EditDoctorForm({
               ))}
             </select>
             <p className="mt-1 text-xs text-dark-4 dark:text-dark-6">
-              გადახდის დროს გამოიყენება არჩეული კლინიკის BOG Merchant ID
+              გადახდის დროს — კლინიკის BOG Merchant ID. კლინიკის მიბმისას
+              ავტომატურად გაიგზავნება MIS AddOrUpdatePatient იმ კლინიკის
+              Ambulatory API-ზე (საჭიროა პირადი ნომერი და Ambulatory Base URL).
             </p>
           </div>
 

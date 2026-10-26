@@ -367,33 +367,41 @@ export class AuthService {
           ? nameParts[nameParts.length - 1]
           : savedUser.name || '';
 
-      const misSyncResult = await this.misAuthService.upsertPatient({
-        ID: null,
-        PersonalID: savedUser.idNumber || '',
-        FirstName: firstName,
-        LastName: lastName,
-        FatherName: '',
-        Gender: savedUser.gender === Gender.FEMALE ? 1 : 0,
-        BirthDate: savedUser.dateOfBirth
-          ? new Date(savedUser.dateOfBirth).toISOString()
-          : undefined,
-        Phone: savedUser.phone || '',
-        Mobile: savedUser.phone || '',
-        Email: savedUser.email || '',
-        Citizenship: citizenship?.trim() || residency?.trim() || undefined,
-        LegalAddress: savedUser.address || '',
-        ActualAddress: savedUser.address || '',
-        Description: '',
-        IdentificationStatus: 0,
-        ConsentForm: true,
-        Encrypted: false,
-        UserID: (savedUser._id as string).toString(),
-        UserFirstName: firstName,
-        UserLastName: lastName,
-        DateCreated: new Date().toISOString(),
-        DateChanged: new Date().toISOString(),
-        IsFromEMR: false,
-      });
+      const ambulatoryBaseUrl =
+        await this.misAuthService.resolveAmbulatoryBaseUrlForDoctor(
+          registerDto.appointmentDoctorId,
+        );
+
+      const misSyncResult = await this.misAuthService.upsertPatient(
+        {
+          ID: null,
+          PersonalID: savedUser.idNumber || '',
+          FirstName: firstName,
+          LastName: lastName,
+          FatherName: '',
+          Gender: savedUser.gender === Gender.FEMALE ? 1 : 0,
+          BirthDate: savedUser.dateOfBirth
+            ? new Date(savedUser.dateOfBirth).toISOString()
+            : undefined,
+          Phone: savedUser.phone || '',
+          Mobile: savedUser.phone || '',
+          Email: savedUser.email || '',
+          Citizenship: citizenship?.trim() || residency?.trim() || undefined,
+          LegalAddress: savedUser.address || '',
+          ActualAddress: savedUser.address || '',
+          Description: '',
+          IdentificationStatus: 0,
+          ConsentForm: true,
+          Encrypted: false,
+          UserID: (savedUser._id as string).toString(),
+          UserFirstName: firstName,
+          UserLastName: lastName,
+          DateCreated: new Date().toISOString(),
+          DateChanged: new Date().toISOString(),
+          IsFromEMR: false,
+        },
+        { ambulatoryBaseUrl },
+      );
 
       if (!misSyncResult.success) {
         await this.userModel.findByIdAndDelete(savedUser._id);

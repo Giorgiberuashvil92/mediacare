@@ -21,6 +21,7 @@ import { formatMisServiceDate } from '../integrations/mis-service-date';
 import {
   ApprovalStatus,
   DoctorStatus,
+  Gender,
   User,
   UserDocument,
   UserRole,
@@ -1247,6 +1248,12 @@ export class DoctorsService {
       throw new BadRequestException('User is not a doctor');
     }
 
+    const previousClinicId =
+      (doctor as any).clinicId?.toString?.() ||
+      ((doctor as any).clinicId
+        ? String((doctor as any).clinicId)
+        : undefined);
+
     console.log('💰 [updateDoctor] Doctor fees BEFORE update:', {
       consultationFee: doctor.consultationFee,
       followUpFee: doctor.followUpFee,
@@ -1436,7 +1443,164 @@ export class DoctorsService {
       homeVisitFee: savedDoctor?.homeVisitFee,
     });
 
-    return this.getDoctorById(doctorId, true);
+    const nextClinicId =
+      (doctor as any).clinicId?.toString?.() ||
+      ((doctor as any).clinicId
+        ? String((doctor as any).clinicId)
+        : undefined);
+
+    let misSync:
+      | {
+          attempted: boolean;
+          success: boolean;
+          personId?: string | null;
+          message: string;
+        }
+      | undefined;
+
+    // კლინიკაზე მიბმისას (ახალი ან შეცვლილი) — AddOrUpdatePatient იმ კლინიკის Ambulatory-ზე
+    if (nextClinicId && nextClinicId !== previousClinicId) {
+      misSync = await this.syncDoctorToClinicMis(doctorId);
+    }
+
+    const result = await this.getDoctorById(doctorId, true);
+    return {
+      ...result,
+      ...(misSync ? { misSync } : {}),
+    };
+  }
+
+  /**
+   * ექიმის AddOrUpdatePatient იმ კლინიკის MIS Ambulatory endpoint-ზე,
+   * რომელზეც ექიმია მიბმული.
+   */
+  private async syncDoctorToClinicMis(doctorId: string): Promise<{
+    attempted: boolean;
+    success: boolean;
+    personId?: string | null;
+    message: string;
+  }> {
+    const doctor = await this.userModel.findById(doctorId);
+    if (!doctor || doctor.role !== UserRole.DOCTOR) {
+      return {
+        attempted: false,
+        success: false,
+        message: 'ექიმი ვერ მოიძებნა',
+      };
+    }
+
+    const clinicId = (doctor as any).clinicId?.toString?.();
+    if (!clinicId) {
+      return {
+        attempted: false,
+        success: false,
+        message: 'ექიმს კლინიკა არ აქვს მიბმული',
+      };
+    }
+
+    const personalId =
+      typeof doctor.idNumber === 'string' ? doctor.idNumber.trim() : '';
+    if (!personalId) {
+      return {
+        attempted: true,
+        success: false,
+        message:
+          'MIS AddOrUpdatePatient ვერ გაიგზავნა — ექიმს პირადი ნომერი აკლია',
+      };
+    }
+
+    const ambulatoryBaseUrl =
+      await this.misAuthService.resolveAmbulatoryBaseUrlForDoctor(doctorId);
+    if (!ambulatoryBaseUrl) {
+      return {
+        attempted: true,
+        success: false,
+        message:
+          'MIS AddOrUpdatePatient ვერ გაიგზავნა — კლინიკაზე Ambulatory Base URL არ არის მითითებული',
+      };
+    }
+
+    const nameParts = (doctor.name || '').trim().split(/\s+/).filter(Boolean);
+    const firstName = nameParts[0] || doctor.name || '';
+    const lastName =
+      nameParts.length > 1 ? nameParts[nameParts.length - 1] : doctor.name || '';
+
+    const existingMisId =
+      typeof doctor.misPersonId === 'string' && doctor.misPersonId.trim()
+        ? doctor.misPersonId.trim()
+        : null;
+
+    try {
+      const misResult = await this.misAuthService.upsertPatient(
+        {
+          ID: existingMisId,
+          PersonalID: personalId,
+          FirstName: firstName,
+          LastName: lastName,
+          FatherName: '',
+          Gender: doctor.gender === Gender.FEMALE ? 1 : 0,
+          BirthDate: doctor.dateOfBirth
+            ? new Date(doctor.dateOfBirth).toISOString()
+            : undefined,
+          Phone: doctor.phone || '',
+          Mobile: doctor.phone || '',
+          Email: doctor.email || '',
+          LegalAddress: doctor.address || doctor.location || '',
+          ActualAddress: doctor.address || doctor.location || '',
+          Description: doctor.specialization
+            ? `Doctor / ${doctor.specialization}`
+            : 'Doctor',
+          IdentificationStatus: 0,
+          ConsentForm: true,
+          Encrypted: false,
+          UserID: (doctor._id as mongoose.Types.ObjectId).toString(),
+          UserFirstName: firstName,
+          UserLastName: lastName,
+          DateCreated: new Date().toISOString(),
+          DateChanged: new Date().toISOString(),
+          IsFromEMR: false,
+        },
+        { ambulatoryBaseUrl },
+      );
+
+      if (!misResult.success) {
+        this.logger.warn(
+          `MIS AddOrUpdatePatient failed for doctor=${doctorId} clinic=${clinicId} base=${ambulatoryBaseUrl}`,
+        );
+        return {
+          attempted: true,
+          success: false,
+          personId: misResult.personId ?? null,
+          message: 'MIS AddOrUpdatePatient წარუმატებელი იყო',
+        };
+      }
+
+      if (misResult.personId) {
+        doctor.misPersonId = misResult.personId;
+        await doctor.save();
+      }
+
+      this.logger.log(
+        `MIS AddOrUpdatePatient OK doctor=${doctorId} personId=${misResult.personId || existingMisId || 'n/a'} base=${ambulatoryBaseUrl}`,
+      );
+
+      return {
+        attempted: true,
+        success: true,
+        personId: misResult.personId ?? existingMisId,
+        message: 'MIS AddOrUpdatePatient წარმატებით გაიგზავნა',
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `MIS AddOrUpdatePatient error doctor=${doctorId}: ${message}`,
+      );
+      return {
+        attempted: true,
+        success: false,
+        message: `MIS AddOrUpdatePatient შეცდომა: ${message}`,
+      };
+    }
   }
 
   /** Doctor revenue share (platform takes the rest): video 60%, home-visit 50% */
@@ -2227,6 +2391,11 @@ export class DoctorsService {
 
     await followUpAppointment.save();
 
+    const followUpAmbulatoryBaseUrl =
+      await this.misAuthService.resolveAmbulatoryBaseUrlForDoctor(
+        appointment.doctorId,
+      );
+
     await misAttachGeneratedServiceId(
       this.misAuthService,
       this.appointmentModel,
@@ -2238,6 +2407,7 @@ export class DoctorsService {
           String(dto.date).trim().split('T')[0],
           dto.time,
         ),
+        ambulatoryBaseUrl: followUpAmbulatoryBaseUrl,
       },
       this.logger,
     );

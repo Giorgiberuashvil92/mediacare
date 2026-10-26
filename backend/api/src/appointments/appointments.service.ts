@@ -84,6 +84,14 @@ export class AppointmentsService {
     }
   }
 
+  private async resolveAmbulatoryBaseUrlForAppointmentDoctor(
+    doctorId: unknown,
+  ): Promise<string | undefined> {
+    return this.misAuthService.resolveAmbulatoryBaseUrlForDoctor(
+      this.appointmentUserRefId(doctorId) || null,
+    );
+  }
+
   /**
    * HIS/MIS ველები პასუხის JSON-ში.
    * `misPrintForms*` Mongo-ში აღარ ინახება — ყოველთვის null (HIS მხოლოდ GET mis-print-forms-ით).
@@ -294,7 +302,7 @@ export class AppointmentsService {
         .select('misPersonId');
       const doctor = await this.userModel
         .findById(appointment.doctorId)
-        .select('idNumber');
+        .select('idNumber clinicId');
 
       const misPersonId =
         typeof patient?.misPersonId === 'string'
@@ -320,14 +328,22 @@ export class AppointmentsService {
         appointment.appointmentTime || '00:00',
       );
 
-      const genResult = await this.misAuthService.generateService({
-        ServiceID: serviceId,
-        PersonID: misPersonId,
-        ContractID: contractId,
-        MakeAutoPayment: true,
-        DoctorPersonalID: doctorPersonalId,
-        ServiceDate: serviceDate,
-      });
+      const ambulatoryBaseUrl =
+        await this.resolveAmbulatoryBaseUrlForAppointmentDoctor(
+          appointment.doctorId,
+        );
+
+      const genResult = await this.misAuthService.generateService(
+        {
+          ServiceID: serviceId,
+          PersonID: misPersonId,
+          ContractID: contractId,
+          MakeAutoPayment: true,
+          DoctorPersonalID: doctorPersonalId,
+          ServiceDate: serviceDate,
+        },
+        { ambulatoryBaseUrl },
+      );
 
       if (!genResult.success || !genResult.serviceId) {
         this.logger.warn(
@@ -665,6 +681,11 @@ export class AppointmentsService {
 
     await appointment.save();
 
+    const ambulatoryBaseUrl =
+      await this.resolveAmbulatoryBaseUrlForAppointmentDoctor(
+        createAppointmentDto.doctorId,
+      );
+
     await misAttachGeneratedServiceId(
       this.misAuthService,
       this.appointmentModel,
@@ -676,6 +697,7 @@ export class AppointmentsService {
           dateOnly,
           createAppointmentDto.appointmentTime || '00:00',
         ),
+        ambulatoryBaseUrl,
       },
       this.logger,
     );
@@ -857,8 +879,11 @@ export class AppointmentsService {
    */
   private async fetchMisPrintFormsBodyFromHis(
     serviceId: string,
+    ambulatoryBaseUrl?: string,
   ): Promise<{ ok: boolean; body: unknown | null }> {
-    const r = await this.misAuthService.getFormsByServiceId(serviceId);
+    const r = await this.misAuthService.getFormsByServiceId(serviceId, {
+      ambulatoryBaseUrl,
+    });
     if (r.success && r.body != null) {
       return { ok: true, body: r.body };
     }
@@ -1029,7 +1054,14 @@ export class AppointmentsService {
       };
     }
 
-    const { ok, body } = await this.fetchMisPrintFormsBodyFromHis(sid);
+    const ambulatoryBaseUrlForForms =
+      await this.resolveAmbulatoryBaseUrlForAppointmentDoctor(
+        appointment.doctorId,
+      );
+    const { ok, body } = await this.fetchMisPrintFormsBodyFromHis(
+      sid,
+      ambulatoryBaseUrlForForms,
+    );
     if (!ok || body == null) {
       const hisAt = appointment.misForm100AvailableAt;
       const storedIdx = appointment.misForm100PrintFormIndex;
@@ -1128,7 +1160,14 @@ export class AppointmentsService {
       );
     }
 
-    const { ok, body } = await this.fetchMisPrintFormsBodyFromHis(sid);
+    const ambulatoryBaseUrlForPdf =
+      await this.resolveAmbulatoryBaseUrlForAppointmentDoctor(
+        appointment.doctorId,
+      );
+    const { ok, body } = await this.fetchMisPrintFormsBodyFromHis(
+      sid,
+      ambulatoryBaseUrlForPdf,
+    );
     if (!ok || body == null) {
       throw new BadRequestException(
         'HIS PrintForm/GetFormsByServiceID ვერ მოხერხდა.',
@@ -1157,6 +1196,7 @@ export class AppointmentsService {
     if (source.url) {
       const downloaded = await this.misAuthService.downloadBinaryFromMis(
         source.url,
+        { ambulatoryBaseUrl: ambulatoryBaseUrlForPdf },
       );
       if (!downloaded.success || !downloaded.buffer) {
         throw new BadRequestException(
@@ -2160,6 +2200,11 @@ export class AppointmentsService {
 
     await followUpAppointment.save();
 
+    const followUpAmbulatoryBaseUrl =
+      await this.resolveAmbulatoryBaseUrlForAppointmentDoctor(
+        originalAppointment.doctorId,
+      );
+
     await misAttachGeneratedServiceId(
       this.misAuthService,
       this.appointmentModel,
@@ -2171,6 +2216,7 @@ export class AppointmentsService {
           String(dto.date).trim().split('T')[0],
           dto.time,
         ),
+        ambulatoryBaseUrl: followUpAmbulatoryBaseUrl,
       },
       this.logger,
     );

@@ -97,6 +97,7 @@ export class ShopService {
     merchantName?: string;
     bogClientId?: string;
     bogClientSecret?: string;
+    misAmbulatoryBaseUrl?: string;
     createdAt?: Date;
     updatedAt?: Date;
   }) {
@@ -113,6 +114,7 @@ export class ShopService {
       hasBogCredentials: Boolean(
         clinic.bogClientId?.trim() && clinic.bogClientSecret?.trim(),
       ),
+      misAmbulatoryBaseUrl: clinic.misAmbulatoryBaseUrl,
       createdAt: clinic.createdAt,
       updatedAt: clinic.updatedAt,
     };
@@ -566,6 +568,9 @@ export class ShopService {
       ...createClinicDto,
       bogClientId: createClinicDto.bogClientId?.trim() || undefined,
       bogClientSecret: createClinicDto.bogClientSecret?.trim() || undefined,
+      misAmbulatoryBaseUrl:
+        createClinicDto.misAmbulatoryBaseUrl?.trim().replace(/\/$/, '') ||
+        undefined,
     });
     const savedClinic = await clinic.save();
     const clinicDoc = savedClinic.toObject() as ClinicDocument & {
@@ -585,6 +590,7 @@ export class ShopService {
         merchantName: savedClinic.merchantName,
         bogClientId: savedClinic.bogClientId,
         bogClientSecret: savedClinic.bogClientSecret,
+        misAmbulatoryBaseUrl: savedClinic.misAmbulatoryBaseUrl,
         createdAt: clinicDoc.createdAt,
         updatedAt: clinicDoc.updatedAt,
       }),
@@ -616,6 +622,7 @@ export class ShopService {
           merchantName: clinic.merchantName,
           bogClientId: clinic.bogClientId,
           bogClientSecret: clinic.bogClientSecret,
+          misAmbulatoryBaseUrl: clinic.misAmbulatoryBaseUrl,
           createdAt: clinic.createdAt,
           updatedAt: clinic.updatedAt,
         }),
@@ -647,6 +654,7 @@ export class ShopService {
         merchantName: clinicDoc.merchantName,
         bogClientId: clinicDoc.bogClientId,
         bogClientSecret: clinicDoc.bogClientSecret,
+        misAmbulatoryBaseUrl: clinicDoc.misAmbulatoryBaseUrl,
         createdAt: clinicDoc.createdAt,
         updatedAt: clinicDoc.updatedAt,
       }),
@@ -671,6 +679,11 @@ export class ShopService {
       } else {
         delete updatePayload.bogClientSecret;
       }
+    }
+    if (typeof updatePayload.misAmbulatoryBaseUrl === 'string') {
+      updatePayload.misAmbulatoryBaseUrl =
+        updatePayload.misAmbulatoryBaseUrl.trim().replace(/\/$/, '') ||
+        undefined;
     }
 
     const clinic = await this.clinicModel.findByIdAndUpdate(
@@ -700,6 +713,7 @@ export class ShopService {
         merchantName: clinic.merchantName,
         bogClientId: clinic.bogClientId,
         bogClientSecret: clinic.bogClientSecret,
+        misAmbulatoryBaseUrl: clinic.misAmbulatoryBaseUrl,
         createdAt: clinicDoc.createdAt,
         updatedAt: clinicDoc.updatedAt,
       }),

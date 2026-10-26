@@ -604,11 +604,15 @@ export default function AIAssistantScreen() {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showPaymentWebView, setShowPaymentWebView] = useState(false);
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
+  const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
   const [showCancelPlanModal, setShowCancelPlanModal] = useState(false);
   const [showInlineUpgradeCard, setShowInlineUpgradeCard] = useState(false);
   const [purchaseResult, setPurchaseResult] = useState<
     "success" | "failure" | "cancelSuccess" | null
   >(null);
+  const modalTransitionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   const isChatEnabled = consentStatus === "accepted";
   const aiUsageLimit = AI_PLAN_LIMITS[aiPlan];
@@ -866,21 +870,60 @@ export default function AIAssistantScreen() {
     }
   }, [aiPlan, showUpgradeModal]);
 
+  const clearModalTransitionTimeout = useCallback(() => {
+    if (modalTransitionTimeoutRef.current) {
+      clearTimeout(modalTransitionTimeoutRef.current);
+      modalTransitionTimeoutRef.current = null;
+    }
+  }, []);
+
+  const openAfterUpgradeModalClose = useCallback(
+    (action: () => void, delayMs = 450) => {
+      clearModalTransitionTimeout();
+      setShowUpgradeModal(false);
+      modalTransitionTimeoutRef.current = setTimeout(() => {
+        modalTransitionTimeoutRef.current = null;
+        action();
+      }, delayMs);
+    },
+    [clearModalTransitionTimeout],
+  );
+
+  useEffect(() => {
+    return () => {
+      clearModalTransitionTimeout();
+    };
+  }, [clearModalTransitionTimeout]);
+
   const handleUpgradePlan = useCallback(async () => {
+    if (isCheckoutLoading) return;
+
     try {
+      setIsCheckoutLoading(true);
       const checkout = await apiService.createAISubscriptionCheckout(
         selectedUpgradePlan,
       );
+
+      if (!checkout?.paymentUrl) {
+        throw new Error("Payment URL missing from checkout response");
+      }
+
       paymentResultHandledRef.current = false;
       setShowInlineUpgradeCard(false);
-      setShowUpgradeModal(false);
       setPaymentUrl(checkout.paymentUrl);
-      setShowPaymentWebView(true);
+      // iOS: closing one Modal and opening another in the same tick often hangs.
+      openAfterUpgradeModalClose(() => {
+        setShowPaymentWebView(true);
+      });
     } catch (error: any) {
       console.error("❌ [AI subscription] Checkout failed:", error);
-      setPurchaseResult("failure");
+      openAfterUpgradeModalClose(() => {
+        setPurchaseResult("failure");
+      });
+    } finally {
+      setIsCheckoutLoading(false);
     }
-  }, [selectedUpgradePlan]);
+  }, [isCheckoutLoading, openAfterUpgradeModalClose, selectedUpgradePlan]);
 
   const handleCancelPlan = useCallback(async () => {
     try {
@@ -889,10 +932,16 @@ export default function AIAssistantScreen() {
       setSelectedUpgradePlan("standard");
       setShowCancelPlanModal(false);
       setShowUpgradeModal(false);
-      setPurchaseResult("cancelSuccess");
+      setTimeout(() => {
+        setPurchaseResult("cancelSuccess");
+      }, 350);
     } catch (error: any) {
       console.error("❌ [AI subscription] Cancellation failed:", error);
-      setPurchaseResult("failure");
+      setShowCancelPlanModal(false);
+      setShowUpgradeModal(false);
+      setTimeout(() => {
+        setPurchaseResult("failure");
+      }, 350);
     }
   }, [syncAISubscription]);
 
@@ -912,15 +961,22 @@ export default function AIAssistantScreen() {
     paymentResultHandledRef.current = true;
     setShowPaymentWebView(false);
     setPaymentUrl(null);
-    setPurchaseResult("failure");
+    setTimeout(() => {
+      setPurchaseResult("failure");
+    }, 350);
   }, []);
 
   const handleOpenPaymentHistory = useCallback(() => {
-    setShowUpgradeModal(false);
-    requestAnimationFrame(() => {
+    openAfterUpgradeModalClose(() => {
       router.push("/screens/ai-payment-history");
     });
-  }, []);
+  }, [openAfterUpgradeModalClose]);
+
+  const handleOpenCancelPlanModal = useCallback(() => {
+    openAfterUpgradeModalClose(() => {
+      setShowCancelPlanModal(true);
+    }, 350);
+  }, [openAfterUpgradeModalClose]);
 
   const closePurchaseResult = useCallback(() => {
     const role = user?.role || userRole;
@@ -2534,6 +2590,7 @@ export default function AIAssistantScreen() {
       <Modal
         visible={showPaymentWebView}
         animationType="slide"
+        presentationStyle="fullScreen"
         onRequestClose={() => {
           setShowPaymentWebView(false);
           setPaymentUrl(null);
@@ -2564,6 +2621,13 @@ export default function AIAssistantScreen() {
               source={{ uri: paymentUrl }}
               style={styles.paymentWebView}
               startInLoadingState
+              javaScriptEnabled
+              domStorageEnabled
+              sharedCookiesEnabled
+              thirdPartyCookiesEnabled
+              originWhitelist={["*"]}
+              setSupportMultipleWindows={false}
+              onShouldStartLoadWithRequest={() => true}
               onNavigationStateChange={(state) => {
                 const url = state.url.toLowerCase();
                 if (url.includes("/payment/success") || url.includes("success")) {
@@ -2573,6 +2637,11 @@ export default function AIAssistantScreen() {
                 if (url.includes("/payment/fail") || url.includes("fail")) {
                   handlePaymentFailure();
                 }
+              }}
+              onError={() => {
+                setShowPaymentWebView(false);
+                setPaymentUrl(null);
+                setTimeout(() => setPurchaseResult("failure"), 350);
               }}
               renderLoading={() => (
                 <View style={styles.paymentWebViewLoading}>
@@ -2715,7 +2784,7 @@ export default function AIAssistantScreen() {
                 <TouchableOpacity
                   style={styles.cancelSubscriptionButton}
                   activeOpacity={0.86}
-                  onPress={() => setShowCancelPlanModal(true)}
+                  onPress={handleOpenCancelPlanModal}
                 >
                   <Text style={styles.cancelSubscriptionButtonText}>
                     {upgradeCopy.cancelButton}
@@ -2724,8 +2793,12 @@ export default function AIAssistantScreen() {
               </>
             ) : (
               <TouchableOpacity
-                style={styles.upgradeButton}
+                style={[
+                  styles.upgradeButton,
+                  isCheckoutLoading ? { opacity: 0.72 } : null,
+                ]}
                 activeOpacity={0.88}
+                disabled={isCheckoutLoading}
                 onPress={handleUpgradePlan}
               >
                 <LinearGradient
@@ -2733,10 +2806,21 @@ export default function AIAssistantScreen() {
                   start={{ x: 0.1, y: 0.2 }}
                   end={{ x: 0.9, y: 0.8 }}
                   style={styles.upgradeButtonGradient}
+                  pointerEvents="none"
                 >
-                  <Ionicons name="flash" size={16} color="#FFFFFF" />
+                  {isCheckoutLoading ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Ionicons name="flash" size={16} color="#FFFFFF" />
+                  )}
                   <Text style={styles.upgradeButtonText}>
-                    {upgradeCopy.upgradeButton}
+                    {isCheckoutLoading
+                      ? language === "en"
+                        ? "Opening payment..."
+                        : language === "ru"
+                          ? "Открываем оплату..."
+                          : "გადახდა იხსნება..."
+                      : upgradeCopy.upgradeButton}
                   </Text>
                 </LinearGradient>
               </TouchableOpacity>

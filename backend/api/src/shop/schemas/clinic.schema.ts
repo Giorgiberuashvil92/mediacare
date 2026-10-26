@@ -30,6 +30,17 @@ export class Clinic {
   @Prop({ trim: true })
   bogClientSecret?: string;
 
+  /**
+   * კლინიკის MIS Ambulatory API base URL.
+   * მაგ.: http://192.168.1.254/MISNew/MIS.AmbulatoryTest.API
+   * აქედან იგება:
+   *  - /api/Patients/AddOrUpdatePatient
+   *  - /api/Services/GenerateService
+   *  - /api/PrintForm/GetFormsByServiceID
+   */
+  @Prop({ trim: true })
+  misAmbulatoryBaseUrl?: string;
+
   @Prop({ type: Object, default: {} })
   metadata?: Record<string, any>;
 }

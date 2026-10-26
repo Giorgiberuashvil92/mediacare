@@ -4,7 +4,16 @@ import {
   OnApplicationBootstrap,
   OnModuleDestroy,
 } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
 import { randomUUID } from 'crypto';
+import mongoose, { Model } from 'mongoose';
+import { User, UserDocument } from '../schemas/user.schema';
+import { Clinic, ClinicDocument } from '../shop/schemas/clinic.schema';
+
+export type MisAmbulatoryRequestOptions = {
+  /** კლინიკის Ambulatory base URL; თუ ცარიელია — env default */
+  ambulatoryBaseUrl?: string | null;
+};
 
 /** ნორმალიზებული პასუხი (Swagger ხშირად PascalCase: Code, Message, Value) */
 type MisLoginResponse = {
@@ -307,6 +316,71 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
     10,
   );
 
+  constructor(
+    @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
+    @InjectModel(Clinic.name)
+    private readonly clinicModel: Model<ClinicDocument>,
+  ) {}
+
+  /** კლინიკაზე შენახული Ambulatory base (trailing slash მოცილებული). */
+  normalizeAmbulatoryBaseUrl(baseUrl?: string | null): string | undefined {
+    const normalized = baseUrl?.trim().replace(/\/$/, '');
+    return normalized || undefined;
+  }
+
+  /**
+   * ექიმის კლინიკიდან Ambulatory base URL.
+   * თუ კლინიკა/ველი არ არის — undefined (გამოიყენება env default).
+   */
+  async resolveAmbulatoryBaseUrlForDoctor(
+    doctorId?: string | mongoose.Types.ObjectId | null,
+  ): Promise<string | undefined> {
+    if (!doctorId || !mongoose.Types.ObjectId.isValid(String(doctorId))) {
+      return undefined;
+    }
+
+    const doctor = await this.userModel
+      .findById(doctorId)
+      .select('clinicId')
+      .lean();
+    const clinicId = (doctor as { clinicId?: mongoose.Types.ObjectId } | null)
+      ?.clinicId;
+    if (!clinicId) {
+      return undefined;
+    }
+
+    const clinic = await this.clinicModel
+      .findById(clinicId)
+      .select('misAmbulatoryBaseUrl name')
+      .lean();
+    const base = this.normalizeAmbulatoryBaseUrl(
+      (clinic as { misAmbulatoryBaseUrl?: string } | null)
+        ?.misAmbulatoryBaseUrl,
+    );
+    if (base) {
+      this.logger.log(
+        `MIS Ambulatory base from clinic "${(clinic as any)?.name || clinicId}": ${base}`,
+      );
+    }
+    return base;
+  }
+
+  private resolveAmbulatoryEndpoints(options?: MisAmbulatoryRequestOptions) {
+    const base = this.normalizeAmbulatoryBaseUrl(options?.ambulatoryBaseUrl);
+    if (!base) {
+      return {
+        patientUpsertUrl: this.patientUpsertUrl,
+        generateServiceUrl: this.generateServiceUrl,
+        printFormGetFormsUrl: this.printFormGetFormsUrl,
+      };
+    }
+    return {
+      patientUpsertUrl: `${base}/api/Patients/AddOrUpdatePatient`,
+      generateServiceUrl: `${base}/api/Services/GenerateService`,
+      printFormGetFormsUrl: `${base}/api/PrintForm/GetFormsByServiceID`,
+    };
+  }
+
   /** GET /Home/Login header-ისთვის: ჯერ მიმდინარე HIS token, შემდეგ env fallback */
   private getLoginTokenForAuthRequest(): string {
     return this.storedValue?.trim() || this.loginTokenHeader.trim();
@@ -510,7 +584,9 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
 
   async upsertPatient(
     payload: MisPatientPayload,
+    options?: MisAmbulatoryRequestOptions,
   ): Promise<MisPatientUpsertResult> {
+    const { patientUpsertUrl } = this.resolveAmbulatoryEndpoints(options);
     const requestBody = buildMisAddOrUpdateRequestBody(payload);
     const rawSentId = requestBody.ID;
     const sentMisPatientGuid = typeof rawSentId === 'string' ? rawSentId : '';
@@ -533,7 +609,7 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
 
       try {
         this.logger.log(
-          `MIS patient upsert request (ცდა ${attempt + 1}/2) | url=${this.patientUpsertUrl} | hasLoginToken=${Boolean(loginToken)}`,
+          `MIS patient upsert request (ცდა ${attempt + 1}/2) | url=${patientUpsertUrl} | hasLoginToken=${Boolean(loginToken)}`,
         );
         this.logger.log(
           `MIS patient upsert body (მხოლოდ აპლიკაციის ველები, undefined ამოღებული):\n${JSON.stringify(plainBody, null, 2)}`,
@@ -542,7 +618,7 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
           `MIS patient upsert request payload (exact outbound):\n${JSON.stringify(
             {
               method: 'POST',
-              url: this.patientUpsertUrl,
+              url: patientUpsertUrl,
               headers: {
                 'Content-Type': 'application/json; charset=utf-8',
                 LoginToken: loginToken,
@@ -556,7 +632,7 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
         this.logger.log(
           `MIS_UPSERT_OUTBOUND::${JSON.stringify({
             method: 'POST',
-            url: this.patientUpsertUrl,
+            url: patientUpsertUrl,
             headers: {
               'Content-Type': 'application/json; charset=utf-8',
               LoginToken: loginToken,
@@ -565,7 +641,7 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
           })}`,
         );
 
-        const response = await fetch(this.patientUpsertUrl, {
+        const response = await fetch(patientUpsertUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json; charset=utf-8',
@@ -665,7 +741,10 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
 
   async generateService(
     payload: MisGenerateServicePayload,
+    options?: MisAmbulatoryRequestOptions,
   ): Promise<MisGenerateServiceResult> {
+    const { generateServiceUrl } = this.resolveAmbulatoryEndpoints(options);
+
     for (let attempt = 0; attempt < 2; attempt++) {
       if (attempt > 0) {
         this.logger.warn(
@@ -684,11 +763,11 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
 
       try {
         this.logger.log(
-          `MIS GenerateService request (ცდა ${attempt + 1}/2) | url=${this.generateServiceUrl}`,
+          `MIS GenerateService request (ცდა ${attempt + 1}/2) | url=${generateServiceUrl}`,
         );
         this.logger.log(`MIS GenerateService body: ${JSON.stringify(payload)}`);
 
-        const response = await fetch(this.generateServiceUrl, {
+        const response = await fetch(generateServiceUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json; charset=utf-8',
@@ -770,7 +849,10 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   /** Relative path თუ მოვიდა, MIS base-ზე ავაწყოთ absolute URL. */
-  private toAbsoluteMisUrl(urlOrPath: string): string {
+  private toAbsoluteMisUrl(
+    urlOrPath: string,
+    options?: MisAmbulatoryRequestOptions,
+  ): string {
     const raw = urlOrPath.trim();
     if (!raw) {
       return raw;
@@ -779,7 +861,8 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
       return raw;
     }
 
-    const base = this.generateServiceUrl.replace(/\/$/, '');
+    const { generateServiceUrl } = this.resolveAmbulatoryEndpoints(options);
+    const base = generateServiceUrl.replace(/\/$/, '');
     try {
       return new URL(raw, `${base}/`).toString();
     } catch {
@@ -793,6 +876,7 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
    */
   async downloadBinaryFromMis(
     urlOrPath: string,
+    options?: MisAmbulatoryRequestOptions,
   ): Promise<MisBinaryDownloadResult> {
     const raw = urlOrPath?.trim();
     if (!raw) {
@@ -817,7 +901,7 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
       };
     }
 
-    const absoluteUrl = this.toAbsoluteMisUrl(raw);
+    const absoluteUrl = this.toAbsoluteMisUrl(raw, options);
 
     try {
       this.logger.log(`MIS binary download GET: ${absoluteUrl}`);
@@ -872,13 +956,15 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
    */
   async getFormsByServiceId(
     generatedServiceInstanceId: string,
+    options?: MisAmbulatoryRequestOptions,
   ): Promise<MisGetFormsByServiceIdResult> {
     const id = generatedServiceInstanceId?.trim();
     if (!id) {
       return { success: false, body: null };
     }
 
-    const base = this.printFormGetFormsUrl.replace(/\/$/, '');
+    const { printFormGetFormsUrl } = this.resolveAmbulatoryEndpoints(options);
+    const base = printFormGetFormsUrl.replace(/\/$/, '');
     const sep = base.includes('?') ? '&' : '?';
     const url = `${base}${sep}ServiceID=${encodeURIComponent(id)}`;
 
