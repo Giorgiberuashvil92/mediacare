@@ -15,39 +15,34 @@ async function bootstrap() {
     prefix: '/uploads/',
   });
 
-  // CORS: always allow admin Vercel; merge with CORS_ORIGINS (or reflect all if *)
-  const DEFAULT_CORS_ORIGINS = [
-    'https://mediacareadmin.vercel.app',
-    'http://localhost:3000',
-    'http://localhost:3001',
-  ];
-  const envCorsOrigins = process.env.CORS_ORIGINS
-    ? process.env.CORS_ORIGINS.split(',')
-        .map((origin) => origin.trim())
-        .filter(Boolean)
-    : [];
-  const allowAllOrigins =
-    envCorsOrigins.length === 0 || envCorsOrigins.includes('*');
-  const allowedOrigins = [
-    ...new Set([
-      ...DEFAULT_CORS_ORIGINS,
-      ...envCorsOrigins.filter((o) => o !== '*'),
-    ]),
-  ];
+  // CORS must run first — browser preflight from Vercel admin
+  app.use((req: any, res: any, next: any) => {
+    const origin = req.headers.origin as string | undefined;
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader(
+        'Access-Control-Allow-Methods',
+        'GET,POST,PUT,PATCH,DELETE,OPTIONS,HEAD',
+      );
+      res.setHeader(
+        'Access-Control-Allow-Headers',
+        (req.headers['access-control-request-headers'] as string) ||
+          'Content-Type, Authorization, Accept, Origin, X-Requested-With',
+      );
+      res.setHeader('Access-Control-Max-Age', '86400');
+      res.setHeader('Vary', 'Origin');
+    }
 
-  const corsConfig = {
-    origin: allowAllOrigins
-      ? true
-      : (
-          origin: string | undefined,
-          callback: (err: Error | null, allow?: boolean) => void,
-        ) => {
-          if (!origin || allowedOrigins.includes(origin)) {
-            callback(null, true);
-          } else {
-            callback(null, false);
-          }
-        },
+    if (req.method === 'OPTIONS') {
+      return res.status(204).end();
+    }
+    return next();
+  });
+
+  // Reflect any Origin (admin Vercel + local + mobile)
+  app.enableCors({
+    origin: true,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'],
     allowedHeaders: [
@@ -57,16 +52,10 @@ async function bootstrap() {
       'Origin',
       'X-Requested-With',
     ],
-    exposedHeaders: ['Content-Length', 'Content-Type'],
-    preflightContinue: false,
     optionsSuccessStatus: 204,
-  };
-
-  console.log('🌐 CORS Configuration:', {
-    origins: allowAllOrigins ? 'All origins reflected' : allowedOrigins,
   });
 
-  app.enableCors(corsConfig);
+  console.log('🌐 CORS: reflecting request Origin (credentials enabled)');
 
   // Global validation pipe
   app.useGlobalPipes(
@@ -86,18 +75,6 @@ async function bootstrap() {
       origin,
       headers: req.headers.authorization ? 'Bearer token present' : 'No token',
     });
-
-    // Log CORS headers for preflight requests
-    if (req.method === 'OPTIONS') {
-      console.log('🔄 Preflight OPTIONS request detected:', {
-        origin,
-        'access-control-request-method':
-          req.headers['access-control-request-method'],
-        'access-control-request-headers':
-          req.headers['access-control-request-headers'],
-      });
-    }
-
     next();
   });
 
@@ -133,8 +110,8 @@ async function bootstrap() {
   );
   console.log(`📊 Database: ${connection.db?.databaseName || 'medicare'}`);
 
-  const port = process.env.PORT || 4001;
-  const host = process.env.HOST || '0.0.0.0'; // Listen on all network interfaces for mobile access
+  const port = Number(process.env.PORT) || 4001;
+  const host = process.env.HOST || '0.0.0.0';
   await app.listen(port, host);
   console.log(`🚀 Server running on http://${host}:${port}`);
   console.log(`📚 API Documentation: http://${host}:${port}/docs`);
