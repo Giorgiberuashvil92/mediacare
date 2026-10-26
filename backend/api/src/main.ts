@@ -15,7 +15,7 @@ async function bootstrap() {
     prefix: '/uploads/',
   });
 
-  // Enable CORS — admin Vercel + local defaults always merged with CORS_ORIGINS
+  // CORS: admin Vercel must always work (even if Railway CORS_ORIGINS is outdated)
   const DEFAULT_CORS_ORIGINS = [
     'https://mediacareadmin.vercel.app',
     'http://localhost:3000',
@@ -28,12 +28,49 @@ async function bootstrap() {
     : [];
   const allowAllOrigins =
     envCorsOrigins.length === 0 || envCorsOrigins.includes('*');
-  const corsOrigins = allowAllOrigins
-    ? true
-    : [...new Set([...DEFAULT_CORS_ORIGINS, ...envCorsOrigins])];
+  const allowedOriginSet = new Set([
+    ...DEFAULT_CORS_ORIGINS,
+    ...envCorsOrigins.filter((o) => o !== '*'),
+  ]);
 
-  const corsConfig = {
-    origin: corsOrigins,
+  const isOriginAllowed = (origin?: string | null): boolean => {
+    if (!origin) return true; // mobile / same-origin / curl
+    if (allowAllOrigins) return true;
+    return allowedOriginSet.has(origin);
+  };
+
+  // Explicit middleware first — Nest enableCors alone sometimes misses OPTIONS on Railway
+  app.use((req: any, res: any, next: any) => {
+    const origin = req.headers.origin as string | undefined;
+    if (origin && isOriginAllowed(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader(
+        'Access-Control-Allow-Methods',
+        'GET,POST,PUT,DELETE,PATCH,OPTIONS,HEAD',
+      );
+      res.setHeader(
+        'Access-Control-Allow-Headers',
+        (req.headers['access-control-request-headers'] as string) ||
+          'Content-Type, Authorization, Accept, Origin, X-Requested-With',
+      );
+      res.setHeader('Access-Control-Max-Age', '86400');
+      res.setHeader('Vary', 'Origin');
+    }
+
+    if (req.method === 'OPTIONS') {
+      return res.status(204).end();
+    }
+    return next();
+  });
+
+  app.enableCors({
+    origin: (
+      origin: string | undefined,
+      callback: (err: Error | null, allow?: boolean) => void,
+    ) => {
+      callback(null, isOriginAllowed(origin));
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'],
     allowedHeaders: [
@@ -42,22 +79,18 @@ async function bootstrap() {
       'Accept',
       'Origin',
       'X-Requested-With',
-      'Access-Control-Allow-Origin',
-      'Access-Control-Allow-Headers',
-      'Access-Control-Allow-Methods',
     ],
     exposedHeaders: ['Content-Length', 'Content-Type'],
     preflightContinue: false,
     optionsSuccessStatus: 204,
-  };
-
-  console.log('🌐 CORS Configuration:', {
-    origins: allowAllOrigins ? 'All origins reflected' : corsOrigins,
-    methods: corsConfig.methods,
-    allowedHeaders: corsConfig.allowedHeaders,
   });
 
-  app.enableCors(corsConfig);
+  console.log('🌐 CORS Configuration:', {
+    allowAllOrigins,
+    allowedOrigins: allowAllOrigins
+      ? 'All origins reflected'
+      : [...allowedOriginSet],
+  });
 
   // Global validation pipe
   app.useGlobalPipes(
