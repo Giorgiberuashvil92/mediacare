@@ -11,6 +11,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import * as bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
 import * as mongoose from 'mongoose';
+import { HeraUsersService } from '../integrations/hera-users.service';
 import { MisAuthService } from '../integrations/mis-auth.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
@@ -43,6 +44,7 @@ export class AuthService {
     private refreshTokenModel: mongoose.Model<RefreshTokenDocument>,
     private jwtService: JwtService,
     private phoneVerificationService: PhoneVerificationService,
+    private heraUsersService: HeraUsersService,
     private misAuthService: MisAuthService,
     @Inject(forwardRef(() => NotificationsService))
     private notificationsService: NotificationsService,
@@ -251,6 +253,9 @@ export class AuthService {
       userDataToSave.identomatDocumentBackImage =
         registerDto.identomatDocumentBackImage;
     }
+    if (registerDto.identomatPassportImage) {
+      userDataToSave.identomatPassportImage = registerDto.identomatPassportImage;
+    }
     if (registerDto.identomatFullData) {
       userDataToSave.identomatFullData = registerDto.identomatFullData;
     }
@@ -404,6 +409,15 @@ export class AuthService {
         misPersonId = misSyncResult.personId;
       }
     }
+
+    void this.heraUsersService.safeUpsertUser({
+      user: savedUser,
+      subscription: {
+        tier: 'free',
+        status: 'active',
+        source: 'mediacare_registration',
+      },
+    });
 
     // Generate tokens
     const tokens = await this.generateTokens(

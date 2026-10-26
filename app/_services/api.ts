@@ -2,6 +2,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 import * as FileSystem from "expo-file-system/legacy";
 import { logger } from "../utils/logger";
+import { HERA_AI_API_KEY, HERA_AI_API_URL } from "../utils/heraApiConfig";
+import type { HeraMessageAttachment } from "../utils/heraAttachment";
+import { resolveMessageImageUri } from "../utils/heraAttachment";
 
 // Development build-ისთვის IP მისამართის ავტომატურად გამოყენება
 const getDevelopmentIP = (): string | null => {
@@ -273,6 +276,7 @@ export interface Clinic {
 export type AppointmentType = "video" | "home-visit";
 
 // AI Assistant Types
+export type AIPlan = 'free' | 'standard' | 'premium';
 export interface AISession {
   id: string;
   initiator_type: "customer" | "doctor";
@@ -335,6 +339,7 @@ export interface AIMessage {
   content: string;
   created_at: string;
   image_url?: string;
+  attachments?: HeraMessageAttachment[];
   feedback?: AIMessageFeedback | null;
   metadata?: AIMessageMetadata;
 }
@@ -364,7 +369,12 @@ export function normalizeAIMessageMetadata(
 
 export function normalizeAIMessage(message: AIMessage): AIMessage {
   const metadata = normalizeAIMessageMetadata(message.metadata);
-  return metadata ? { ...message, metadata } : { ...message, metadata: undefined };
+  const image_url = resolveMessageImageUri(message);
+  return {
+    ...message,
+    ...(image_url ? { image_url } : {}),
+    metadata: metadata ?? undefined,
+  };
 }
 
 export interface SendMessageRequest {
@@ -374,6 +384,11 @@ export interface SendMessageRequest {
     type: string;
     name: string;
   };
+  attachments?: {
+    filename: string;
+    content_type: string;
+    data: string;
+  }[];
 }
 
 export interface SendMessageResponse {
@@ -2933,22 +2948,18 @@ class ApiService {
     // ALWAYS use external API for session creation (NOT our backend)
     // HERA Backend API - External AI Assistant Service
     // HERA XXI Organization: https://hera-youth.ge
-    const EXTERNAL_API_URL =
-      "https://telemedicine-app-production-347c.up.railway.app";
-    const API_KEY = "hera-api-key";
-
     console.log("🚀 [createAISession] Using EXTERNAL API (NOT backend):", {
-      url: `${EXTERNAL_API_URL}/sessions`,
+      url: `${HERA_AI_API_URL}/sessions`,
       request: request,
-      apiKey: API_KEY,
+      apiKey: HERA_AI_API_KEY,
     });
 
     try {
-      const response = await fetch(`${EXTERNAL_API_URL}/sessions`, {
+      const response = await fetch(`${HERA_AI_API_URL}/sessions`, {
         method: "POST",
         headers: {
           accept: "application/json",
-          "X-API-Key": API_KEY,
+          "X-API-Key": HERA_AI_API_KEY,
           "Content-Type": "application/json",
         },
         body: JSON.stringify(request),
@@ -2981,6 +2992,81 @@ class ApiService {
     }
   }
 
+  async getAISubscription(): Promise<{
+    plan: AIPlan;
+    status: string;
+    monthlyLimit: number;
+    usageCount: number;
+    usageRemaining: number;
+    periodStart: string;
+    periodEnd: string;
+  }> {
+    const response = await this.apiCall<
+      | {
+          plan: AIPlan;
+          status: string;
+          monthlyLimit: number;
+          usageCount: number;
+          usageRemaining: number;
+          periodStart: string;
+          periodEnd: string;
+        }
+      | {
+          success: boolean;
+          data: {
+            plan: AIPlan;
+            status: string;
+            monthlyLimit: number;
+            usageCount: number;
+            usageRemaining: number;
+            periodStart: string;
+            periodEnd: string;
+          };
+        }
+    >('/ai/subscription', { method: 'GET' });
+
+    if ('data' in response && response.data) {
+      return response.data;
+    }
+
+    return response;
+  }
+
+  async createAISubscriptionCheckout(plan: 'standard' | 'premium') {
+    return this.apiCall<{
+      success: boolean;
+      orderId: string;
+      paymentUrl: string;
+    }>('/ai/subscription/checkout', {
+      method: 'POST',
+      body: JSON.stringify({ plan }),
+    });
+  }
+
+  async cancelAISubscription() {
+    return this.apiCall('/ai/subscription/cancel', { method: 'POST' });
+  }
+
+  async consumeAIUsage() {
+    return this.apiCall<{
+      allowed: boolean;
+      subscription: {
+        plan: AIPlan;
+        status: string;
+        monthlyLimit: number;
+        usageCount: number;
+        usageRemaining: number;
+      };
+    }>('/ai/subscription/consume', { method: 'POST' });
+  }
+
+  async getAISubscriptionPayments() {
+    return this.apiCall<{ success: boolean; data: any[] }>(
+      '/ai/subscription/payments',
+      { method: 'GET' },
+    );
+  }
+
   async getAISessions(params?: {
     skip?: number;
     limit?: number;
@@ -2993,15 +3079,13 @@ class ApiService {
     // DO NOT use this.apiCall - use fetch directly!
     // HERA Backend API - External AI Assistant Service
     // HERA XXI Organization: https://hera-youth.ge
-    const EXTERNAL_API_URL = "https://hapttic-hera.click";
-    const API_KEY = "hera-api-key";
 
     console.log(
       "🚀🚀🚀 [getAISessions] Using EXTERNAL API (NOT backend) - DO NOT USE apiCall:",
       {
-        url: `${EXTERNAL_API_URL}/sessions`,
+        url: `${HERA_AI_API_URL}/sessions`,
         params: params,
-        apiKey: API_KEY,
+        apiKey: HERA_AI_API_KEY,
       },
     );
 
@@ -3018,13 +3102,13 @@ class ApiService {
       }
 
       const queryString = queryParams.toString();
-      const url = `${EXTERNAL_API_URL}/sessions${queryString ? `?${queryString}` : ""}`;
+      const url = `${HERA_AI_API_URL}/sessions${queryString ? `?${queryString}` : ""}`;
 
       const response = await fetch(url, {
         method: "GET",
         headers: {
           accept: "application/json",
-          "X-API-Key": API_KEY,
+          "X-API-Key": HERA_AI_API_KEY,
         },
       });
 
@@ -3085,22 +3169,20 @@ class ApiService {
     // ALWAYS use external API for getting session (NOT our backend)
     // HERA Backend API - External AI Assistant Service
     // HERA XXI Organization: https://hera-youth.ge
-    const EXTERNAL_API_URL = "https://hapttic-hera.click";
-    const API_KEY = "hera-api-key";
 
     console.log("🚀 [getAISession] Using EXTERNAL API (NOT backend):", {
-      url: `${EXTERNAL_API_URL}/sessions/${sessionId}`,
+      url: `${HERA_AI_API_URL}/sessions/${sessionId}`,
       sessionId: sessionId,
     });
 
     try {
       const response = await fetch(
-        `${EXTERNAL_API_URL}/sessions/${sessionId}`,
+        `${HERA_AI_API_URL}/sessions/${sessionId}`,
         {
           method: "GET",
           headers: {
             accept: "application/json",
-            "X-API-Key": API_KEY,
+            "X-API-Key": HERA_AI_API_KEY,
           },
         },
       );
@@ -3176,6 +3258,77 @@ class ApiService {
   }
 
   // AI Assistant - Messages
+  async sendAIMessageStream(
+    sessionId: string,
+    request: SendMessageRequest,
+    callbacks: {
+      onUserMessage?: (message: AIMessage) => void;
+      onStatus?: (status: { state: string; query?: string }) => void;
+      onAssistantDelta?: (fullContent: string) => void;
+      onComplete: (data: SendMessageResponse) => void;
+    },
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const { streamHeraAIMessage } = await import("../utils/heraAiStream");
+
+    try {
+      await streamHeraAIMessage(
+        sessionId,
+        request.content || "",
+        {
+          onUserMessage: (message) => {
+            if (
+              request.attachments?.length &&
+              !message.attachments?.length
+            ) {
+              message.attachments = request.attachments;
+            }
+            const resolvedImage =
+              request.image?.uri ??
+              resolveMessageImageUri(message);
+            if (resolvedImage) {
+              message.image_url = resolvedImage;
+            }
+            callbacks.onUserMessage?.(message);
+          },
+          onStatus: callbacks.onStatus,
+          onAssistantDelta: callbacks.onAssistantDelta,
+          onComplete: (data) => {
+            if (
+              data.user_message &&
+              request.attachments?.length &&
+              !data.user_message.attachments?.length
+            ) {
+              data.user_message.attachments = request.attachments;
+            }
+            const resolvedImage =
+              request.image?.uri ??
+              resolveMessageImageUri(data.user_message);
+            if (resolvedImage && data.user_message) {
+              data.user_message.image_url = resolvedImage;
+            }
+            callbacks.onComplete(data);
+          },
+          onError: () => {},
+        },
+        signal,
+        request.image?.uri,
+        request.attachments,
+      );
+    } catch (streamError: any) {
+      console.warn(
+        "⚠️ [sendAIMessageStream] Stream failed, falling back to non-streaming:",
+        streamError?.message,
+      );
+      const fallback = await this.sendAIMessage(sessionId, request);
+      if (fallback.success) {
+        callbacks.onComplete(fallback.data);
+        return;
+      }
+      throw streamError;
+    }
+  }
+
   async sendAIMessage(
     sessionId: string,
     request: SendMessageRequest,
@@ -3186,39 +3339,31 @@ class ApiService {
     // ALWAYS use external API for sending messages (NOT our backend)
     // HERA Backend API - External AI Assistant Service
     // HERA XXI Organization: https://hera-youth.ge
-    const EXTERNAL_API_URL = "https://hapttic-hera.click";
-    const API_KEY = "hera-api-key";
 
     console.log("🚀 [sendAIMessage] Using EXTERNAL API (NOT backend):", {
-      url: `${EXTERNAL_API_URL}/sessions/${sessionId}/messages`,
+      url: `${HERA_AI_API_URL}/sessions/${sessionId}/messages`,
       sessionId: sessionId,
       hasContent: !!request.content,
       hasImage: !!request.image,
     });
 
     try {
-      // Note: External API currently only supports text content, not images
-      // If image is provided, we'll send it as part of the content description
       const messageContent = request.content || "";
 
-      if (request.image) {
-        console.warn(
-          "⚠️ [sendAIMessage] Image upload not yet supported by external API, sending text only",
-        );
-        // TODO: When external API supports images, implement image upload here
-      }
-
       const response = await fetch(
-        `${EXTERNAL_API_URL}/sessions/${sessionId}/messages`,
+        `${HERA_AI_API_URL}/sessions/${sessionId}/messages`,
         {
           method: "POST",
           headers: {
             accept: "application/json",
-            "X-API-Key": API_KEY,
+            "X-API-Key": HERA_AI_API_KEY,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
             content: messageContent,
+            ...(request.attachments?.length
+              ? { attachments: request.attachments }
+              : {}),
           }),
         },
       );
@@ -3272,15 +3417,11 @@ class ApiService {
       return {
         success: true,
         data: {
-          user_message: {
-            id: userMessage.id,
-            session_id: userMessage.session_id,
-            role: userMessage.role,
-            content: userMessage.content,
-            created_at: userMessage.created_at,
-            image_url: request.image?.uri, // Preserve image URL if provided
-            feedback: userMessage.feedback ?? null,
-          },
+          user_message: normalizeAIMessage({
+            ...userMessage,
+            attachments: userMessage.attachments ?? request.attachments,
+            image_url: request.image?.uri ?? userMessage.image_url,
+          }),
           assistant_message: {
             id: assistantMessage.id,
             session_id: assistantMessage.session_id,
@@ -3312,16 +3453,14 @@ class ApiService {
     // DO NOT use this.apiCall - use fetch directly!
     // HERA Backend API - External AI Assistant Service
     // HERA XXI Organization: https://hera-youth.ge
-    const EXTERNAL_API_URL = "https://hapttic-hera.click";
-    const API_KEY = "hera-api-key";
 
     console.log(
       "🚀🚀🚀 [getAIMessages] Using EXTERNAL API (NOT backend) - DO NOT USE apiCall:",
       {
-        url: `${EXTERNAL_API_URL}/sessions/${sessionId}/messages`,
+        url: `${HERA_AI_API_URL}/sessions/${sessionId}/messages`,
         sessionId: sessionId,
         params: params,
-        apiKey: API_KEY,
+        apiKey: HERA_AI_API_KEY,
       },
     );
 
@@ -3338,13 +3477,13 @@ class ApiService {
       }
 
       const queryString = queryParams.toString();
-      const url = `${EXTERNAL_API_URL}/sessions/${sessionId}/messages${queryString ? `?${queryString}` : ""}`;
+      const url = `${HERA_AI_API_URL}/sessions/${sessionId}/messages${queryString ? `?${queryString}` : ""}`;
 
       const response = await fetch(url, {
         method: "GET",
         headers: {
           accept: "application/json",
-          "X-API-Key": API_KEY,
+          "X-API-Key": HERA_AI_API_KEY,
         },
       });
 
@@ -3389,8 +3528,6 @@ class ApiService {
       details?: string;
     },
   ): Promise<{ success: boolean; data: AIMessage }> {
-    const EXTERNAL_API_URL = "https://hapttic-hera.click";
-    const API_KEY = "hera-api-key";
 
     const payload: Record<string, unknown> = { rating: body.rating };
     if (body.rating === "dislike") {
@@ -3402,7 +3539,7 @@ class ApiService {
       }
     }
 
-    const feedbackUrl = `${EXTERNAL_API_URL}/sessions/${sessionId}/messages/${messageId}/feedback`;
+    const feedbackUrl = `${HERA_AI_API_URL}/sessions/${sessionId}/messages/${messageId}/feedback`;
     if (__DEV__) {
       console.log("💬 [putAIMessageFeedback] →", {
         url: feedbackUrl,
@@ -3417,7 +3554,7 @@ class ApiService {
       headers: {
         accept: "application/json",
         "Content-Type": "application/json",
-        "X-API-Key": API_KEY,
+        "X-API-Key": HERA_AI_API_KEY,
       },
       body: JSON.stringify(payload),
     });
@@ -3452,10 +3589,8 @@ class ApiService {
     sessionId: string,
     messageId: string,
   ): Promise<{ success: boolean; data: AIMessage }> {
-    const EXTERNAL_API_URL = "https://hapttic-hera.click";
-    const API_KEY = "hera-api-key";
 
-    const feedbackUrl = `${EXTERNAL_API_URL}/sessions/${sessionId}/messages/${messageId}/feedback`;
+    const feedbackUrl = `${HERA_AI_API_URL}/sessions/${sessionId}/messages/${messageId}/feedback`;
     if (__DEV__) {
       console.log("💬 [deleteAIMessageFeedback] →", {
         url: feedbackUrl,
@@ -3468,7 +3603,7 @@ class ApiService {
       method: "DELETE",
       headers: {
         accept: "application/json",
-        "X-API-Key": API_KEY,
+        "X-API-Key": HERA_AI_API_KEY,
       },
     });
 
@@ -3554,21 +3689,30 @@ class ApiService {
   /**
    * Get payment status
    */
-  async getPaymentStatus(orderId: string): Promise<{
+  async getPaymentStatus(
+    orderId: string,
+    doctorId?: string,
+  ): Promise<{
     success: boolean;
     status?: string;
     amount?: number;
     error?: string;
   }> {
     try {
-      console.log("💳 [ApiService] getPaymentStatus called:", orderId);
+      console.log("💳 [ApiService] getPaymentStatus called:", {
+        orderId,
+        doctorId,
+      });
+      const query = doctorId
+        ? `?doctorId=${encodeURIComponent(doctorId)}`
+        : "";
 
       const result = await this.apiCall<{
         success: boolean;
         status?: string;
         amount?: number;
         error?: string;
-      }>(`/payment/status/${orderId}`, {
+      }>(`/payment/status/${orderId}${query}`, {
         method: "GET",
       });
 

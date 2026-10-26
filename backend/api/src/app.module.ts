@@ -21,6 +21,7 @@ import { TermsModule } from './terms/terms.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { UploadModule } from './upload/upload.module';
 import { DocumentsModule } from './documents/documents.module';
+import { AiSubscriptionModule } from './ai-subscription/ai-subscription.module';
 
 const moduleImports: Array<
   Type<any> | DynamicModule | Promise<DynamicModule> | ForwardReference
@@ -61,6 +62,7 @@ const moduleImports: Array<
   NotificationsModule,
   PaymentModule,
   DocumentsModule,
+  AiSubscriptionModule,
 ];
 
 @Module({

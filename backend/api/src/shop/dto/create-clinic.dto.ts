@@ -33,4 +33,14 @@ export class CreateClinicDto {
   @IsString()
   @MaxLength(200)
   merchantName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  bogClientId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  bogClientSecret?: string;
 }

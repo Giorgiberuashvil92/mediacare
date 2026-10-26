@@ -1,0 +1,31 @@
+{
+  "appStoreConnect": {
+    "privacyNutritionLabels": {
+      "dataLinkedToYou": [
+        {
+          "category": "Health & Fitness",
+          "types": ["Health", "Fitness"],
+          "purposes": ["App Functionality"],
+          "sharedWithThirdParties": true,
+          "thirdPartyNote": "Anthropic PBC (Claude API) for AI Health Assistant responses; PubMed/NCBI for medical source lookup. Only after explicit in-app consent."
+        },
+        {
+          "category": "Contact Info",
+          "types": ["Name", "Email Address", "Phone Number"],
+          "purposes": ["App Functionality"],
+          "sharedWithThirdParties": false
+        },
+        {
+          "category": "User Content",
+          "types": ["Photos or Videos", "Other User Content"],
+          "purposes": ["App Functionality"],
+          "sharedWithThirdParties": true,
+          "thirdPartyNote": "Chat messages and uploaded files sent to Anthropic when using AI Assistant (with consent)."
+        }
+      ],
+      "dataNotLinkedToYou": [],
+      "tracking": false
+    },
+    "reviewNotes": "AI Health Assistant: first-run consent names Anthropic; medical answers show PubMed Sources below assistant messages. Privacy Policy updated with Anthropic processor disclosure."
+  }
+}

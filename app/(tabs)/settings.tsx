@@ -295,41 +295,6 @@ export default function SettingsScreen() {
               <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
             </TouchableOpacity>
           )}
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={handleResetOnboarding}
-          >
-            <View style={styles.menuIconContainer}>
-              <Ionicons name="refresh" size={20} color="#FF3B30" />
-            </View>
-            <Text style={[styles.menuText, { color: "#FF3B30" }]}>
-              ონბორდინგის განულება
-            </Text>
-            <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Testing Tools - Switch to Doctor */}
-        <View style={styles.testingSection}>
-          <Text style={styles.testingSectionTitle}>
-            🧪 ტესტირების ხელსაწყოები (Dev)
-          </Text>
-          <View style={styles.menuSection}>
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={async () => {
-                await AsyncStorage.setItem("@medicare_user_role", "doctor");
-                router.replace("/(doctor-tabs)");
-              }}
-            >
-              <View style={styles.menuIconContainer}>
-                <Ionicons name="swap-horizontal" size={20} color="#06B6D4" />
-              </View>
-              <Text style={styles.menuText}>ექიმის რეჟიმზე გადასვლა</Text>
-              <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
-            </TouchableOpacity>
-          </View>
         </View>
       </ScrollView>
 

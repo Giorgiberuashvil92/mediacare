@@ -6,6 +6,7 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import * as bcrypt from 'bcrypt';
 import mongoose, { FilterQuery, Model } from 'mongoose';
+import { HeraUsersService } from '../integrations/hera-users.service';
 import {
   Appointment,
   AppointmentDocument,
@@ -24,6 +25,8 @@ import {
 import { CreateUserDto } from './dto/create-user.dto';
 import { GetUsersDto } from './dto/get-users.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { AiSubscription, AiSubscriptionDocument } from '../ai-subscription/schemas/ai-subscription.schema';
+import { Clinic, ClinicDocument } from '../shop/schemas/clinic.schema';
 
 @Injectable()
 export class AdminService {
@@ -33,7 +36,21 @@ export class AdminService {
     private appointmentModel: Model<AppointmentDocument>,
     @InjectModel(Availability.name)
     private availabilityModel: Model<AvailabilityDocument>,
+    @InjectModel(AiSubscription.name)
+    private aiSubscriptionModel: Model<AiSubscriptionDocument>,
+    @InjectModel(Clinic.name)
+    private clinicModel: Model<ClinicDocument>,
+    private heraUsersService: HeraUsersService,
   ) {}
+
+  async getAiSubscriptions() {
+    const subscriptions = await this.aiSubscriptionModel
+      .find()
+      .populate('userId', 'name email phone role')
+      .sort({ updatedAt: -1 })
+      .lean();
+    return { success: true, data: subscriptions };
+  }
 
   async getUsers(query: GetUsersDto) {
     const { page = 1, limit = 10, role, search } = query;
@@ -76,6 +93,25 @@ export class AdminService {
         : [];
     const doctorsWithSchedule =
       await this.getDoctorIdsWithFutureSchedule(doctorIdsForSchedule);
+    const clinicIds = users
+      .filter((user) => user.role === UserRole.DOCTOR && user.clinicId)
+      .map((user) => user.clinicId!.toString());
+    const clinics =
+      clinicIds.length > 0
+        ? await this.clinicModel
+            .find({
+              _id: {
+                $in: [...new Set(clinicIds)].map(
+                  (id) => new mongoose.Types.ObjectId(id),
+                ),
+              },
+            })
+            .select('name')
+            .lean()
+        : [];
+    const clinicNameById = new Map(
+      clinics.map((clinic) => [clinic._id.toString(), clinic.name]),
+    );
 
     // Format users
     const formattedUsers = users.map((user) => {
@@ -142,11 +178,16 @@ export class AdminService {
           doctorStatus,
           hasSchedule,
           isTopRated: user.isTopRated ?? false,
+          clinicId: user.clinicId?.toString(),
+          clinicName: user.clinicId
+            ? clinicNameById.get(user.clinicId.toString())
+            : undefined,
         }),
         // Identomat verification images (for all users who used Identomat)
         identomatFaceImage: user.identomatFaceImage,
         identomatDocumentFrontImage: user.identomatDocumentFrontImage,
         identomatDocumentBackImage: user.identomatDocumentBackImage,
+        identomatPassportImage: user.identomatPassportImage,
         identomatFullData: user.identomatFullData,
       };
     });
@@ -752,6 +793,7 @@ export class AdminService {
         identomatFaceImage: user.identomatFaceImage,
         identomatDocumentFrontImage: user.identomatDocumentFrontImage,
         identomatDocumentBackImage: user.identomatDocumentBackImage,
+        identomatPassportImage: user.identomatPassportImage,
         identomatFullData: user.identomatFullData,
       },
     };
@@ -1025,6 +1067,7 @@ export class AdminService {
 
     // Hard delete
     await this.userModel.findByIdAndDelete(userId);
+    void this.heraUsersService.safeDeleteUser(userId);
 
     return {
       success: true,

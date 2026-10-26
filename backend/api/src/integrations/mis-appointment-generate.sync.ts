@@ -7,7 +7,8 @@ import { resolveMisGenerateCatalog } from './mis-generate-service-catalog';
 export type MisAttachGenerateContext = {
   misPersonId: string;
   doctorPersonalId: string;
-  serviceDateIso: string;
+  /** MIS GenerateService: `YYYY-MM-DDTHH:mm:ss+04:00` */
+  serviceDate: string;
 };
 
 /**
@@ -36,7 +37,7 @@ export async function misAttachGeneratedServiceId(
     ContractID: contractId,
     MakeAutoPayment: true,
     DoctorPersonalID: ctx.doctorPersonalId,
-    ServiceDate: ctx.serviceDateIso,
+    ServiceDate: ctx.serviceDate,
   });
 
   if (!genResult.success || !genResult.serviceId) {

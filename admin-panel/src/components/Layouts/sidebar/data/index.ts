@@ -21,6 +21,12 @@ export const NAV_DATA = [
         items: [],
       },
       {
+        title: "AI გამოწერები",
+        url: "/ai-subscriptions",
+        icon: Icons.DocumentText,
+        items: [],
+      },
+      {
         title: "ექიმები",
         url: "/doctors",
         icon: Icons.User,

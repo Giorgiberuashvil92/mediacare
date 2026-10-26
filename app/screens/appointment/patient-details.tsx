@@ -19,6 +19,16 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+const parseMoneyParam = (value: unknown): number => {
+  const raw = Array.isArray(value) ? value[0] : value;
+  const parsed = parseFloat(
+    String(raw ?? "")
+      .replace(",", ".")
+      .replace(/[^\d.]/g, ""),
+  );
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
 const PatientDetails = () => {
   const { user } = useAuth();
   const {
@@ -331,12 +341,8 @@ const PatientDetails = () => {
     try {
       setLoading(true);
 
-      const fee = consultationFee
-        ? parseFloat(consultationFee as string)
-        : amount
-          ? parseFloat(amount as string) / 1.05
-          : 0;
-      const total = amount ? parseFloat(amount as string) : fee * 1.05;
+      const fee = parseMoneyParam(consultationFee);
+      const total = parseMoneyParam(amount) || fee;
 
       // Convert dateOfBirth to ISO format for API
       const dateOfBirthISO = convertDateToISO(formData.dateOfBirth);

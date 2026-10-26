@@ -64,6 +64,7 @@ export interface User {
   identomatFaceImage?: string; // Face image URL from Identomat
   identomatDocumentFrontImage?: string; // Document front image URL from Identomat
   identomatDocumentBackImage?: string; // Document back image URL from Identomat
+  identomatPassportImage?: string; // Passport image URL from Identomat
   identomatFullData?: any; // Full Identomat response data for admin panel
   /** ადმინის ჩანაწერი ექიმის შესახებ (აპში ჩანს „ექიმის შესახებ“) */
   adminNotes?: string;
@@ -158,6 +159,8 @@ export interface Clinic {
   isActive: boolean;
   merchantId?: string;
   merchantName?: string;
+  bogClientId?: string;
+  hasBogCredentials?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -358,6 +361,14 @@ class ApiService {
     });
 
     return this.handleResponse<ApiResponse<User>>(response);
+  }
+
+  async getAISubscriptions(): Promise<ApiResponse<any[]>> {
+    const response = await fetch(`${this.baseURL}/admin/ai-subscriptions`, {
+      method: "GET",
+      headers: this.getHeaders(),
+    });
+    return this.handleResponse<ApiResponse<any[]>>(response);
   }
 
   async createUser(userData: {
@@ -1327,6 +1338,8 @@ class ApiService {
     isActive?: boolean;
     merchantId?: string;
     merchantName?: string;
+    bogClientId?: string;
+    bogClientSecret?: string;
   }): Promise<ApiResponse<Clinic>> {
     const response = await fetch(`${this.baseURL}/admin/shop/clinics`, {
       method: "POST",
@@ -1339,7 +1352,7 @@ class ApiService {
 
   async updateClinic(
     id: string,
-    data: Partial<Clinic>,
+    data: Partial<Clinic> & { bogClientSecret?: string },
   ): Promise<ApiResponse<Clinic>> {
     const response = await fetch(`${this.baseURL}/admin/shop/clinics/${id}`, {
       method: "PATCH",

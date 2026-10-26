@@ -85,6 +85,8 @@ const mapDoctorFromAPI = (
     image: imageSource,
     degrees: doctor.degrees || "",
     location: doctor.location || "",
+    clinicId: doctor.clinicId,
+    clinicName: doctor.clinicName,
     feeSummary,
     consultationFee: baseFee || undefined,
     followUpFee: doctor.followUpFee ? `${doctor.followUpFee} ₾` : undefined,
@@ -187,6 +189,8 @@ const Doctor = () => {
           specialization: d.specialization,
           doctorStatus: d.doctorStatus,
           approvalStatus: d.approvalStatus,
+          clinicId: d.clinicId,
+          clinicName: d.clinicName,
           availabilityTypes: d.availabilityTypes,
         })),
       });
@@ -255,7 +259,9 @@ const Doctor = () => {
       filtered = filtered.filter(
         (doctor) =>
           doctorNameSearchText(doctor).includes(q) ||
-          doctor.specialization?.toLowerCase().includes(q),
+          doctor.specialization?.toLowerCase().includes(q) ||
+          doctor.clinicName?.toLowerCase().includes(q) ||
+          doctor.clinicId?.toLowerCase().includes(q),
       );
     }
 
@@ -267,6 +273,7 @@ const Doctor = () => {
         before: localizedDoctors.length,
         after: filtered.length,
         names: filtered.map((d) => d.name),
+        clinics: filtered.map((d) => d.clinicName).filter(Boolean),
       });
     }
 
@@ -350,6 +357,11 @@ const Doctor = () => {
         </Text>
         {doctor.degrees && (
           <Text style={styles.doctorQualification}>{doctor.degrees}</Text>
+        )}
+        {doctor.clinicName && (
+          <Text style={styles.doctorClinic} numberOfLines={1}>
+            🏥 {doctor.clinicName}
+          </Text>
         )}
         {doctor.about && (
           <Text style={styles.doctorLanguages}>{doctor.about}</Text>
@@ -768,6 +780,12 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   doctorQualification: {
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+    marginBottom: 4,
+  },
+  doctorClinic: {
     fontSize: 12,
     fontFamily: "Poppins-Regular",
     color: "#6B7280",

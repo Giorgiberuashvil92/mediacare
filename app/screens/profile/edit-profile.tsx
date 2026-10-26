@@ -24,6 +24,7 @@ import {
 } from "react-native-safe-area-context";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../contexts/LanguageContext";
+import { ensureMediaLibraryAccess } from "../../utils/mediaLibraryPermission";
 export default function EditProfileScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
@@ -139,6 +140,13 @@ export default function EditProfileScreen() {
 
   const handleProfileImagePick = async () => {
     try {
+      const hasAccess = await ensureMediaLibraryAccess({
+        message: "პროფილის ფოტოს ასარჩევად საჭიროა გალერეის წვდომა.",
+      });
+      if (!hasAccess) {
+        return;
+      }
+
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
         allowsEditing: true,

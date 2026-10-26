@@ -283,90 +283,6 @@ export default function LoginScreen() {
     }
   };
 
-  const handleSkipOTP = async () => {
-    // Temporary skip function for development
-    // This bypasses OTP verification by using a dummy code
-    if (!pendingLoginEmail) {
-      showToast.error("შეცდომა: Email არ მოიძებნა", "შეცდომა");
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      console.log("⚠️ [Login] Skipping OTP verification (development mode)");
-
-      // Use a dummy code to bypass OTP verification
-      // This is only for development - should be removed in production
-      const authResponse = await apiService.verifyLoginOTP(
-        pendingLoginEmail,
-        "000000", // Dummy code for development
-        pendingLoginUserId || undefined,
-      );
-
-      // Complete login in AuthContext
-      await completeLoginAfterOTP(authResponse);
-
-      // Get role from response
-      const role = authResponse.data.user?.role;
-      if (!role) {
-        throw new Error("მომხმარებლის როლი ვერ მოიძებნა");
-      }
-
-      // Show success toast
-      showToast.info("OTP გამოტოვებულია (დროებით)", "ინფორმაცია");
-
-      // Close OTP Modal
-      setShowOTPModal(false);
-      setPendingLoginEmail("");
-      setPendingLoginUserId("");
-      resetDuplicateSelection();
-
-      // Navigate based on role
-      navigateByRole(role);
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "OTP გამოტოვება ვერ მოხერხდა";
-      showToast.error(errorMessage, "შეცდომა");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  /** შესვლა OTP-ის გარეშე — ერთი ღილაკით ლოგინი და ოტპის გამოტოვება */
-  const handleLoginWithoutOTP = async () => {
-    if (!email.trim() || !password.trim()) {
-      showToast.error(
-        t("auth.login.validation.fillAll"),
-        t("auth.login.error.default"),
-      );
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      await persistRememberedEmail(rememberMe, email);
-      const authResponse = await loginContext({
-        email: email.trim(),
-        password,
-      });
-      await completeSelectedLogin(authResponse);
-    } catch (err) {
-      let errorMessage = t("auth.login.error.default");
-      if (err instanceof Error) {
-        if (err.message.includes("Invalid credentials"))
-          errorMessage = t("auth.login.error.invalidCredentials");
-        else if (err.message.includes("User not found"))
-          errorMessage = t("auth.login.error.userNotFound");
-        else if (err.message.includes("Invalid email"))
-          errorMessage = t("auth.login.error.invalidEmail");
-        else errorMessage = err.message;
-      }
-      showToast.auth.loginError(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleSignup = () => {
     router.push("/screens/auth/roleSelection");
   };
@@ -536,20 +452,6 @@ export default function LoginScreen() {
                     {isLoading
                       ? t("auth.login.submitting")
                       : t("auth.login.submit")}
-                  </Text>
-                </TouchableOpacity>
-
-                {/* შესვლა OTP-ის გარეშე */}
-                <TouchableOpacity
-                  style={[
-                    styles.loginWithoutOTPButton,
-                    isLoading && styles.loginButtonDisabled,
-                  ]}
-                  onPress={handleLoginWithoutOTP}
-                  disabled={isLoading}
-                >
-                  <Text style={styles.loginWithoutOTPButtonText}>
-                    შესვლა OTP-ის გარეშე
                   </Text>
                 </TouchableOpacity>
 
@@ -741,8 +643,6 @@ export default function LoginScreen() {
           resetDuplicateSelection();
         }}
         onVerified={handleOTPVerified}
-        onSkip={__DEV__ ? handleSkipOTP : undefined}
-        showSkipButton={__DEV__}
         isLoginOTP={true}
         loginEmail={pendingLoginEmail}
         loginUserId={pendingLoginUserId || undefined}
@@ -915,21 +815,6 @@ const styles = StyleSheet.create({
   loginButtonDisabled: {
     backgroundColor: "#9CA3AF",
     opacity: 0.7,
-  },
-  loginWithoutOTPButton: {
-    backgroundColor: "transparent",
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: "#9CA3AF",
-    height: 48,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 24,
-  },
-  loginWithoutOTPButtonText: {
-    fontSize: 15,
-    fontFamily: "Poppins-Medium",
-    color: "#6B7280",
   },
   dividerContainer: {
     flexDirection: "row",

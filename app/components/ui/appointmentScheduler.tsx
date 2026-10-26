@@ -716,6 +716,8 @@ const AppointmentScheduler: React.FC<AppointmentSchedulerProps> = ({
                   selectedTime,
                   appointmentType: mode,
                   paymentMethod: "visa",
+                  amount: totalAmount.toString(),
+                  consultationFee: consultationFee.toString(),
                 },
               });
             } catch (doctorError) {

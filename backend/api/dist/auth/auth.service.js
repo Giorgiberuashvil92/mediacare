@@ -52,6 +52,7 @@ const mongoose_1 = require("@nestjs/mongoose");
 const bcrypt = __importStar(require("bcrypt"));
 const crypto_1 = require("crypto");
 const mongoose = __importStar(require("mongoose"));
+const hera_users_service_1 = require("../integrations/hera-users.service");
 const mis_auth_service_1 = require("../integrations/mis-auth.service");
 const notifications_service_1 = require("../notifications/notifications.service");
 const notification_schema_1 = require("../schemas/notification.schema");
@@ -60,11 +61,12 @@ const user_schema_1 = require("../schemas/user.schema");
 const phone_verification_service_1 = require("./phone-verification.service");
 const review_login_config_1 = require("./review-login.config");
 let AuthService = class AuthService {
-    constructor(userModel, refreshTokenModel, jwtService, phoneVerificationService, misAuthService, notificationsService) {
+    constructor(userModel, refreshTokenModel, jwtService, phoneVerificationService, heraUsersService, misAuthService, notificationsService) {
         this.userModel = userModel;
         this.refreshTokenModel = refreshTokenModel;
         this.jwtService = jwtService;
         this.phoneVerificationService = phoneVerificationService;
+        this.heraUsersService = heraUsersService;
         this.misAuthService = misAuthService;
         this.notificationsService = notificationsService;
         if (!this.notificationsService) {
@@ -200,6 +202,9 @@ let AuthService = class AuthService {
         if (registerDto.identomatDocumentBackImage) {
             userDataToSave.identomatDocumentBackImage =
                 registerDto.identomatDocumentBackImage;
+        }
+        if (registerDto.identomatPassportImage) {
+            userDataToSave.identomatPassportImage = registerDto.identomatPassportImage;
         }
         if (registerDto.identomatFullData) {
             userDataToSave.identomatFullData = registerDto.identomatFullData;
@@ -337,6 +342,14 @@ let AuthService = class AuthService {
                 misPersonId = misSyncResult.personId;
             }
         }
+        void this.heraUsersService.safeUpsertUser({
+            user: savedUser,
+            subscription: {
+                tier: 'free',
+                status: 'active',
+                source: 'mediacare_registration',
+            },
+        });
         const tokens = await this.generateTokens(savedUser._id.toString());
         return {
             success: true,
@@ -838,9 +851,10 @@ exports.AuthService = AuthService = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, mongoose_1.InjectModel)(user_schema_1.User.name)),
     __param(1, (0, mongoose_1.InjectModel)(refresh_token_schema_1.RefreshToken.name)),
-    __param(5, (0, common_1.Inject)((0, common_1.forwardRef)(() => notifications_service_1.NotificationsService))),
+    __param(6, (0, common_1.Inject)((0, common_1.forwardRef)(() => notifications_service_1.NotificationsService))),
     __metadata("design:paramtypes", [mongoose.Model, mongoose.Model, jwt_1.JwtService,
         phone_verification_service_1.PhoneVerificationService,
+        hera_users_service_1.HeraUsersService,
         mis_auth_service_1.MisAuthService,
         notifications_service_1.NotificationsService])
 ], AuthService);

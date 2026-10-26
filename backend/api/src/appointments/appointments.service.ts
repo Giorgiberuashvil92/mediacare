@@ -12,11 +12,15 @@ import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { Availability } from '../doctors/schemas/availability.schema';
 import { misAttachGeneratedServiceId } from '../integrations/mis-appointment-generate.sync';
 import { MisAuthService } from '../integrations/mis-auth.service';
-import { resolveMisGenerateCatalog } from '../integrations/mis-generate-service-catalog';
 import {
   misHisForm100FirstIndex,
   misHisPrintFormsIncludeForm100,
 } from '../integrations/mis-form100-his-detect';
+import { resolveMisGenerateCatalog } from '../integrations/mis-generate-service-catalog';
+import {
+  appointmentDateToYmd,
+  formatMisServiceDate,
+} from '../integrations/mis-service-date';
 import { User, UserRole } from '../schemas/user.schema';
 import { appointmentHasForm100ReadyForCompletion } from './appointment-form100-ready.util';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
@@ -280,7 +284,6 @@ export class AppointmentsService {
    */
   private async syncMisServiceOnReschedule(
     appointment: AppointmentDocument,
-    appointmentStartLocal: Date,
   ): Promise<'success' | 'failed' | 'skipped'> {
     try {
       const appointmentIdStr = String(
@@ -294,13 +297,11 @@ export class AppointmentsService {
         .select('idNumber');
 
       const misPersonId =
-        typeof (patient as any)?.misPersonId === 'string'
-          ? (patient as any).misPersonId.trim()
+        typeof patient?.misPersonId === 'string'
+          ? patient.misPersonId.trim()
           : '';
       const doctorPersonalId =
-        typeof (doctor as any)?.idNumber === 'string'
-          ? (doctor as any).idNumber.trim()
-          : '';
+        typeof doctor?.idNumber === 'string' ? doctor.idNumber.trim() : '';
 
       if (!misPersonId || !doctorPersonalId) {
         this.logger.warn(
@@ -314,13 +315,18 @@ export class AppointmentsService {
         isFollowUp: appointment.isFollowUp === true,
       });
 
+      const serviceDate = formatMisServiceDate(
+        appointmentDateToYmd(appointment.appointmentDate),
+        appointment.appointmentTime || '00:00',
+      );
+
       const genResult = await this.misAuthService.generateService({
         ServiceID: serviceId,
         PersonID: misPersonId,
         ContractID: contractId,
         MakeAutoPayment: true,
         DoctorPersonalID: doctorPersonalId,
-        ServiceDate: appointmentStartLocal.toISOString(),
+        ServiceDate: serviceDate,
       });
 
       if (!genResult.success || !genResult.serviceId) {
@@ -666,7 +672,10 @@ export class AppointmentsService {
       {
         misPersonId,
         doctorPersonalId,
-        serviceDateIso: appointmentStartLocal.toISOString(),
+        serviceDate: formatMisServiceDate(
+          dateOnly,
+          createAppointmentDto.appointmentTime || '00:00',
+        ),
       },
       this.logger,
     );
@@ -805,7 +814,10 @@ export class AppointmentsService {
       .find({
         patientId: new mongoose.Types.ObjectId(patientId),
       })
-      .populate('doctorId', '_id name nameEn nameRu specialization profileImage')
+      .populate(
+        'doctorId',
+        '_id name nameEn nameRu specialization profileImage',
+      )
       .sort({ appointmentDate: -1 })
       .lean();
 
@@ -1178,14 +1190,20 @@ export class AppointmentsService {
     if (mongoose.Types.ObjectId.isValid(appointmentId)) {
       appointment = await this.appointmentModel
         .findById(new mongoose.Types.ObjectId(appointmentId))
-        .populate('doctorId', '_id name nameEn nameRu specialization profileImage')
+        .populate(
+          'doctorId',
+          '_id name nameEn nameRu specialization profileImage',
+        )
         .populate('patientId', 'name email phone')
         .lean();
     } else {
       // If not ObjectId, try to find by appointmentNumber
       appointment = await this.appointmentModel
         .findOne({ appointmentNumber: appointmentId })
-        .populate('doctorId', '_id name nameEn nameRu specialization profileImage')
+        .populate(
+          'doctorId',
+          '_id name nameEn nameRu specialization profileImage',
+        )
         .populate('patientId', 'name email phone')
         .lean();
     }
@@ -1382,10 +1400,8 @@ export class AppointmentsService {
     // Explicitly ensure status is not changed
     appointment.status = previousStatus;
     await appointment.save();
-    const misRescheduleSync = await this.syncMisServiceOnReschedule(
-      appointment,
-      appointmentDateTime,
-    );
+    const misRescheduleSync =
+      await this.syncMisServiceOnReschedule(appointment);
 
     console.log('Appointment rescheduled:', {
       appointmentId: (appointment._id as any).toString(),
@@ -1819,15 +1835,8 @@ export class AppointmentsService {
     appointment.rescheduleRequest.respondedBy = isDoctor ? 'doctor' : 'patient';
 
     await appointment.save();
-    const approvedStartLocal = new Date(finalDate);
-    const [finalHours, finalMinutes] = (finalTime || '00:00')
-      .split(':')
-      .map(Number) as [number, number];
-    approvedStartLocal.setHours(finalHours, finalMinutes || 0, 0, 0);
-    const misRescheduleSync = await this.syncMisServiceOnReschedule(
-      appointment,
-      approvedStartLocal,
-    );
+    const misRescheduleSync =
+      await this.syncMisServiceOnReschedule(appointment);
 
     // პასუხში ახალი თარიღი/დრო — იგივე დოკუმენტის ინსტანცია ზოგჯერ სერილიზაციაში ძველს აჩვენებს
     const fresh = await this.appointmentModel
@@ -2158,7 +2167,10 @@ export class AppointmentsService {
       {
         misPersonId: followUpMisPersonId,
         doctorPersonalId: followUpDoctorPersonalId,
-        serviceDateIso: followUpDateTime.toISOString(),
+        serviceDate: formatMisServiceDate(
+          String(dto.date).trim().split('T')[0],
+          dto.time,
+        ),
       },
       this.logger,
     );

@@ -2,7 +2,7 @@
 
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import { apiService, User } from "@/lib/api";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AddDoctorForm } from "./_components/add-doctor-form";
 import { AvailabilityManager } from "./_components/availability-manager";
 import { DoctorDetailsModal } from "./_components/doctor-details-modal";
@@ -29,6 +29,8 @@ interface Doctor {
   doctorStatus?: "awaiting_schedule" | "active";
   isTopRated?: boolean;
   minScheduleDate?: string;
+  clinicId?: string;
+  clinicName?: string;
 }
 
 export default function DoctorsPage() {
@@ -43,6 +45,7 @@ export default function DoctorsPage() {
   const [selectedDoctor, setSelectedDoctor] = useState<User | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [showAvailabilityManager, setShowAvailabilityManager] = useState(false);
   const [selectedDoctorForAvailability, setSelectedDoctorForAvailability] =
     useState<{
@@ -68,7 +71,7 @@ export default function DoctorsPage() {
       if (response.success) {
         const allDoctors = response.data?.users ?? [];
 
-        const filteredDoctors = allDoctors.filter((doctor) => {
+        const statusFilteredDoctors = allDoctors.filter((doctor) => {
           if (statusFilter === "pending") {
             return doctor.approvalStatus === "pending";
           }
@@ -87,7 +90,7 @@ export default function DoctorsPage() {
           );
         });
 
-        const mappedDoctors: Doctor[] = filteredDoctors.map((doctor) => ({
+        const mappedDoctors: Doctor[] = statusFilteredDoctors.map((doctor) => ({
           id: doctor.id,
           name: doctor.name || "",
           email: doctor.email,
@@ -111,6 +114,8 @@ export default function DoctorsPage() {
           doctorStatus: doctor.doctorStatus,
           isTopRated: doctor.isTopRated ?? false,
           minScheduleDate: "",
+          clinicId: doctor.clinicId,
+          clinicName: doctor.clinicName,
         }));
 
         setDoctors(mappedDoctors);
@@ -122,6 +127,30 @@ export default function DoctorsPage() {
       setLoading(false);
     }
   };
+
+  const visibleDoctors = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) {
+      return doctors;
+    }
+
+    return doctors.filter((doctor) =>
+      [
+        doctor.name,
+        doctor.email,
+        doctor.phone,
+        doctor.idNumber,
+        doctor.specialization,
+        doctor.location,
+        doctor.degrees,
+        doctor.experience,
+        doctor.clinicName,
+        doctor.clinicId,
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query)),
+    );
+  }, [doctors, searchQuery]);
 
   const handleDoctorAdded = () => {
     setShowAddForm(false);
@@ -254,17 +283,35 @@ export default function DoctorsPage() {
                 </div>
               )}
 
+              <div className="mb-5">
+                <label className="mb-2 block text-sm font-medium text-dark dark:text-white">
+                  ექიმების ძებნა
+                </label>
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="მოძებნე სახელით, სპეციალიზაციით, ტელეფონით ან კლინიკით..."
+                  className="w-full rounded-lg border border-stroke bg-transparent px-4 py-3 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:bg-gray-dark dark:text-white dark:focus:border-primary"
+                />
+                {searchQuery.trim() && (
+                  <p className="mt-2 text-xs text-dark-4 dark:text-dark-6">
+                    ნაპოვნია {visibleDoctors.length} ექიმი
+                  </p>
+                )}
+              </div>
+
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {loading ? (
                   <div className="col-span-full flex justify-center p-10">
                     <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
                   </div>
-                ) : doctors.length === 0 ? (
+                ) : visibleDoctors.length === 0 ? (
                   <div className="col-span-full p-8 text-center text-dark-4">
                     ექიმები არ მოიძებნა
                   </div>
                 ) : (
-                  doctors.map((doctor) => (
+                  visibleDoctors.map((doctor) => (
                     <div
                       key={doctor.id}
                       className="rounded-lg border border-stroke bg-white p-6 shadow-1 dark:border-dark-3 dark:bg-gray-dark"
@@ -300,6 +347,12 @@ export default function DoctorsPage() {
                           <div className="flex items-center text-sm text-dark-4 dark:text-dark-6">
                             <span className="mr-2">📍</span>
                             {doctor.location}
+                          </div>
+                        )}
+                        {doctor.clinicName && (
+                          <div className="flex items-center text-sm text-dark-4 dark:text-dark-6">
+                            <span className="mr-2">🏥</span>
+                            კლინიკა: {doctor.clinicName}
                           </div>
                         )}
                         {doctor.experience && (

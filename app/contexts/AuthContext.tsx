@@ -204,9 +204,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw new Error("Login response missing user");
       }
 
-      // ALWAYS require OTP if user has a phone number (after logout, force OTP)
-      // Even if backend says requiresOTP: false, we still require OTP on frontend
-      if (loggedInUser.phone && loggedInUser.phone.trim()) {
+      // Require OTP only when the backend requests it. Review/demo accounts can
+      // intentionally skip OTP for store review and QA access.
+      if (authResponse.requiresOTP && loggedInUser.phone?.trim()) {
         // Don't set user yet, return response for OTP verification
         // Don't store tokens - they will be stored after OTP verification
         return {

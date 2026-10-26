@@ -144,6 +144,10 @@ export class RegisterDto {
   @IsOptional()
   identomatDocumentBackImage?: string; // Document back image URL from Identomat
 
+  @IsString()
+  @IsOptional()
+  identomatPassportImage?: string; // Passport image URL from Identomat
+
   @IsOptional()
   identomatFullData?: any; // Full Identomat response data for admin panel
 }

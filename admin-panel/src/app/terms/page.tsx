@@ -1,10 +1,18 @@
-'use client';
+"use client";
 
-import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
-import { apiService } from '@/lib/api';
-import { useEffect, useState } from 'react';
+import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
+import { apiService } from "@/lib/api";
+import { PRIVACY_POLICY_TEMPLATE } from "@/lib/default-privacy-policy";
+import { useEffect, useState } from "react";
 
-type TermType = 'cancellation' | 'service' | 'privacy' | 'contract' | 'usage' | 'doctor-cancellation' | 'doctor-service';
+type TermType =
+  | "cancellation"
+  | "service"
+  | "privacy"
+  | "contract"
+  | "usage"
+  | "doctor-cancellation"
+  | "doctor-service";
 
 interface Term {
   type: string;
@@ -14,7 +22,7 @@ interface Term {
   updatedAt?: string;
 }
 
-type TermContentValues = Pick<Term, 'content' | 'contentEn' | 'contentRu'>;
+type TermContentValues = Pick<Term, "content" | "contentEn" | "contentRu">;
 
 function TermLanguageFields({
   values,
@@ -29,7 +37,7 @@ function TermLanguageFields({
         <p className="mb-2 text-sm font-medium text-black">ქართული *</p>
         <textarea
           value={values.content}
-          onChange={(e) => onChange('content', e.target.value)}
+          onChange={(e) => onChange("content", e.target.value)}
           rows={12}
           className="w-full rounded border border-stroke bg-transparent px-4 py-2.5 text-black outline-none focus:border-primary"
           placeholder="შეიყვანეთ ტერმინების კონტენტი (ქართული)..."
@@ -39,8 +47,8 @@ function TermLanguageFields({
       <div className="rounded-lg border border-stroke bg-white p-3">
         <p className="mb-2 text-sm font-medium text-black">English</p>
         <textarea
-          value={values.contentEn || ''}
-          onChange={(e) => onChange('contentEn', e.target.value)}
+          value={values.contentEn || ""}
+          onChange={(e) => onChange("contentEn", e.target.value)}
           rows={12}
           className="w-full rounded border border-stroke bg-transparent px-4 py-2.5 text-black outline-none focus:border-primary"
           placeholder="Enter terms content (English)..."
@@ -50,8 +58,8 @@ function TermLanguageFields({
       <div className="rounded-lg border border-stroke bg-white p-3">
         <p className="mb-2 text-sm font-medium text-black">Русский</p>
         <textarea
-          value={values.contentRu || ''}
-          onChange={(e) => onChange('contentRu', e.target.value)}
+          value={values.contentRu || ""}
+          onChange={(e) => onChange("contentRu", e.target.value)}
           rows={12}
           className="w-full rounded border border-stroke bg-transparent px-4 py-2.5 text-black outline-none focus:border-primary"
           placeholder="Введите текст условий (русский)..."
@@ -62,32 +70,32 @@ function TermLanguageFields({
 }
 
 const termLabels: Record<TermType, string> = {
-  cancellation: 'ჯავშნების გაუქმების პირობები',
-  service: 'სერვისის პირობები',
-  privacy: 'კონფიდენციალურობა',
-  contract: 'ხელშეკრულება (ექიმებისთვის)',
-  usage: 'მოხმარების წესები (ექიმებისთვის)',
-  'doctor-cancellation': 'ჯავშნების გაუქმების პირობები (ექიმებისთვის)',
-  'doctor-service': 'სერვისის პირობები (ექიმებისთვის)',
+  cancellation: "ჯავშნების გაუქმების პირობები",
+  service: "სერვისის პირობები",
+  privacy: "კონფიდენციალურობა",
+  contract: "ხელშეკრულება (ექიმებისთვის)",
+  usage: "მოხმარების წესები (ექიმებისთვის)",
+  "doctor-cancellation": "ჯავშნების გაუქმების პირობები (ექიმებისთვის)",
+  "doctor-service": "სერვისის პირობები (ექიმებისთვის)",
 };
 
 export default function TermsPage() {
   const [terms, setTerms] = useState<Record<TermType, Term>>({
-    cancellation: { type: 'cancellation', content: '' },
-    service: { type: 'service', content: '' },
-    privacy: { type: 'privacy', content: '' },
-    contract: { type: 'contract', content: '' },
-    usage: { type: 'usage', content: '' },
-    'doctor-cancellation': { type: 'doctor-cancellation', content: '' },
-    'doctor-service': { type: 'doctor-service', content: '' },
+    cancellation: { type: "cancellation", content: "" },
+    service: { type: "service", content: "" },
+    privacy: { type: "privacy", content: "" },
+    contract: { type: "contract", content: "" },
+    usage: { type: "usage", content: "" },
+    "doctor-cancellation": { type: "doctor-cancellation", content: "" },
+    "doctor-service": { type: "doctor-service", content: "" },
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingType, setEditingType] = useState<TermType | null>(null);
   const [editContent, setEditContent] = useState<TermContentValues>({
-    content: '',
-    contentEn: '',
-    contentRu: '',
+    content: "",
+    contentEn: "",
+    contentRu: "",
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -95,15 +103,23 @@ export default function TermsPage() {
     try {
       setLoading(true);
       setError(null);
-      
-      const [cancellationRes, serviceRes, privacyRes, contractRes, usageRes, doctorCancellationRes, doctorServiceRes] = await Promise.all([
-        apiService.getTerms('cancellation'),
-        apiService.getTerms('service'),
-        apiService.getTerms('privacy'),
-        apiService.getTerms('contract'),
-        apiService.getTerms('usage'),
-        apiService.getTerms('doctor-cancellation'),
-        apiService.getTerms('doctor-service'),
+
+      const [
+        cancellationRes,
+        serviceRes,
+        privacyRes,
+        contractRes,
+        usageRes,
+        doctorCancellationRes,
+        doctorServiceRes,
+      ] = await Promise.all([
+        apiService.getTerms("cancellation"),
+        apiService.getTerms("service"),
+        apiService.getTerms("privacy"),
+        apiService.getTerms("contract"),
+        apiService.getTerms("usage"),
+        apiService.getTerms("doctor-cancellation"),
+        apiService.getTerms("doctor-service"),
       ]);
 
       if (cancellationRes.success && serviceRes.success && privacyRes.success) {
@@ -111,16 +127,22 @@ export default function TermsPage() {
           cancellation: cancellationRes.data,
           service: serviceRes.data,
           privacy: privacyRes.data,
-          contract: contractRes.data || { type: 'contract', content: '' },
-          usage: usageRes.data || { type: 'usage', content: '' },
-          'doctor-cancellation': doctorCancellationRes.data || { type: 'doctor-cancellation', content: '' },
-          'doctor-service': doctorServiceRes.data || { type: 'doctor-service', content: '' },
+          contract: contractRes.data || { type: "contract", content: "" },
+          usage: usageRes.data || { type: "usage", content: "" },
+          "doctor-cancellation": doctorCancellationRes.data || {
+            type: "doctor-cancellation",
+            content: "",
+          },
+          "doctor-service": doctorServiceRes.data || {
+            type: "doctor-service",
+            content: "",
+          },
         });
       } else {
-        setError('ტერმინების ჩატვირთვა ვერ მოხერხდა');
+        setError("ტერმინების ჩატვირთვა ვერ მოხერხდა");
       }
     } catch (err: any) {
-      setError(err.message || 'ტერმინების ჩატვირთვა ვერ მოხერხდა');
+      setError(err.message || "ტერმინების ჩატვირთვა ვერ მოხერხდა");
     } finally {
       setLoading(false);
     }
@@ -134,19 +156,19 @@ export default function TermsPage() {
     setEditingType(type);
     setEditContent({
       content: terms[type].content,
-      contentEn: terms[type].contentEn || '',
-      contentRu: terms[type].contentRu || '',
+      contentEn: terms[type].contentEn || "",
+      contentRu: terms[type].contentRu || "",
     });
   };
 
   const handleCancel = () => {
     setEditingType(null);
-    setEditContent({ content: '', contentEn: '', contentRu: '' });
+    setEditContent({ content: "", contentEn: "", contentRu: "" });
   };
 
   const handleSave = async (type: TermType) => {
     if (!editContent.content.trim()) {
-      setError('ქართული კონტენტი არ შეიძლება იყოს ცარიელი');
+      setError("ქართული კონტენტი არ შეიძლება იყოს ცარიელი");
       return;
     }
 
@@ -155,22 +177,22 @@ export default function TermsPage() {
       setError(null);
       const response = await apiService.updateTerms(type, {
         content: editContent.content.trim(),
-        contentEn: editContent.contentEn?.trim() || '',
-        contentRu: editContent.contentRu?.trim() || '',
+        contentEn: editContent.contentEn?.trim() || "",
+        contentRu: editContent.contentRu?.trim() || "",
       });
-      
+
       if (response.success) {
         setTerms((prev) => ({
           ...prev,
           [type]: response.data,
         }));
         setEditingType(null);
-        setEditContent({ content: '', contentEn: '', contentRu: '' });
+        setEditContent({ content: "", contentEn: "", contentRu: "" });
       } else {
-        setError('ტერმინის განახლება ვერ მოხერხდა');
+        setError("ტერმინის განახლება ვერ მოხერხდა");
       }
     } catch (err: any) {
-      setError(err.message || 'ტერმინის განახლება ვერ მოხერხდა');
+      setError(err.message || "ტერმინის განახლება ვერ მოხერხდა");
     } finally {
       setSubmitting(false);
     }
@@ -202,8 +224,21 @@ export default function TermsPage() {
         )}
 
         <div className="p-6.5">
-          {(['cancellation', 'service', 'privacy', 'contract', 'usage', 'doctor-cancellation', 'doctor-service'] as TermType[]).map((type) => (
-            <div key={type} className="mb-6 rounded-lg border border-stroke bg-gray-50 p-6">
+          {(
+            [
+              "cancellation",
+              "service",
+              "privacy",
+              "contract",
+              "usage",
+              "doctor-cancellation",
+              "doctor-service",
+            ] as TermType[]
+          ).map((type) => (
+            <div
+              key={type}
+              className="mb-6 rounded-lg border border-stroke bg-gray-50 p-6"
+            >
               <div className="mb-4 flex items-center justify-between">
                 <h4 className="text-lg font-semibold text-black">
                   {termLabels[type]}
@@ -220,6 +255,21 @@ export default function TermsPage() {
 
               {editingType === type ? (
                 <div>
+                  {type === "privacy" && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setEditContent({
+                          content: PRIVACY_POLICY_TEMPLATE.content,
+                          contentEn: PRIVACY_POLICY_TEMPLATE.contentEn,
+                          contentRu: PRIVACY_POLICY_TEMPLATE.contentRu,
+                        })
+                      }
+                      className="mb-4 rounded border border-primary bg-primary/5 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/10"
+                    >
+                      Anthropic სექციის ჩატვირთვა
+                    </button>
+                  )}
                   <TermLanguageFields
                     values={editContent}
                     onChange={(field, value) =>
@@ -232,7 +282,7 @@ export default function TermsPage() {
                       disabled={submitting}
                       className="rounded bg-primary px-6 py-2 text-sm font-medium text-white hover:bg-opacity-90 disabled:opacity-50"
                     >
-                      {submitting ? 'შენახვა...' : 'შენახვა'}
+                      {submitting ? "შენახვა..." : "შენახვა"}
                     </button>
                     <button
                       onClick={handleCancel}
@@ -246,16 +296,21 @@ export default function TermsPage() {
               ) : (
                 <div className="space-y-3">
                   <div className="rounded border border-stroke bg-white p-4">
-                    <p className="mb-1 text-xs font-medium text-gray-500">ქართული</p>
+                    <p className="mb-1 text-xs font-medium text-gray-500">
+                      ქართული
+                    </p>
                     <p className="whitespace-pre-wrap text-sm text-gray-700">
-                      {terms[type].content || 'კონტენტი ჯერ არ არის დამატებული.'}
+                      {terms[type].content ||
+                        "კონტენტი ჯერ არ არის დამატებული."}
                     </p>
                   </div>
                   {(terms[type].contentEn || terms[type].contentRu) && (
                     <>
                       {terms[type].contentEn && (
                         <div className="rounded border border-stroke bg-white p-4">
-                          <p className="mb-1 text-xs font-medium text-gray-500">English</p>
+                          <p className="mb-1 text-xs font-medium text-gray-500">
+                            English
+                          </p>
                           <p className="whitespace-pre-wrap text-sm text-gray-700">
                             {terms[type].contentEn}
                           </p>
@@ -263,7 +318,9 @@ export default function TermsPage() {
                       )}
                       {terms[type].contentRu && (
                         <div className="rounded border border-stroke bg-white p-4">
-                          <p className="mb-1 text-xs font-medium text-gray-500">Русский</p>
+                          <p className="mb-1 text-xs font-medium text-gray-500">
+                            Русский
+                          </p>
                           <p className="whitespace-pre-wrap text-sm text-gray-700">
                             {terms[type].contentRu}
                           </p>
@@ -273,7 +330,8 @@ export default function TermsPage() {
                   )}
                   {terms[type].updatedAt && (
                     <p className="mt-2 text-xs text-gray-500">
-                      ბოლო განახლება: {new Date(terms[type].updatedAt!).toLocaleString('ka-GE')}
+                      ბოლო განახლება:{" "}
+                      {new Date(terms[type].updatedAt!).toLocaleString("ka-GE")}
                     </p>
                   )}
                 </div>
@@ -285,4 +343,3 @@ export default function TermsPage() {
     </>
   );
 }
-

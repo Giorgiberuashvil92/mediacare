@@ -12,6 +12,8 @@ const defaultClinicForm = {
   isActive: true,
   merchantId: '',
   merchantName: '',
+  bogClientId: '',
+  bogClientSecret: '',
 };
 
 export default function ClinicsPage() {
@@ -60,6 +62,8 @@ export default function ClinicsPage() {
         isActive: clinicForm.isActive,
         merchantId: clinicForm.merchantId.trim() || undefined,
         merchantName: clinicForm.merchantName.trim() || undefined,
+        bogClientId: clinicForm.bogClientId.trim() || undefined,
+        bogClientSecret: clinicForm.bogClientSecret.trim() || undefined,
       };
 
       if (editingClinicId) {
@@ -90,6 +94,8 @@ export default function ClinicsPage() {
       isActive: clinic.isActive,
       merchantId: clinic.merchantId || '',
       merchantName: clinic.merchantName || '',
+      bogClientId: clinic.bogClientId || '',
+      bogClientSecret: '',
     });
   };
 
@@ -124,7 +130,7 @@ export default function ClinicsPage() {
                 კლინიკების მართვა
               </h2>
               <p className="mt-1 text-dark-4 dark:text-dark-6">
-                კლინიკების დამატება, ექიმების მიბმა და BOG Merchant ID-ის კონფიგურაცია
+                კლინიკების დამატება, ექიმების მიბმა და BOG merchant credentials-ის კონფიგურაცია
               </p>
             </div>
             <button
@@ -241,6 +247,33 @@ export default function ClinicsPage() {
                         className={inputClass}
                       />
                     </div>
+                    <div>
+                      <label className={labelClass}>BOG Client ID</label>
+                      <input
+                        type="text"
+                        value={clinicForm.bogClientId}
+                        onChange={(e) =>
+                          setClinicForm({ ...clinicForm, bogClientId: e.target.value })
+                        }
+                        placeholder="კლინიკის BOG client_id"
+                        className={inputClass}
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>
+                        BOG Client Secret {editingClinicId ? '(ცარიელი დატოვე თუ არ იცვლება)' : ''}
+                      </label>
+                      <input
+                        type="password"
+                        value={clinicForm.bogClientSecret}
+                        onChange={(e) =>
+                          setClinicForm({ ...clinicForm, bogClientSecret: e.target.value })
+                        }
+                        placeholder="კლინიკის BOG client_secret"
+                        className={inputClass}
+                        autoComplete="new-password"
+                      />
+                    </div>
                     <div className="flex items-center gap-2">
                       <input
                         id="clinic-active"
@@ -291,6 +324,7 @@ export default function ClinicsPage() {
                       <th className="p-3">ელ. ფოსტა</th>
                       <th className="p-3">Merchant ID</th>
                       <th className="p-3">Merchant სახელი</th>
+                      <th className="p-3">BOG Credentials</th>
                       <th className="p-3">სტატუსი</th>
                       <th className="p-3 text-right">ქმედებები</th>
                     </tr>
@@ -298,7 +332,7 @@ export default function ClinicsPage() {
                   <tbody>
                     {clinics.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="p-6 text-center text-dark-4">
+                        <td colSpan={9} className="p-6 text-center text-dark-4">
                           კლინიკა არ მოიძებნა
                         </td>
                       </tr>
@@ -316,6 +350,17 @@ export default function ClinicsPage() {
                             {clinic.merchantId || '—'}
                           </td>
                           <td className="p-3">{clinic.merchantName || '—'}</td>
+                          <td className="p-3">
+                            {clinic.hasBogCredentials ? (
+                              <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/20 dark:text-green-300">
+                                დაყენებულია
+                              </span>
+                            ) : (
+                              <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
+                                აკლია
+                              </span>
+                            )}
+                          </td>
                           <td className="p-3">
                             <span
                               className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${

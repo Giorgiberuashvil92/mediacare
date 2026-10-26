@@ -1,6 +1,7 @@
 import { apiService, AppointmentType } from "@/app/_services/api";
 import { useLanguage } from "@/app/contexts/LanguageContext";
 import { getDoctorDisplayName } from "@/app/utils/doctorNameLabel";
+import { ensureMediaLibraryAccess } from "@/app/utils/mediaLibraryPermission";
 import {
   formatAppointmentDateLong,
   formatAppointmentTime,
@@ -22,6 +23,32 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+const parseFeeValue = (value: unknown): number => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  const parsed = parseFloat(
+    String(value ?? "")
+      .replace(",", ".")
+      .replace(/[^\d.]/g, ""),
+  );
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const getDoctorFeeByAppointmentType = (
+  doctor: any,
+  appointmentType: AppointmentType,
+): number => {
+  const preferred =
+    appointmentType === "home-visit"
+      ? doctor.homeVisitFee ?? doctor.home_visit_fee ?? doctor.homeVisitPrice
+      : doctor.videoConsultationFee ??
+        doctor.video_consultation_fee ??
+        doctor.videoVisitFee;
+  return (
+    parseFeeValue(preferred) ||
+    parseFeeValue(doctor.consultationFee ?? doctor.consultation_fee)
+  );
+};
 
 // Helper function to map backend doctor to app format
 const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
@@ -46,7 +73,10 @@ const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
     reviewCount: doctor.reviewCount || 0,
     image: imageSource,
     degrees: doctor.degrees || "",
-    consultationFee: doctor.consultationFee || 0,
+    consultationFee: doctor.consultationFee ?? doctor.consultation_fee ?? 0,
+    videoConsultationFee:
+      doctor.videoConsultationFee ?? doctor.video_consultation_fee ?? 0,
+    homeVisitFee: doctor.homeVisitFee ?? doctor.home_visit_fee ?? 0,
   };
 };
 
@@ -57,6 +87,8 @@ const MakeAppointment = () => {
     selectedTime,
     paymentMethod,
     appointmentType: appointmentTypeParam,
+    amount: amountParam,
+    consultationFee: consultationFeeParam,
   } = useLocalSearchParams();
   const { language, t } = useLanguage();
   const [doctor, setDoctor] = useState<any>(null);
@@ -129,14 +161,10 @@ const MakeAppointment = () => {
             text: "სურათი",
             onPress: async () => {
               try {
-                // Request permissions
-                const { status } =
-                  await ImagePicker.requestMediaLibraryPermissionsAsync();
-                if (status !== "granted") {
-                  Alert.alert(
-                    "წვდომა",
-                    "სურათის არჩევისთვის საჭიროა გალერეის წვდომა",
-                  );
+                const hasAccess = await ensureMediaLibraryAccess({
+                  message: "სურათის არჩევისთვის საჭიროა გალერეის წვდომა",
+                });
+                if (!hasAccess) {
                   return;
                 }
 
@@ -308,10 +336,10 @@ const MakeAppointment = () => {
     );
   }
 
-  const consultationFee =
-    typeof doctor.consultationFee === "number"
-      ? doctor.consultationFee
-      : parseFloat(String(doctor.consultationFee).replace(/[^\d.]/g, "")) || 0;
+  const consultationFee = getDoctorFeeByAppointmentType(
+    doctor,
+    appointmentType,
+  ) || parseFeeValue(consultationFeeParam) || parseFeeValue(amountParam);
   const netAmount = consultationFee;
 
   const appointmentDateTime = `${formatAppointmentDateLong(

@@ -207,6 +207,9 @@ export default function UsersPage() {
                     ფოტო
                   </th>
                   <th className="p-4 text-left font-medium text-dark dark:text-white">
+                    IDENTOMAT
+                  </th>
+                  <th className="p-4 text-left font-medium text-dark dark:text-white">
                     სახელი
                   </th>
                   <th className="p-4 text-left font-medium text-dark dark:text-white">
@@ -253,7 +256,7 @@ export default function UsersPage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={15} className="p-8 text-center">
+                    <td colSpan={16} className="p-8 text-center">
                       <div className="flex items-center justify-center">
                         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
                       </div>
@@ -261,7 +264,7 @@ export default function UsersPage() {
                   </tr>
                 ) : users.length === 0 ? (
                   <tr>
-                    <td colSpan={15} className="p-4 text-center text-dark-4">
+                    <td colSpan={16} className="p-4 text-center text-dark-4">
                       მომხმარებლები არ მოიძებნა
                     </td>
                   </tr>
@@ -294,6 +297,15 @@ export default function UsersPage() {
                         ? user.licenseDocument
                         : `${apiBase}/${user.licenseDocument}`
                       : null;
+                    const identomatImages = [
+                      { label: "სახე", url: user.identomatFaceImage },
+                      { label: "წინა", url: user.identomatDocumentFrontImage },
+                      { label: "უკანა", url: user.identomatDocumentBackImage },
+                      { label: "პასპორტი", url: user.identomatPassportImage },
+                    ].filter(
+                      (image): image is { label: string; url: string } =>
+                        Boolean(image.url),
+                    );
                     return (
                       <tr
                         key={user.id}
@@ -313,6 +325,30 @@ export default function UsersPage() {
                             >
                               {(user.name || "?").charAt(0).toUpperCase()}
                             </div>
+                          )}
+                        </td>
+                        <td className="p-4">
+                          {identomatImages.length > 0 ? (
+                            <div className="flex gap-1">
+                              {identomatImages.map((image) => (
+                                <a
+                                  key={image.label}
+                                  href={image.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  title={image.label}
+                                  className="block overflow-hidden rounded border border-stroke dark:border-dark-3"
+                                >
+                                  <img
+                                    src={image.url}
+                                    alt={`Identomat ${image.label}`}
+                                    className="h-10 w-10 object-cover"
+                                  />
+                                </a>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-dark-4 dark:text-dark-6">-</span>
                           )}
                         </td>
                         <td className="p-4 text-dark dark:text-white">

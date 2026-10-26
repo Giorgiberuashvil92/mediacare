@@ -1,13 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { router } from "expo-router";
-import {
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useLanguage } from "../../contexts/LanguageContext";
 
 interface AIConsentModalProps {
@@ -37,23 +29,6 @@ export default function AIConsentModal({
           </View>
 
           <Text style={styles.title}>{t("aiAssistant.consent.title")}</Text>
-
-          <ScrollView
-            style={styles.bodyScroll}
-            showsVerticalScrollIndicator={false}
-          >
-            <Text style={styles.body}>{t("aiAssistant.consent.body")}</Text>
-          </ScrollView>
-
-          <TouchableOpacity
-            style={styles.privacyLink}
-            onPress={() => router.push("/screens/profile/terms/privacy")}
-          >
-            <Text style={styles.privacyLinkText}>
-              {t("aiAssistant.consent.viewPrivacyPolicy")}
-            </Text>
-            <Ionicons name="chevron-forward" size={16} color="#6366F1" />
-          </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.acceptButton}
@@ -90,7 +65,6 @@ const styles = StyleSheet.create({
   },
   card: {
     width: "100%",
-    maxHeight: "85%",
     backgroundColor: "#FFFFFF",
     borderRadius: 20,
     padding: 24,
@@ -111,35 +85,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   title: {
-    fontSize: 18,
-    fontFamily: "Poppins-Bold",
+    fontSize: 15,
+    fontFamily: "Poppins-Regular",
     color: "#1F2937",
     textAlign: "center",
-    marginBottom: 16,
-    lineHeight: 26,
-  },
-  bodyScroll: {
-    maxHeight: 280,
-    marginBottom: 12,
-  },
-  body: {
-    fontSize: 14,
-    fontFamily: "Poppins-Regular",
-    color: "#374151",
-    lineHeight: 22,
-  },
-  privacyLink: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-    marginBottom: 20,
-    paddingVertical: 8,
-  },
-  privacyLinkText: {
-    fontSize: 14,
-    fontFamily: "Poppins-SemiBold",
-    color: "#6366F1",
+    marginBottom: 24,
+    lineHeight: 23,
   },
   acceptButton: {
     backgroundColor: "#6366F1",

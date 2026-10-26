@@ -21,6 +21,7 @@
     "dev": "nest start --watch",
     "seed:specializations": "ts-node -r tsconfig-paths/register src/specializations/seed-specializations.ts",
     "seed:review-login": "ts-node -r tsconfig-paths/register src/auth/seed-review-login.ts",
+    "seed:review-login:prod": "node dist/auth/seed-review-login.js",
     "clear:appointments": "ts-node -r tsconfig-paths/register src/appointments/scripts/clear-appointments.ts",
     "fix:user-email-index": "ts-node -r tsconfig-paths/register src/scripts/fix-user-email-index.ts",
     "fix:user-unique-indexes": "ts-node -r tsconfig-paths/register src/scripts/fix-user-email-index.ts"

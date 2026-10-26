@@ -42,6 +42,7 @@ import {
   formatAppointmentTime,
 } from "../utils/appointmentDateTime";
 import { truncateDisplayFileName } from "../utils/fileNameDisplay";
+import { ensureMediaLibraryAccess } from "../utils/mediaLibraryPermission";
 
 interface Medication {
   name: string;
@@ -986,13 +987,10 @@ export default function DoctorAppointments() {
 
   const handlePickPatientImagesFromGallery = async () => {
     try {
-      const { status } =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert(
-          t("doctor.appointments.accessTitle"),
-          t("doctor.appointments.galleryAccessMessage"),
-        );
+      const hasAccess = await ensureMediaLibraryAccess({
+        message: t("doctor.appointments.galleryAccessMessage"),
+      });
+      if (!hasAccess) {
         return;
       }
 

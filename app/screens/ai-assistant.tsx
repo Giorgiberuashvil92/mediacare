@@ -1,6 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Clipboard from "expo-clipboard";
+import * as DocumentPicker from "expo-document-picker";
+import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
@@ -14,7 +16,6 @@ import React, {
 import {
   ActivityIndicator,
   Alert,
-  Image,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -28,10 +29,16 @@ import {
   View,
 } from "react-native";
 import {
+  ensureCameraAccess,
+  ensureMediaLibraryAccess,
+} from "../utils/mediaLibraryPermission";
+import { WebView } from "react-native-webview";
+import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import Svg, {
+  Circle,
   ClipPath,
   Defs,
   G,
@@ -54,8 +61,199 @@ import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { getAIConsent, saveAIConsent } from "../utils/aiConsentStorage";
 import { getDoctorDisplayName } from "../utils/doctorNameLabel";
+import {
+  buildAttachmentPreviewUri,
+  buildHeraAttachmentFromUri,
+  isImageFilename,
+  isImageMimeType,
+  isSupportedAttachmentMime,
+  resolveMessageImageUri,
+} from "../utils/heraAttachment";
 
 type AIConsentStatus = "loading" | "pending" | "accepted" | "declined";
+type AIPlan = "free" | "standard" | "premium";
+const AI_SCREEN_BG = "#F2F2F7";
+const STREAMING_ASSISTANT_ID = "__streaming_assistant__";
+const AI_PLAN_LIMITS: Record<AIPlan, number> = {
+  free: 10,
+  standard: 20,
+  premium: 50,
+};
+const AI_PLAN_PRICES: Record<Exclude<AIPlan, "free">, number> = {
+  standard: 20,
+  premium: 50,
+};
+
+function getMessagePreviewText(content: string): string {
+  const trimmed = content.trim();
+  if (!trimmed) return "";
+
+  if (trimmed.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(trimmed) as { text?: string; content?: string };
+      if (typeof parsed.text === "string" && parsed.text.trim()) {
+        return parsed.text.trim();
+      }
+      if (typeof parsed.content === "string" && parsed.content.trim()) {
+        return parsed.content.trim();
+      }
+    } catch {
+      // plain text
+    }
+  }
+
+  return trimmed;
+}
+
+async function fetchSessionPreview(sessionId: string): Promise<string> {
+  try {
+    // ისტორიის სათაური = GET /sessions/{id}/messages → პირველი user შეტყობინების content
+    const response = await apiService.getAIMessages(sessionId, {
+      skip: 0,
+      limit: 20,
+    });
+    if (!response.success || !response.data.length) return "";
+
+    const firstUserWithContent = response.data.find(
+      (message) =>
+        message.role === "user" && getMessagePreviewText(message.content),
+    );
+    if (firstUserWithContent) {
+      return getMessagePreviewText(firstUserWithContent.content);
+    }
+
+    const firstUser = response.data.find((message) => message.role === "user");
+    if (firstUser?.attachments?.length) {
+      const file = firstUser.attachments[0];
+      return file.filename?.trim() || "";
+    }
+
+    return "";
+  } catch {
+    return "";
+  }
+}
+
+function streamStatusLabel(
+  status: { state: string; query?: string },
+  t: (key: string) => string,
+): string {
+  if (status.state === "searching_pubmed") {
+    return t("aiAssistant.stream.searchingPubMed");
+  }
+  return t("aiAssistant.stream.thinking");
+}
+
+function AIQuotaRing({ label }: { label: string }) {
+  return (
+    <View style={styles.quotaRingWrap}>
+      <Svg width={48} height={48} viewBox="0 0 48 48" fill="none">
+        <Circle cx={24} cy={24} r={20.4} stroke="#BEC3C9" strokeWidth={7.2} />
+        <Path
+          d="M24 3.6C24 1.61178 25.6207 -0.0276345 27.5866 0.269493C30.6833 0.73753 33.6703 1.80904 36.3737 3.43568C40.1096 5.68361 43.1626 8.9068 45.2047 12.7591C47.2469 16.6113 48.201 20.9471 47.9647 25.3008C47.7284 29.6545 46.3106 33.8615 43.8634 37.4701C41.4163 41.0787 38.0324 43.9525 34.0751 45.7828C30.1178 47.6132 25.7367 48.3309 21.4022 47.859C17.0678 47.3871 12.9437 45.7433 9.4731 43.1042C6.96167 41.1945 4.86102 38.8158 3.28047 36.112C2.27707 34.3956 3.20051 32.2833 5.04765 31.5477C6.89478 30.8121 8.95937 31.7442 10.071 33.3927C11.0938 34.9095 12.3621 36.2558 13.8312 37.3729C16.2606 39.2203 19.1474 40.3709 22.1816 40.7013C25.2157 41.0317 28.2825 40.5292 31.0526 39.248C33.8227 37.9667 36.1914 35.9551 37.9044 33.4291C39.6174 30.9031 40.6099 27.9581 40.7753 24.9106C40.9407 21.863 40.2728 18.8279 38.8433 16.1313C37.4138 13.4348 35.2767 11.1785 32.6616 9.60498C31.0802 8.65345 29.3602 7.9733 27.5726 7.58425C25.6298 7.16144 24 5.58822 24 3.6Z"
+          fill="url(#quota_ring_gradient)"
+        />
+        <Defs>
+          <SvgLinearGradient
+            id="quota_ring_gradient"
+            x1={41.5}
+            y1={36.5}
+            x2={1.5}
+            y2={27}
+            gradientUnits="userSpaceOnUse"
+          >
+            <Stop stopColor="#3A61DD" />
+            <Stop offset={1} stopColor="#3A61DD" stopOpacity={0} />
+          </SvgLinearGradient>
+        </Defs>
+      </Svg>
+      <Text style={styles.quotaRingText} numberOfLines={1}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+function AISparkleBadge({ size = 48 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 48 48" fill="none">
+      <Rect width={48} height={48} rx={24} fill="#D4E0FC" fillOpacity={0.2} />
+      <Path
+        d="M21.6199 21.1598L22.6536 17.5443C23.0409 16.1909 24.9589 16.1909 25.3463 17.5443L26.3788 21.1598C26.4442 21.3885 26.5667 21.5968 26.7349 21.765C26.9031 21.9332 27.1114 22.0557 27.3401 22.1211L30.9556 23.1536C32.3089 23.5409 32.3089 25.4589 30.9556 25.8463L27.3401 26.8788C27.1114 26.9441 26.9031 27.0667 26.7349 27.2349C26.5667 27.4031 26.4442 27.6114 26.3788 27.8401L25.3463 31.4556C24.9589 32.8089 23.0409 32.8089 22.6536 31.4556L21.6211 27.8401C21.5557 27.6114 21.4332 27.4031 21.265 27.2349C21.0968 27.0667 20.8885 26.9441 20.6598 26.8788L17.0443 25.8463C15.6909 25.4589 15.6909 23.5409 17.0443 23.1536L20.6598 22.1211C20.8885 22.0557 21.0968 21.9332 21.265 21.765C21.4332 21.5968 21.5557 21.3885 21.6211 21.1598M31.1213 29.7581C31.4584 28.7746 32.8759 28.7734 33.2119 29.7581L33.2423 29.8596L33.5876 31.2456L34.9736 31.5921C36.0936 31.8721 36.0936 33.4611 34.9736 33.7411L33.5876 34.0876L33.2423 35.4736C32.9623 36.5924 31.3721 36.5924 31.0921 35.4736L30.7456 34.0876L29.3596 33.7411C28.2396 33.4611 28.2396 31.8709 29.3596 31.5921L30.7456 31.2456L31.0921 29.8596L31.1213 29.7581ZM32.1666 32.4298C32.0995 32.5197 32.0197 32.5995 31.9298 32.6666C32.0197 32.7337 32.0995 32.8135 32.1666 32.9034C32.2338 32.8135 32.3135 32.7337 32.4034 32.6666C32.3134 32.5991 32.2337 32.5189 32.1666 32.4286M14.7879 13.4236C15.1356 12.4074 16.6371 12.4413 16.9089 13.5251L17.2543 14.9111L18.6403 15.2576C19.7603 15.5376 19.7603 17.1266 18.6403 17.4066L17.2543 17.7531L16.9089 19.1391C16.6289 20.2579 15.0388 20.2579 14.7588 19.1391L14.4123 17.7531L13.0263 17.4066C11.9063 17.1266 11.9063 15.5364 13.0263 15.2576L14.4123 14.9111L14.7588 13.5251L14.7879 13.4236ZM15.8333 16.0964C15.7661 16.1859 15.6863 16.2653 15.5964 16.3321C15.6865 16.3996 15.7662 16.4798 15.8333 16.5701C15.9003 16.4798 15.9801 16.3996 16.0701 16.3321C15.9802 16.265 15.9004 16.1864 15.8333 16.0964Z"
+        fill="url(#ai_sparkle_gradient)"
+      />
+      <Defs>
+        <SvgLinearGradient
+          id="ai_sparkle_gradient"
+          x1={21.7808}
+          y1={15.9675}
+          x2={32.6991}
+          y2={20.1751}
+          gradientUnits="userSpaceOnUse"
+        >
+          <Stop stopColor="#6366F1" />
+          <Stop offset={1} stopColor="#A855F7" />
+        </SvgLinearGradient>
+      </Defs>
+    </Svg>
+  );
+}
+
+function AIPlanDiamondIcon() {
+  return (
+    <Svg width={16} height={16} viewBox="0 0 16 16" fill="none">
+      <Path
+        d="M12.0727 7.03061L12.2068 6.73414C12.4428 6.20968 12.8748 5.78918 13.4177 5.55561L13.8317 5.37805C13.882 5.35586 13.9245 5.32031 13.9543 5.27561C13.9841 5.23091 14 5.17893 14 5.12584C14 5.07275 13.9841 5.02078 13.9543 4.97608C13.9245 4.93138 13.882 4.89583 13.8317 4.87364L13.4406 4.70655C12.8841 4.46633 12.4446 4.03027 12.2128 3.48821L12.0748 3.16818C12.0546 3.1186 12.0192 3.07604 11.9734 3.04604C11.9276 3.01605 11.8734 3 11.8179 3C11.7625 3 11.7083 3.01605 11.6625 3.04604C11.6167 3.07604 11.5813 3.1186 11.561 3.16818L11.423 3.48769C11.1915 4.02985 10.7523 4.4661 10.1958 4.70655L9.80416 4.87416C9.75409 4.89641 9.71169 4.93196 9.68198 4.9766C9.65227 5.02125 9.63648 5.07312 9.63648 5.12611C9.63648 5.17909 9.65227 5.23097 9.68198 5.27561C9.71169 5.32025 9.75409 5.3558 9.80416 5.37805L10.2187 5.55509C10.7615 5.78889 11.1934 6.20958 11.429 6.73414L11.5632 7.03061C11.6614 7.24745 11.9739 7.24745 12.0727 7.03061ZM8.75636 5.79708C8.90581 6.02406 9.11017 6.19184 9.36944 6.30044L9.67762 6.42982C9.98852 6.56007 10.2109 6.76923 10.3447 7.05732L10.5291 7.4554C10.9256 8.31284 12.1059 8.44746 12.7501 7.86081L12.7997 7.92419C12.8755 8.02129 12.9139 8.14065 12.9082 8.26188C12.9025 8.38312 12.8532 8.4987 12.7687 8.58888L7.85965 13.8268C7.8085 13.8813 7.746 13.9249 7.67618 13.9547C7.60637 13.9846 7.5308 14 7.45438 14C7.37797 14 7.3024 13.9846 7.23259 13.9547C7.16277 13.9249 7.10026 13.8813 7.04912 13.8268L2.14011 8.58888C2.05555 8.4987 2.00622 8.38312 2.00055 8.26188C1.99488 8.14065 2.03322 8.02129 2.10902 7.92419L3.74536 5.82903C3.79617 5.76398 3.86205 5.71118 3.93778 5.67481C4.01352 5.63845 4.09704 5.61952 4.18171 5.61952H8.65764C8.68564 5.68027 8.71836 5.73946 8.75582 5.79708"
+        fill="url(#ai_plan_diamond_gradient)"
+      />
+      <Defs>
+        <SvgLinearGradient
+          id="ai_plan_diamond_gradient"
+          x1={6.87293}
+          y1={4.52778}
+          x2={12.2852}
+          y2={6.80305}
+          gradientUnits="userSpaceOnUse"
+        >
+          <Stop stopColor="#6366F1" />
+          <Stop offset={1} stopColor="#A855F7" />
+        </SvgLinearGradient>
+      </Defs>
+    </Svg>
+  );
+}
+
+function AIPremiumCrownIcon() {
+  return (
+    <Svg width={12} height={11} viewBox="0 0 12 11" fill="none">
+      <Path
+        d="M2.218 10.6667C2.12378 10.6667 2.04467 10.6347 1.98067 10.5707C1.91667 10.5067 1.88467 10.4273 1.88467 10.3327C1.88467 10.238 1.91667 10.1589 1.98067 10.0953C2.04467 10.0318 2.12378 10 2.218 10H9.782C9.87667 10 9.95578 10.032 10.0193 10.096C10.0829 10.16 10.1149 10.2393 10.1153 10.334C10.1158 10.4287 10.0838 10.5078 10.0193 10.5713C9.95489 10.6349 9.87578 10.6667 9.782 10.6667H2.218ZM2.736 8.744C2.47378 8.744 2.24533 8.66178 2.05067 8.49733C1.856 8.33289 1.73111 8.124 1.676 7.87067L0.88 3.65C0.857778 3.65889 0.832889 3.66378 0.805333 3.66467C0.777333 3.666 0.752222 3.66667 0.73 3.66667C0.520667 3.66667 0.346667 3.59556 0.208 3.45333C0.0693334 3.31111 0 3.13867 0 2.936C0 2.72578 0.0695555 2.54711 0.208667 2.4C0.347333 2.25333 0.521556 2.18 0.731333 2.18C0.941111 2.18 1.11956 2.25333 1.26667 2.4C1.41333 2.54711 1.48667 2.72578 1.48667 2.936C1.48667 2.98222 1.48489 3.02511 1.48133 3.06467C1.47778 3.10422 1.46467 3.14333 1.442 3.182L3.282 3.92267C3.36733 3.95689 3.45289 3.96133 3.53867 3.936C3.624 3.91022 3.69644 3.85889 3.756 3.782L5.55733 1.342C5.46089 1.27889 5.38444 1.19533 5.328 1.09133C5.27156 0.987778 5.24333 0.876 5.24333 0.756C5.24333 0.546222 5.31689 0.367778 5.464 0.220667C5.61067 0.0735556 5.78911 0 5.99933 0C6.20911 0 6.38778 0.0733333 6.53533 0.22C6.68289 0.366667 6.75667 0.544445 6.75667 0.753333C6.75667 0.879556 6.72845 0.993334 6.672 1.09467C6.61556 1.19689 6.53911 1.27933 6.44267 1.342L8.244 3.782C8.30356 3.85889 8.376 3.91 8.46133 3.93533C8.54711 3.96156 8.63267 3.95756 8.718 3.92333L10.558 3.182C10.546 3.14644 10.5356 3.10756 10.5267 3.06533C10.5178 3.02267 10.5133 2.97956 10.5133 2.936C10.5133 2.72578 10.5827 2.54711 10.7213 2.4C10.86 2.25333 11.0342 2.18 11.244 2.18C11.4538 2.18 11.6322 2.25333 11.7793 2.4C11.9264 2.54711 12 2.72578 12 2.936C12 3.13778 11.9262 3.31 11.7787 3.45267C11.6311 3.59533 11.452 3.66667 11.2413 3.66667C11.2244 3.66667 11.2053 3.664 11.184 3.65867C11.1627 3.65333 11.1391 3.65044 11.1133 3.65L10.324 7.87C10.2684 8.12422 10.1436 8.33333 9.94933 8.49733C9.75511 8.66133 9.52667 8.74356 9.264 8.744H2.736Z"
+        fill="url(#ai_premium_crown_gradient)"
+      />
+      <Defs>
+        <SvgLinearGradient
+          id="ai_premium_crown_gradient"
+          x1={4.87293}
+          y1={1.48148}
+          x2={10.2341}
+          y2={3.8057}
+          gradientUnits="userSpaceOnUse"
+        >
+          <Stop stopColor="#6366F1" />
+          <Stop offset={1} stopColor="#A855F7" />
+        </SvgLinearGradient>
+      </Defs>
+    </Svg>
+  );
+}
+
+function AIPlanBadgeIcon({ premium }: { premium: boolean }) {
+  return (
+    <View style={styles.planBadgeIconWrap}>
+      {premium ? <AIPremiumCrownIcon /> : <AIPlanDiamondIcon />}
+    </View>
+  );
+}
 
 function MessageLikeIcon({
   size = 20,
@@ -160,6 +358,63 @@ function MessageTypingDots() {
         />
       ))}
     </View>
+  );
+}
+
+function AIHeaderNewChatIcon({ size = 24 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M11 2H9C4 2 2 4 2 9V15C2 20 4 22 9 22H15C20 22 22 20 22 15V13"
+        stroke="#000000"
+        strokeWidth={1.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M16.04 3.02L8.16004 10.9C7.86004 11.2 7.56004 11.79 7.50004 12.22L7.07004 15.23C6.91004 16.32 7.68004 17.08 8.77004 16.93L11.78 16.5C12.2 16.44 12.79 16.14 13.1 15.84L20.98 7.96C22.34 6.6 22.98 5.02 20.98 3.02C18.98 1.02 17.4 1.66 16.04 3.02Z"
+        stroke="#000000"
+        strokeWidth={1.5}
+        strokeMiterlimit={10}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M14.91 4.15C15.58 6.54 17.45 8.41 19.85 9.09"
+        stroke="#000000"
+        strokeWidth={1.5}
+        strokeMiterlimit={10}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+function AIHeaderHistoryIcon({ size = 20 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 20 20" fill="none">
+      <Path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M2.82934 2.81902C6.62434 -0.970979 12.7943 -0.930979 16.6123 2.88802C20.4323 6.70802 20.4723 12.881 16.6763 16.676C12.8803 20.471 6.70834 20.432 2.88834 16.612C1.81371 15.542 1.00177 14.2375 0.516293 12.8008C0.0308133 11.3642 -0.114988 9.83453 0.0903395 8.33202C0.117259 8.13483 0.221409 7.95641 0.379877 7.83602C0.538345 7.71562 0.738151 7.6631 0.93534 7.69002C1.13253 7.71694 1.31095 7.82109 1.43134 7.97956C1.55174 8.13803 1.60426 8.33783 1.57734 8.53502C1.40302 9.80834 1.52642 11.1047 1.93782 12.3223C2.34923 13.5399 3.03744 14.6454 3.94834 15.552C7.19334 18.796 12.4163 18.815 15.6163 15.616C18.8153 12.416 18.7963 7.19302 15.5523 3.94802C12.3093 0.706021 7.08934 0.685022 3.88934 3.88002L4.63734 3.88302C4.73583 3.88348 4.83327 3.90334 4.92409 3.94145C5.0149 3.97957 5.09733 4.0352 5.16664 4.10517C5.23596 4.17514 5.29082 4.25807 5.32809 4.34924C5.36536 4.44041 5.3843 4.53803 5.38384 4.63652C5.38338 4.73501 5.36353 4.83245 5.32541 4.92327C5.28729 5.01409 5.23166 5.09651 5.16169 5.16583C5.09173 5.23515 5.00879 5.29 4.91762 5.32727C4.82645 5.36454 4.72883 5.38348 4.63034 5.38302L2.08434 5.37102C1.88664 5.36997 1.69735 5.2909 1.55765 5.15101C1.41795 5.01112 1.33913 4.82172 1.33834 4.62402L1.32534 2.08002C1.32481 1.98153 1.34369 1.8839 1.3809 1.7927C1.4181 1.70151 1.47291 1.61854 1.54218 1.54852C1.61145 1.4785 1.69384 1.42282 1.78463 1.38464C1.87542 1.34647 1.97285 1.32655 2.07134 1.32602C2.16983 1.3255 2.26746 1.34438 2.35866 1.38158C2.44985 1.41879 2.53283 1.47359 2.60284 1.54286C2.67286 1.61214 2.72854 1.69452 2.76672 1.78531C2.80489 1.87611 2.82481 1.97353 2.82534 2.07202L2.82934 2.81902ZM9.74934 4.99902C9.94825 4.99902 10.139 5.07804 10.2797 5.21869C10.4203 5.35934 10.4993 5.55011 10.4993 5.74902V9.43902L12.7803 11.719C12.852 11.7882 12.9092 11.8709 12.9485 11.9624C12.9879 12.0539 13.0086 12.1523 13.0095 12.2519C13.0104 12.3514 12.9915 12.4502 12.9538 12.5424C12.9162 12.6346 12.8605 12.7184 12.7901 12.7888C12.7198 12.8593 12.636 12.915 12.5439 12.9527C12.4517 12.9905 12.353 13.0095 12.2534 13.0087C12.1538 13.0079 12.0554 12.9872 11.9639 12.948C11.8723 12.9087 11.7896 12.8516 11.7203 12.78L9.00034 10.06V5.75002C9.00034 5.55111 9.07936 5.36034 9.22001 5.21969C9.36066 5.07904 9.55143 5.00002 9.75034 5.00002"
+        fill="#000000"
+      />
+    </Svg>
+  );
+}
+
+function AISendIcon({ size = 32 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 32 32" fill="none">
+      <Rect width={32} height={32} rx={16} fill="#25262D" />
+      <Path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M8.40919 8.50749C8.29373 8.45895 8.16635 8.44622 8.04356 8.47096C7.92078 8.49569 7.80826 8.55675 7.72059 8.64621C7.63293 8.73567 7.57417 8.84941 7.55192 8.97267C7.52968 9.09593 7.54499 9.22303 7.59586 9.33749L10.1734 15.125H16.5C16.6658 15.125 16.8248 15.1908 16.942 15.308C17.0592 15.4253 17.125 15.5842 17.125 15.75C17.125 15.9157 17.0592 16.0747 16.942 16.1919C16.8248 16.3091 16.6658 16.375 16.5 16.375H10.1734L7.59586 22.1625C7.54499 22.2769 7.52968 22.404 7.55192 22.5273C7.57417 22.6506 7.63293 22.7643 7.72059 22.8538C7.80826 22.9432 7.92078 23.0043 8.04356 23.029C8.16635 23.0537 8.29373 23.041 8.40919 22.9925L24.2425 16.3258C24.3558 16.278 24.4524 16.1979 24.5204 16.0955C24.5883 15.9931 24.6245 15.8729 24.6245 15.75C24.6245 15.6271 24.5883 15.5069 24.5204 15.4045C24.4524 15.3021 24.3558 15.2219 24.2425 15.1742L8.40919 8.50749Z"
+        fill="#FFFFFF"
+      />
+    </Svg>
   );
 }
 
@@ -272,6 +527,24 @@ export default function AIAssistantScreen() {
       })),
     [t, isDoctor],
   );
+  const historyTitleLabel = useMemo(() => {
+    const label = t("aiAssistant.history.title");
+    if (label !== "aiAssistant.history.title") return label;
+    return language === "en"
+      ? "History"
+      : language === "ru"
+        ? "История"
+        : "ისტორია";
+  }, [t, language]);
+  const historyEmptyLabel = useMemo(() => {
+    const label = t("aiAssistant.history.empty");
+    if (label !== "aiAssistant.history.empty") return label;
+    return language === "en"
+      ? "No chat history yet"
+      : language === "ru"
+        ? "История пуста"
+        : "ისტორია ცარიელია";
+  }, [t, language]);
   const [inputText, setInputText] = useState("");
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showMediaModal, setShowMediaModal] = useState(false);
@@ -281,8 +554,15 @@ export default function AIAssistantScreen() {
   const [currentSession, setCurrentSession] = useState<AISession | null>(null);
   const [messages, setMessages] = useState<AIMessage[]>([]);
   const [sessions, setSessions] = useState<AISession[]>([]);
+  const [sessionPreviews, setSessionPreviews] = useState<
+    Record<string, string>
+  >({});
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [streamStatus, setStreamStatus] = useState<{
+    state: string;
+    query?: string;
+  } | null>(null);
   const [pendingSend, setPendingSend] = useState<{
     content: string;
     imageUri?: string;
@@ -302,12 +582,247 @@ export default function AIAssistantScreen() {
   const negFeedbackSubmittingRef = useRef(false);
   const [likeBusyById, setLikeBusyById] = useState<Record<string, boolean>>({});
   const likeBusyIdsRef = useRef<Set<string>>(new Set());
+  const pendingLocalImageUriRef = useRef<string | null>(null);
+  const pendingAttachmentsRef = useRef<
+    | {
+        filename: string;
+        content_type: string;
+        data: string;
+      }[]
+    | undefined
+  >(undefined);
+  const messageImagePreviewsRef = useRef<Record<string, string>>({});
+  const paymentResultHandledRef = useRef(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const [consentStatus, setConsentStatus] =
     useState<AIConsentStatus>("loading");
   const [showConsentModal, setShowConsentModal] = useState(false);
+  const [aiPlan, setAiPlan] = useState<AIPlan>("free");
+  const [aiUsageCount, setAiUsageCount] = useState(0);
+  const [selectedUpgradePlan, setSelectedUpgradePlan] =
+    useState<Exclude<AIPlan, "free">>("standard");
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showPaymentWebView, setShowPaymentWebView] = useState(false);
+  const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
+  const [showCancelPlanModal, setShowCancelPlanModal] = useState(false);
+  const [showInlineUpgradeCard, setShowInlineUpgradeCard] = useState(false);
+  const [purchaseResult, setPurchaseResult] = useState<
+    "success" | "failure" | "cancelSuccess" | null
+  >(null);
 
   const isChatEnabled = consentStatus === "accepted";
+  const aiUsageLimit = AI_PLAN_LIMITS[aiPlan];
+  const aiUsageRemaining = Math.max(aiUsageLimit - aiUsageCount, 0);
+  const isAILimitReached = aiUsageRemaining <= 0;
+  const activePlanLabel =
+    aiPlan === "premium"
+      ? language === "en"
+        ? "Premium"
+        : language === "ru"
+          ? "Премиум"
+          : "პრემიუმი"
+      : aiPlan === "standard"
+        ? language === "en"
+          ? "Standard"
+          : language === "ru"
+            ? "Стандарт"
+            : "სტანდარტი"
+        : language === "en"
+          ? "Free version"
+          : language === "ru"
+            ? "Бесплатная версия"
+            : "უფასო ვერსია";
+  const aiQuotaCopy =
+    language === "en"
+      ? {
+          freeStrip: `You are using the free version — ${aiUsageRemaining} of ${aiUsageLimit} questions remaining.`,
+          limitStrip: `Question limit reached — upgrade to continue.`,
+          upgrade: "Upgrade",
+          inlineHeading: "Laboratory analysis results review",
+          inlineTitle: "AI Assistant",
+          inlineFree: "Free version",
+          inlineLimitTitle: "Free version limit reached",
+          inlineLimitText: `You used all ${aiUsageLimit} questions. Upgrade for more questions.`,
+          inlineBenefitsTitle: "AI assistant with more capabilities",
+          inlineBenefits: [
+            "Deeper analysis",
+            "More capabilities",
+            "Faster AI version",
+          ],
+        }
+      : language === "ru"
+        ? {
+            freeStrip: `Вы используете бесплатную версию — осталось ${aiUsageRemaining} из ${aiUsageLimit} вопросов.`,
+            limitStrip: `Лимит вопросов исчерпан — обновите версию, чтобы продолжить.`,
+            upgrade: "Обновить",
+            inlineHeading: "Обзор результатов лабораторного анализа",
+            inlineTitle: "AI Ассистент",
+            inlineFree: "Бесплатная версия",
+            inlineLimitTitle: "Лимит бесплатной версии исчерпан",
+            inlineLimitText: `Вы использовали все ${aiUsageLimit} вопросов. Обновите версию для большего количества вопросов.`,
+            inlineBenefitsTitle: "AI ассистент с большими возможностями",
+            inlineBenefits: [
+              "Более глубокий анализ",
+              "Больше возможностей",
+              "Более быстрая AI версия",
+            ],
+          }
+        : {
+            freeStrip: `თქვენ იყენებთ უფასო ვერსიას — დარჩენილია ${aiUsageRemaining} კითხვა ${aiUsageLimit}-დან.`,
+            limitStrip: `კითხვების ლიმიტი ამოწურულია — გასაგრძელებლად განაახლე ვერსია.`,
+            upgrade: "განახლება",
+            inlineHeading: "ლაბორატორიული ანალიზის შედეგების ჩვენება",
+            inlineTitle: "AI ასისტენტი",
+            inlineFree: "უფასო ვერსია",
+            inlineLimitTitle: "უფასო ვერსიის ლიმიტი ამოწურულია",
+            inlineLimitText: `თქვენ ამოწურეთ ${aiUsageLimit} კითხვა. მეტი კითხვებისთვის განაახლე ვერსია.`,
+            inlineBenefitsTitle: "AI ასისტენტი მეტი შესაძლებლობებით",
+            inlineBenefits: [
+              "უფრო ღრმა ანალიზი",
+              "მეტი შესაძლებლობა",
+              "უფრო სწრაფი AI ვერსია",
+            ],
+          };
+  const upgradeCopy =
+    language === "en"
+      ? {
+          standard: "Standard",
+          premium: "Premium",
+          title: `Get AI Assistant ${selectedUpgradePlan === "premium" ? "Premium" : "Standard"}`,
+          subtitle: "Ask health questions about any topic",
+          featureHeader: "Feature",
+          upgradeButton: `Upgrade for ${AI_PLAN_PRICES[selectedUpgradePlan]} GEL / month`,
+          footnote:
+            "Renews automatically every month. You can cancel anytime.",
+          features: [
+            "General health questions",
+            "Information about symptoms",
+            "Doctor prescriptions explained simply",
+            "Simple summary of lab results",
+            "Health history consideration",
+            "Previous lab result comparison",
+            "Question understanding monitoring",
+            "Medical document summary",
+          ],
+          successTitle: "Package activated successfully",
+          successText:
+            "Your AI Assistant limit has been updated. You can continue sending questions.",
+          failureTitle: "Package activation failed",
+          failureText: "Try again or use another payment method.",
+          cancelSuccessTitle: "Package cancellation requested",
+          cancelSuccessText:
+            "Your cancellation request has been received. The package will stay active until the end of the billing period.",
+          resultButton: "Got it",
+          cancelEyebrow: "Attention",
+          activeStatus: "Package is active",
+          paymentTitle: "Last payment",
+          paymentAmount: `${AI_PLAN_PRICES[selectedUpgradePlan]} GEL`,
+          paymentDate: "September 5, 2026",
+          paymentHistory: "View payment history",
+          cancelButton: "Cancel subscription",
+          cancelTitle: "Cancel package",
+          cancelText: "Are you sure you want to cancel this subscription?",
+          cancelNo: "No",
+          cancelYes: "Cancel",
+        }
+      : language === "ru"
+        ? {
+            standard: "Стандарт",
+            premium: "Премиум",
+            title: `Получите AI Ассистент ${selectedUpgradePlan === "premium" ? "Премиум" : "Стандарт"}`,
+            subtitle: "Задавайте вопросы о здоровье на любую тему",
+            featureHeader: "Функция",
+            upgradeButton: `Обновить за ${AI_PLAN_PRICES[selectedUpgradePlan]} лари / месяц`,
+            footnote:
+              "Автоматически продлевается каждый месяц. Отменить можно в любое время.",
+            features: [
+              "Общие вопросы о здоровье",
+              "Информация о симптомах",
+              "Объяснение назначений врача простым языком",
+              "Простое резюме лабораторных результатов",
+              "Учет истории здоровья",
+              "Сравнение предыдущих анализов",
+              "Мониторинг понимания вопросов",
+              "Резюме медицинских документов",
+            ],
+            successTitle: "Пакет успешно активирован",
+            successText:
+              "Лимит вашего AI Ассистента обновлен. Вы можете продолжить отправлять вопросы.",
+            failureTitle: "Не удалось активировать пакет",
+            failureText:
+              "Попробуйте снова или используйте другой способ оплаты.",
+            cancelSuccessTitle: "Запрос на отмену пакета принят",
+            cancelSuccessText:
+              "Ваш запрос на отмену получен. Пакет останется активным до конца платежного периода.",
+            resultButton: "Понятно",
+            cancelEyebrow: "Внимание",
+            activeStatus: "Пакет активен",
+            paymentTitle: "Последний платеж",
+            paymentAmount: `${AI_PLAN_PRICES[selectedUpgradePlan]} лари`,
+            paymentDate: "5 сентября, 2026",
+            paymentHistory: "Посмотреть историю платежей",
+            cancelButton: "Отменить подписку",
+            cancelTitle: "Отмена пакета",
+            cancelText: "Вы уверены, что хотите отменить эту подписку?",
+            cancelNo: "Нет",
+            cancelYes: "Отменить",
+          }
+        : {
+            standard: "სტანდარტი",
+            premium: "პრემიუმი",
+            title: `მიიღე AI ასისტენტი ${selectedUpgradePlan === "premium" ? "პრემიუმი" : "სტანდარტი"}`,
+            subtitle: "კითხვები ჯანმრთელობის შესახებ ნებისმიერ საკითხზე",
+            featureHeader: "ფუნქცია",
+            upgradeButton: `განახლება ${AI_PLAN_PRICES[selectedUpgradePlan]} ლარი / თვე`,
+            footnote:
+              "ავტომატურად განახლდება ყოველთვიურად. გაუქმება შეგიძლიათ ნებისმიერ დროს.",
+            features: [
+              "ზოგადი ჯანმრთელობის კითხვები",
+              "სიმპტომების შესახებ ინფორმაცია",
+              "ექიმის დანიშნულების ახსნა მარტივი ენით",
+              "ანალიზის პასუხების მარტივი შეჯამება",
+              "ჯანმრთელობის ისტორიის გათვალისწინება",
+              "წინა ანალიზების შედარება",
+              "შეკითხვების გაგების მონიტორინგი",
+              "სამედიცინო დოკუმენტაციის შეჯამება",
+            ],
+            successTitle: "პაკეტი წარმატებით გააქტიურდა",
+            successText:
+              "თქვენი AI ასისტენტის ლიმიტი განახლდა. შეგიძლიათ გააგრძელოთ კითხვების გაგზავნა.",
+            failureTitle: "პაკეტის გააქტიურება ვერ მოხერხდა",
+            failureText: "სცადეთ თავიდან ან გამოიყენეთ სხვა გადახდის მეთოდი.",
+            cancelSuccessTitle: "პაკეტის გაუქმება ჩაინიშნა",
+            cancelSuccessText:
+              "თქვენი გაუქმების მოთხოვნა მიღებულია. პაკეტი აქტიური დარჩება გადახდის პერიოდის დასრულებამდე.",
+            resultButton: "გასაგებია",
+            cancelEyebrow: "ყურადღება",
+            activeStatus: "გამოწერა აქტიურია",
+            paymentTitle: "შემდეგი გადახდა",
+            paymentAmount: `${AI_PLAN_PRICES[selectedUpgradePlan]} ლარი`,
+            paymentDate: "5 სექტემბერი, 2026",
+            paymentHistory: "გადახდების ისტორიის ნახვა",
+            cancelButton: "გამოწერის გაუქმება",
+            cancelTitle: "პაკეტის გაუქმება",
+            cancelText: "ნამდვილად გსურთ გამოწერის გაუქმება?",
+            cancelNo: "არა",
+            cancelYes: "გაუქმება",
+          };
+  const selectedUpgradePlanLabel =
+    selectedUpgradePlan === "premium"
+      ? upgradeCopy.premium
+      : upgradeCopy.standard;
+
+  const showEmptyState =
+    !isLoading &&
+    messages.length === 0 &&
+    !isSending &&
+    consentStatus !== "declined";
+  const showUsageStrip =
+    messages.length > 0 ||
+    isSending ||
+    Boolean(pendingSend) ||
+    showInlineUpgradeCard ||
+    isAILimitReached;
 
   const loadConsentStatus = useCallback(async () => {
     const record = await getAIConsent();
@@ -330,6 +845,92 @@ export default function AIAssistantScreen() {
   useEffect(() => {
     void loadConsentStatus();
   }, [loadConsentStatus]);
+
+  const syncAISubscription = useCallback(async () => {
+    try {
+      const subscription = await apiService.getAISubscription();
+      setAiPlan(subscription.plan);
+      setAiUsageCount(subscription.usageCount);
+    } catch (error) {
+      console.warn("⚠️ [AI subscription] Could not load subscription:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (user?.id) void syncAISubscription();
+  }, [user?.id, syncAISubscription]);
+
+  useEffect(() => {
+    if (showUpgradeModal && aiPlan !== "free") {
+      setSelectedUpgradePlan(aiPlan);
+    }
+  }, [aiPlan, showUpgradeModal]);
+
+  const handleUpgradePlan = useCallback(async () => {
+    try {
+      const checkout = await apiService.createAISubscriptionCheckout(
+        selectedUpgradePlan,
+      );
+      paymentResultHandledRef.current = false;
+      setShowInlineUpgradeCard(false);
+      setShowUpgradeModal(false);
+      setPaymentUrl(checkout.paymentUrl);
+      setShowPaymentWebView(true);
+    } catch (error: any) {
+      console.error("❌ [AI subscription] Checkout failed:", error);
+      setPurchaseResult("failure");
+    }
+  }, [selectedUpgradePlan]);
+
+  const handleCancelPlan = useCallback(async () => {
+    try {
+      await apiService.cancelAISubscription();
+      await syncAISubscription();
+      setSelectedUpgradePlan("standard");
+      setShowCancelPlanModal(false);
+      setShowUpgradeModal(false);
+      setPurchaseResult("cancelSuccess");
+    } catch (error: any) {
+      console.error("❌ [AI subscription] Cancellation failed:", error);
+      setPurchaseResult("failure");
+    }
+  }, [syncAISubscription]);
+
+  const handlePaymentSuccess = useCallback(() => {
+    if (paymentResultHandledRef.current) return;
+    paymentResultHandledRef.current = true;
+    setShowPaymentWebView(false);
+    setPaymentUrl(null);
+    setTimeout(async () => {
+      await syncAISubscription();
+      setPurchaseResult("success");
+    }, 1200);
+  }, [syncAISubscription]);
+
+  const handlePaymentFailure = useCallback(() => {
+    if (paymentResultHandledRef.current) return;
+    paymentResultHandledRef.current = true;
+    setShowPaymentWebView(false);
+    setPaymentUrl(null);
+    setPurchaseResult("failure");
+  }, []);
+
+  const handleOpenPaymentHistory = useCallback(() => {
+    setShowUpgradeModal(false);
+    requestAnimationFrame(() => {
+      router.push("/screens/ai-payment-history");
+    });
+  }, []);
+
+  const closePurchaseResult = useCallback(() => {
+    const role = user?.role || userRole;
+    setPurchaseResult(null);
+    if (role === "doctor") {
+      router.replace("/(doctor-tabs)");
+    } else {
+      router.replace("/(tabs)");
+    }
+  }, [user?.role, userRole]);
 
   const handleAcceptConsent = useCallback(async () => {
     await saveAIConsent(true);
@@ -560,30 +1161,12 @@ export default function AIAssistantScreen() {
     return () => clearTimeout(t);
   }, [isSending]);
 
-  // Request camera permissions
-  const requestCameraPermission = async () => {
-    if (Platform.OS !== "web") {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert("წვდომა", "კამერის გამოსაყენებლად საჭიროა კამერის წვდომა");
-        return false;
-      }
-    }
-    return true;
-  };
+  const requestCameraPermission = () => ensureCameraAccess();
 
-  // Request media library permissions
-  const requestMediaLibraryPermission = async () => {
-    if (Platform.OS !== "web") {
-      const { status } =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert("წვდომა", "სურათის არჩევისთვის საჭიროა გალერეის წვდომა");
-        return false;
-      }
-    }
-    return true;
-  };
+  const requestMediaLibraryPermission = () =>
+    ensureMediaLibraryAccess({
+      message: "სურათის არჩევისთვის საჭიროა გალერეის წვდომა.",
+    });
 
   // Open camera
   const handleOpenCamera = async () => {
@@ -653,39 +1236,70 @@ export default function AIAssistantScreen() {
   const handleAddPhoto = () => {
     if (selectedImage) {
       setShowMediaModal(false);
-      // Image is ready to be sent to API
-      // You can access selectedImage.uri, selectedImage.type, selectedImage.name
-      console.log("Image ready for API:", selectedImage);
     }
   };
 
-  // Reset state when screen loses focus (user navigates away)
+  const handleOpenDocuments = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["image/*", "application/pdf"],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+
+      if (result.canceled || !result.assets?.length) return;
+
+      const asset = result.assets[0];
+      const mimeType =
+        asset.mimeType ||
+        (asset.name?.toLowerCase().endsWith(".pdf")
+          ? "application/pdf"
+          : "image/jpeg");
+
+      if (!isSupportedAttachmentMime(mimeType, asset.name)) {
+        Alert.alert(t("common.info"), t("aiAssistant.media.unsupportedFile"));
+        return;
+      }
+
+      if (asset.size && asset.size > 10 * 1024 * 1024) {
+        Alert.alert(
+          t("identomat.error.title"),
+          t("aiAssistant.media.fileTooLarge"),
+        );
+        return;
+      }
+
+      setSelectedImage({
+        uri: asset.uri,
+        type: mimeType,
+        name: asset.name || `file_${Date.now()}`,
+        fileSize: asset.size,
+      });
+    } catch (error) {
+      console.error("Document picker error:", error);
+      Alert.alert(
+        t("identomat.error.title"),
+        t("aiAssistant.media.filePickFailed"),
+      );
+    }
+  };
+
+  const canSend = Boolean(inputText.trim() || selectedImage);
+
+  // Reset only when leaving the screen — not on focus (camera/gallery would wipe attachments).
   useFocusEffect(
     useCallback(() => {
-      // When screen comes into focus, reset everything for fresh start
-      console.log(
-        "🔄 [useFocusEffect] Screen focused - resetting for fresh start",
-      );
-      setMessages([]);
-      setCurrentSession(null);
-      setInputText("");
-      setSelectedImage(null);
-      setIsLoading(false);
-
-      // Don't load existing session - always start fresh
-      console.log(
-        "📝 [useFocusEffect] Starting fresh - session will be created when user sends first message.",
-      );
-
+      void syncAISubscription();
       return () => {
-        // Cleanup when screen loses focus (user navigates away)
-        console.log("🧹 [useFocusEffect] Screen unfocused - cleaning up");
         setMessages([]);
         setCurrentSession(null);
         setInputText("");
         setSelectedImage(null);
+        pendingLocalImageUriRef.current = null;
+        pendingAttachmentsRef.current = undefined;
+        messageImagePreviewsRef.current = {};
       };
-    }, []),
+    }, [syncAISubscription]),
   );
 
   // Load messages for current session
@@ -737,11 +1351,20 @@ export default function AIAssistantScreen() {
       });
 
       if (sessionsResponse.success) {
-        setSessions(sessionsResponse.data);
+        const list = sessionsResponse.data;
+        setSessions(list);
         console.log(
           "✅ [loadSessions] Sessions loaded successfully:",
-          sessionsResponse.data.length,
+          list.length,
         );
+
+        const previewEntries = await Promise.all(
+          list.map(async (session) => {
+            const preview = await fetchSessionPreview(session.id);
+            return [session.id, preview] as const;
+          }),
+        );
+        setSessionPreviews(Object.fromEntries(previewEntries));
       }
     } catch (error) {
       console.error("❌ [loadSessions] Error loading sessions:", error);
@@ -761,18 +1384,97 @@ export default function AIAssistantScreen() {
   // Handle send message with image (textOverride = when sent from suggested prompt)
   const handleSendMessage = async (textOverride?: string) => {
     const content = (textOverride ?? inputText.trim()) || "";
-    if ((!content && !selectedImage) || isSending) return;
+    const imageToSend = selectedImage;
+    if ((!content && !imageToSend) || isSending) return;
     if (!user?.id) return;
     if (!isChatEnabled) {
       setShowConsentModal(true);
       return;
     }
+    if (isAILimitReached) {
+      setShowInlineUpgradeCard(true);
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 80);
+      return;
+    }
+
+    try {
+      const quota = await apiService.consumeAIUsage();
+      setAiPlan(quota.subscription.plan);
+      setAiUsageCount(quota.subscription.usageCount);
+      if (!quota.allowed) {
+        setShowInlineUpgradeCard(true);
+        return;
+      }
+    } catch (error) {
+      console.error("❌ [AI subscription] Usage check failed:", error);
+      Alert.alert("შეცდომა", "AI გამოწერის სტატუსის შემოწმება ვერ მოხერხდა");
+      return;
+    }
+
+    let attachments:
+      | {
+          filename: string;
+          content_type: string;
+          data: string;
+        }[]
+      | undefined;
+    let localImagePreviewUri: string | null = null;
+
+    if (imageToSend) {
+      try {
+        const attachment = await buildHeraAttachmentFromUri({
+          uri: imageToSend.uri,
+          filename: imageToSend.name || "attachment",
+          contentType: imageToSend.type || "image/jpeg",
+          fileSize: imageToSend.fileSize,
+        });
+        attachments = [attachment];
+        pendingAttachmentsRef.current = attachments;
+        localImagePreviewUri =
+          buildAttachmentPreviewUri(attachment) ??
+          (isImageMimeType(imageToSend.type) ||
+          isImageFilename(imageToSend.name)
+            ? imageToSend.uri
+            : null);
+      } catch (error) {
+        const code = error instanceof Error ? error.message : "";
+        if (code === "FILE_TOO_LARGE") {
+          Alert.alert(
+            t("identomat.error.title"),
+            t("aiAssistant.media.fileTooLarge"),
+          );
+        } else {
+          Alert.alert(
+            t("identomat.error.title"),
+            t("aiAssistant.media.filePickFailed"),
+          );
+        }
+        return;
+      }
+    }
+
+    const messageContent =
+      content ||
+      (attachments?.length
+        ? t("aiAssistant.media.analyzeAttachmentDefault")
+        : "");
+
+    const displayImageUri =
+      imageToSend &&
+      (isImageMimeType(imageToSend.type) || isImageFilename(imageToSend.name))
+        ? imageToSend.uri
+        : localImagePreviewUri;
+
+    pendingLocalImageUriRef.current = displayImageUri;
 
     try {
       setIsSending(true);
+      setStreamStatus(null);
       setPendingSend({
-        content,
-        imageUri: selectedImage?.uri,
+        content: messageContent,
+        imageUri: displayImageUri ?? undefined,
       });
 
       // Create session if it doesn't exist (first message)
@@ -796,36 +1498,119 @@ export default function AIAssistantScreen() {
         console.log("✅ [handleSendMessage] Session created:", sessionToUse.id);
       }
 
-      const response = await apiService.sendAIMessage(sessionToUse.id, {
-        content,
-        image: selectedImage
-          ? {
-              uri: selectedImage.uri,
-              type: selectedImage.type || "image/jpeg",
-              name: selectedImage.name || `photo_${Date.now()}.jpg`,
+      const sentAttachments = attachments ?? pendingAttachmentsRef.current;
+
+      await apiService.sendAIMessageStream(
+        sessionToUse.id,
+        {
+          content: messageContent,
+          attachments: sentAttachments,
+          image: imageToSend
+            ? {
+                uri: imageToSend.uri,
+                type: imageToSend.type || "image/jpeg",
+                name: imageToSend.name || `photo_${Date.now()}.jpg`,
+              }
+            : undefined,
+        },
+        {
+          onUserMessage: (userMessage) => {
+            setPendingSend(null);
+            setInputText("");
+            setSelectedImage(null);
+            const localImageUri = pendingLocalImageUriRef.current;
+            const mergedAttachments =
+              userMessage.attachments ?? sentAttachments;
+            const enrichedUserMessage: AIMessage = {
+              ...userMessage,
+              attachments: mergedAttachments,
+              image_url:
+                localImageUri ??
+                resolveMessageImageUri({
+                  ...userMessage,
+                  attachments: mergedAttachments,
+                }) ??
+                userMessage.image_url,
+            };
+            if (enrichedUserMessage.image_url) {
+              messageImagePreviewsRef.current[enrichedUserMessage.id] =
+                enrichedUserMessage.image_url;
             }
-          : undefined,
-      });
-
-      if (response.success) {
-        // Add both user and assistant messages to the list
-        setMessages((prev) => [
-          ...prev,
-          response.data.user_message,
-          response.data.assistant_message,
-        ]);
-
-        // Clear input
-        setInputText("");
-        setSelectedImage(null);
-
-        // Scroll to bottom
-        setTimeout(() => {
-          scrollViewRef.current?.scrollToEnd({ animated: true });
-        }, 100);
-      } else {
-        Alert.alert("შეცდომა", "შეტყობინების გაგზავნა ვერ მოხერხდა");
-      }
+            setMessages((prev) => [...prev, enrichedUserMessage]);
+            const preview = getMessagePreviewText(enrichedUserMessage.content);
+            if (preview) {
+              setSessionPreviews((prev) => ({
+                ...prev,
+                [sessionToUse!.id]: prev[sessionToUse!.id] || preview,
+              }));
+            }
+            setTimeout(() => {
+              scrollViewRef.current?.scrollToEnd({ animated: true });
+            }, 50);
+          },
+          onStatus: (status) => {
+            setStreamStatus(status);
+          },
+          onAssistantDelta: (fullContent) => {
+            setStreamStatus(null);
+            setMessages((prev) => {
+              const withoutStream = prev.filter(
+                (m) => m.id !== STREAMING_ASSISTANT_ID,
+              );
+              const streamingMsg: AIMessage = {
+                id: STREAMING_ASSISTANT_ID,
+                session_id: sessionToUse!.id,
+                role: "assistant",
+                content: fullContent,
+                created_at: new Date().toISOString(),
+              };
+              return [...withoutStream, streamingMsg];
+            });
+            setTimeout(() => {
+              scrollViewRef.current?.scrollToEnd({ animated: true });
+            }, 50);
+          },
+          onComplete: (data) => {
+            setStreamStatus(null);
+            const localImageUri = pendingLocalImageUriRef.current;
+            const mergedAttachments =
+              data.user_message.attachments ?? sentAttachments;
+            const userMessage: AIMessage = {
+              ...data.user_message,
+              attachments: mergedAttachments,
+              image_url:
+                localImageUri ??
+                messageImagePreviewsRef.current[data.user_message.id] ??
+                resolveMessageImageUri({
+                  ...data.user_message,
+                  attachments: mergedAttachments,
+                }) ??
+                data.user_message.image_url,
+            };
+            if (userMessage.image_url) {
+              messageImagePreviewsRef.current[userMessage.id] =
+                userMessage.image_url;
+            }
+            pendingLocalImageUriRef.current = null;
+            pendingAttachmentsRef.current = undefined;
+            setMessages((prev) => {
+              const withoutStream = prev.filter(
+                (m) => m.id !== STREAMING_ASSISTANT_ID,
+              );
+              const withoutDupUser = withoutStream.filter(
+                (m) => m.id !== userMessage.id,
+              );
+              return [...withoutDupUser, userMessage, data.assistant_message];
+            });
+            setInputText("");
+            setSelectedImage(null);
+            setPendingSend(null);
+            setTimeout(() => {
+              scrollViewRef.current?.scrollToEnd({ animated: true });
+            }, 100);
+          },
+        },
+      );
     } catch (error: any) {
       console.error("Send message error:", error);
       Alert.alert(
@@ -834,13 +1619,21 @@ export default function AIAssistantScreen() {
       );
     } finally {
       setIsSending(false);
+      setStreamStatus(null);
       setPendingSend(null);
     }
   };
 
-  const handlePromptSelect = (promptText: string) => {
+  const handlePromptSelect = (
+    promptText: string,
+    action: "text" | "photo" = "text",
+  ) => {
     if (!isChatEnabled) {
       setShowConsentModal(true);
+      return;
+    }
+    if (action === "photo") {
+      setShowMediaModal(true);
       return;
     }
     setInputText(promptText);
@@ -858,23 +1651,87 @@ export default function AIAssistantScreen() {
     await loadMessages(session.id);
   };
 
-  // Format date for history
-  const formatSessionDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const renderLimitUpgradeCard = (showClose: boolean) => (
+    <View style={styles.inlineUpgradeBlock}>
+      <Text style={styles.inlineUpgradeHeading}>
+        {aiQuotaCopy.inlineHeading}
+      </Text>
+      <View style={styles.inlineUpgradeCard}>
+        <View style={styles.inlineUpgradeHeader}>
+          <View>
+            <View style={styles.inlineUpgradeTitleRow}>
+              <Text style={styles.inlineUpgradeTitle}>
+                {aiQuotaCopy.inlineTitle}
+              </Text>
+              <View style={styles.inlineUpgradeBadge}>
+                <Ionicons name="lock-closed" size={12} color="#EF4444" />
+                <Text style={styles.inlineUpgradeBadgeText}>
+                  {aiQuotaCopy.inlineFree}
+                </Text>
+              </View>
+            </View>
+          </View>
+          {showClose ? (
+            <TouchableOpacity
+              onPress={() => setShowInlineUpgradeCard(false)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="close" size={22} color="#1F2937" />
+            </TouchableOpacity>
+          ) : null}
+        </View>
 
-    if (diffDays === 0) {
-      return `დღეს, ${date.toLocaleTimeString("ka-GE", { hour: "2-digit", minute: "2-digit" })}`;
-    } else if (diffDays === 1) {
-      return `გუშინ, ${date.toLocaleTimeString("ka-GE", { hour: "2-digit", minute: "2-digit" })}`;
-    } else if (diffDays < 7) {
-      return `${diffDays} დღის წინ`;
-    } else {
-      return date.toLocaleDateString("ka-GE");
-    }
-  };
+        <View style={styles.inlineUpgradeWarning}>
+          <View style={styles.inlineWarningIcon}>
+            <Ionicons name="alert" size={14} color="#FFFFFF" />
+          </View>
+          <View style={styles.inlineWarningCopy}>
+            <Text style={styles.inlineWarningTitle}>
+              {aiQuotaCopy.inlineLimitTitle}
+            </Text>
+            <Text style={styles.inlineWarningText}>
+              {aiQuotaCopy.inlineLimitText}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.inlineUpgradeBenefits}>
+          <View style={styles.inlineBenefitsIconBox}>
+            <AISparkleBadge />
+          </View>
+          <View style={styles.inlineBenefitsCopy}>
+            <Text style={styles.inlineBenefitsTitle}>
+              {aiQuotaCopy.inlineBenefitsTitle}
+            </Text>
+            {aiQuotaCopy.inlineBenefits.map((item) => (
+              <View key={item} style={styles.inlineBenefitRow}>
+                <Ionicons name="checkmark" size={14} color="#5B6CFF" />
+                <Text style={styles.inlineBenefitText}>{item}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={styles.inlineUpgradeButton}
+          activeOpacity={0.86}
+          onPress={() => setShowUpgradeModal(true)}
+        >
+          <LinearGradient
+            colors={["#6366F1", "#A855F7"]}
+            start={{ x: 0.1, y: 0.2 }}
+            end={{ x: 0.9, y: 0.8 }}
+            style={styles.inlineUpgradeButtonGradient}
+          >
+            <Ionicons name="flash" size={16} color="#FFFFFF" />
+            <Text style={styles.inlineUpgradeButtonText}>
+              {aiQuotaCopy.upgrade}
+            </Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -894,34 +1751,14 @@ export default function AIAssistantScreen() {
           </TouchableOpacity>
 
           <View style={styles.headerTitleContainer}>
-            <View style={styles.headerIconContainer}>
-              <Svg width={32} height={32} viewBox="0 0 56 56" fill="none">
-                <Rect
-                  width={56}
-                  height={56}
-                  rx={11}
-                  fill="#A47CF6"
-                  fillOpacity={0.2}
-                />
-                <Path
-                  d="M24.6 23.2283L26.0767 18.0633C26.63 16.13 29.37 16.13 29.9233 18.0633L31.3983 23.2283C31.4917 23.555 31.6668 23.8526 31.9071 24.0929C32.1474 24.3332 32.4449 24.5083 32.7717 24.6017L37.9367 26.0767C39.87 26.63 39.87 29.37 37.9367 29.9233L32.7717 31.3983C32.4449 31.4917 32.1474 31.6668 31.9071 31.9071C31.6668 32.1474 31.4917 32.4449 31.3983 32.7717L29.9233 37.9367C29.37 39.87 26.63 39.87 26.0767 37.9367L24.6017 32.7717C24.5083 32.4449 24.3332 32.1474 24.0929 31.9071C23.8526 31.6668 23.555 31.4917 23.2283 31.3983L18.0633 29.9233C16.13 29.37 16.13 26.63 18.0633 26.0767L23.2283 24.6017C23.555 24.5083 23.8526 24.3332 24.0929 24.0929C24.3332 23.8526 24.5083 23.555 24.6017 23.2283M38.1733 35.5117C38.655 34.1067 40.68 34.105 41.16 35.5117L41.2033 35.6567L41.6967 37.6367L43.6767 38.1317C45.2767 38.5317 45.2767 40.8017 43.6767 41.2017L41.6967 41.6967L41.2033 43.6767C40.8033 45.275 38.5317 45.275 38.1317 43.6767L37.6367 41.6967L35.6567 41.2017C34.0567 40.8017 34.0567 38.53 35.6567 38.1317L37.6367 37.6367L38.1317 35.6567L38.1733 35.5117ZM39.6667 39.3283C39.5707 39.4568 39.4568 39.5707 39.3283 39.6667C39.4568 39.7626 39.5707 39.8765 39.6667 40.005C39.7626 39.8765 39.8765 39.7626 40.005 39.6667C39.8764 39.5702 39.7624 39.4557 39.6667 39.3267M14.84 12.1767C15.3367 10.725 17.4817 10.7733 17.87 12.3217L18.3633 14.3017L20.3433 14.7967C21.9433 15.1967 21.9433 17.4667 20.3433 17.8667L18.3633 18.3617L17.87 20.3417C17.47 21.94 15.1983 21.94 14.7983 20.3417L14.3033 18.3617L12.3233 17.8667C10.7233 17.4667 10.7233 15.195 12.3233 14.7967L14.3033 14.3017L14.7983 12.3217L14.84 12.1767ZM16.3333 15.995C16.2373 16.1229 16.1233 16.2362 15.995 16.3317C16.1236 16.4281 16.2375 16.5426 16.3333 16.6717C16.4291 16.5426 16.5431 16.4281 16.6717 16.3317C16.5432 16.2357 16.4292 16.1235 16.3333 15.995Z"
-                  fill="url(#paint0_linear_5_1329)"
-                />
-                <Defs>
-                  <SvgLinearGradient
-                    id="paint0_linear_5_1329"
-                    x1="24.8298"
-                    y1="15.8108"
-                    x2="40.4274"
-                    y2="21.8217"
-                    gradientUnits="userSpaceOnUse"
-                  >
-                    <Stop stopColor="#6366F1" />
-                    <Stop offset={1} stopColor="#A855F7" />
-                  </SvgLinearGradient>
-                </Defs>
-              </Svg>
-            </View>
+            <LinearGradient
+              colors={["#6366F1", "#A855F7"]}
+              start={{ x: 0.1, y: 0.2 }}
+              end={{ x: 0.9, y: 0.8 }}
+              style={styles.headerAvatar}
+            >
+              <Ionicons name="sparkles" size={16} color="#FFFFFF" />
+            </LinearGradient>
             <View style={styles.headerTextContainer}>
               <Text style={styles.headerTitle}>
                 {t(isDoctor ? "aiAssistant.doctor.title" : "aiAssistant.title")}
@@ -969,7 +1806,7 @@ export default function AIAssistantScreen() {
                 }
               }}
             >
-              <Ionicons name="create-outline" size={22} color="#1F2937" />
+              <AIHeaderNewChatIcon />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.headerIconButton}
@@ -978,13 +1815,10 @@ export default function AIAssistantScreen() {
                   setShowConsentModal(true);
                   return;
                 }
-                setShowHistoryModal(true);
+                setShowHistoryModal((open) => !open);
               }}
             >
-              <Ionicons name="time-outline" size={22} color="#1F2937" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.headerIconButton}>
-              <Ionicons name="ellipsis-vertical" size={22} color="#1F2937" />
+              <AIHeaderHistoryIcon />
             </TouchableOpacity>
           </View>
         </View>
@@ -995,64 +1829,88 @@ export default function AIAssistantScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* AI Generated Tag */}
-          <View style={styles.aiTagContainer}>
-            <View style={styles.aiTag}>
-              <Svg width={12} height={12} viewBox="0 0 56 56" fill="none">
-                <Path
-                  d="M24.6 23.2283L26.0767 18.0633C26.63 16.13 29.37 16.13 29.9233 18.0633L31.3983 23.2283C31.4917 23.555 31.6668 23.8526 31.9071 24.0929C32.1474 24.3332 32.4449 24.5083 32.7717 24.6017L37.9367 26.0767C39.87 26.63 39.87 29.37 37.9367 29.9233L32.7717 31.3983C32.4449 31.4917 32.1474 31.6668 31.9071 31.9071C31.6668 32.1474 31.4917 32.4449 31.3983 32.7717L29.9233 37.9367C29.37 39.87 26.63 39.87 26.0767 37.9367L24.6017 32.7717C24.5083 32.4449 24.3332 32.1474 24.0929 31.9071C23.8526 31.6668 23.555 31.4917 23.2283 31.3983L18.0633 29.9233C16.13 29.37 16.13 26.63 18.0633 26.0767L23.2283 24.6017C23.555 24.5083 23.8526 24.3332 24.0929 24.0929C24.3332 23.8526 24.5083 23.555 24.6017 23.2283M38.1733 35.5117C38.655 34.1067 40.68 34.105 41.16 35.5117L41.2033 35.6567L41.6967 37.6367L43.6767 38.1317C45.2767 38.5317 45.2767 40.8017 43.6767 41.2017L41.6967 41.6967L41.2033 43.6767C40.8033 45.275 38.5317 45.275 38.1317 43.6767L37.6367 41.6967L35.6567 41.2017C34.0567 40.8017 34.0567 38.53 35.6567 38.1317L37.6367 37.6367L38.1317 35.6567L38.1733 35.5117ZM39.6667 39.3283C39.5707 39.4568 39.4568 39.5707 39.3283 39.6667C39.4568 39.7626 39.5707 39.8765 39.6667 40.005C39.7626 39.8765 39.8765 39.7626 40.005 39.6667C39.8764 39.5702 39.7624 39.4557 39.6667 39.3267M14.84 12.1767C15.3367 10.725 17.4817 10.7733 17.87 12.3217L18.3633 14.3017L20.3433 14.7967C21.9433 15.1967 21.9433 17.4667 20.3433 17.8667L18.3633 18.3617L17.87 20.3417C17.47 21.94 15.1983 21.94 14.7983 20.3417L14.3033 18.3617L12.3233 17.8667C10.7233 17.4667 10.7233 15.195 12.3233 14.7967L14.3033 14.3017L14.7983 12.3217L14.84 12.1767ZM16.3333 15.995C16.2373 16.1229 16.1233 16.2362 15.995 16.3317C16.1236 16.4281 16.2375 16.5426 16.3333 16.6717C16.4291 16.5426 16.5431 16.4281 16.6717 16.3317C16.5432 16.2357 16.4292 16.1235 16.3333 15.995Z"
-                  fill="url(#paint0_linear_5_1329)"
-                />
-                <Defs>
-                  <SvgLinearGradient
-                    id="paint0_linear_5_1329"
-                    x1="24.8298"
-                    y1="15.8108"
-                    x2="40.4274"
-                    y2="21.8217"
-                    gradientUnits="userSpaceOnUse"
-                  >
-                    <Stop stopColor="#6366F1" />
-                    <Stop offset={1} stopColor="#A855F7" />
-                  </SvgLinearGradient>
-                </Defs>
-              </Svg>
-              <Text style={styles.aiTagText}>
-                {t(
-                  isDoctor
-                    ? "aiAssistant.doctor.disclaimer"
-                    : "aiAssistant.disclaimer",
-                )}
-              </Text>
-            </View>
-            <View style={styles.creditsContainer}>
-              <Text style={styles.creditsText}>100</Text>
-              <TouchableOpacity>
-                <Ionicons
-                  name="information-circle-outline"
-                  size={18}
-                  color="#6B7280"
-                />
+          {showUsageStrip ? (
+            <View
+              style={[
+                styles.usageCard,
+                isAILimitReached ? styles.usageCardLocked : null,
+              ]}
+            >
+              <AIQuotaRing label={`${aiUsageRemaining}/${aiUsageLimit}`} />
+              <View style={styles.usageTextWrap}>
+                <Text
+                  style={[
+                    styles.usageSubtitle,
+                    isAILimitReached ? styles.usageSubtitleLocked : null,
+                  ]}
+                  numberOfLines={3}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.9}
+                >
+                  {isAILimitReached
+                    ? aiQuotaCopy.limitStrip
+                    : aiQuotaCopy.freeStrip}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.upgradePill}
+                activeOpacity={0.86}
+                onPress={() => setShowUpgradeModal(true)}
+              >
+                <LinearGradient
+                  colors={["#6366F1", "#A855F7"]}
+                  start={{ x: 0.1, y: 0.2 }}
+                  end={{ x: 0.9, y: 0.8 }}
+                  style={styles.upgradePillGradient}
+                >
+                  <Ionicons name="flash" size={16} color="#FFFFFF" />
+                  <Text style={styles.upgradePillText}>
+                    {aiQuotaCopy.upgrade}
+                  </Text>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
-          </View>
+          ) : null}
 
-          {/* AI Assistant Banner */}
-          <View style={styles.bannerContainer}>
-            <View style={styles.bannerCard}>
-              <AIAssistantBannerGraphic width={96} height={96} />
-            </View>
-            <Text style={styles.bannerTitle}>
-              {t(isDoctor ? "aiAssistant.doctor.title" : "aiAssistant.title")}
-            </Text>
-            <Text style={styles.bannerDescription}>
-              {t(
-                isDoctor
-                  ? "aiAssistant.doctor.bannerDescription"
-                  : "aiAssistant.bannerDescription",
-              )}
-            </Text>
-          </View>
+          {isAILimitReached && messages.length === 0 && !isSending
+            ? renderLimitUpgradeCard(false)
+            : null}
+
+          {/* Empty state hero */}
+          {showEmptyState && !isAILimitReached ? (
+            <>
+              <TouchableOpacity
+                style={styles.emptyPlanBadge}
+                activeOpacity={0.82}
+                onPress={() => setShowUpgradeModal(true)}
+              >
+                <AIPlanBadgeIcon premium={aiPlan === "premium"} />
+                <Text
+                  style={styles.emptyPlanBadgeText}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.82}
+                >
+                  {activePlanLabel}
+                </Text>
+              </TouchableOpacity>
+              <View style={styles.bannerContainer}>
+                <AIAssistantBannerGraphic width={200} height={200} />
+                <Text style={styles.bannerTitle}>
+                  {t(
+                    isDoctor ? "aiAssistant.doctor.title" : "aiAssistant.title",
+                  )}
+                </Text>
+                <Text style={styles.bannerDescription}>
+                  {t(
+                    isDoctor
+                      ? "aiAssistant.doctor.bannerDescription"
+                      : "aiAssistant.bannerDescription",
+                  )}
+                </Text>
+              </View>
+            </>
+          ) : null}
 
           {/* Messages */}
           {isLoading ? (
@@ -1064,6 +1922,11 @@ export default function AIAssistantScreen() {
             <View style={styles.messagesContainer}>
               {messages.map((message) => {
                 const isUserBubble = message.role === "user";
+                const isStreamingAssistant =
+                  message.id === STREAMING_ASSISTANT_ID;
+                const messageImageUri =
+                  resolveMessageImageUri(message) ??
+                  messageImagePreviewsRef.current[message.id];
                 const messageActionIdle = isUserBubble
                   ? "rgba(255,255,255,0.85)"
                   : "#575759";
@@ -1080,83 +1943,94 @@ export default function AIAssistantScreen() {
                         message.role === "user"
                           ? styles.userMessage
                           : styles.assistantMessage,
+                        messageImageUri ? styles.messageBubbleWithImage : null,
                       ]}
                     >
-                      {message.image_url && (
+                      {messageImageUri ? (
                         <Image
-                          source={{ uri: message.image_url }}
+                          source={{ uri: messageImageUri }}
                           style={styles.messageImage}
+                          contentFit="cover"
+                          cachePolicy="memory-disk"
                         />
-                      )}
-                      <Text
-                        style={[
-                          styles.messageText,
-                          message.role === "user"
-                            ? styles.userMessageText
-                            : styles.assistantMessageText,
-                        ]}
-                      >
-                        {message.content}
-                      </Text>
-                      {Boolean(message.content?.trim()) && (
-                        <View style={styles.messageActionsRow}>
-                          <TouchableOpacity
-                            style={styles.messageActionButton}
-                            onPress={() => handleCopyMessage(message.content)}
-                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                            accessibilityLabel="კოპირება"
-                          >
-                            <MessageCopyIcon
-                              size={22}
-                              color={messageActionIdle}
-                              clipId={copyClipId}
-                            />
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={styles.messageActionButton}
-                            onPress={() => {
-                              handleLikePress(message);
-                            }}
-                            disabled={
-                              message.role === "assistant" &&
-                              !!likeBusyById[message.id]
-                            }
-                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                            accessibilityLabel="მოწონება"
-                          >
-                            <MessageLikeIcon
-                              size={22}
-                              color={
-                                message.role === "assistant"
-                                  ? message.feedback?.rating === "like"
-                                    ? messageActionActive
-                                    : messageActionIdle
-                                  : userMessageLikes[message.id]
-                                    ? messageActionActive
-                                    : messageActionIdle
-                              }
-                            />
-                          </TouchableOpacity>
-                          {message.role === "assistant" ? (
+                      ) : null}
+                      {Boolean(message.content?.trim()) ? (
+                        <Text
+                          style={[
+                            styles.messageText,
+                            message.role === "user"
+                              ? styles.userMessageText
+                              : styles.assistantMessageText,
+                          ]}
+                        >
+                          {message.content}
+                        </Text>
+                      ) : null}
+                      {Boolean(message.content?.trim()) &&
+                        !isStreamingAssistant && (
+                          <View style={styles.messageActionsRow}>
                             <TouchableOpacity
                               style={styles.messageActionButton}
-                              onPress={() => openNegFeedbackModal(message.id)}
+                              onPress={() => handleCopyMessage(message.content)}
                               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                              accessibilityLabel="არ მომწონს"
+                              accessibilityLabel="კოპირება"
                             >
-                              <MessageDislikeIcon
+                              <MessageCopyIcon
                                 size={22}
-                                color={
-                                  message.feedback?.rating === "dislike" ||
-                                  negFeedbackMessageId === message.id
-                                    ? messageActionActive
-                                    : messageActionIdle
-                                }
+                                color={messageActionIdle}
+                                clipId={copyClipId}
                               />
                             </TouchableOpacity>
-                          ) : null}
-                        </View>
-                      )}
+                            {message.role === "assistant" ? (
+                              <TouchableOpacity
+                                style={styles.messageActionButton}
+                                onPress={() => {
+                                  handleLikePress(message);
+                                }}
+                                disabled={!!likeBusyById[message.id]}
+                                hitSlop={{
+                                  top: 8,
+                                  bottom: 8,
+                                  left: 8,
+                                  right: 8,
+                                }}
+                                accessibilityLabel="მოწონება"
+                              >
+                                <MessageLikeIcon
+                                  size={22}
+                                  color={
+                                    message.feedback?.rating === "like"
+                                      ? messageActionActive
+                                      : messageActionIdle
+                                  }
+                                />
+                              </TouchableOpacity>
+                            ) : null}
+                            {message.role === "assistant" ? (
+                              <TouchableOpacity
+                                style={styles.messageActionButton}
+                                onPress={() => openNegFeedbackModal(message.id)}
+                                hitSlop={{
+                                  top: 8,
+                                  bottom: 8,
+                                  left: 8,
+                                  right: 8,
+                                }}
+                                accessibilityLabel="არ მომწონს"
+                              >
+                                <MessageDislikeIcon
+                                  size={22}
+                                  color={
+                                    message.feedback?.rating === "dislike" ||
+                                    negFeedbackMessageId === message.id
+                                      ? messageActionActive
+                                      : messageActionIdle
+                                  }
+                                />
+                              </TouchableOpacity>
+                            ) : null}
+                          </View>
+                        )}
                       <Text style={styles.messageTime}>
                         {new Date(message.created_at).toLocaleTimeString(
                           "ka-GE",
@@ -1191,6 +2065,7 @@ export default function AIAssistantScreen() {
                                   <Image
                                     source={{ uri: doctor.image }}
                                     style={styles.doctorRecommendationImage}
+                                    contentFit="cover"
                                   />
                                 )}
                                 <View style={styles.doctorRecommendationInfo}>
@@ -1280,6 +2155,7 @@ export default function AIAssistantScreen() {
                       <Image
                         source={{ uri: pendingSend.imageUri }}
                         style={styles.messageImage}
+                        contentFit="cover"
                       />
                     ) : null}
                     {pendingSend.content.trim() ? (
@@ -1293,7 +2169,8 @@ export default function AIAssistantScreen() {
                 </View>
               )}
 
-              {isSending ? (
+              {isSending &&
+              !messages.some((m) => m.id === STREAMING_ASSISTANT_ID) ? (
                 <View
                   style={[
                     styles.messageBubble,
@@ -1304,25 +2181,32 @@ export default function AIAssistantScreen() {
                   <Text
                     style={[styles.messageText, styles.assistantTypingTitle]}
                   >
-                    დამელოდე ⌛
+                    {streamStatus
+                      ? streamStatusLabel(streamStatus, t)
+                      : "დამელოდე ⌛"}
                   </Text>
                   <Text
                     style={[styles.messageText, styles.assistantTypingSubtitle]}
                   >
-                    სრული პასუხისთვის დრო მჭირდება - რამდენიმე წამში გიპასუხებ.
+                    {streamStatus?.query
+                      ? streamStatus.query
+                      : streamStatus
+                        ? t("aiAssistant.stream.thinking")
+                        : "სრული პასუხისთვის დრო მჭირდება - რამდენიმე წამში გიპასუხებ."}
                   </Text>
                   <MessageTypingDots />
                 </View>
               ) : null}
+
+              {showInlineUpgradeCard || isAILimitReached
+                ? renderLimitUpgradeCard(true)
+                : null}
             </View>
           ) : consentStatus === "declined" ? (
             <View style={styles.consentDeclinedContainer}>
               <Ionicons name="lock-closed-outline" size={48} color="#9CA3AF" />
               <Text style={styles.consentDeclinedTitle}>
                 {t("aiAssistant.consent.declinedTitle")}
-              </Text>
-              <Text style={styles.consentDeclinedBody}>
-                {t("aiAssistant.consent.declinedBody")}
               </Text>
               <TouchableOpacity
                 style={styles.consentReviewButton}
@@ -1333,7 +2217,7 @@ export default function AIAssistantScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
-          ) : (
+          ) : showEmptyState ? (
             <View style={styles.promptsSection}>
               <View style={styles.promptsContainer}>
                 {suggestedPrompts.map((prompt) => (
@@ -1344,9 +2228,9 @@ export default function AIAssistantScreen() {
                     onPress={() => handlePromptSelect(prompt.text)}
                   >
                     <Ionicons
-                      name="list-outline"
-                      size={18}
-                      color="#6B7280"
+                      name="document-text-outline"
+                      size={24}
+                      color="#1F2937"
                       style={styles.promptIcon}
                     />
                     <Text style={styles.promptText}>{prompt.text}</Text>
@@ -1354,26 +2238,30 @@ export default function AIAssistantScreen() {
                 ))}
               </View>
             </View>
-          )}
+          ) : null}
         </ScrollView>
 
-        {/* Input Field — დამალულია უკუკავშირის მოდალისას, რომ კლავიატურამ ქვედა ზოლი არ აიწიოს */}
         {negFeedbackMessageId === null && isChatEnabled ? (
-          <View style={styles.inputSection}>
-            <Text style={styles.inputReminder}>{t("aiAssistant.inputReminder")}</Text>
-            <View style={styles.inputContainer}>
+          <View
+            style={[
+              styles.inputSection,
+              { paddingBottom: Math.max(insets.bottom, 8) },
+            ]}
+          >
+            <View style={styles.inputRow}>
               <TouchableOpacity
-                style={styles.inputIconButton}
+                style={styles.addButton}
                 onPress={() => setShowMediaModal(true)}
               >
-                <Ionicons name="add-circle-outline" size={24} color="#6B7280" />
+                <Ionicons name="add" size={24} color="#1F2937" />
               </TouchableOpacity>
-              <View style={styles.inputWrapper}>
-                {selectedImage && (
+              <View style={styles.inputPill}>
+                {selectedImage ? (
                   <View style={styles.inputImagePreview}>
                     <Image
                       source={{ uri: selectedImage.uri }}
                       style={styles.inputPreviewImage}
+                      contentFit="cover"
                     />
                     <TouchableOpacity
                       style={styles.inputRemoveImageButton}
@@ -1382,40 +2270,40 @@ export default function AIAssistantScreen() {
                       <Ionicons name="close-circle" size={20} color="#FFFFFF" />
                     </TouchableOpacity>
                   </View>
-                )}
+                ) : null}
                 <TextInput
-                  style={[styles.input, selectedImage && styles.inputWithImage]}
+                  style={[
+                    styles.inputPillText,
+                    selectedImage && styles.inputWithImage,
+                  ]}
                   placeholder={t(
                     isDoctor
                       ? "aiAssistant.doctor.inputPlaceholder"
                       : "aiAssistant.inputPlaceholder",
                   )}
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor="rgba(0, 0, 0, 0.3)"
                   value={inputText}
                   onChangeText={setInputText}
                   multiline
                 />
+                <View style={styles.inputPillActions}>
+                  {canSend ? (
+                    <TouchableOpacity
+                      style={styles.sendButton}
+                      disabled={isSending}
+                      onPress={() => handleSendMessage()}
+                    >
+                      {isSending ? (
+                        <View style={styles.sendButtonLoading}>
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                        </View>
+                      ) : (
+                        <AISendIcon />
+                      )}
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
               </View>
-              <TouchableOpacity style={styles.inputIconButton}>
-                <Ionicons name="mic-outline" size={24} color="#6B7280" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.sendButton}
-                disabled={(!inputText.trim() && !selectedImage) || isSending}
-                onPress={() => handleSendMessage()}
-              >
-                {isSending ? (
-                  <ActivityIndicator size="small" color="#6366F1" />
-                ) : (
-                  <Ionicons
-                    name="send"
-                    size={20}
-                    color={
-                      inputText.trim() || selectedImage ? "#6366F1" : "#9CA3AF"
-                    }
-                  />
-                )}
-              </TouchableOpacity>
             </View>
           </View>
         ) : null}
@@ -1427,248 +2315,540 @@ export default function AIAssistantScreen() {
         onDecline={handleDeclineConsent}
       />
 
-      {/* History Modal */}
+      {/* History popover */}
       <Modal
         visible={showHistoryModal}
         transparent
         animationType="fade"
         onRequestClose={() => setShowHistoryModal(false)}
       >
-        <TouchableOpacity
-          style={styles.historyModalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowHistoryModal(false)}
-        >
-          <View
-            style={styles.historyModalContent}
-            onStartShouldSetResponder={() => true}
-          >
-            <View style={styles.historyModalHeader}>
-              <View style={styles.historyModalHeaderLeft}>
-                <TouchableOpacity
-                  style={styles.historyNewChatButton}
-                  onPress={async () => {
-                    // Create new session and start fresh
-                    if (user?.id) {
-                      console.log("✍️ [newChatButton] Creating new session");
-                      try {
-                        const sessionResponse =
-                          await apiService.createAISession({
-                            initiator_id: user.id,
-                            initiator_type:
-                              user.role === "doctor" ? "doctor" : "customer",
-                          });
-                        if (sessionResponse.success) {
-                          setCurrentSession(sessionResponse.data);
-                          await AsyncStorage.setItem(
-                            "ai_session_id",
-                            sessionResponse.data.id,
-                          );
-                          setMessages([]);
-                          setShowHistoryModal(false);
-                          console.log(
-                            "✅ [newChatButton] New session created:",
-                            sessionResponse.data.id,
-                          );
-                        }
-                      } catch (error) {
-                        console.error(
-                          "❌ [newChatButton] Error creating session:",
-                          error,
-                        );
-                        Alert.alert(
-                          "შეცდომა",
-                          "ახალი სესიის შექმნა ვერ მოხერხდა",
-                        );
-                      }
-                    }
-                  }}
-                >
-                  <Ionicons name="create-outline" size={24} color="#6366F1" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.historyRefreshButton}
-                  onPress={() => loadSessions()}
-                >
-                  <Ionicons name="refresh" size={24} color="#1F2937" />
-                </TouchableOpacity>
-                <Text style={styles.historyModalTitle}>ისტორია</Text>
+        <View style={styles.modalRoot}>
+          <Pressable
+            style={styles.historyPopoverOverlay}
+            onPress={() => setShowHistoryModal(false)}
+          />
+          <View style={styles.historyPopoverAnchor} pointerEvents="box-none">
+            <View style={styles.historyPopoverCard}>
+              <View style={styles.historyPopoverHeader}>
+                <AIHeaderHistoryIcon size={16} />
+                <Text style={styles.historyPopoverTitle}>
+                  {historyTitleLabel}
+                </Text>
               </View>
-              <TouchableOpacity
-                style={styles.historyCloseButton}
-                onPress={() => setShowHistoryModal(false)}
-              >
-                <Ionicons name="close" size={24} color="#1F2937" />
-              </TouchableOpacity>
-            </View>
 
-            <ScrollView
-              style={styles.historyModalList}
-              showsVerticalScrollIndicator={false}
-            >
-              {isLoadingHistory ? (
-                <View style={styles.historyLoadingState}>
-                  <ActivityIndicator size="large" color="#6366F1" />
-                  <Text style={styles.historyLoadingText}>იტვირთება...</Text>
-                </View>
-              ) : sessions.length > 0 ? (
-                sessions.map((session) => (
-                  <TouchableOpacity
-                    key={session.id}
-                    style={styles.historyModalItem}
-                    onPress={() => handleSessionSelect(session)}
-                  >
-                    <View style={styles.historyItemContent}>
-                      <Text style={styles.historyItemTitle}>
-                        {session.status === "active"
-                          ? "აქტიური სესია"
-                          : "დასრულებული სესია"}
+              <ScrollView
+                style={styles.historyPopoverList}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled
+              >
+                {isLoadingHistory ? (
+                  <View style={styles.historyPopoverLoading}>
+                    <ActivityIndicator size="small" color="#6366F1" />
+                  </View>
+                ) : sessions.length > 0 ? (
+                  sessions.map((session) => (
+                    <TouchableOpacity
+                      key={session.id}
+                      style={styles.historyPopoverPill}
+                      activeOpacity={0.75}
+                      onPress={() => handleSessionSelect(session)}
+                    >
+                      <Text
+                        style={styles.historyPopoverPillText}
+                        numberOfLines={2}
+                      >
+                        {sessionPreviews[session.id]?.trim() ||
+                          t("aiAssistant.history.untitled")}
                       </Text>
-                      <Text style={styles.historyItemDate}>
-                        {formatSessionDate(session.created_at)}
-                      </Text>
-                    </View>
-                    <Ionicons
-                      name="chevron-forward"
-                      size={20}
-                      color="#9CA3AF"
-                    />
-                  </TouchableOpacity>
-                ))
-              ) : (
-                <View style={styles.historyEmptyState}>
-                  <Ionicons
-                    name="chatbubbles-outline"
-                    size={64}
-                    color="#D1D5DB"
-                  />
-                  <Text style={styles.historyEmptyText}>ისტორია ცარიელია</Text>
-                  <Text style={styles.historyEmptySubtext}>
-                    თქვენი ჩატის ისტორია აქ გამოჩნდება
-                  </Text>
-                </View>
-              )}
-            </ScrollView>
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <View style={styles.historyPopoverPill}>
+                    <Text style={styles.historyPopoverPillText}>
+                      {historyEmptyLabel}
+                    </Text>
+                  </View>
+                )}
+              </ScrollView>
+            </View>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* Media Selection Modal */}
       <Modal
         visible={showMediaModal}
         transparent
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setShowMediaModal(false)}
       >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowMediaModal(false)}
-        >
+        <View style={styles.modalRoot}>
+          <Pressable
+            style={styles.mediaModalOverlay}
+            onPress={() => setShowMediaModal(false)}
+          />
           <View
-            style={styles.mediaModalContent}
-            onStartShouldSetResponder={() => true}
+            style={[
+              styles.mediaModalAnchor,
+              { paddingBottom: Math.max(insets.bottom, 12) },
+            ]}
+            pointerEvents="box-none"
           >
-            <View style={styles.mediaModalHeader}>
-              <View style={styles.modalHeaderTitleContainer}>
-                <View style={styles.modalHeaderIconContainer}>
-                  <Svg width={32} height={32} viewBox="0 0 56 56" fill="none">
-                    <Rect
-                      width={56}
-                      height={56}
-                      rx={11}
-                      fill="#A47CF6"
-                      fillOpacity={0.2}
-                    />
-                    <Path
-                      d="M24.6 23.2283L26.0767 18.0633C26.63 16.13 29.37 16.13 29.9233 18.0633L31.3983 23.2283C31.4917 23.555 31.6668 23.8526 31.9071 24.0929C32.1474 24.3332 32.4449 24.5083 32.7717 24.6017L37.9367 26.0767C39.87 26.63 39.87 29.37 37.9367 29.9233L32.7717 31.3983C32.4449 31.4917 32.1474 31.6668 31.9071 31.9071C31.6668 32.1474 31.4917 32.4449 31.3983 32.7717L29.9233 37.9367C29.37 39.87 26.63 39.87 26.0767 37.9367L24.6017 32.7717C24.5083 32.4449 24.3332 32.1474 24.0929 31.9071C23.8526 31.6668 23.555 31.4917 23.2283 31.3983L18.0633 29.9233C16.13 29.37 16.13 26.63 18.0633 26.0767L23.2283 24.6017C23.555 24.5083 23.8526 24.3332 24.0929 24.0929C24.3332 23.8526 24.5083 23.555 24.6017 23.2283M38.1733 35.5117C38.655 34.1067 40.68 34.105 41.16 35.5117L41.2033 35.6567L41.6967 37.6367L43.6767 38.1317C45.2767 38.5317 45.2767 40.8017 43.6767 41.2017L41.6967 41.6967L41.2033 43.6767C40.8033 45.275 38.5317 45.275 38.1317 43.6767L37.6367 41.6967L35.6567 41.2017C34.0567 40.8017 34.0567 38.53 35.6567 38.1317L37.6367 37.6367L38.1317 35.6567L38.1733 35.5117ZM39.6667 39.3283C39.5707 39.4568 39.4568 39.5707 39.3283 39.6667C39.4568 39.7626 39.5707 39.8765 39.6667 40.005C39.7626 39.8765 39.8765 39.7626 40.005 39.6667C39.8764 39.5702 39.7624 39.4557 39.6667 39.3267M14.84 12.1767C15.3367 10.725 17.4817 10.7733 17.87 12.3217L18.3633 14.3017L20.3433 14.7967C21.9433 15.1967 21.9433 17.4667 20.3433 17.8667L18.3633 18.3617L17.87 20.3417C17.47 21.94 15.1983 21.94 14.7983 20.3417L14.3033 18.3617L12.3233 17.8667C10.7233 17.4667 10.7233 15.195 12.3233 14.7967L14.3033 14.3017L14.7983 12.3217L14.84 12.1767ZM16.3333 15.995C16.2373 16.1229 16.1233 16.2362 15.995 16.3317C16.1236 16.4281 16.2375 16.5426 16.3333 16.6717C16.4291 16.5426 16.5431 16.4281 16.6717 16.3317C16.5432 16.2357 16.4292 16.1235 16.3333 15.995Z"
-                      fill="url(#paint0_linear_5_1329)"
-                    />
-                    <Defs>
-                      <SvgLinearGradient
-                        id="paint0_linear_5_1329"
-                        x1="24.8298"
-                        y1="15.8108"
-                        x2="40.4274"
-                        y2="21.8217"
-                        gradientUnits="userSpaceOnUse"
-                      >
-                        <Stop stopColor="#6366F1" />
-                        <Stop offset={1} stopColor="#A855F7" />
-                      </SvgLinearGradient>
-                    </Defs>
-                  </Svg>
+            <View
+              style={styles.mediaModalCard}
+              onStartShouldSetResponder={() => true}
+            >
+              <View style={styles.mediaModalGlassContent}>
+                <View style={styles.mediaModalTopSection}>
+                  <View style={styles.mediaModalHeaderRow}>
+                    <LinearGradient
+                      colors={["#6366F1", "#A855F7"]}
+                      start={{ x: 0.1, y: 0.2 }}
+                      end={{ x: 0.9, y: 0.8 }}
+                      style={styles.mediaModalAvatar}
+                    >
+                      <Ionicons name="sparkles" size={16} color="#FFFFFF" />
+                    </LinearGradient>
+                    <View>
+                      <Text style={styles.mediaModalTitle}>
+                        {t("aiAssistant.headerTitle")}
+                      </Text>
+                      <Text style={styles.mediaModalSubtitle}>
+                        {t("aiAssistant.poweredBy")}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.mediaTilesRow}
+                  >
+                    <TouchableOpacity
+                      style={styles.mediaTile}
+                      activeOpacity={0.75}
+                      onPress={handleOpenCamera}
+                    >
+                      <Ionicons
+                        name="camera-outline"
+                        size={24}
+                        color="#000000"
+                      />
+                      <Text style={styles.mediaTileLabel}>
+                        {t("aiAssistant.media.camera")}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.mediaTile}
+                      activeOpacity={0.75}
+                      onPress={handleOpenPhotos}
+                    >
+                      <Ionicons
+                        name="image-outline"
+                        size={24}
+                        color="#000000"
+                      />
+                      <Text style={styles.mediaTileLabel}>
+                        {t("aiAssistant.media.photos")}
+                      </Text>
+                    </TouchableOpacity>
+
+                    {selectedImage ? (
+                      <View style={styles.mediaSelectedTile}>
+                        {isImageMimeType(selectedImage.type) ? (
+                          <Image
+                            source={{ uri: selectedImage.uri }}
+                            style={styles.mediaSelectedImage}
+                            contentFit="cover"
+                          />
+                        ) : (
+                          <View style={styles.mediaSelectedFile}>
+                            <Ionicons
+                              name="document-text-outline"
+                              size={28}
+                              color="#1F2937"
+                            />
+                            <Text
+                              style={styles.mediaSelectedFileName}
+                              numberOfLines={2}
+                            >
+                              {selectedImage.name}
+                            </Text>
+                          </View>
+                        )}
+                        <View style={styles.mediaSelectedBadge}>
+                          <Text style={styles.mediaSelectedBadgeText}>1</Text>
+                        </View>
+                        <TouchableOpacity
+                          style={styles.mediaRemoveSelectedButton}
+                          onPress={() => setSelectedImage(null)}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Ionicons name="close" size={14} color="#1F2937" />
+                        </TouchableOpacity>
+                      </View>
+                    ) : null}
+                  </ScrollView>
                 </View>
-                <View>
-                  <Text style={styles.modalHeaderTitle}>
-                    {t(
-                      isDoctor
-                        ? "aiAssistant.doctor.title"
-                        : "aiAssistant.title",
-                    )}
-                  </Text>
-                  <Text style={styles.modalHeaderSubtitle}>
-                    {t("aiAssistant.poweredBy")}
-                  </Text>
-                </View>
+
+                <View style={styles.mediaModalDivider} />
+
+                <TouchableOpacity
+                  style={styles.mediaFilesRow}
+                  activeOpacity={0.75}
+                  onPress={handleOpenDocuments}
+                >
+                  <Ionicons name="attach-outline" size={24} color="#1F2937" />
+                  <View style={styles.mediaFilesTextWrap}>
+                    <Text style={styles.mediaFilesTitle}>
+                      {t("aiAssistant.media.addFiles")}
+                    </Text>
+                    <Text style={styles.mediaFilesSubtitle}>
+                      {t("aiAssistant.media.addFilesHint")}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+
+                {selectedImage ? (
+                  <TouchableOpacity
+                    style={styles.mediaConfirmButton}
+                    activeOpacity={0.85}
+                    onPress={handleAddPhoto}
+                  >
+                    <Text style={styles.mediaConfirmButtonText}>
+                      {t(
+                        isImageMimeType(selectedImage?.type)
+                          ? "aiAssistant.media.addPhotoOne"
+                          : "aiAssistant.media.addFileOne",
+                      )}
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
               </View>
             </View>
-            <View style={styles.mediaOptionsContainer}>
-              <TouchableOpacity
-                style={styles.mediaOption}
-                onPress={handleOpenCamera}
-              >
-                <View style={styles.mediaOptionIcon}>
-                  <Ionicons name="camera-outline" size={32} color="#6366F1" />
-                </View>
-                <Text style={styles.mediaOptionText}>Camera</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.mediaOption}
-                onPress={handleOpenPhotos}
-              >
-                <View style={styles.mediaOptionIcon}>
-                  <Ionicons name="images-outline" size={32} color="#6366F1" />
-                </View>
-                <Text style={styles.mediaOptionText}>Photos</Text>
-              </TouchableOpacity>
-              {selectedImage && (
-                <View style={styles.selectedImageContainer}>
-                  <Image
-                    source={{ uri: selectedImage.uri }}
-                    style={styles.selectedImage}
-                  />
-                  <View style={styles.selectedImageBadge}>
-                    <Text style={styles.selectedImageBadgeText}>1</Text>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.removeImageButton}
-                    onPress={() => setSelectedImage(null)}
-                  >
-                    <Ionicons name="close" size={16} color="#FFFFFF" />
-                  </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showPaymentWebView}
+        animationType="slide"
+        onRequestClose={() => {
+          setShowPaymentWebView(false);
+          setPaymentUrl(null);
+          void syncAISubscription();
+        }}
+      >
+        <View
+          style={[
+            styles.paymentWebViewRoot,
+            { paddingTop: Platform.OS === "ios" ? insets.top + 12 : 0 },
+          ]}
+        >
+          <View style={styles.paymentWebViewHeader}>
+            <Text style={styles.paymentWebViewTitle}>BOG გადახდა</Text>
+            <TouchableOpacity
+              onPress={() => {
+                setShowPaymentWebView(false);
+                setPaymentUrl(null);
+                void syncAISubscription();
+              }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="close" size={24} color="#1F2937" />
+            </TouchableOpacity>
+          </View>
+          {paymentUrl ? (
+            <WebView
+              source={{ uri: paymentUrl }}
+              style={styles.paymentWebView}
+              startInLoadingState
+              onNavigationStateChange={(state) => {
+                const url = state.url.toLowerCase();
+                if (url.includes("/payment/success") || url.includes("success")) {
+                  handlePaymentSuccess();
+                  return;
+                }
+                if (url.includes("/payment/fail") || url.includes("fail")) {
+                  handlePaymentFailure();
+                }
+              }}
+              renderLoading={() => (
+                <View style={styles.paymentWebViewLoading}>
+                  <ActivityIndicator size="large" color="#6366F1" />
+                  <Text style={styles.paymentWebViewLoadingText}>
+                    გადახდის გვერდი იტვირთება...
+                  </Text>
                 </View>
               )}
-            </View>
-            {selectedImage && (
+            />
+          ) : null}
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showUpgradeModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowUpgradeModal(false)}
+      >
+        <View style={styles.upgradeModalRoot}>
+          <Pressable
+            style={styles.upgradeBackdrop}
+            onPress={() => setShowUpgradeModal(false)}
+          />
+          <View
+            style={[
+              styles.upgradeSheet,
+              { paddingBottom: Math.max(insets.bottom + 16, 28) },
+            ]}
+          >
+            <View style={styles.upgradeHeader}>
+              <View style={styles.upgradeLogo}>
+                <Ionicons name="sparkles" size={18} color="#FFFFFF" />
+              </View>
               <TouchableOpacity
-                style={styles.addPhotoButton}
-                onPress={handleAddPhoto}
+                onPress={() => setShowUpgradeModal(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close" size={24} color="#1F2937" />
+              </TouchableOpacity>
+            </View>
+
+            {aiPlan === "free" ? (
+              <>
+                <Text style={styles.upgradeTitle}>{upgradeCopy.title}</Text>
+                <Text style={styles.upgradeSubtitle}>
+                  {upgradeCopy.subtitle}
+                </Text>
+              </>
+            ) : null}
+
+            <View style={styles.planTabs}>
+              {(["standard", "premium"] as const).map((plan) => (
+                <TouchableOpacity
+                  key={plan}
+                  style={[
+                    styles.planTab,
+                    selectedUpgradePlan === plan ? styles.planTabActive : null,
+                  ]}
+                  onPress={() => setSelectedUpgradePlan(plan)}
+                  activeOpacity={0.82}
+                >
+                  <Text
+                    style={[
+                      styles.planTabText,
+                      selectedUpgradePlan === plan
+                        ? styles.planTabTextActive
+                        : null,
+                    ]}
+                  >
+                    {plan === "premium"
+                      ? upgradeCopy.premium
+                      : upgradeCopy.standard}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {aiPlan !== "free" ? (
+              <View style={styles.activePlanStatus}>
+                <View style={styles.activePlanDot} />
+                <Text style={styles.activePlanStatusText}>
+                  {upgradeCopy.activeStatus}
+                </Text>
+              </View>
+            ) : null}
+
+            <View style={styles.featuresCard}>
+              <View style={styles.featuresHeader}>
+                <Text style={styles.featuresHeaderText}>
+                  {upgradeCopy.featureHeader}
+                </Text>
+                <Text style={styles.featuresHeaderText}>
+                  {selectedUpgradePlanLabel}
+                </Text>
+              </View>
+              {upgradeCopy.features.map((feature, index) => {
+                const enabled =
+                  selectedUpgradePlan === "premium" || index < 3;
+                return (
+                  <View key={feature} style={styles.featureRow}>
+                    <Text style={styles.featureText}>{feature}</Text>
+                    <Ionicons
+                      name={enabled ? "checkmark" : "close"}
+                      size={22}
+                      color={enabled ? "#7775FF" : "#A3A3A3"}
+                    />
+                  </View>
+                );
+              })}
+            </View>
+
+            {aiPlan !== "free" ? (
+              <>
+                <View style={styles.paymentCard}>
+                  <View>
+                    <Text style={styles.paymentTitle}>
+                      {upgradeCopy.paymentTitle}
+                    </Text>
+                    <Text style={styles.paymentDate}>
+                      {upgradeCopy.paymentDate}
+                    </Text>
+                  </View>
+                  <Text style={styles.paymentPrice}>
+                    {upgradeCopy.paymentAmount}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.paymentHistoryRow}
+                  activeOpacity={0.75}
+                  onPress={handleOpenPaymentHistory}
+                >
+                  <Ionicons name="time-outline" size={16} color="#6D64F2" />
+                  <Text style={styles.paymentHistoryText}>
+                    {upgradeCopy.paymentHistory}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={14} color="#9CA3AF" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.cancelSubscriptionButton}
+                  activeOpacity={0.86}
+                  onPress={() => setShowCancelPlanModal(true)}
+                >
+                  <Text style={styles.cancelSubscriptionButtonText}>
+                    {upgradeCopy.cancelButton}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <TouchableOpacity
+                style={styles.upgradeButton}
+                activeOpacity={0.88}
+                onPress={handleUpgradePlan}
               >
                 <LinearGradient
                   colors={["#6366F1", "#A855F7"]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.addPhotoButtonGradient}
+                  start={{ x: 0.1, y: 0.2 }}
+                  end={{ x: 0.9, y: 0.8 }}
+                  style={styles.upgradeButtonGradient}
                 >
-                  <Text style={styles.addPhotoButtonText}>
-                    1 ფოტოს დამატება
+                  <Ionicons name="flash" size={16} color="#FFFFFF" />
+                  <Text style={styles.upgradeButtonText}>
+                    {upgradeCopy.upgradeButton}
                   </Text>
                 </LinearGradient>
               </TouchableOpacity>
             )}
+            <Text style={styles.upgradeFootnote}>{upgradeCopy.footnote}</Text>
           </View>
-        </TouchableOpacity>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showCancelPlanModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowCancelPlanModal(false)}
+      >
+        <View style={styles.purchaseResultRoot}>
+          <Pressable
+            style={styles.upgradeBackdrop}
+            onPress={() => setShowCancelPlanModal(false)}
+          />
+          <View style={styles.cancelPlanCard}>
+            <View style={styles.cancelPlanHandle} />
+            <TouchableOpacity
+              style={styles.purchaseResultClose}
+              onPress={() => setShowCancelPlanModal(false)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="close" size={22} color="#1F2937" />
+            </TouchableOpacity>
+            <Text style={styles.cancelPlanEyebrow}>
+              {upgradeCopy.cancelEyebrow}
+            </Text>
+            <Text style={styles.cancelPlanTitle}>{upgradeCopy.cancelTitle}</Text>
+            <Text style={styles.cancelPlanText}>{upgradeCopy.cancelText}</Text>
+            <View style={styles.cancelPlanActions}>
+              <TouchableOpacity
+                style={styles.cancelPlanPrimaryButton}
+                activeOpacity={0.86}
+                onPress={() => setShowCancelPlanModal(false)}
+              >
+                <Text style={styles.cancelPlanPrimaryText}>
+                  {upgradeCopy.cancelNo}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.cancelPlanSecondaryButton}
+                activeOpacity={0.86}
+                onPress={handleCancelPlan}
+              >
+                <Text style={styles.cancelPlanSecondaryText}>
+                  {upgradeCopy.cancelYes}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={purchaseResult !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={closePurchaseResult}
+      >
+        <View style={styles.purchaseResultRoot}>
+          <View style={styles.purchaseResultCard}>
+            <TouchableOpacity
+              style={styles.purchaseResultClose}
+              onPress={closePurchaseResult}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="close" size={22} color="#1F2937" />
+            </TouchableOpacity>
+            <View
+              style={[
+                styles.purchaseResultIcon,
+                purchaseResult === "failure"
+                  ? styles.purchaseResultIconFailure
+                  : null,
+              ]}
+            >
+              <Ionicons
+                name={purchaseResult === "failure" ? "close" : "checkmark"}
+                size={34}
+                color="#FFFFFF"
+              />
+            </View>
+            <Text style={styles.purchaseResultTitle}>
+              {purchaseResult === "failure"
+                ? upgradeCopy.failureTitle
+                : purchaseResult === "cancelSuccess"
+                  ? upgradeCopy.cancelSuccessTitle
+                  : upgradeCopy.successTitle}
+            </Text>
+            <Text style={styles.purchaseResultText}>
+              {purchaseResult === "failure"
+                ? upgradeCopy.failureText
+                : purchaseResult === "cancelSuccess"
+                  ? upgradeCopy.cancelSuccessText
+                  : upgradeCopy.successText}
+            </Text>
+            <TouchableOpacity
+              style={styles.purchaseResultButton}
+              onPress={closePurchaseResult}
+              activeOpacity={0.86}
+            >
+              <Text style={styles.purchaseResultButtonText}>
+                {upgradeCopy.resultButton}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
 
       {/* უარყოფითი უკუკავშირი (დისლაიქი) */}
@@ -1836,7 +3016,7 @@ export default function AIAssistantScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F2F2F7",
+    backgroundColor: AI_SCREEN_BG,
   },
   flex: {
     flex: 1,
@@ -1846,86 +3026,157 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 10,
+    backgroundColor: AI_SCREEN_BG,
     borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
+    borderBottomColor: "rgba(31, 41, 55, 0.1)",
   },
   backButton: {
-    padding: 8,
+    padding: 4,
   },
   headerTitleContainer: {
     flexDirection: "row",
     alignItems: "center",
     flex: 1,
-    marginLeft: 8,
+    marginLeft: 4,
+    gap: 6,
   },
-  headerIconContainer: {
-    marginRight: 12,
+  headerAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
   },
   headerTextContainer: {
-    flex: 1,
+    flexShrink: 1,
   },
   headerTitle: {
-    fontSize: 14,
-    fontFamily: "Poppins-Bold",
+    fontSize: 12,
+    fontFamily: "Poppins-Medium",
     color: "#1F2937",
+    lineHeight: 16,
   },
   headerSubtitle: {
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: "Poppins-Regular",
-    color: "#6B7280",
-    marginTop: 2,
+    color: "#1F2937",
+    opacity: 0.6,
+    lineHeight: 16,
   },
   headerActions: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
+  emptyPlanBadge: {
+    alignSelf: "flex-end",
+    marginTop: 8,
+    marginRight: 16,
+    marginBottom: 4,
+    height: 26,
+    maxWidth: 104,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: "#6D64F2",
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  planBadgeIconWrap: {
+    width: 16,
+    height: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyPlanBadgeText: {
+    flexShrink: 1,
+    fontSize: 10,
+    fontFamily: "Poppins-Medium",
+    color: "#6D64F2",
+    lineHeight: 14,
+  },
   headerIconButton: {
-    padding: 8,
+    padding: 0,
+  },
+  sendButton: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sendButtonLoading: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#25262D",
+    alignItems: "center",
+    justifyContent: "center",
   },
   historyButtonContainer: {
     position: "relative",
   },
-  historyDropdown: {
+  historyPopoverOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.12)",
+  },
+  historyPopoverAnchor: {
     position: "absolute",
-    top: 48,
-    right: 0,
-    width: 280,
-    maxHeight: 400,
-    backgroundColor: "#FFFFFF",
+    top: Platform.OS === "ios" ? 96 : 72,
+    right: 16,
+    left: 16,
+    alignItems: "flex-end",
+  },
+  historyPopoverCard: {
+    width: 296,
+    maxHeight: 280,
+    padding: 16,
+    gap: 12,
+    backgroundColor: "rgba(255, 255, 255, 0.94)",
+    borderWidth: 1,
+    borderColor: "rgba(0, 0, 0, 0.02)",
     borderRadius: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
     elevation: 8,
-    zIndex: 1000,
-    overflow: "hidden",
   },
-  historyDropdownList: {
-    maxHeight: 400,
-  },
-  historyDropdownItem: {
+  historyPopoverHeader: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
+    gap: 4,
   },
-  historyEmptyState: {
+  historyPopoverTitle: {
+    fontSize: 12,
+    fontFamily: "Poppins-Medium",
+    color: "#1F2937",
+    lineHeight: 16,
+  },
+  historyPopoverList: {
+    maxHeight: 220,
+  },
+  historyPopoverLoading: {
+    paddingVertical: 16,
     alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 40,
-    paddingHorizontal: 20,
   },
-  historyEmptyText: {
+  historyPopoverPill: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 8,
+    backgroundColor: "rgba(232, 224, 235, 0.5)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.6)",
+    borderRadius: 16,
+  },
+  historyPopoverPillText: {
     fontSize: 14,
     fontFamily: "Poppins-Medium",
-    color: "#9CA3AF",
-    marginTop: 12,
+    color: "#1F2937",
+    opacity: 0.8,
+    lineHeight: 19,
   },
   dropdownOverlay: {
     position: "absolute",
@@ -1947,106 +3198,238 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 8,
+    paddingBottom: 14,
+    gap: 12,
   },
   aiTag: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F3F4F6",
-    borderRadius: 8,
-    paddingHorizontal: 10,
+    borderRadius: 34,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    gap: 4,
+    flexShrink: 1,
+  },
+  aiTagIconWrap: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  aiTagText: {
+    flexShrink: 1,
+    fontSize: 10,
+    fontFamily: "Poppins-Medium",
+    color: "#1F2937",
+    opacity: 0.8,
+    lineHeight: 14,
+    letterSpacing: 0.1,
+  },
+  creditsBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#EEDFE0",
+    borderRadius: 64,
+    paddingHorizontal: 12,
     paddingVertical: 6,
     gap: 6,
   },
-  aiTagText: {
-    fontSize: 12,
-    fontFamily: "Poppins-Regular",
-    color: "#6B7280",
-  },
-  creditsContainer: {
+  creditsLeft: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
   },
+  creditsWalletIcon: {
+    opacity: 0.8,
+  },
   creditsText: {
     fontSize: 14,
-    fontFamily: "Poppins-SemiBold",
+    fontFamily: "Poppins-Medium",
     color: "#1F2937",
+    opacity: 0.8,
+  },
+  creditsInfoIcon: {
+    opacity: 0.6,
+  },
+  usageCard: {
+    marginHorizontal: 10,
+    marginBottom: 22,
+    height: 70,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#EFD7C0",
+    backgroundColor: "rgba(186, 153, 62, 0.1)",
+    padding: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+  usageCardLocked: {
+    backgroundColor: "rgba(244, 63, 94, 0.08)",
+    borderColor: "#FDA4AF",
+    justifyContent: "space-between",
+  },
+  quotaRingWrap: {
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  quotaRingText: {
+    position: "absolute",
+    left: 6,
+    right: 6,
+    top: 16,
+    fontSize: 12,
+    fontFamily: "Poppins-Medium",
+    color: "#4B54FA",
+    lineHeight: 16,
+    opacity: 0.8,
+    textAlign: "center",
+  },
+  usageTextWrap: {
+    flex: 1,
+    minWidth: 0,
+    justifyContent: "center",
+  },
+  usageTitle: {
+    fontSize: 12,
+    fontFamily: "Poppins-Bold",
+    color: "#D97706",
+    lineHeight: 17,
+  },
+  usageTitleLocked: {
+    color: "#DC2626",
+  },
+  usageSubtitle: {
+    fontSize: 11,
+    fontFamily: "Poppins-Regular",
+    color: "#DCB23C",
+    lineHeight: 13,
+  },
+  usageSubtitleLocked: {
+    color: "#DC2626",
+    fontFamily: "Poppins-Medium",
+    fontSize: 11,
+    lineHeight: 14,
+  },
+  upgradePill: {
+    width: 117,
+    height: 34,
+    borderRadius: 64,
+    overflow: "hidden",
+    flexShrink: 0,
+  },
+  upgradePillGradient: {
+    flex: 1,
+    paddingHorizontal: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  upgradePillText: {
+    fontSize: 13,
+    fontFamily: "Poppins-Regular",
+    color: "#FFFFFF",
+    lineHeight: 18,
   },
   bannerContainer: {
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingVertical: 16,
-  },
-  bannerCard: {
-    width: 96,
-    height: 96,
-    backgroundColor: "transparent",
-    borderRadius: 16,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 12,
+    paddingTop: 0,
+    paddingBottom: 8,
+    gap: 9,
   },
   bannerTitle: {
-    fontSize: 15,
+    fontSize: 20,
     fontFamily: "Poppins-Bold",
     color: "#1F2937",
-    marginBottom: 6,
     textAlign: "center",
-    paddingHorizontal: 8,
+    lineHeight: 27,
   },
   bannerDescription: {
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: "Poppins-Regular",
-    color: "#6B7280",
+    color: "#000000",
+    opacity: 0.6,
     textAlign: "center",
-    lineHeight: 17,
-    paddingHorizontal: 12,
+    lineHeight: 22,
+    maxWidth: 258,
   },
   promptsSection: {
     paddingHorizontal: 16,
-    marginTop: 8,
-  },
-  promptsTitle: {
-    fontSize: 18,
-    fontFamily: "Poppins-Bold",
-    color: "#1F2937",
-    marginBottom: 16,
+    marginTop: 4,
   },
   promptsContainer: {
     gap: 12,
   },
   promptCard: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     backgroundColor: "#FFFFFF",
     borderRadius: 12,
-    padding: 12,
-    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    gap: 12,
+    minHeight: 56,
   },
   promptIcon: {
-    marginTop: 1,
+    opacity: 0.8,
   },
   promptText: {
     flex: 1,
     flexShrink: 1,
-    fontSize: 12,
-    fontFamily: "Poppins-Regular",
-    color: "#374151",
-    lineHeight: 17,
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#1F2937",
+    opacity: 0.8,
+    lineHeight: 19,
   },
   inputSection: {
-    borderTopWidth: 1,
-    borderTopColor: "#F3F4F6",
-    backgroundColor: "#FFFFFF",
-    paddingBottom: 8,
+    backgroundColor: AI_SCREEN_BG,
+    paddingHorizontal: 16,
+    paddingTop: 8,
   },
-  inputContainer: {
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  addButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 34,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  inputPill: {
+    flex: 1,
+    minHeight: 44,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 46,
+    paddingLeft: 20,
+    paddingRight: 12,
+    paddingVertical: 8,
     flexDirection: "row",
     alignItems: "flex-end",
-    paddingHorizontal: 16,
-    paddingTop: 12,
     gap: 8,
+  },
+  inputPillText: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: "#1F2937",
+    maxHeight: 80,
+    paddingVertical: 4,
+  },
+  inputPillActions: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   aiDisclaimer: {
     fontSize: 10,
@@ -2059,16 +3442,6 @@ const styles = StyleSheet.create({
   },
   inputWrapper: {
     flex: 1,
-  },
-  input: {
-    backgroundColor: "#F9FAFB",
-    borderRadius: 24,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 13,
-    fontFamily: "Poppins-Regular",
-    color: "#1F2937",
-    maxHeight: 100,
   },
   inputWithImage: {
     marginTop: 8,
@@ -2097,19 +3470,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  inputIconButton: {
-    padding: 8,
-    flexShrink: 0,
-  },
-  sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#F3F4F6",
-    justifyContent: "center",
-    alignItems: "center",
-    flexShrink: 0,
-  },
   historyItemContent: {
     flex: 1,
   },
@@ -2128,6 +3488,722 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "flex-end",
+  },
+  modalRoot: {
+    flex: 1,
+  },
+  mediaModalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.35)",
+  },
+  mediaModalAnchor: {
+    flex: 1,
+    justifyContent: "flex-end",
+    paddingHorizontal: 16,
+  },
+  mediaModalCard: {
+    width: "100%",
+    maxWidth: 358,
+    alignSelf: "center",
+    borderRadius: 16,
+    overflow: "hidden",
+    backgroundColor: AI_SCREEN_BG,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 1)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  mediaModalGlassContent: {
+    padding: 16,
+    gap: 20,
+  },
+  mediaModalTopSection: {
+    gap: 20,
+  },
+  mediaModalHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  mediaModalAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mediaModalTitle: {
+    fontSize: 12,
+    fontFamily: "Poppins-Medium",
+    color: "#1F2937",
+    lineHeight: 16,
+  },
+  mediaModalSubtitle: {
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: "#1F2937",
+    opacity: 0.6,
+    lineHeight: 16,
+  },
+  mediaTilesRow: {
+    gap: 8,
+    paddingRight: 4,
+  },
+  mediaTile: {
+    width: 102,
+    height: 96,
+    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.9)",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+  },
+  mediaTileLabel: {
+    fontSize: 16,
+    fontFamily: "Poppins-Medium",
+    color: "#000000",
+    lineHeight: 22,
+  },
+  mediaSelectedTile: {
+    width: 102,
+    height: 96,
+    borderRadius: 19,
+    borderWidth: 3,
+    borderColor: "#595CD9",
+    overflow: "hidden",
+    position: "relative",
+  },
+  mediaSelectedImage: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#E5E7EB",
+  },
+  mediaSelectedFile: {
+    flex: 1,
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+    gap: 6,
+    backgroundColor: "#FFFFFF",
+  },
+  mediaSelectedFileName: {
+    fontSize: 11,
+    fontFamily: "Poppins-Medium",
+    color: "#1F2937",
+    textAlign: "center",
+  },
+  mediaSelectedBadge: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mediaSelectedBadgeText: {
+    fontSize: 12,
+    fontFamily: "Poppins-Medium",
+    color: "#000000",
+    lineHeight: 16,
+  },
+  mediaRemoveSelectedButton: {
+    position: "absolute",
+    top: 6,
+    left: 6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "rgba(255, 255, 255, 0.85)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mediaModalDivider: {
+    height: 1,
+    backgroundColor: "#1F2937",
+    opacity: 0.1,
+  },
+  mediaFilesRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  mediaFilesTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  mediaFilesTitle: {
+    fontSize: 16,
+    fontFamily: "Poppins-Medium",
+    color: "#1F2937",
+    lineHeight: 22,
+  },
+  mediaFilesSubtitle: {
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: "#1F2937",
+    opacity: 0.4,
+    lineHeight: 16,
+  },
+  mediaConfirmButton: {
+    height: 48,
+    borderRadius: 43,
+    backgroundColor: "#6D64F2",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  mediaConfirmButtonText: {
+    fontSize: 16,
+    fontFamily: "Poppins-Medium",
+    color: "#FFFFFF",
+    lineHeight: 22,
+  },
+  upgradeModalRoot: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  upgradeBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.38)",
+  },
+  upgradeSheet: {
+    backgroundColor: AI_SCREEN_BG,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 24,
+    paddingTop: 18,
+  },
+  upgradeHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  upgradeLogo: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#7C3AED",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  upgradeTitle: {
+    fontSize: 20,
+    fontFamily: "Poppins-Bold",
+    color: "#1F2937",
+    textAlign: "center",
+    lineHeight: 28,
+  },
+  upgradeSubtitle: {
+    marginTop: 4,
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+    textAlign: "center",
+    lineHeight: 18,
+  },
+  planTabs: {
+    height: 44,
+    flexDirection: "row",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: 4,
+    marginTop: 18,
+    marginBottom: 16,
+  },
+  planTab: {
+    flex: 1,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  planTabActive: {
+    backgroundColor: "#6D64F2",
+  },
+  planTabText: {
+    fontSize: 13,
+    fontFamily: "Poppins-SemiBold",
+    color: "#1F2937",
+  },
+  planTabTextActive: {
+    color: "#FFFFFF",
+  },
+  featuresCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  featuresHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  featuresHeaderText: {
+    fontSize: 12,
+    fontFamily: "Poppins-Medium",
+    color: "#6B7280",
+  },
+  featureRow: {
+    minHeight: 34,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  featureText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: "#1F2937",
+    lineHeight: 17,
+  },
+  activePlanStatus: {
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: "rgba(16, 185, 129, 0.08)",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginBottom: 14,
+  },
+  activePlanDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#10B981",
+  },
+  activePlanStatusText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#10B981",
+    lineHeight: 20,
+  },
+  paymentCard: {
+    minHeight: 72,
+    borderRadius: 14,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  paymentTitle: {
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#1F2937",
+    lineHeight: 20,
+  },
+  paymentDate: {
+    marginTop: 2,
+    fontSize: 11,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+    lineHeight: 16,
+  },
+  paymentPrice: {
+    fontSize: 14,
+    fontFamily: "Poppins-Bold",
+    color: "#1F2937",
+    lineHeight: 20,
+  },
+  paymentHistoryRow: {
+    minHeight: 40,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(107, 114, 128, 0.16)",
+    backgroundColor: "#FFFFFF",
+    marginTop: -1,
+    marginBottom: 18,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 14,
+  },
+  paymentHistoryText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: "#6D64F2",
+    lineHeight: 17,
+  },
+  paymentWebViewRoot: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+  },
+  paymentWebViewHeader: {
+    height: 38,
+    paddingHorizontal: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+  },
+  paymentWebViewTitle: {
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#1F2937",
+  },
+  paymentWebView: {
+    flex: 1,
+  },
+  paymentWebViewLoading: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
+  },
+  paymentWebViewLoadingText: {
+    marginTop: 12,
+    fontSize: 13,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+  },
+  upgradeButton: {
+    height: 52,
+    marginTop: 16,
+    borderRadius: 26,
+    overflow: "hidden",
+  },
+  upgradeButtonGradient: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  upgradeButtonText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Bold",
+    color: "#FFFFFF",
+  },
+  upgradeFootnote: {
+    marginTop: 10,
+    fontSize: 10,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+    textAlign: "center",
+    lineHeight: 15,
+  },
+  cancelSubscriptionButton: {
+    height: 44,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "#6D64F2",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 14,
+  },
+  cancelSubscriptionButtonText: {
+    fontSize: 13,
+    fontFamily: "Poppins-Medium",
+    color: "#1F2937",
+    lineHeight: 18,
+  },
+  purchaseResultRoot: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0, 0, 0, 0.38)",
+  },
+  cancelPlanCard: {
+    marginHorizontal: 0,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    backgroundColor: AI_SCREEN_BG,
+    paddingHorizontal: 24,
+    paddingTop: 32,
+    paddingBottom: 34,
+    alignItems: "center",
+  },
+  cancelPlanHandle: {
+    position: "absolute",
+    top: 8,
+    width: 60,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(31, 41, 55, 0.16)",
+  },
+  cancelPlanEyebrow: {
+    alignSelf: "flex-start",
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+    color: "#1F2937",
+    lineHeight: 20,
+  },
+  cancelPlanTitle: {
+    marginTop: 90,
+    fontSize: 16,
+    fontFamily: "Poppins-Bold",
+    color: "#1F2937",
+    textAlign: "center",
+    lineHeight: 24,
+  },
+  cancelPlanText: {
+    marginTop: 8,
+    fontSize: 13,
+    fontFamily: "Poppins-Regular",
+    color: "#1F2937",
+    textAlign: "center",
+    lineHeight: 19,
+  },
+  cancelPlanActions: {
+    alignSelf: "stretch",
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 90,
+  },
+  cancelPlanPrimaryButton: {
+    flex: 1,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: "#6D64F2",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cancelPlanPrimaryText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Bold",
+    color: "#FFFFFF",
+    lineHeight: 19,
+  },
+  cancelPlanSecondaryButton: {
+    flex: 1,
+    height: 46,
+    borderRadius: 23,
+    borderWidth: 1,
+    borderColor: "#6D64F2",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cancelPlanSecondaryText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Bold",
+    color: "#6D64F2",
+    lineHeight: 19,
+  },
+  purchaseResultCard: {
+    marginHorizontal: 16,
+    marginBottom: 24,
+    borderRadius: 24,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 24,
+    paddingTop: 48,
+    paddingBottom: 24,
+    alignItems: "center",
+  },
+  purchaseResultClose: {
+    position: "absolute",
+    top: 16,
+    right: 16,
+  },
+  purchaseResultIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#7C3AED",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 20,
+  },
+  purchaseResultIconFailure: {
+    backgroundColor: "#C81E1E",
+  },
+  purchaseResultTitle: {
+    fontSize: 16,
+    fontFamily: "Poppins-Bold",
+    color: "#1F2937",
+    textAlign: "center",
+    lineHeight: 24,
+  },
+  purchaseResultText: {
+    marginTop: 8,
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: "#4B5563",
+    textAlign: "center",
+    lineHeight: 18,
+  },
+  purchaseResultButton: {
+    height: 48,
+    alignSelf: "stretch",
+    borderRadius: 24,
+    backgroundColor: "#6D64F2",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 28,
+  },
+  purchaseResultButtonText: {
+    fontSize: 14,
+    fontFamily: "Poppins-Bold",
+    color: "#FFFFFF",
+  },
+  inlineUpgradeBlock: {
+    width: "100%",
+    maxWidth: 358,
+    alignSelf: "center",
+    marginTop: 10,
+    gap: 8,
+  },
+  inlineUpgradeHeading: {
+    fontSize: 15,
+    fontFamily: "Poppins-Bold",
+    color: "#111827",
+    lineHeight: 21,
+  },
+  inlineUpgradeCard: {
+    minHeight: 290,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(125, 157, 255, 0.24)",
+    backgroundColor: "#EAF8FF",
+    padding: 14,
+    overflow: "hidden",
+  },
+  inlineUpgradeHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 8,
+  },
+  inlineUpgradeTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  inlineUpgradeTitle: {
+    fontSize: 14,
+    fontFamily: "Poppins-Bold",
+    color: "#1F2937",
+    lineHeight: 20,
+  },
+  inlineUpgradeBadge: {
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "#FFF1F2",
+    paddingHorizontal: 9,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    maxWidth: 142,
+  },
+  inlineUpgradeBadgeText: {
+    flexShrink: 1,
+    fontSize: 11,
+    fontFamily: "Poppins-Bold",
+    color: "#EF4444",
+    lineHeight: 15,
+  },
+  inlineUpgradeWarning: {
+    marginTop: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#FDA4AF",
+    backgroundColor: "#FFF7F8",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: "row",
+    gap: 10,
+  },
+  inlineWarningIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#DC2626",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 1,
+  },
+  inlineWarningCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  inlineWarningTitle: {
+    fontSize: 12,
+    fontFamily: "Poppins-Bold",
+    color: "#DC2626",
+    lineHeight: 17,
+    flexShrink: 1,
+  },
+  inlineWarningText: {
+    marginTop: 2,
+    fontSize: 10,
+    fontFamily: "Poppins-Regular",
+    color: "#6B7280",
+    lineHeight: 15,
+  },
+  inlineUpgradeBenefits: {
+    marginTop: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.86)",
+    backgroundColor: "rgba(255, 255, 255, 0.55)",
+    padding: 12,
+    flexDirection: "row",
+    gap: 10,
+    flex: 1,
+  },
+  inlineBenefitsIconBox: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  inlineBenefitsCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  inlineBenefitsTitle: {
+    fontSize: 11,
+    fontFamily: "Poppins-Medium",
+    color: "#6B7280",
+    lineHeight: 16,
+    marginBottom: 3,
+  },
+  inlineBenefitRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  inlineBenefitText: {
+    fontSize: 11,
+    fontFamily: "Poppins-Regular",
+    color: "#4B5563",
+    lineHeight: 16,
+  },
+  inlineUpgradeButton: {
+    height: 44,
+    borderRadius: 22,
+    marginTop: 10,
+    overflow: "hidden",
+  },
+  inlineUpgradeButtonGradient: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+  },
+  inlineUpgradeButtonText: {
+    fontSize: 13,
+    fontFamily: "Poppins-Bold",
+    color: "#FFFFFF",
   },
   modalHeaderTitleContainer: {
     flexDirection: "row",
@@ -2271,6 +4347,10 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginBottom: 8,
   },
+  messageBubbleWithImage: {
+    width: 240,
+    maxWidth: "80%",
+  },
   userMessage: {
     alignSelf: "flex-end",
     backgroundColor: "#6366F1",
@@ -2331,6 +4411,7 @@ const styles = StyleSheet.create({
   },
   messageImage: {
     width: "100%",
+    minWidth: 200,
     height: 200,
     borderRadius: 12,
     marginBottom: 8,

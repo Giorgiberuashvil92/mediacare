@@ -114,6 +114,7 @@ export default function RegisterScreen() {
   const [identomatSessionToken, setIdentomatSessionToken] =
     useState<string>("");
   const [identomatLoading, setIdentomatLoading] = useState(false);
+  const identomatResultRequestedRef = useRef(false);
 
   const emailInputRef = useRef<TextInput>(null);
   const phoneInputRef = useRef<TextInput>(null);
@@ -870,6 +871,9 @@ export default function RegisterScreen() {
             registerData.identomatDocumentBackImage =
               identomatData.documentBackImage;
           }
+          if (identomatData.passportImage) {
+            registerData.identomatPassportImage = identomatData.passportImage;
+          }
           if (identomatData.fullData) {
             registerData.identomatFullData = identomatData.fullData;
           }
@@ -954,15 +958,19 @@ export default function RegisterScreen() {
   };
 
   const handleIdentomatResult = async () => {
-    if (!identomatSessionToken) {
+    if (!identomatSessionToken || identomatResultRequestedRef.current) {
       console.error("❌ [IDENTOMAT] No session token available");
       return;
     }
 
     try {
+      identomatResultRequestedRef.current = true;
       setIdentomatLoading(true);
 
-      const COMPANY_KEY = "6a992532bab4f5134e2b97c0";
+      // This is the company key used to create the session. The configuration
+      // id is different and must not be used for result requests.
+      const COMPANY_KEY =
+        "699c6dc7915fc8ed730c5034_0c1c01bb7b27253e3abe4d2ab9c573ff0ca5931f";
 
       const resultResponse = await fetch(
         "https://widget.identomat.com/external-api/result/",
@@ -990,6 +998,7 @@ export default function RegisterScreen() {
       let faceImage: string | null = null;
       let documentFrontImage: string | null = null;
       let documentBackImage: string | null = null;
+      let passportImage: string | null = null;
 
       const uploadImageToCloudinary = async (
         imageBlob: Blob,
@@ -1212,6 +1221,34 @@ export default function RegisterScreen() {
             cardBackError,
           );
         }
+
+        try {
+          const passportResponse = await fetch(
+            "https://widget.identomat.com/external-api/result/passport/",
+            { method: "POST", body: formData },
+          );
+
+          if (passportResponse.ok) {
+            const contentType = passportResponse.headers.get("content-type");
+            if (contentType && contentType.startsWith("image/")) {
+              passportImage = await uploadImageToCloudinary(
+                await passportResponse.blob(),
+                `identomat-passport-${identomatSessionToken.substring(0, 10)}.jpg`,
+              );
+            }
+          } else {
+            console.warn(
+              "⚠️ [IDENTOMAT] Passport endpoint returned error:",
+              passportResponse.status,
+              passportResponse.statusText,
+            );
+          }
+        } catch (passportError) {
+          console.warn(
+            "⚠️ [IDENTOMAT] Failed to get passport image:",
+            passportError,
+          );
+        }
       } catch (imageError) {
         console.warn(
           "⚠️ [IDENTOMAT] Failed to get images from Identomat endpoints, falling back to result data:",
@@ -1219,115 +1256,35 @@ export default function RegisterScreen() {
         );
       }
 
-      const person = resultData.person || resultData;
+      const person = resultData.person;
+
+      if (!person || typeof person !== "object") {
+        throw new Error(t("identomat.error.resultFailed"));
+      }
 
       const wantsGeorgianIdentomatData = isDoctor || nationality === "georgian";
 
-      const pickFirstString = (...values: any[]): string | undefined => {
-        for (const v of values) {
-          if (typeof v === "string") {
-            const s = v.trim();
-            if (s) return s;
-          }
-        }
-        return undefined;
-      };
-
-      const getByKey = (obj: any, key: string): string | undefined => {
-        if (!obj || typeof obj !== "object") return undefined;
-        return pickFirstString(obj[key]);
-      };
-
-      const pickLocalizedDocField = (
-        obj: any,
-        baseKey: string,
-        localeVariants: string[],
-      ): string | undefined => {
-        if (!obj || typeof obj !== "object") return undefined;
-        for (const loc of localeVariants) {
-          const v = getByKey(obj, `${baseKey}_${loc}`);
-          if (v) return v;
-        }
-        return undefined;
-      };
-
-      const docSections: any[] = [
-        resultData?.id_card_front,
-        resultData?.id_card_back,
-        resultData?.passport,
-        resultData?.front,
-        resultData?.back,
-        resultData?.document?.front,
-        resultData?.document?.back,
-        resultData?.documentPages?.[0]?.front,
-        resultData?.documentPages?.[0]?.back,
-        resultData?.documents?.[0]?.front,
-        resultData?.documents?.[0]?.back,
-      ].filter(Boolean);
-
-      const extractGeorgianFromDocs = () => {
-        const localeVariants = ["ka_GE", "ka"];
-        for (const sec of docSections) {
-          const first = pickLocalizedDocField(
-            sec,
-            "Given_Names",
-            localeVariants,
-          );
-          const last = pickLocalizedDocField(sec, "Surname", localeVariants);
-          const personal = pickLocalizedDocField(
-            sec,
-            "Personal_Number",
-            localeVariants,
-          );
-          if (first || last || personal) {
-            return { first, last, personal };
-          }
-        }
-        return { first: undefined, last: undefined, personal: undefined };
-      };
-
-      const geDoc = wantsGeorgianIdentomatData
-        ? extractGeorgianFromDocs()
-        : { first: undefined, last: undefined, personal: undefined };
-
       const idNumber =
-        geDoc.personal ||
         person.personal_number ||
         person.id_number ||
         person.person_number ||
-        resultData.personal_number ||
-        resultData.id_number ||
-        resultData.person_number ||
-        resultData.idNumber;
+        person.idNumber;
 
-      // Try to get name from person object first, then fallback to root level
-      const firstName =
-        geDoc.first ||
-        person.first_name ||
-        person.firstName ||
-        person.name?.first ||
-        resultData.first_name ||
-        resultData.firstName ||
-        resultData.name?.first;
-      const lastName =
-        geDoc.last ||
-        person.last_name ||
-        person.lastName ||
-        person.name?.last ||
-        resultData.last_name ||
-        resultData.lastName ||
-        resultData.name?.last;
+      // Identomat returns localized and transliterated names separately.
+      // Always read identity data from the person object.
+      const firstName = wantsGeorgianIdentomatData
+        ? person.local_first_name || person.first_name
+        : person.first_name || person.local_first_name;
+      const lastName = wantsGeorgianIdentomatData
+        ? person.local_last_name || person.last_name
+        : person.last_name || person.local_last_name;
 
       const dateOfBirth =
         person.birthday ||
         person.birthday_time ||
         person.date_of_birth ||
         person.dateOfBirth ||
-        person.dob ||
-        resultData.date_of_birth ||
-        resultData.dateOfBirth ||
-        resultData.dob ||
-        resultData.birthday;
+        person.dob;
 
       if (idNumber) {
         setIdNumber(idNumber);
@@ -1397,6 +1354,7 @@ export default function RegisterScreen() {
           faceImage,
           documentFrontImage,
           documentBackImage,
+          passportImage,
           fullData: resultData,
         });
 
@@ -1415,6 +1373,7 @@ export default function RegisterScreen() {
         throw new Error(t("identomat.error.idNotFound"));
       }
     } catch (error) {
+      identomatResultRequestedRef.current = false;
       console.error("❌ [IDENTOMAT] Error getting result:", error);
       Alert.alert(
         t("identomat.error.title"),
@@ -1659,6 +1618,7 @@ export default function RegisterScreen() {
 
                             const COMPANY_KEY =
                               "699c6dc7915fc8ed730c5034_0c1c01bb7b27253e3abe4d2ab9c573ff0ca5931f";
+                            const CONFIG_ID = "6a992532bab4f5134e2b97c0";
                             const beginResponse = await fetch(
                               "https://widget.identomat.com/external-api/begin/",
                               {
@@ -1668,26 +1628,7 @@ export default function RegisterScreen() {
                                 },
                                 body: JSON.stringify({
                                   company_key: COMPANY_KEY,
-                                  flags: {
-                                    skip_agreement: true,
-                                    skip_document: false,
-                                    skip_face: false,
-                                    language: isDoctor
-                                      ? "ka"
-                                      : nationality === "georgian"
-                                        ? "ka"
-                                        : "en",
-                                  },
-                                  steps: [
-                                    {
-                                      type: "face",
-                                      key: "face",
-                                    },
-                                    {
-                                      type: "document",
-                                      key: "document",
-                                    },
-                                  ],
+                                  config_id: CONFIG_ID,
                                 }),
                               },
                             );
@@ -1759,6 +1700,7 @@ export default function RegisterScreen() {
                             );
 
                             setIdentomatSessionToken(sessionToken);
+                            identomatResultRequestedRef.current = false;
 
                             // Step 2: Open WebView with session token
                             const widgetUrl = `https://widget.identomat.com/?session_token=${sessionToken}`;
@@ -2965,6 +2907,9 @@ export default function RegisterScreen() {
                   "📨 [IDENTOMAT] WebView message:",
                   event.nativeEvent.data,
                 );
+                if (event.nativeEvent.data === "DONE") {
+                  void handleIdentomatResult();
+                }
               }}
               renderError={(
                 errorDomain: string | undefined,

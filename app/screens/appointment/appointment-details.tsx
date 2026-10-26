@@ -22,6 +22,29 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+const parseFeeValue = (value: unknown): number => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  const parsed = parseFloat(
+    String(value ?? "")
+      .replace(",", ".")
+      .replace(/[^\d.]/g, ""),
+  );
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const getDoctorFeeByAppointmentType = (doctor: any, appointmentType?: string) => {
+  const preferred =
+    appointmentType === "home-visit"
+      ? doctor.homeVisitFee ?? doctor.home_visit_fee ?? doctor.homeVisitPrice
+      : doctor.videoConsultationFee ??
+        doctor.video_consultation_fee ??
+        doctor.videoVisitFee;
+  return (
+    parseFeeValue(preferred) ||
+    parseFeeValue(doctor.consultationFee ?? doctor.consultation_fee)
+  );
+};
+
 // Helper function to map backend doctor to app format
 const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
   let imageSource;
@@ -45,7 +68,10 @@ const mapDoctorFromAPI = (doctor: any, apiBaseUrl: string) => {
     reviewCount: doctor.reviewCount || 0,
     image: imageSource,
     degrees: doctor.degrees || "",
-    consultationFee: doctor.consultationFee || 0,
+    consultationFee: doctor.consultationFee ?? doctor.consultation_fee ?? 0,
+    videoConsultationFee:
+      doctor.videoConsultationFee ?? doctor.video_consultation_fee ?? 0,
+    homeVisitFee: doctor.homeVisitFee ?? doctor.home_visit_fee ?? 0,
   };
 };
 
@@ -291,8 +317,9 @@ const AppointmentDetails = () => {
   const finalPatientName = appointment?.patientDetails?.name || patientName;
   const finalProblem = appointment?.notes || problem;
   const consultationFee =
-    appointment?.consultationFee || doctor.consultationFee;
-  const totalAmount = appointment?.totalAmount || consultationFee * 1.05;
+    parseFeeValue(appointment?.consultationFee) ||
+    getDoctorFeeByAppointmentType(doctor, appointment?.type);
+  const totalAmount = parseFeeValue(appointment?.totalAmount) || consultationFee;
 
   const handleBackToHome = () => {
     router.replace("/(tabs)");

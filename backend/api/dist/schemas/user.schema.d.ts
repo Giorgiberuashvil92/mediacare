@@ -68,6 +68,7 @@ export declare class User {
     identomatFaceImage?: string;
     identomatDocumentFrontImage?: string;
     identomatDocumentBackImage?: string;
+    identomatPassportImage?: string;
     identomatFullData?: any;
     createdAt?: Date;
     updatedAt?: Date;

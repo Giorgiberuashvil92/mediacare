@@ -17,6 +17,7 @@ import {
 } from '../appointments/schemas/appointment.schema';
 import { misAttachGeneratedServiceId } from '../integrations/mis-appointment-generate.sync';
 import { MisAuthService } from '../integrations/mis-auth.service';
+import { formatMisServiceDate } from '../integrations/mis-service-date';
 import {
   ApprovalStatus,
   DoctorStatus,
@@ -24,6 +25,7 @@ import {
   UserDocument,
   UserRole,
 } from '../schemas/user.schema';
+import { Clinic, ClinicDocument } from '../shop/schemas/clinic.schema';
 import {
   Specialization,
   SpecializationDocument,
@@ -39,7 +41,6 @@ import {
   Availability,
   AvailabilityDocument,
 } from './schemas/availability.schema';
-import { Clinic, ClinicDocument } from '../shop/schemas/clinic.schema';
 
 @Injectable()
 export class DoctorsService {
@@ -443,6 +444,26 @@ export class DoctorsService {
       availableDoctors.length,
     );
 
+    const clinicIds = availableDoctors
+      .filter((doctor) => (doctor as any).clinicId)
+      .map((doctor) => (doctor as any).clinicId.toString());
+    const clinics =
+      clinicIds.length > 0
+        ? await this.clinicModel
+            .find({
+              _id: {
+                $in: [...new Set(clinicIds)].map(
+                  (id) => new mongoose.Types.ObjectId(id),
+                ),
+              },
+            })
+            .select('name')
+            .lean()
+        : [];
+    const clinicNameById = new Map(
+      clinics.map((clinic) => [clinic._id.toString(), clinic.name]),
+    );
+
     // Format doctors
     const availabilityTypesMap =
       (availableDoctors as any).availabilityTypes || new Map();
@@ -484,6 +505,10 @@ export class DoctorsService {
         approvalStatus: doctor.approvalStatus,
         doctorStatus: (doctor as any).doctorStatus,
         isTopRated: doctor.isTopRated || false,
+        clinicId: (doctor as any).clinicId?.toString(),
+        clinicName: (doctor as any).clinicId
+          ? clinicNameById.get((doctor as any).clinicId.toString())
+          : undefined,
         availabilityTypes, // Array of 'video' | 'home-visit' that doctor offers
       };
     });
@@ -2209,7 +2234,10 @@ export class DoctorsService {
       {
         misPersonId: followUpMisPersonId,
         doctorPersonalId: followUpDoctorPersonalId,
-        serviceDateIso: followUpDateTime.toISOString(),
+        serviceDate: formatMisServiceDate(
+          String(dto.date).trim().split('T')[0],
+          dto.time,
+        ),
       },
       this.logger,
     );

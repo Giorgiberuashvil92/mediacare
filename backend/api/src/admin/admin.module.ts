@@ -10,6 +10,8 @@ import {
   AvailabilitySchema,
 } from '../doctors/schemas/availability.schema';
 import { User, UserSchema } from '../schemas/user.schema';
+import { AiSubscription, AiSubscriptionSchema } from '../ai-subscription/schemas/ai-subscription.schema';
+import { Clinic, ClinicSchema } from '../shop/schemas/clinic.schema';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
 
@@ -19,6 +21,8 @@ import { AdminService } from './admin.service';
       { name: User.name, schema: UserSchema },
       { name: Appointment.name, schema: AppointmentSchema },
       { name: Availability.name, schema: AvailabilitySchema },
+      { name: AiSubscription.name, schema: AiSubscriptionSchema },
+      { name: Clinic.name, schema: ClinicSchema },
     ]),
     JwtModule.register({}),
   ],

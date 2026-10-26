@@ -24,6 +24,12 @@ export class Clinic {
   @Prop({ trim: true })
   merchantName?: string;
 
+  @Prop({ trim: true })
+  bogClientId?: string;
+
+  @Prop({ trim: true })
+  bogClientSecret?: string;
+
   @Prop({ type: Object, default: {} })
   metadata?: Record<string, any>;
 }

@@ -231,6 +231,10 @@ __decorate([
     __metadata("design:type", String)
 ], User.prototype, "identomatDocumentBackImage", void 0);
 __decorate([
+    (0, mongoose_1.Prop)(),
+    __metadata("design:type", String)
+], User.prototype, "identomatPassportImage", void 0);
+__decorate([
     (0, mongoose_1.Prop)({ type: Object }),
     __metadata("design:type", Object)
 ], User.prototype, "identomatFullData", void 0);

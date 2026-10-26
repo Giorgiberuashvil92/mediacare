@@ -76,6 +76,13 @@ export default function ScreensLayout() {
           animation: "slide_from_right",
         }}
       />
+      <Stack.Screen
+        name="ai-payment-history"
+        options={{
+          presentation: "card",
+          animation: "slide_from_right",
+        }}
+      />
     </Stack>
   );
 }

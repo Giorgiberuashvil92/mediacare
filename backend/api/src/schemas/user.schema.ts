@@ -182,6 +182,9 @@ export class User {
   @Prop()
   identomatDocumentBackImage?: string; // Document back image URL from Identomat
 
+  @Prop()
+  identomatPassportImage?: string; // Passport image URL from Identomat
+
   @Prop({ type: Object })
   identomatFullData?: any; // Full Identomat response data for admin panel
 

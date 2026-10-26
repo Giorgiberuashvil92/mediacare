@@ -663,7 +663,7 @@ export default function UserFormModal({
               )}
 
               {/* Identomat Verification Images */}
-              {(user?.identomatFaceImage || user?.identomatDocumentFrontImage || user?.identomatDocumentBackImage) && (
+              {(user?.identomatFaceImage || user?.identomatDocumentFrontImage || user?.identomatDocumentBackImage || user?.identomatPassportImage) && (
                 <div className="rounded-lg border border-stroke bg-gray-50 p-4 dark:border-dark-3 dark:bg-dark-2">
                   <label className="mb-4 block text-sm font-medium text-dark dark:text-white">
                     IDENTOMAT-ით იდენტიფიკაცია
@@ -721,6 +721,25 @@ export default function UserFormModal({
                           <img
                             src={user.identomatDocumentBackImage}
                             alt="Identomat Document Back"
+                            className="h-32 w-full object-cover transition hover:scale-105"
+                          />
+                        </a>
+                      </div>
+                    )}
+                    {user.identomatPassportImage && (
+                      <div>
+                        <label className="mb-2 block text-xs font-medium text-dark-4 dark:text-dark-6">
+                          პასპორტის ფოტო
+                        </label>
+                        <a
+                          href={user.identomatPassportImage}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block overflow-hidden rounded-lg border border-stroke dark:border-dark-3"
+                        >
+                          <img
+                            src={user.identomatPassportImage}
+                            alt="Identomat Passport"
                             className="h-32 w-full object-cover transition hover:scale-105"
                           />
                         </a>
@@ -1010,4 +1029,3 @@ export default function UserFormModal({
     </div>
   );
 }
-

@@ -5,6 +5,14 @@ import mongoose, { Model } from 'mongoose';
 import { User, UserDocument, UserRole } from '../schemas/user.schema';
 import { Clinic, ClinicDocument } from '../shop/schemas/clinic.schema';
 
+type BogCredentials = {
+  clientId: string;
+  clientSecret: string;
+  merchantId: string;
+  merchantName: string;
+  source: 'default' | 'clinic';
+};
+
 @Injectable()
 export class PaymentService {
   private readonly logger = new Logger(PaymentService.name);
@@ -49,15 +57,33 @@ tcBuHV4f7qsynQT+f2UYbESX/TLHwT5qFWZDHZ0YUOUIvb8n7JujVSGZO9/+ll/g
 PwIDAQAB
 -----END PUBLIC KEY-----`;
 
-  private accessToken: string | null = null;
-  private tokenExpiresAt: number = 0;
+  private tokenCache = new Map<
+    string,
+    {
+      accessToken: string;
+      tokenExpiresAt: number;
+    }
+  >();
 
   /**
-   * ექიმის კლინიკიდან merchantId-ის მიღება; fallback — default MEDEKSES merchant
+   * ექიმის კლინიკიდან BOG credentials-ის მიღება; fallback — default MEDEKSES merchant
    */
-  async resolveMerchantIdForDoctor(doctorId?: string): Promise<string> {
+  async resolveBogCredentialsForDoctor(
+    doctorId?: string,
+  ): Promise<BogCredentials> {
+    const defaultCredentials: BogCredentials = {
+      clientId: this.BOG_CLIENT_ID,
+      clientSecret: this.BOG_CLIENT_SECRET,
+      merchantId: this.BOG_MERCHANT_ID,
+      merchantName: this.BOG_MERCHANT_NAME,
+      source: 'default',
+    };
+
     if (!doctorId || !mongoose.Types.ObjectId.isValid(doctorId)) {
-      return this.BOG_MERCHANT_ID;
+      this.logger.warn(
+        `⚠️ [BOG] Missing/invalid doctorId "${doctorId}" — using default Medexes merchant`,
+      );
+      return defaultCredentials;
     }
 
     const doctor = await this.userModel
@@ -66,49 +92,75 @@ PwIDAQAB
       .lean();
 
     if (!doctor || doctor.role !== UserRole.DOCTOR || !doctor.clinicId) {
-      return this.BOG_MERCHANT_ID;
+      this.logger.warn(
+        `⚠️ [BOG] Doctor ${doctorId} has no clinicId — using default Medexes merchant`,
+      );
+      return defaultCredentials;
     }
 
     const clinic = await this.clinicModel
       .findById(doctor.clinicId)
-      .select('merchantId isActive name')
+      .select('merchantId merchantName bogClientId bogClientSecret isActive name')
       .lean();
 
-    if (!clinic?.merchantId?.trim()) {
+    if (!clinic) {
       this.logger.warn(
-        `⚠️ [BOG] Doctor ${doctorId} clinic "${clinic?.name || doctor.clinicId}" has no merchantId — using default`,
+        `⚠️ [BOG] Doctor ${doctorId} clinic "${doctor.clinicId}" not found — using default Medexes merchant`,
       );
-      return this.BOG_MERCHANT_ID;
+      return defaultCredentials;
     }
 
     if (!clinic.isActive) {
       this.logger.warn(
-        `⚠️ [BOG] Doctor ${doctorId} clinic "${clinic.name}" is inactive — using default merchant`,
+        `⚠️ [BOG] Doctor ${doctorId} clinic "${clinic.name}" is inactive — using default Medexes merchant`,
       );
-      return this.BOG_MERCHANT_ID;
+      return defaultCredentials;
+    }
+
+    if (!clinic.bogClientId?.trim() || !clinic.bogClientSecret?.trim()) {
+      this.logger.warn(
+        `⚠️ [BOG] Doctor ${doctorId} clinic "${clinic.name}" has no BOG client credentials — using default Medexes merchant`,
+      );
+      return defaultCredentials;
     }
 
     this.logger.log(
-      `💳 [BOG] Using clinic merchant for doctor ${doctorId}: ${clinic.merchantId} (${clinic.name})`,
+      `💳 [BOG] Using clinic BOG credentials for doctor ${doctorId}: ${clinic.merchantId || clinic.bogClientId} (${clinic.name})`,
     );
-    return clinic.merchantId.trim();
+    return {
+      clientId: clinic.bogClientId.trim(),
+      clientSecret: clinic.bogClientSecret.trim(),
+      merchantId: clinic.merchantId?.trim() || clinic.bogClientId.trim(),
+      merchantName: clinic.merchantName?.trim() || clinic.name,
+      source: 'clinic',
+    };
   }
 
   /**
    * Get BOG access token (with caching)
    */
-  async getAccessToken(): Promise<string> {
+  async getAccessToken(credentials?: {
+    clientId: string;
+    clientSecret: string;
+  }): Promise<string> {
+    const clientId = credentials?.clientId || this.BOG_CLIENT_ID;
+    const clientSecret = credentials?.clientSecret || this.BOG_CLIENT_SECRET;
+    const cacheKey = clientId;
+    const cachedToken = this.tokenCache.get(cacheKey);
     // Check if token is still valid (with 5 minute buffer)
-    if (this.accessToken && Date.now() < this.tokenExpiresAt - 5 * 60 * 1000) {
-      return this.accessToken;
+    if (
+      cachedToken?.accessToken &&
+      Date.now() < cachedToken.tokenExpiresAt - 5 * 60 * 1000
+    ) {
+      return cachedToken.accessToken;
     }
 
     try {
-      this.logger.log('🔐 [BOG] Requesting new access token');
+      this.logger.log('🔐 [BOG] Requesting new access token', { clientId });
 
       // Create Basic Auth header
-      const credentials = `${this.BOG_CLIENT_ID}:${this.BOG_CLIENT_SECRET}`;
-      const base64Credentials = Buffer.from(credentials).toString('base64');
+      const authCredentials = `${clientId}:${clientSecret}`;
+      const base64Credentials = Buffer.from(authCredentials).toString('base64');
 
       const response = await fetch(this.BOG_AUTH_URL, {
         method: 'POST',
@@ -135,15 +187,17 @@ PwIDAQAB
         expires_in: number;
       };
 
-      this.accessToken = data.access_token;
       // expires_in is in seconds, convert to milliseconds
-      this.tokenExpiresAt = Date.now() + data.expires_in * 1000;
+      this.tokenCache.set(cacheKey, {
+        accessToken: data.access_token,
+        tokenExpiresAt: Date.now() + data.expires_in * 1000,
+      });
 
       this.logger.log(
         `✅ [BOG] Access token obtained, expires in ${data.expires_in} seconds`,
       );
 
-      return this.accessToken;
+      return data.access_token;
     } catch (error) {
       this.logger.error(`❌ [BOG] Error getting access token:`, error);
       throw error;
@@ -173,8 +227,10 @@ PwIDAQAB
     error?: string;
   }> {
     try {
-      const token = await this.getAccessToken();
-      const merchantId = await this.resolveMerchantIdForDoctor(params.doctorId);
+      const bogCredentials = await this.resolveBogCredentialsForDoctor(
+        params.doctorId,
+      );
+      const token = await this.getAccessToken(bogCredentials);
 
       this.logger.log('💳 [BOG] Creating payment order:', {
         amount: params.amount,
@@ -182,7 +238,9 @@ PwIDAQAB
         orderId: params.orderId,
         description: params.description,
         doctorId: params.doctorId,
-        merchantId,
+        merchantId: bogCredentials.merchantId,
+        merchantName: bogCredentials.merchantName,
+        merchantSource: bogCredentials.source,
       });
 
       // BOG Payment API endpoint - ecommerce/orders
@@ -242,7 +300,7 @@ PwIDAQAB
             {
               quantity: 1,
               unit_price: params.amount,
-              product_id: merchantId,
+              product_id: bogCredentials.merchantId,
             },
           ],
         },
@@ -404,11 +462,62 @@ PwIDAQAB
   }
 
   /**
+   * Register this order as the parent payment for automatic subscription charges.
+   * BOG requires this call after order creation and before redirecting the user.
+   */
+  async saveCardForAutomaticPayments(orderId: string): Promise<{
+    success: boolean;
+    error?: string;
+  }> {
+    try {
+      const token = await this.getAccessToken();
+      const endpoint = `${this.BOG_API_URL}/orders/${orderId}/subscriptions`;
+
+      this.logger.log('💳 [BOG] Saving card for automatic payments:', {
+        orderId,
+        endpoint,
+      });
+
+      const response = await fetch(endpoint, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const responseText = await response.text();
+      this.logger.log('📥 [BOG] Save card response:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: responseText,
+      });
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error: `BOG save card failed: ${response.status} ${responseText}`,
+        };
+      }
+
+      return { success: true };
+    } catch (error) {
+      this.logger.error('❌ [BOG] Error saving card for automatic payments:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
    * Get payment order status
    * BOG API Documentation: GET /payments/v1/receipt/:order_id
    * Note: orderId should be BOG's order ID (from response.id), not external_order_id
    */
-  async getPaymentStatus(orderId: string): Promise<{
+  async getPaymentStatus(
+    orderId: string,
+    doctorId?: string,
+  ): Promise<{
     success: boolean;
     status?: string;
     amount?: number;
@@ -416,7 +525,8 @@ PwIDAQAB
     error?: string;
   }> {
     try {
-      const token = await this.getAccessToken();
+      const bogCredentials = await this.resolveBogCredentialsForDoctor(doctorId);
+      const token = await this.getAccessToken(bogCredentials);
 
       // BOG API endpoint for getting receipt/order details
       // orderId should be BOG's order ID (UUID format), not external_order_id
@@ -425,6 +535,9 @@ PwIDAQAB
       this.logger.log('🔍 [BOG] Getting payment status:', {
         orderId,
         endpoint,
+        doctorId,
+        merchantId: bogCredentials.merchantId,
+        merchantSource: bogCredentials.source,
       });
 
       const response = await fetch(endpoint, {

@@ -1,5 +1,6 @@
 import { JwtService } from '@nestjs/jwt';
 import * as mongoose from 'mongoose';
+import { HeraUsersService } from '../integrations/hera-users.service';
 import { MisAuthService } from '../integrations/mis-auth.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RefreshTokenDocument } from '../schemas/refresh-token.schema';
@@ -14,9 +15,10 @@ export declare class AuthService {
     private refreshTokenModel;
     private jwtService;
     private phoneVerificationService;
+    private heraUsersService;
     private misAuthService;
     private notificationsService;
-    constructor(userModel: mongoose.Model<UserDocument>, refreshTokenModel: mongoose.Model<RefreshTokenDocument>, jwtService: JwtService, phoneVerificationService: PhoneVerificationService, misAuthService: MisAuthService, notificationsService: NotificationsService);
+    constructor(userModel: mongoose.Model<UserDocument>, refreshTokenModel: mongoose.Model<RefreshTokenDocument>, jwtService: JwtService, phoneVerificationService: PhoneVerificationService, heraUsersService: HeraUsersService, misAuthService: MisAuthService, notificationsService: NotificationsService);
     register(registerDto: RegisterDto): Promise<{
         success: boolean;
         message: string;

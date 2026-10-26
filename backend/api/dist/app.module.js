@@ -30,6 +30,7 @@ const terms_module_1 = require("./terms/terms.module");
 const integrations_module_1 = require("./integrations/integrations.module");
 const upload_module_1 = require("./upload/upload.module");
 const documents_module_1 = require("./documents/documents.module");
+const ai_subscription_module_1 = require("./ai-subscription/ai-subscription.module");
 const moduleImports = [
     config_1.ConfigModule.forRoot({
         isGlobal: true,
@@ -64,6 +65,7 @@ const moduleImports = [
     notifications_module_1.NotificationsModule,
     payment_module_1.PaymentModule,
     documents_module_1.DocumentsModule,
+    ai_subscription_module_1.AiSubscriptionModule,
 ];
 let AppModule = class AppModule {
 };

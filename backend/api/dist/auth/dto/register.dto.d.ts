@@ -30,5 +30,6 @@ export declare class RegisterDto {
     identomatFaceImage?: string;
     identomatDocumentFrontImage?: string;
     identomatDocumentBackImage?: string;
+    identomatPassportImage?: string;
     identomatFullData?: any;
 }

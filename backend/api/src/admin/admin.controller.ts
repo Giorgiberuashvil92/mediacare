@@ -29,6 +29,13 @@ export class AdminController {
     return this.adminService.getUsers(query);
   }
 
+  @Get('ai-subscriptions')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  async getAiSubscriptions() {
+    return this.adminService.getAiSubscriptions();
+  }
+
   @Get('users/:id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)

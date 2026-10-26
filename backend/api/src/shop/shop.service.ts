@@ -95,6 +95,8 @@ export class ShopService {
     isActive: boolean;
     merchantId?: string;
     merchantName?: string;
+    bogClientId?: string;
+    bogClientSecret?: string;
     createdAt?: Date;
     updatedAt?: Date;
   }) {
@@ -107,6 +109,10 @@ export class ShopService {
       isActive: clinic.isActive,
       merchantId: clinic.merchantId,
       merchantName: clinic.merchantName,
+      bogClientId: clinic.bogClientId,
+      hasBogCredentials: Boolean(
+        clinic.bogClientId?.trim() && clinic.bogClientSecret?.trim(),
+      ),
       createdAt: clinic.createdAt,
       updatedAt: clinic.updatedAt,
     };
@@ -556,7 +562,11 @@ export class ShopService {
 
   // Clinic methods
   async createClinic(createClinicDto: CreateClinicDto) {
-    const clinic = new this.clinicModel(createClinicDto);
+    const clinic = new this.clinicModel({
+      ...createClinicDto,
+      bogClientId: createClinicDto.bogClientId?.trim() || undefined,
+      bogClientSecret: createClinicDto.bogClientSecret?.trim() || undefined,
+    });
     const savedClinic = await clinic.save();
     const clinicDoc = savedClinic.toObject() as ClinicDocument & {
       createdAt?: Date;
@@ -573,6 +583,8 @@ export class ShopService {
         isActive: savedClinic.isActive,
         merchantId: savedClinic.merchantId,
         merchantName: savedClinic.merchantName,
+        bogClientId: savedClinic.bogClientId,
+        bogClientSecret: savedClinic.bogClientSecret,
         createdAt: clinicDoc.createdAt,
         updatedAt: clinicDoc.updatedAt,
       }),
@@ -602,6 +614,8 @@ export class ShopService {
           isActive: clinic.isActive,
           merchantId: clinic.merchantId,
           merchantName: clinic.merchantName,
+          bogClientId: clinic.bogClientId,
+          bogClientSecret: clinic.bogClientSecret,
           createdAt: clinic.createdAt,
           updatedAt: clinic.updatedAt,
         }),
@@ -631,6 +645,8 @@ export class ShopService {
         isActive: clinicDoc.isActive,
         merchantId: clinicDoc.merchantId,
         merchantName: clinicDoc.merchantName,
+        bogClientId: clinicDoc.bogClientId,
+        bogClientSecret: clinicDoc.bogClientSecret,
         createdAt: clinicDoc.createdAt,
         updatedAt: clinicDoc.updatedAt,
       }),
@@ -642,9 +658,24 @@ export class ShopService {
       throw new Error('Invalid clinic ID');
     }
 
+    const updatePayload = {
+      ...(updateClinicDto as any),
+    };
+    if (typeof updatePayload.bogClientId === 'string') {
+      updatePayload.bogClientId = updatePayload.bogClientId.trim() || undefined;
+    }
+    if (typeof updatePayload.bogClientSecret === 'string') {
+      const trimmedSecret = updatePayload.bogClientSecret.trim();
+      if (trimmedSecret) {
+        updatePayload.bogClientSecret = trimmedSecret;
+      } else {
+        delete updatePayload.bogClientSecret;
+      }
+    }
+
     const clinic = await this.clinicModel.findByIdAndUpdate(
       id,
-      updateClinicDto as any,
+      updatePayload,
       { new: true, runValidators: true },
     );
 
@@ -667,6 +698,8 @@ export class ShopService {
         isActive: clinic.isActive,
         merchantId: clinic.merchantId,
         merchantName: clinic.merchantName,
+        bogClientId: clinic.bogClientId,
+        bogClientSecret: clinic.bogClientSecret,
         createdAt: clinicDoc.createdAt,
         updatedAt: clinicDoc.updatedAt,
       }),

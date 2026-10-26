@@ -13,15 +13,17 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { resolvePrivacyContent } from "../../../utils/privacyPolicyDefaults";
+
 export default function PrivacyTermsScreen() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [content, setContent] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadTerms();
-  }, []);
+  }, [language]);
 
   const loadTerms = async () => {
     try {
@@ -29,14 +31,21 @@ export default function PrivacyTermsScreen() {
       setError(null);
 
       if (apiService.isMockMode()) {
-        setContent("ეს არის მოკლე ტექსტი კონფიდენციალურობის პირობების შესახებ.");
+        setContent(
+          resolvePrivacyContent(null, language === "en" ? "en" : language === "ru" ? "ru" : "ka"),
+        );
         setLoading(false);
         return;
       }
 
       const response = await apiService.getTerms("privacy");
       if (response.success && response.data) {
-        setContent(response.data.content || "");
+        setContent(
+          resolvePrivacyContent(
+            response.data,
+            language === "en" ? "en" : language === "ru" ? "ru" : "ka",
+          ),
+        );
       } else {
         setError("ტერმინების ჩატვირთვა ვერ მოხერხდა");
       }

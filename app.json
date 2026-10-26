@@ -2,7 +2,7 @@
   "expo": {
     "name": "medicare",
     "slug": "medicare",
-    "version": "2.0.40",
+    "version": "2.1.4",
     "orientation": "default",
     "icon": "./assets/images/logo/logo.png",
     "scheme": "myapp",
@@ -14,18 +14,69 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "buildNumber": "2.0.40",
+      "buildNumber": "2.1.4",
       "supportsTablet": true,
       "bundleIdentifier": "ge.medcompass",
       "backgroundModes": ["audio", "voip"],
+      "privacyManifests": {
+        "NSPrivacyTracking": false,
+        "NSPrivacyCollectedDataTypes": [
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeHealthAndFitness",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
+          },
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeOtherUserContent",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
+          },
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeName",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
+          },
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeEmailAddress",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
+          },
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypePhoneNumber",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
+          }
+        ],
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+          }
+        ]
+      },
       "infoPlist": {
         "UIRequiredDeviceCapabilities": [],
         "UIBackgroundModes": ["audio", "voip"],
-        "NSCameraUsageDescription": "...",
-        "NSMicrophoneUsageDescription": "...",
+        "NSCameraUsageDescription": "Camera access is used to take profile photos and send photos in the AI assistant.",
+        "NSMicrophoneUsageDescription": "Microphone access is used to record and send voice messages.",
         "ITSAppUsesNonExemptEncryption": false,
-        "NSPhotoLibraryUsageDescription": "...",
-        "NSPhotoLibraryAddUsageDescription": "..."
+        "NSPhotoLibraryUsageDescription": "Photo library access is used to choose a profile photo and attach photos in the AI assistant.",
+        "NSPhotoLibraryAddUsageDescription": "Photo library access is used to save generated images and downloaded photos to your device."
       }
     },
     "android": {
@@ -36,9 +87,14 @@
         "backgroundColor": "#ffffff"
       },
       "package": "ge.blh.medcompass",
-      "versionCode": 40,
+      "versionCode": 47,
       "blockedPermissions": [
-        "android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION"
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED"
       ],
       "permissions": [
         "android.permission.CAMERA",
@@ -66,6 +122,13 @@
             "./assets/fonts/Poppins-SemiBold.ttf",
             "./assets/fonts/Poppins-Medium.ttf"
           ]
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "აპლიკაციას სჭირდება ფოტოებზე წვდომა პროფილის სურათის ასარჩევად",
+          "cameraPermission": "აპლიკაციას სჭირდება კამერაზე წვდომა"
         }
       ]
     ],
