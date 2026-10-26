@@ -15,13 +15,25 @@ async function bootstrap() {
     prefix: '/uploads/',
   });
 
-  // Enable CORS - Allow development and production origins
-  const corsOrigins = process.env.CORS_ORIGINS
-    ? process.env.CORS_ORIGINS.split(',').map((origin) => origin.trim())
-    : ['*'];
+  // Enable CORS — admin Vercel + local defaults always merged with CORS_ORIGINS
+  const DEFAULT_CORS_ORIGINS = [
+    'https://mediacareadmin.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:3001',
+  ];
+  const envCorsOrigins = process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',')
+        .map((origin) => origin.trim())
+        .filter(Boolean)
+    : [];
+  const allowAllOrigins =
+    envCorsOrigins.length === 0 || envCorsOrigins.includes('*');
+  const corsOrigins = allowAllOrigins
+    ? true
+    : [...new Set([...DEFAULT_CORS_ORIGINS, ...envCorsOrigins])];
 
   const corsConfig = {
-    origin: corsOrigins.includes('*') ? true : corsOrigins,
+    origin: corsOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'],
     allowedHeaders: [
@@ -40,7 +52,7 @@ async function bootstrap() {
   };
 
   console.log('🌐 CORS Configuration:', {
-    origins: corsOrigins.includes('*') ? 'All origins allowed' : corsOrigins,
+    origins: allowAllOrigins ? 'All origins reflected' : corsOrigins,
     methods: corsConfig.methods,
     allowedHeaders: corsConfig.allowedHeaders,
   });
