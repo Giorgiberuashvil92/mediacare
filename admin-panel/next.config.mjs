@@ -1,23 +1,3 @@
-const PRODUCTION_API_URL = "https://mediacare-production.up.railway.app";
-
-function resolveApiDestination() {
-  const raw = (
-    process.env.API_URL ||
-    process.env.NEXT_PUBLIC_API_URL ||
-    PRODUCTION_API_URL
-  )
-    .trim()
-    .replace(/\/$/, "");
-
-  if (!raw || /localhost|127\.0\.0\.1/i.test(raw)) {
-    return PRODUCTION_API_URL;
-  }
-
-  return raw;
-}
-
-const apiDestination = resolveApiDestination();
-
 /** @type {import("next").NextConfig} */
 const nextConfig = {
   images: {
@@ -48,14 +28,6 @@ const nextConfig = {
         port: "",
       },
     ],
-  },
-  async rewrites() {
-    return [
-      {
-        source: "/api/proxy/:path*",
-        destination: `${apiDestination}/:path*`,
-      },
-    ];
   },
 };
 
