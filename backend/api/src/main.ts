@@ -15,13 +15,39 @@ async function bootstrap() {
     prefix: '/uploads/',
   });
 
-  // Enable CORS - Allow development and production origins
-  const corsOrigins = process.env.CORS_ORIGINS
-    ? process.env.CORS_ORIGINS.split(',').map((origin) => origin.trim())
-    : ['*'];
+  // CORS: always allow admin Vercel; merge with CORS_ORIGINS (or reflect all if *)
+  const DEFAULT_CORS_ORIGINS = [
+    'https://mediacareadmin.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:3001',
+  ];
+  const envCorsOrigins = process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',')
+        .map((origin) => origin.trim())
+        .filter(Boolean)
+    : [];
+  const allowAllOrigins =
+    envCorsOrigins.length === 0 || envCorsOrigins.includes('*');
+  const allowedOrigins = [
+    ...new Set([
+      ...DEFAULT_CORS_ORIGINS,
+      ...envCorsOrigins.filter((o) => o !== '*'),
+    ]),
+  ];
 
   const corsConfig = {
-    origin: corsOrigins.includes('*') ? true : corsOrigins,
+    origin: allowAllOrigins
+      ? true
+      : (
+          origin: string | undefined,
+          callback: (err: Error | null, allow?: boolean) => void,
+        ) => {
+          if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+          } else {
+            callback(null, false);
+          }
+        },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'],
     allowedHeaders: [
@@ -30,9 +56,6 @@ async function bootstrap() {
       'Accept',
       'Origin',
       'X-Requested-With',
-      'Access-Control-Allow-Origin',
-      'Access-Control-Allow-Headers',
-      'Access-Control-Allow-Methods',
     ],
     exposedHeaders: ['Content-Length', 'Content-Type'],
     preflightContinue: false,
@@ -40,9 +63,7 @@ async function bootstrap() {
   };
 
   console.log('🌐 CORS Configuration:', {
-    origins: corsOrigins.includes('*') ? 'All origins allowed' : corsOrigins,
-    methods: corsConfig.methods,
-    allowedHeaders: corsConfig.allowedHeaders,
+    origins: allowAllOrigins ? 'All origins reflected' : allowedOrigins,
   });
 
   app.enableCors(corsConfig);
