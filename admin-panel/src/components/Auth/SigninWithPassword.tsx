@@ -36,7 +36,7 @@ export default function SigninWithPassword() {
         err instanceof Error ? err.message : "Login failed. Please check your credentials.";
       const friendly =
         message === "Failed to fetch"
-          ? "Cannot reach API. Check NEXT_PUBLIC_API_URL on Vercel (use Railway URL, not localhost)."
+          ? "Cannot reach API. Hard-refresh the page after Vercel redeploy, or set API_URL to the Railway URL."
           : message;
       setError(friendly);
       setLoading(false);

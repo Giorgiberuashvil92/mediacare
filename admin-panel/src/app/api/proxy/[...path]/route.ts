@@ -3,10 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/**
- * Compatibility shim for old admin bundles that still call /api/proxy/*.
- * Current app code talks to Railway directly — this only prevents 404 on stale clients.
- */
+/** Vercel same-origin proxy → Railway (avoids browser CORS / bad localhost env). */
 const PRODUCTION_API_URL = "https://mediacare-production.up.railway.app";
 
 function getUpstreamBase(): string {
