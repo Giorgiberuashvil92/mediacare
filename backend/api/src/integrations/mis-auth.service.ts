@@ -309,6 +309,7 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
     'http://185.247.94.160/MISNew/MIS.Ambulatory/MIS.Ambulatory.API/api/PrintForm/GetFormsByServiceID';
 
   private storedValue: string | null = null;
+  private readonly clinicTokens = new Map<string, string>();
   private lastResponse: MisLoginResponse | null = null;
   private refreshTimer: NodeJS.Timeout | null = null;
   private readonly autoRefreshIntervalMs = Number.parseInt(
@@ -439,6 +440,49 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
     };
   }
 
+  private async tokenForAmbulatory(options?: MisAmbulatoryRequestOptions): Promise<string | null> {
+    const base = this.normalizeAmbulatoryBaseUrl(options?.ambulatoryBaseUrl);
+    if (!base) return this.ensureMisLoginToken(true);
+    if (this.patientUpsertUrl.startsWith(`${base}/api/`)) {
+      return this.ensureMisLoginToken(true);
+    }
+    const clinic = await this.clinicModel.findOne({ misAmbulatoryBaseUrl: base })
+      .select('+misAuthPassword +misAuthLoginToken misAuthLoginUrl misAuthLoginName').lean();
+    if (!clinic) {
+      this.logger.error(`MIS clinic not found for Ambulatory URL ${base}`);
+      return null;
+    }
+    const key = String(clinic._id);
+    // A clinic with a separate MIS installation must never reuse the default account/token.
+    if (!clinic.misAuthLoginUrl || !clinic.misAuthLoginName || !clinic.misAuthPassword) {
+      this.logger.error(`MIS Authentication configuration missing for clinic ${key}`);
+      return null;
+    }
+    try {
+      const url = new URL(clinic.misAuthLoginUrl);
+      url.searchParams.set('loginName', clinic.misAuthLoginName);
+      url.searchParams.set('password', clinic.misAuthPassword);
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: { LoginToken: this.clinicTokens.get(key) || clinic.misAuthLoginToken || '' },
+      });
+      if (!response.ok) {
+        this.logger.error(`MIS clinic ${key} login HTTP ${response.status}`);
+        return null;
+      }
+      const parsed = parseMisLoginResponse(await response.json());
+      if (!parsed?.value) {
+        this.logger.error(`MIS clinic ${key} login returned no token: ${parsed?.message || 'invalid response'}`);
+        return null;
+      }
+      this.clinicTokens.set(key, parsed.value);
+      return parsed.value;
+    } catch (error) {
+      this.logger.error(`MIS clinic ${key} login failed: ${error instanceof Error ? error.message : String(error)}`);
+      return null;
+    }
+  }
+
   /** GET /Home/Login header-ისთვის: ჯერ მიმდინარე HIS token, შემდეგ env fallback */
   private getLoginTokenForAuthRequest(): string {
     return this.storedValue?.trim() || this.loginTokenHeader.trim();
@@ -508,9 +552,7 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
           `MIS login: Code=${data.code} (სავარაუდოდ 0 უნდა იყოს წარმატებაზე), მაგრამ Value მოვიდა — ვინახავთ LoginToken-ს`,
         );
       }
-      this.logger.log(
-        `MIS LoginToken (header LoginToken Ambulatory-ზე), სიგრძე=${data.value.length}: ${data.value}`,
-      );
+      this.logger.log(`MIS LoginToken received, length=${data.value.length}`);
     } else {
       this.logger.warn(
         `MIS login: Value ცარიელია — Ambulatory მოთხოვნებზე LoginToken არ გექნება. code=${data.code} message="${data.message}"`,
@@ -531,9 +573,7 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
 
     const bootstrapToken = this.getStoredValue();
     if (bootstrapToken) {
-      this.logger.log(
-        `MIS bootstrap token ready | length=${bootstrapToken.length} | token=${bootstrapToken}`,
-      );
+      this.logger.log(`MIS bootstrap token ready | length=${bootstrapToken.length}`);
     } else {
       this.logger.warn('MIS bootstrap token missing after initial login');
     }
@@ -656,10 +696,10 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
         this.logger.warn(
           'MIS AddOrUpdatePatient: მეორე ცდა — LoginToken ხელახლა განახლება',
         );
-        await this.refreshLoginToken();
+        if (!options?.ambulatoryBaseUrl) await this.refreshLoginToken();
       }
 
-      const loginToken = await this.ensureMisLoginToken(attempt === 0);
+      const loginToken = await this.tokenForAmbulatory(options);
       if (!loginToken) {
         this.logger.error('Cannot upsert MIS patient: LoginToken is empty');
         return { success: false, personId: null };
@@ -669,36 +709,6 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
         this.logger.log(
           `MIS patient upsert request (ცდა ${attempt + 1}/2) | url=${patientUpsertUrl} | hasLoginToken=${Boolean(loginToken)}`,
         );
-        this.logger.log(
-          `MIS patient upsert body (მხოლოდ აპლიკაციის ველები, undefined ამოღებული):\n${JSON.stringify(plainBody, null, 2)}`,
-        );
-        this.logger.log(
-          `MIS patient upsert request payload (exact outbound):\n${JSON.stringify(
-            {
-              method: 'POST',
-              url: patientUpsertUrl,
-              headers: {
-                'Content-Type': 'application/json; charset=utf-8',
-                LoginToken: loginToken,
-              },
-              body: plainBody,
-            },
-            null,
-            2,
-          )}`,
-        );
-        this.logger.log(
-          `MIS_UPSERT_OUTBOUND::${JSON.stringify({
-            method: 'POST',
-            url: patientUpsertUrl,
-            headers: {
-              'Content-Type': 'application/json; charset=utf-8',
-              LoginToken: loginToken,
-            },
-            body: plainBody,
-          })}`,
-        );
-
         const response = await fetch(patientUpsertUrl, {
           method: 'POST',
           headers: {
@@ -808,10 +818,10 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
         this.logger.warn(
           'MIS GenerateService: მეორე ცდა — LoginToken ხელახლა განახლება',
         );
-        await this.refreshLoginToken();
+        if (!options?.ambulatoryBaseUrl) await this.refreshLoginToken();
       }
 
-      const loginToken = await this.ensureMisLoginToken(attempt === 0);
+      const loginToken = await this.tokenForAmbulatory(options);
       if (!loginToken) {
         this.logger.error(
           'Cannot call MIS GenerateService: LoginToken is empty',
@@ -947,7 +957,7 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
       };
     }
 
-    const loginToken = await this.ensureMisLoginToken(true);
+    const loginToken = await this.tokenForAmbulatory(options);
     if (!loginToken) {
       this.logger.error('Cannot download MIS binary: LoginToken is empty');
       return {
@@ -1036,10 +1046,10 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
         this.logger.warn(
           'MIS GetFormsByServiceID: მეორე ცდა — LoginToken ხელახლა განახლება',
         );
-        await this.refreshLoginToken();
+        if (!options?.ambulatoryBaseUrl) await this.refreshLoginToken();
       }
 
-      const loginToken = await this.ensureMisLoginToken(attempt === 0);
+      const loginToken = await this.tokenForAmbulatory(options);
       if (!loginToken) {
         this.logger.error(
           'Cannot call MIS GetFormsByServiceID: LoginToken is empty',

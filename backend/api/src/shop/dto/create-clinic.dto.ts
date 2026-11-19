@@ -49,6 +49,11 @@ export class CreateClinicDto {
   @MaxLength(500)
   misAmbulatoryBaseUrl?: string;
 
+  @IsOptional() @IsString() misAuthLoginUrl?: string;
+  @IsOptional() @IsString() misAuthLoginName?: string;
+  @IsOptional() @IsString() misAuthPassword?: string;
+  @IsOptional() @IsString() misAuthLoginToken?: string;
+
   @IsOptional() @IsString() misServiceIdHomeVisit?: string;
   @IsOptional() @IsString() misServiceIdVideo?: string;
   @IsOptional() @IsString() misServiceIdVideoFollowUp?: string;

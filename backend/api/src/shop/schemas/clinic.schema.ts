@@ -42,6 +42,18 @@ export class Clinic {
   misAmbulatoryBaseUrl?: string;
 
   @Prop({ trim: true })
+  misAuthLoginUrl?: string;
+
+  @Prop({ trim: true })
+  misAuthLoginName?: string;
+
+  @Prop({ trim: true, select: false })
+  misAuthPassword?: string;
+
+  @Prop({ trim: true, select: false })
+  misAuthLoginToken?: string;
+
+  @Prop({ trim: true })
   misServiceIdHomeVisit?: string;
 
   @Prop({ trim: true })
