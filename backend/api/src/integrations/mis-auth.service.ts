@@ -359,10 +359,11 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
 
   async ensurePatientForClinic(patient: UserDocument, clinicId?: string | null, citizenship?: string): Promise<string> {
     const key = clinicId?.toString() || '';
-    const existing = key ? patient.misPersonIdsByClinic?.[key] : patient.misPersonId;
-    if (existing?.trim()) return existing.trim();
     const clinic = key ? (await this.configuredClinics()).find((item) => item.id === key) : undefined;
     if (key && !clinic) throw new Error(`MIS clinic is not configured: ${key}`);
+    const isDefault = !clinic || this.patientUpsertUrl.startsWith(`${clinic.baseUrl}/api/`);
+    const existing = isDefault ? patient.misPersonId : patient.misPersonIdsByClinic?.[key];
+    if (existing?.trim()) return existing.trim();
     const nameParts = (patient.name || '').trim().split(/\s+/);
     const now = new Date().toISOString();
     const result = await this.upsertPatient({
@@ -377,9 +378,9 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
       UserID: String(patient._id), UserFirstName: nameParts[0] || '',
       UserLastName: nameParts.length > 1 ? nameParts[nameParts.length - 1] : patient.name || '',
       DateCreated: now, DateChanged: now, IsFromEMR: false,
-    }, { ambulatoryBaseUrl: clinic?.baseUrl });
+    }, { ambulatoryBaseUrl: isDefault ? undefined : clinic.baseUrl });
     if (!result.success || !result.personId) throw new Error(`MIS patient sync failed for clinic ${key || 'default'}`);
-    if (key) {
+    if (!isDefault) {
       await this.userModel.updateOne({ _id: patient._id }, { $set: { [`misPersonIdsByClinic.${key}`]: result.personId } });
     } else {
       await this.userModel.updateOne({ _id: patient._id }, { $set: { misPersonId: result.personId } });
@@ -453,19 +454,24 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
       return null;
     }
     const key = String(clinic._id);
-    // A clinic with a separate MIS installation must never reuse the default account/token.
-    if (!clinic.misAuthLoginUrl || !clinic.misAuthLoginName || !clinic.misAuthPassword) {
-      this.logger.error(`MIS Authentication configuration missing for clinic ${key}`);
-      return null;
-    }
     try {
-      const url = new URL(clinic.misAuthLoginUrl);
-      url.searchParams.set('loginName', clinic.misAuthLoginName);
-      url.searchParams.set('password', clinic.misAuthPassword);
-      const response = await fetch(url.toString(), {
+      // Same MIS credentials/path, separate host and port for each installation.
+      // Admin may override any part if a future clinic differs.
+      const defaultLogin = new URL(this.loginUrl);
+      const ambulatory = new URL(base);
+      const url = clinic.misAuthLoginUrl
+        ? new URL(clinic.misAuthLoginUrl)
+        : new URL(`${ambulatory.origin}${defaultLogin.pathname}`);
+      url.searchParams.set('loginName', clinic.misAuthLoginName || this.loginName);
+      url.searchParams.set('password', clinic.misAuthPassword || this.password);
+      let response = await fetch(url.toString(), {
         method: 'GET',
         headers: { LoginToken: this.clinicTokens.get(key) || clinic.misAuthLoginToken || '' },
       });
+      if (!response.ok && (this.clinicTokens.has(key) || clinic.misAuthLoginToken)) {
+        this.clinicTokens.delete(key);
+        response = await fetch(url.toString(), { method: 'GET', headers: { LoginToken: '' } });
+      }
       if (!response.ok) {
         this.logger.error(`MIS clinic ${key} login HTTP ${response.status}`);
         return null;

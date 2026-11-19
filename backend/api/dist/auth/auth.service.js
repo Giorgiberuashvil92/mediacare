@@ -299,25 +299,12 @@ let AuthService = class AuthService {
         }
         let misPersonId = null;
         if (savedUser.role === user_schema_1.UserRole.PATIENT) {
-            const clinics = await this.misAuthService.configuredClinics();
-            if (clinics.length) {
-                for (const clinic of clinics) {
-                    try {
-                        const id = await this.misAuthService.ensurePatientForClinic(savedUser, clinic.id, citizenship?.trim() || residency?.trim());
-                        misPersonId ||= id;
-                    }
-                    catch (error) {
-                        console.error(`MIS clinic sync failed clinic=${clinic.id} user=${savedUser._id}`, error);
-                    }
-                }
+            try {
+                misPersonId = await this.misAuthService.ensurePatientForClinic(savedUser, undefined, citizenship?.trim() || residency?.trim());
             }
-            else {
-                try {
-                    misPersonId = await this.misAuthService.ensurePatientForClinic(savedUser, undefined, citizenship?.trim() || residency?.trim());
-                }
-                catch (error) {
-                    console.error(`MIS default sync failed user=${savedUser._id}`, error);
-                }
+            catch (error) {
+                await this.userModel.findByIdAndDelete(savedUser._id);
+                throw new common_1.BadRequestException('Patient sync to default MIS failed. Registration cancelled.');
             }
         }
         void this.heraUsersService.safeUpsertUser({
