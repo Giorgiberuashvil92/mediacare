@@ -11,6 +11,7 @@ export type MisAttachGenerateContext = {
   serviceDate: string;
   /** კლინიკის Ambulatory base URL (ექიმის კლინიკიდან) */
   ambulatoryBaseUrl?: string;
+  clinicCatalog?: { misServiceIdHomeVisit?: string; misServiceIdVideo?: string; misServiceIdVideoFollowUp?: string; misContractId?: string };
 };
 
 /**
@@ -31,6 +32,7 @@ export async function misAttachGeneratedServiceId(
   const { serviceId, contractId } = resolveMisGenerateCatalog({
     type: appointment.type,
     isFollowUp: appointment.isFollowUp === true,
+    clinicCatalog: ctx.clinicCatalog,
   });
 
   const genResult = await misAuthService.generateService(

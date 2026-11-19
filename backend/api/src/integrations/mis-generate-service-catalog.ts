@@ -17,6 +17,7 @@ export const MIS_GENERATE_CONTRACT_ID_DEFAULT =
 export type MisGenerateCatalogContext = {
   type: AppointmentType;
   isFollowUp: boolean;
+  clinicCatalog?: { misServiceIdHomeVisit?: string; misServiceIdVideo?: string; misServiceIdVideoFollowUp?: string; misContractId?: string };
 };
 
 /**
@@ -27,21 +28,24 @@ export function resolveMisGenerateCatalog(ctx: MisGenerateCatalogContext): {
   serviceId: string;
   contractId: string;
 } {
-  const contractId =
+  const contractId = ctx.clinicCatalog?.misContractId?.trim() ||
     process.env.MIS_GENERATE_SERVICE_CONTRACT_ID?.trim() ||
     MIS_GENERATE_CONTRACT_ID_DEFAULT;
 
   let serviceId: string;
   if (ctx.type === AppointmentType.HOME_VISIT) {
     serviceId =
+      ctx.clinicCatalog?.misServiceIdHomeVisit?.trim() ||
       process.env.MIS_SERVICE_ID_HOME_VISIT?.trim() ||
       MIS_SERVICE_IDS.homeVisit;
   } else if (ctx.isFollowUp) {
     serviceId =
+      ctx.clinicCatalog?.misServiceIdVideoFollowUp?.trim() ||
       process.env.MIS_SERVICE_ID_VIDEO_FOLLOWUP?.trim() ||
       MIS_SERVICE_IDS.videoFollowUp;
   } else {
     serviceId =
+      ctx.clinicCatalog?.misServiceIdVideo?.trim() ||
       process.env.MIS_SERVICE_ID_VIDEO?.trim() ||
       MIS_SERVICE_IDS.videoConsultation;
   }

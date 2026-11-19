@@ -299,48 +299,25 @@ let AuthService = class AuthService {
         }
         let misPersonId = null;
         if (savedUser.role === user_schema_1.UserRole.PATIENT) {
-            const nameParts = (savedUser.name || '').trim().split(/\s+/);
-            const firstName = nameParts[0] || savedUser.name || '';
-            const lastName = nameParts.length > 1
-                ? nameParts[nameParts.length - 1]
-                : savedUser.name || '';
-            const ambulatoryBaseUrl = await this.misAuthService.resolveAmbulatoryBaseUrlForDoctor(registerDto.appointmentDoctorId);
-            const misSyncResult = await this.misAuthService.upsertPatient({
-                ID: null,
-                PersonalID: savedUser.idNumber || '',
-                FirstName: firstName,
-                LastName: lastName,
-                FatherName: '',
-                Gender: savedUser.gender === user_schema_1.Gender.FEMALE ? 1 : 0,
-                BirthDate: savedUser.dateOfBirth
-                    ? new Date(savedUser.dateOfBirth).toISOString()
-                    : undefined,
-                Phone: savedUser.phone || '',
-                Mobile: savedUser.phone || '',
-                Email: savedUser.email || '',
-                Citizenship: citizenship?.trim() || residency?.trim() || undefined,
-                LegalAddress: savedUser.address || '',
-                ActualAddress: savedUser.address || '',
-                Description: '',
-                IdentificationStatus: 0,
-                ConsentForm: true,
-                Encrypted: false,
-                UserID: savedUser._id.toString(),
-                UserFirstName: firstName,
-                UserLastName: lastName,
-                DateCreated: new Date().toISOString(),
-                DateChanged: new Date().toISOString(),
-                IsFromEMR: false,
-            }, { ambulatoryBaseUrl });
-            if (!misSyncResult.success) {
-                await this.userModel.findByIdAndDelete(savedUser._id);
-                throw new common_1.BadRequestException('Patient sync to MIS failed. Registration cancelled.');
+            const clinics = await this.misAuthService.configuredClinics();
+            if (clinics.length) {
+                for (const clinic of clinics) {
+                    try {
+                        const id = await this.misAuthService.ensurePatientForClinic(savedUser, clinic.id, citizenship?.trim() || residency?.trim());
+                        misPersonId ||= id;
+                    }
+                    catch (error) {
+                        console.error(`MIS clinic sync failed clinic=${clinic.id} user=${savedUser._id}`, error);
+                    }
+                }
             }
-            if (misSyncResult.personId) {
-                await this.userModel.findByIdAndUpdate(savedUser._id, {
-                    misPersonId: misSyncResult.personId,
-                });
-                misPersonId = misSyncResult.personId;
+            else {
+                try {
+                    misPersonId = await this.misAuthService.ensurePatientForClinic(savedUser, undefined, citizenship?.trim() || residency?.trim());
+                }
+                catch (error) {
+                    console.error(`MIS default sync failed user=${savedUser._id}`, error);
+                }
             }
         }
         void this.heraUsersService.safeUpsertUser({

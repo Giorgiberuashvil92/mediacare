@@ -2255,16 +2255,10 @@ export class DoctorsService {
     if (!patientUser) {
       throw new BadRequestException('Patient user not found');
     }
-    const followUpMisPersonId =
-      typeof patientUser.misPersonId === 'string'
-        ? patientUser.misPersonId.trim()
-        : '';
-    if (!followUpMisPersonId) {
-      throw new BadRequestException(
-        'HIS პაციენტის ID აკლია — განმეორებითი ვიზიტი შეუძლებელია.',
-      );
-    }
     const doctorUser = await this.userModel.findById(doctorId);
+    const followUpMisPersonId = await this.misAuthService.ensurePatientForClinic(
+      patientUser, doctorUser?.clinicId?.toString(),
+    );
     const followUpDoctorPersonalId =
       typeof doctorUser?.idNumber === 'string'
         ? doctorUser.idNumber.trim()
@@ -2408,6 +2402,7 @@ export class DoctorsService {
           dto.time,
         ),
         ambulatoryBaseUrl: followUpAmbulatoryBaseUrl,
+        clinicCatalog: await this.misAuthService.resolveClinicCatalogForDoctor(doctorId),
       },
       this.logger,
     );

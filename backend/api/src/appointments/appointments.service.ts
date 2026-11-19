@@ -299,15 +299,14 @@ export class AppointmentsService {
       );
       const patient = await this.userModel
         .findById(appointment.patientId)
-        .select('misPersonId');
+        .select('misPersonId misPersonIdsByClinic');
       const doctor = await this.userModel
         .findById(appointment.doctorId)
         .select('idNumber clinicId');
 
-      const misPersonId =
-        typeof patient?.misPersonId === 'string'
-          ? patient.misPersonId.trim()
-          : '';
+      const misPersonId = await this.misAuthService.ensurePatientForClinic(
+        patient as any, doctor?.clinicId?.toString(),
+      );
       const doctorPersonalId =
         typeof doctor?.idNumber === 'string' ? doctor.idNumber.trim() : '';
 
@@ -321,6 +320,7 @@ export class AppointmentsService {
       const { serviceId, contractId } = resolveMisGenerateCatalog({
         type: appointment.type,
         isFollowUp: appointment.isFollowUp === true,
+        clinicCatalog: await this.misAuthService.resolveClinicCatalogForDoctor(String(appointment.doctorId)),
       });
 
       const serviceDate = formatMisServiceDate(
@@ -512,13 +512,9 @@ export class AppointmentsService {
       throw new NotFoundException('User not found');
     }
 
-    const misPersonId =
-      typeof patient.misPersonId === 'string' ? patient.misPersonId.trim() : '';
-    if (!misPersonId) {
-      throw new BadRequestException(
-        'HIS პაციენტის ID აკლია — ჯავშანი შეუძლებელია. დარწმუნდით, რომ პროფილი HIS-თან არის დასინქრონებული.',
-      );
-    }
+    const misPersonId = await this.misAuthService.ensurePatientForClinic(
+      patient, doctor.clinicId?.toString(),
+    );
 
     const doctorPersonalId =
       typeof doctor.idNumber === 'string' ? doctor.idNumber.trim() : '';
@@ -698,6 +694,7 @@ export class AppointmentsService {
           createAppointmentDto.appointmentTime || '00:00',
         ),
         ambulatoryBaseUrl,
+        clinicCatalog: await this.misAuthService.resolveClinicCatalogForDoctor(createAppointmentDto.doctorId),
       },
       this.logger,
     );
@@ -2031,21 +2028,13 @@ export class AppointmentsService {
     if (!patientForMis) {
       throw new NotFoundException('User not found');
     }
-    const followUpMisPersonId =
-      typeof patientForMis.misPersonId === 'string'
-        ? patientForMis.misPersonId.trim()
-        : '';
-    if (!followUpMisPersonId) {
-      throw new BadRequestException(
-        'HIS პაციენტის ID აკლია — განმეორებითი ვიზიტი შეუძლებელია.',
-      );
-    }
-    const doctorForMis = await this.userModel.findById(
-      originalAppointment.doctorId,
-    );
+    const doctorForMis = await this.userModel.findById(originalAppointment.doctorId);
     if (!doctorForMis || doctorForMis.role !== UserRole.DOCTOR) {
       throw new NotFoundException('Doctor not found');
     }
+    const followUpMisPersonId = await this.misAuthService.ensurePatientForClinic(
+      patientForMis, doctorForMis.clinicId?.toString(),
+    );
     const followUpDoctorPersonalId =
       typeof doctorForMis.idNumber === 'string'
         ? doctorForMis.idNumber.trim()
@@ -2217,6 +2206,7 @@ export class AppointmentsService {
           dto.time,
         ),
         ambulatoryBaseUrl: followUpAmbulatoryBaseUrl,
+        clinicCatalog: await this.misAuthService.resolveClinicCatalogForDoctor(String(originalAppointment.doctorId)),
       },
       this.logger,
     );

@@ -328,6 +328,64 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
     return normalized || undefined;
   }
 
+  /** ყველა აქტიური, MIS-ით კონფიგურირებული კლინიკა. */
+  async configuredClinics(): Promise<Array<{ id: string; baseUrl: string }>> {
+    const clinics = await this.clinicModel.find({ isActive: true, misAmbulatoryBaseUrl: { $exists: true, $ne: '' } })
+      .select('misAmbulatoryBaseUrl').lean();
+    return clinics.flatMap((clinic) => {
+      const baseUrl = this.normalizeAmbulatoryBaseUrl(clinic.misAmbulatoryBaseUrl);
+      return baseUrl ? [{ id: String(clinic._id), baseUrl }] : [];
+    });
+  }
+
+  async resolveClinicCatalogForDoctor(doctorId: string): Promise<Clinic | undefined> {
+    if (!mongoose.Types.ObjectId.isValid(doctorId)) return undefined;
+    const doctor = await this.userModel.findById(doctorId).select('clinicId').lean();
+    if (!doctor?.clinicId) return undefined;
+    const clinic = await this.clinicModel.findById(doctor.clinicId).lean();
+    if (!clinic) return undefined;
+    // The second MIS installation uses its own service catalog.
+    if (clinic.misAmbulatoryBaseUrl && new URL(clinic.misAmbulatoryBaseUrl).hostname === '31.146.99.156') {
+      return {
+        ...clinic,
+        misServiceIdHomeVisit: clinic.misServiceIdHomeVisit || '49BA5D57-C534-4603-ACE1-4A8F0CD53231',
+        misServiceIdVideo: clinic.misServiceIdVideo || '1C34EB6C-9738-409C-AAE9-167975A024C1',
+        misServiceIdVideoFollowUp: clinic.misServiceIdVideoFollowUp || '366368BF-D11A-47BB-890A-6B6DCF55635E',
+      };
+    }
+    return clinic;
+  }
+
+  async ensurePatientForClinic(patient: UserDocument, clinicId?: string | null, citizenship?: string): Promise<string> {
+    const key = clinicId?.toString() || '';
+    const existing = key ? patient.misPersonIdsByClinic?.[key] : patient.misPersonId;
+    if (existing?.trim()) return existing.trim();
+    const clinic = key ? (await this.configuredClinics()).find((item) => item.id === key) : undefined;
+    if (key && !clinic) throw new Error(`MIS clinic is not configured: ${key}`);
+    const nameParts = (patient.name || '').trim().split(/\s+/);
+    const now = new Date().toISOString();
+    const result = await this.upsertPatient({
+      ID: null, PersonalID: patient.idNumber || '', FirstName: nameParts[0] || '',
+      LastName: nameParts.length > 1 ? nameParts[nameParts.length - 1] : patient.name || '',
+      FatherName: '', Gender: patient.gender === 'female' ? 1 : 0,
+      BirthDate: patient.dateOfBirth ? new Date(patient.dateOfBirth).toISOString() : undefined,
+      Phone: patient.phone || '', Mobile: patient.phone || '', Email: patient.email || '',
+      Citizenship: citizenship || undefined,
+      LegalAddress: patient.address || '', ActualAddress: patient.address || '', Description: '',
+      IdentificationStatus: 0, ConsentForm: true, Encrypted: false,
+      UserID: String(patient._id), UserFirstName: nameParts[0] || '',
+      UserLastName: nameParts.length > 1 ? nameParts[nameParts.length - 1] : patient.name || '',
+      DateCreated: now, DateChanged: now, IsFromEMR: false,
+    }, { ambulatoryBaseUrl: clinic?.baseUrl });
+    if (!result.success || !result.personId) throw new Error(`MIS patient sync failed for clinic ${key || 'default'}`);
+    if (key) {
+      await this.userModel.updateOne({ _id: patient._id }, { $set: { [`misPersonIdsByClinic.${key}`]: result.personId } });
+    } else {
+      await this.userModel.updateOne({ _id: patient._id }, { $set: { misPersonId: result.personId } });
+    }
+    return result.personId;
+  }
+
   /**
    * ექიმის კლინიკიდან Ambulatory base URL.
    * თუ კლინიკა/ველი არ არის — undefined (გამოიყენება env default).

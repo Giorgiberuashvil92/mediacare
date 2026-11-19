@@ -48,4 +48,9 @@ export class CreateClinicDto {
   @IsString()
   @MaxLength(500)
   misAmbulatoryBaseUrl?: string;
+
+  @IsOptional() @IsString() misServiceIdHomeVisit?: string;
+  @IsOptional() @IsString() misServiceIdVideo?: string;
+  @IsOptional() @IsString() misServiceIdVideoFollowUp?: string;
+  @IsOptional() @IsString() misContractId?: string;
 }

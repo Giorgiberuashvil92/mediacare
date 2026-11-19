@@ -2,7 +2,7 @@
   "expo": {
     "name": "medicare",
     "slug": "medicare",
-    "version": "2.1.4",
+    "version": "2.1.5",
     "orientation": "default",
     "icon": "./assets/images/logo/logo.png",
     "scheme": "myapp",
@@ -14,10 +14,13 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "buildNumber": "2.1.4",
+      "buildNumber": "2.1.5",
       "supportsTablet": true,
       "bundleIdentifier": "ge.medcompass",
-      "backgroundModes": ["audio", "voip"],
+      "backgroundModes": [
+        "audio",
+        "voip"
+      ],
       "privacyManifests": {
         "NSPrivacyTracking": false,
         "NSPrivacyCollectedDataTypes": [
@@ -65,13 +68,18 @@
         "NSPrivacyAccessedAPITypes": [
           {
             "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
-            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+            "NSPrivacyAccessedAPITypeReasons": [
+              "CA92.1"
+            ]
           }
         ]
       },
       "infoPlist": {
         "UIRequiredDeviceCapabilities": [],
-        "UIBackgroundModes": ["audio", "voip"],
+        "UIBackgroundModes": [
+          "audio",
+          "voip"
+        ],
         "NSCameraUsageDescription": "Camera access is used to take profile photos and send photos in the AI assistant.",
         "NSMicrophoneUsageDescription": "Microphone access is used to record and send voice messages.",
         "ITSAppUsesNonExemptEncryption": false,
@@ -87,7 +95,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "ge.blh.medcompass",
-      "versionCode": 47,
+      "versionCode": 49,
       "blockedPermissions": [
         "android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION",
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -112,6 +120,15 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 36
+          }
+        }
+      ],
       "expo-router",
       [
         "expo-font",
@@ -130,7 +147,8 @@
           "photosPermission": "აპლიკაციას სჭირდება ფოტოებზე წვდომა პროფილის სურათის ასარჩევად",
           "cameraPermission": "აპლიკაციას სჭირდება კამერაზე წვდომა"
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true

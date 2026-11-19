@@ -33,6 +33,7 @@ const PaymentMethods = () => {
   const insets = useSafeAreaInsets();
   const {
     doctorId,
+    doctorName,
     selectedDate,
     selectedTime,
     amount,
@@ -86,13 +87,28 @@ const PaymentMethods = () => {
         return;
       }
 
-      // Generate unique order ID (external_order_id for BOG)
-      const externalOrderId = `MEDEKSES-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      // BOG uses the first 25 characters of external_order_id in statements.
+      const payer = Array.from(user.name?.trim().replace(/\s+/g, " ") || "");
+      const doctor = Array.from(
+        typeof doctorName === "string"
+          ? doctorName.trim().replace(/\s+/g, " ")
+          : "",
+      );
+      const purpose =
+        payer.length && doctor.length
+          ? [
+              payer.slice(0, Math.max(12, 24 - doctor.length)).join(""),
+              doctor.slice(0, Math.max(12, 24 - payer.length)).join(""),
+            ].join("/")
+          : (payer.length ? payer : doctor).slice(0, 25).join("");
+      const uniqueOrderId = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+      const externalOrderId = purpose
+        ? `${purpose}-${uniqueOrderId}`
+        : uniqueOrderId;
 
       // Create BOG payment order
       console.log("💳 [Payment] Creating BOG payment order:", {
         amount: total,
-        externalOrderId,
         description: `კონსულტაცია - ${selectedDate} ${selectedTime}`,
       });
 
@@ -128,7 +144,6 @@ const PaymentMethods = () => {
       }
 
       console.log("✅ [Payment] Payment order created:", {
-        externalOrderId,
         bogOrderId: paymentResponse.orderId,
         paymentUrl: paymentResponse.paymentUrl,
       });

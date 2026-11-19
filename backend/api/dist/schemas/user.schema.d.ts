@@ -29,6 +29,7 @@ export declare class User {
     phone?: string;
     idNumber?: string;
     misPersonId?: string;
+    misPersonIdsByClinic?: Record<string, string>;
     misGeneratedServiceId?: string;
     dateOfBirth?: Date;
     gender?: Gender;

@@ -393,6 +393,7 @@ const MakeAppointment = () => {
       pathname: "/screens/payment/payment-methods",
       params: {
         doctorId: doctorId as string,
+        doctorName: doctor?.name || "",
         selectedDate: selectedDate as string,
         selectedTime: selectedTime as string,
         paymentMethod: selectedPaymentMethod,

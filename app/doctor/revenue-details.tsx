@@ -356,7 +356,6 @@ export default function RevenueDetails() {
           </View>
         </View>
 
-        {/* ფინანსური მიმოხილვა - არჩეული პერიოდის შემოსავალი (ექიმის წილი) */}
         <View style={[styles.section, { marginBottom: 24 }]}>
           <Text style={styles.sectionTitle}>{t("doctor.revenue.income")}</Text>
           <View style={styles.revenueCard}>

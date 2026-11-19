@@ -75,6 +75,10 @@ __decorate([
     __metadata("design:type", String)
 ], User.prototype, "misPersonId", void 0);
 __decorate([
+    (0, mongoose_1.Prop)({ type: Object, default: {} }),
+    __metadata("design:type", Object)
+], User.prototype, "misPersonIdsByClinic", void 0);
+__decorate([
     (0, mongoose_1.Prop)(),
     __metadata("design:type", String)
 ], User.prototype, "misGeneratedServiceId", void 0);

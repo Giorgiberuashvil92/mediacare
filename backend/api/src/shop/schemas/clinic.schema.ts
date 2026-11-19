@@ -41,6 +41,18 @@ export class Clinic {
   @Prop({ trim: true })
   misAmbulatoryBaseUrl?: string;
 
+  @Prop({ trim: true })
+  misServiceIdHomeVisit?: string;
+
+  @Prop({ trim: true })
+  misServiceIdVideo?: string;
+
+  @Prop({ trim: true })
+  misServiceIdVideoFollowUp?: string;
+
+  @Prop({ trim: true })
+  misContractId?: string;
+
   @Prop({ type: Object, default: {} })
   metadata?: Record<string, any>;
 }

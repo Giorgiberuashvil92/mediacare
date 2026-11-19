@@ -12,34 +12,12 @@ async function bootstrap() {
     app.useStaticAssets((0, path_1.join)(__dirname, '..', 'uploads'), {
         prefix: '/uploads/',
     });
-    const DEFAULT_CORS_ORIGINS = [
-        'https://mediacareadmin.vercel.app',
-        'http://localhost:3000',
-        'http://localhost:3001',
-    ];
-    const envCorsOrigins = process.env.CORS_ORIGINS
-        ? process.env.CORS_ORIGINS.split(',')
-            .map((origin) => origin.trim())
-            .filter(Boolean)
-        : [];
-    const allowAllOrigins = envCorsOrigins.length === 0 || envCorsOrigins.includes('*');
-    const allowedOriginSet = new Set([
-        ...DEFAULT_CORS_ORIGINS,
-        ...envCorsOrigins.filter((o) => o !== '*'),
-    ]);
-    const isOriginAllowed = (origin) => {
-        if (!origin)
-            return true;
-        if (allowAllOrigins)
-            return true;
-        return allowedOriginSet.has(origin);
-    };
     app.use((req, res, next) => {
         const origin = req.headers.origin;
-        if (origin && isOriginAllowed(origin)) {
+        if (origin) {
             res.setHeader('Access-Control-Allow-Origin', origin);
             res.setHeader('Access-Control-Allow-Credentials', 'true');
-            res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,PATCH,OPTIONS,HEAD');
+            res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS,HEAD');
             res.setHeader('Access-Control-Allow-Headers', req.headers['access-control-request-headers'] ||
                 'Content-Type, Authorization, Accept, Origin, X-Requested-With');
             res.setHeader('Access-Control-Max-Age', '86400');
@@ -51,9 +29,7 @@ async function bootstrap() {
         return next();
     });
     app.enableCors({
-        origin: (origin, callback) => {
-            callback(null, isOriginAllowed(origin));
-        },
+        origin: true,
         credentials: true,
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'],
         allowedHeaders: [
@@ -63,16 +39,9 @@ async function bootstrap() {
             'Origin',
             'X-Requested-With',
         ],
-        exposedHeaders: ['Content-Length', 'Content-Type'],
-        preflightContinue: false,
         optionsSuccessStatus: 204,
     });
-    console.log('🌐 CORS Configuration:', {
-        allowAllOrigins,
-        allowedOrigins: allowAllOrigins
-            ? 'All origins reflected'
-            : [...allowedOriginSet],
-    });
+    console.log('🌐 CORS: reflecting request Origin (credentials enabled)');
     app.useGlobalPipes(new common_1.ValidationPipe({
         whitelist: true,
         forbidNonWhitelisted: true,
@@ -86,13 +55,6 @@ async function bootstrap() {
             origin,
             headers: req.headers.authorization ? 'Bearer token present' : 'No token',
         });
-        if (req.method === 'OPTIONS') {
-            console.log('🔄 Preflight OPTIONS request detected:', {
-                origin,
-                'access-control-request-method': req.headers['access-control-request-method'],
-                'access-control-request-headers': req.headers['access-control-request-headers'],
-            });
-        }
         next();
     });
     app.use((err, req, res, next) => {
@@ -118,7 +80,7 @@ async function bootstrap() {
     const connection = app.get((0, mongoose_1.getConnectionToken)());
     console.log(`🗄️  MongoDB connected: ${connection.readyState === mongoose_2.ConnectionStates.connected ? '✅ Connected' : '❌ Disconnected'}`);
     console.log(`📊 Database: ${connection.db?.databaseName || 'medicare'}`);
-    const port = process.env.PORT || 4001;
+    const port = Number(process.env.PORT) || 4001;
     const host = process.env.HOST || '0.0.0.0';
     await app.listen(port, host);
     console.log(`🚀 Server running on http://${host}:${port}`);
