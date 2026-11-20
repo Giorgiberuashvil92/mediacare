@@ -3,7 +3,7 @@ import { useAuth } from "@/app/contexts/AuthContext";
 import { useLanguage } from "@/app/contexts/LanguageContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -59,6 +59,7 @@ const PaymentMethods = () => {
   const [showPaymentWebView, setShowPaymentWebView] = useState(false);
   const [paymentUrl, setPaymentUrl] = useState<string>("");
   const [paymentOrderId, setPaymentOrderId] = useState<string>("");
+  const processingPaymentRef = useRef(false);
 
   const consultationFeeAmount = parseMoneyParam(consultationFee);
   const totalAmount = parseMoneyParam(amount) || consultationFeeAmount;
@@ -171,6 +172,8 @@ const PaymentMethods = () => {
   };
 
   const handlePaymentSuccess = async () => {
+    if (processingPaymentRef.current) return;
+    processingPaymentRef.current = true;
     try {
       setLoading(true);
       setShowPaymentWebView(false);

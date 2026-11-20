@@ -519,21 +519,32 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
       return null;
     }
     const key = String(clinic._id);
+    // This clinic's fixed MIS account takes precedence over admin credentials.
+    const clinicLogin =
+      key === '6accae97f8a7cbc6f09e1cd6'
+        ? { name: 'caseuser', password: 'MIS123456' }
+        : undefined;
     let loginEndpoint = '(invalid URL)';
     try {
-      // Same MIS credentials/path, separate host and port for each installation.
-      // Admin may override any part if a future clinic differs.
+      // Other clinics may override credentials and URL in the admin panel.
       const defaultLogin = new URL(this.loginUrl);
       const ambulatory = new URL(base);
-      const url = clinic.misAuthLoginUrl
-        ? new URL(clinic.misAuthLoginUrl)
-        : new URL(`${ambulatory.origin}${defaultLogin.pathname}`);
+      const url = clinicLogin
+        ? new URL(
+            'http://31.146.99.156/MISNew/MIS.Authentication.API/api/Home/Login',
+          )
+        : clinic.misAuthLoginUrl
+          ? new URL(clinic.misAuthLoginUrl)
+          : new URL(`${ambulatory.origin}${defaultLogin.pathname}`);
       loginEndpoint = `${url.origin}${url.pathname}`;
       url.searchParams.set(
         'loginName',
-        clinic.misAuthLoginName || this.loginName,
+        clinicLogin?.name || clinic.misAuthLoginName || this.loginName,
       );
-      url.searchParams.set('password', clinic.misAuthPassword || this.password);
+      url.searchParams.set(
+        'password',
+        clinicLogin?.password || clinic.misAuthPassword || this.password,
+      );
       let response = await fetch(url.toString(), {
         method: 'GET',
         headers: {
@@ -552,7 +563,9 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
         });
       }
       if (!response.ok) {
-        this.logger.error(`MIS clinic ${key} login HTTP ${response.status}`);
+        this.logger.error(
+          `MIS clinic ${key} login HTTP ${response.status} at ${loginEndpoint}`,
+        );
         return null;
       }
       const parsed = parseMisLoginResponse(await response.json());
@@ -565,10 +578,16 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
       this.clinicTokens.set(key, parsed.value);
       return parsed.value;
     } catch (error) {
-      const cause = error instanceof Error ? (error as Error & { cause?: unknown }).cause : undefined;
-      const causeMessage = cause instanceof Error
-        ? `${cause.message}${'code' in cause ? ` (${String(cause.code)})` : ''}`
-        : cause ? String(cause) : '';
+      const cause =
+        error instanceof Error
+          ? (error as Error & { cause?: unknown }).cause
+          : undefined;
+      const causeMessage =
+        cause instanceof Error
+          ? `${cause.message}${'code' in cause ? ` (${String(cause.code)})` : ''}`
+          : cause
+            ? String(cause)
+            : '';
       this.logger.error(
         `MIS clinic ${key} login failed at ${loginEndpoint}: ${error instanceof Error ? error.message : String(error)}${causeMessage ? `; cause: ${causeMessage}` : ''}`,
       );
