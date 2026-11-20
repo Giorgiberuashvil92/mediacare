@@ -613,6 +613,7 @@ export class ShopService {
 
     const clinics = await this.clinicModel
       .find(filter)
+      .select('+misAuthPassword')
       .sort({ name: 1 })
       .lean();
 
@@ -633,6 +634,7 @@ export class ShopService {
           misAmbulatoryBaseUrl: clinic.misAmbulatoryBaseUrl,
           misAuthLoginUrl: clinic.misAuthLoginUrl,
           misAuthLoginName: clinic.misAuthLoginName,
+          misAuthPassword: clinic.misAuthPassword,
           createdAt: clinic.createdAt,
           updatedAt: clinic.updatedAt,
         }),
@@ -645,7 +647,7 @@ export class ShopService {
       throw new Error('Invalid clinic ID');
     }
 
-    const clinic = await this.clinicModel.findById(id).lean();
+    const clinic = await this.clinicModel.findById(id).select('+misAuthPassword').lean();
     if (!clinic) {
       throw new Error('Clinic not found');
     }
@@ -667,6 +669,7 @@ export class ShopService {
         misAmbulatoryBaseUrl: clinicDoc.misAmbulatoryBaseUrl,
         misAuthLoginUrl: clinicDoc.misAuthLoginUrl,
         misAuthLoginName: clinicDoc.misAuthLoginName,
+        misAuthPassword: clinicDoc.misAuthPassword,
         createdAt: clinicDoc.createdAt,
         updatedAt: clinicDoc.updatedAt,
       }),
@@ -707,7 +710,7 @@ export class ShopService {
       id,
       updatePayload,
       { new: true, runValidators: true },
-    );
+    ).select('+misAuthPassword');
 
     if (!clinic) {
       throw new Error('Clinic not found');
@@ -733,6 +736,7 @@ export class ShopService {
         misAmbulatoryBaseUrl: clinic.misAmbulatoryBaseUrl,
         misAuthLoginUrl: clinic.misAuthLoginUrl,
         misAuthLoginName: clinic.misAuthLoginName,
+        misAuthPassword: clinic.misAuthPassword,
         createdAt: clinicDoc.createdAt,
         updatedAt: clinicDoc.updatedAt,
       }),

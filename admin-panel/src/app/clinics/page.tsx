@@ -27,6 +27,7 @@ export default function ClinicsPage() {
   const [clinics, setClinics] = useState<Clinic[]>([]);
   const [clinicForm, setClinicForm] = useState({ ...defaultClinicForm });
   const [editingClinicId, setEditingClinicId] = useState<string | null>(null);
+  const [hasSavedMisPassword, setHasSavedMisPassword] = useState(false);
   const [showClinicForm, setShowClinicForm] = useState(false);
 
   const inputClass =
@@ -85,6 +86,7 @@ export default function ClinicsPage() {
 
       setClinicForm({ ...defaultClinicForm });
       setEditingClinicId(null);
+      setHasSavedMisPassword(false);
       setShowClinicForm(false);
       await loadClinics();
     } catch (err: any) {
@@ -94,6 +96,7 @@ export default function ClinicsPage() {
 
   const startClinicEdit = (clinic: Clinic) => {
     setEditingClinicId(clinic.id);
+    setHasSavedMisPassword(Boolean(clinic.hasMisAuthPassword));
     setShowClinicForm(true);
     setClinicForm({
       name: clinic.name,
@@ -127,6 +130,7 @@ export default function ClinicsPage() {
 
   const resetForm = () => {
     setEditingClinicId(null);
+    setHasSavedMisPassword(false);
     setClinicForm({ ...defaultClinicForm });
     setShowClinicForm(false);
   };
@@ -324,6 +328,9 @@ export default function ClinicsPage() {
                       <input type="password" value={clinicForm.misAuthPassword}
                         onChange={(e) => setClinicForm({ ...clinicForm, misAuthPassword: e.target.value })}
                         autoComplete="new-password" className={inputClass} />
+                      {editingClinicId && <p className="mt-1 text-xs text-dark-4">
+                        {hasSavedMisPassword ? 'პაროლი შენახულია • ცვლილებისთვის შეიყვანე ახალი პაროლი' : 'პაროლი ჯერ არ არის შენახული'}
+                      </p>}
                     </div>
                     <div className="flex items-center gap-2">
                       <input

@@ -105,11 +105,18 @@ const PaymentMethods = () => {
       const externalOrderId = purpose
         ? `${purpose}-${uniqueOrderId}`
         : uniqueOrderId;
+      const paymentDescription = [
+        "კონსულტაცია",
+        user.name?.trim() && `პაციენტი: ${user.name.trim()}`,
+        typeof doctorName === "string" && doctorName.trim() &&
+          `ექიმი: ${doctorName.trim()}`,
+        `${selectedDate} ${selectedTime}`,
+      ].filter(Boolean).join(" | ");
 
       // Create BOG payment order
       console.log("💳 [Payment] Creating BOG payment order:", {
         amount: total,
-        description: `კონსულტაცია - ${selectedDate} ${selectedTime}`,
+        description: paymentDescription,
       });
 
       // Get base URL for callback
@@ -121,7 +128,7 @@ const PaymentMethods = () => {
         amount: total,
         currency: "GEL",
         orderId: externalOrderId,
-        description: `კონსულტაცია - ${selectedDate} ${selectedTime}`,
+        description: paymentDescription,
         callbackUrl: callbackUrl,
         captureMethod: "AUTO",
         doctorId: doctorId as string,

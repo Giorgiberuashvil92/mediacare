@@ -301,6 +301,7 @@ PwIDAQAB
               quantity: 1,
               unit_price: params.amount,
               product_id: bogCredentials.merchantId,
+              description: params.description,
             },
           ],
         },
