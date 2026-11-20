@@ -331,59 +331,118 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
 
   /** ყველა აქტიური, MIS-ით კონფიგურირებული კლინიკა. */
   async configuredClinics(): Promise<Array<{ id: string; baseUrl: string }>> {
-    const clinics = await this.clinicModel.find({ isActive: true, misAmbulatoryBaseUrl: { $exists: true, $ne: '' } })
-      .select('misAmbulatoryBaseUrl').lean();
+    const clinics = await this.clinicModel
+      .find({
+        isActive: true,
+        misAmbulatoryBaseUrl: { $exists: true, $ne: '' },
+      })
+      .select('misAmbulatoryBaseUrl')
+      .lean();
     return clinics.flatMap((clinic) => {
-      const baseUrl = this.normalizeAmbulatoryBaseUrl(clinic.misAmbulatoryBaseUrl);
+      const baseUrl = this.normalizeAmbulatoryBaseUrl(
+        clinic.misAmbulatoryBaseUrl,
+      );
       return baseUrl ? [{ id: String(clinic._id), baseUrl }] : [];
     });
   }
 
-  async resolveClinicCatalogForDoctor(doctorId: string): Promise<Clinic | undefined> {
+  async resolveClinicCatalogForDoctor(
+    doctorId: string,
+  ): Promise<Clinic | undefined> {
     if (!mongoose.Types.ObjectId.isValid(doctorId)) return undefined;
-    const doctor = await this.userModel.findById(doctorId).select('clinicId').lean();
+    const doctor = await this.userModel
+      .findById(doctorId)
+      .select('clinicId')
+      .lean();
     if (!doctor?.clinicId) return undefined;
     const clinic = await this.clinicModel.findById(doctor.clinicId).lean();
     if (!clinic) return undefined;
     // The second MIS installation uses its own service catalog.
-    if (clinic.misAmbulatoryBaseUrl && new URL(clinic.misAmbulatoryBaseUrl).hostname === '31.146.99.156') {
+    if (
+      clinic.misAmbulatoryBaseUrl &&
+      new URL(clinic.misAmbulatoryBaseUrl).hostname === '31.146.99.156'
+    ) {
       return {
         ...clinic,
-        misServiceIdHomeVisit: clinic.misServiceIdHomeVisit || '49BA5D57-C534-4603-ACE1-4A8F0CD53231',
-        misServiceIdVideo: clinic.misServiceIdVideo || '1C34EB6C-9738-409C-AAE9-167975A024C1',
-        misServiceIdVideoFollowUp: clinic.misServiceIdVideoFollowUp || '366368BF-D11A-47BB-890A-6B6DCF55635E',
+        misServiceIdHomeVisit:
+          clinic.misServiceIdHomeVisit ||
+          '49BA5D57-C534-4603-ACE1-4A8F0CD53231',
+        misServiceIdVideo:
+          clinic.misServiceIdVideo || '1C34EB6C-9738-409C-AAE9-167975A024C1',
+        misServiceIdVideoFollowUp:
+          clinic.misServiceIdVideoFollowUp ||
+          '366368BF-D11A-47BB-890A-6B6DCF55635E',
       };
     }
     return clinic;
   }
 
-  async ensurePatientForClinic(patient: UserDocument, clinicId?: string | null, citizenship?: string): Promise<string> {
+  async ensurePatientForClinic(
+    patient: UserDocument,
+    clinicId?: string | null,
+    citizenship?: string,
+  ): Promise<string> {
     const key = clinicId?.toString() || '';
-    const clinic = key ? (await this.configuredClinics()).find((item) => item.id === key) : undefined;
+    const clinic = key
+      ? (await this.configuredClinics()).find((item) => item.id === key)
+      : undefined;
     if (key && !clinic) throw new Error(`MIS clinic is not configured: ${key}`);
-    const isDefault = !clinic || this.patientUpsertUrl.startsWith(`${clinic.baseUrl}/api/`);
-    const existing = isDefault ? patient.misPersonId : patient.misPersonIdsByClinic?.[key];
+    const isDefault =
+      !clinic || this.patientUpsertUrl.startsWith(`${clinic.baseUrl}/api/`);
+    const existing = isDefault
+      ? patient.misPersonId
+      : patient.misPersonIdsByClinic?.[key];
     if (existing?.trim()) return existing.trim();
     const nameParts = (patient.name || '').trim().split(/\s+/);
     const now = new Date().toISOString();
-    const result = await this.upsertPatient({
-      ID: null, PersonalID: patient.idNumber || '', FirstName: nameParts[0] || '',
-      LastName: nameParts.length > 1 ? nameParts[nameParts.length - 1] : patient.name || '',
-      FatherName: '', Gender: patient.gender === 'female' ? 1 : 0,
-      BirthDate: patient.dateOfBirth ? new Date(patient.dateOfBirth).toISOString() : undefined,
-      Phone: patient.phone || '', Mobile: patient.phone || '', Email: patient.email || '',
-      Citizenship: citizenship || undefined,
-      LegalAddress: patient.address || '', ActualAddress: patient.address || '', Description: '',
-      IdentificationStatus: 0, ConsentForm: true, Encrypted: false,
-      UserID: String(patient._id), UserFirstName: nameParts[0] || '',
-      UserLastName: nameParts.length > 1 ? nameParts[nameParts.length - 1] : patient.name || '',
-      DateCreated: now, DateChanged: now, IsFromEMR: false,
-    }, { ambulatoryBaseUrl: isDefault ? undefined : clinic.baseUrl });
-    if (!result.success || !result.personId) throw new Error(`MIS patient sync failed for clinic ${key || 'default'}`);
+    const result = await this.upsertPatient(
+      {
+        ID: null,
+        PersonalID: patient.idNumber || '',
+        FirstName: nameParts[0] || '',
+        LastName:
+          nameParts.length > 1
+            ? nameParts[nameParts.length - 1]
+            : patient.name || '',
+        FatherName: '',
+        Gender: patient.gender === 'female' ? 1 : 0,
+        BirthDate: patient.dateOfBirth
+          ? new Date(patient.dateOfBirth).toISOString()
+          : undefined,
+        Phone: patient.phone || '',
+        Mobile: patient.phone || '',
+        Email: patient.email || '',
+        Citizenship: citizenship || undefined,
+        LegalAddress: patient.address || '',
+        ActualAddress: patient.address || '',
+        Description: '',
+        IdentificationStatus: 0,
+        ConsentForm: true,
+        Encrypted: false,
+        UserID: String(patient._id),
+        UserFirstName: nameParts[0] || '',
+        UserLastName:
+          nameParts.length > 1
+            ? nameParts[nameParts.length - 1]
+            : patient.name || '',
+        DateCreated: now,
+        DateChanged: now,
+        IsFromEMR: false,
+      },
+      { ambulatoryBaseUrl: isDefault ? undefined : clinic.baseUrl },
+    );
+    if (!result.success || !result.personId)
+      throw new Error(`MIS patient sync failed for clinic ${key || 'default'}`);
     if (!isDefault) {
-      await this.userModel.updateOne({ _id: patient._id }, { $set: { [`misPersonIdsByClinic.${key}`]: result.personId } });
+      await this.userModel.updateOne(
+        { _id: patient._id },
+        { $set: { [`misPersonIdsByClinic.${key}`]: result.personId } },
+      );
     } else {
-      await this.userModel.updateOne({ _id: patient._id }, { $set: { misPersonId: result.personId } });
+      await this.userModel.updateOne(
+        { _id: patient._id },
+        { $set: { misPersonId: result.personId } },
+      );
     }
     return result.personId;
   }
@@ -441,19 +500,26 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
     };
   }
 
-  private async tokenForAmbulatory(options?: MisAmbulatoryRequestOptions): Promise<string | null> {
+  private async tokenForAmbulatory(
+    options?: MisAmbulatoryRequestOptions,
+  ): Promise<string | null> {
     const base = this.normalizeAmbulatoryBaseUrl(options?.ambulatoryBaseUrl);
     if (!base) return this.ensureMisLoginToken(true);
     if (this.patientUpsertUrl.startsWith(`${base}/api/`)) {
       return this.ensureMisLoginToken(true);
     }
-    const clinic = await this.clinicModel.findOne({ misAmbulatoryBaseUrl: base })
-      .select('+misAuthPassword +misAuthLoginToken misAuthLoginUrl misAuthLoginName').lean();
+    const clinic = await this.clinicModel
+      .findOne({ misAmbulatoryBaseUrl: base })
+      .select(
+        '+misAuthPassword +misAuthLoginToken misAuthLoginUrl misAuthLoginName',
+      )
+      .lean();
     if (!clinic) {
       this.logger.error(`MIS clinic not found for Ambulatory URL ${base}`);
       return null;
     }
     const key = String(clinic._id);
+    let loginEndpoint = '(invalid URL)';
     try {
       // Same MIS credentials/path, separate host and port for each installation.
       // Admin may override any part if a future clinic differs.
@@ -462,15 +528,28 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
       const url = clinic.misAuthLoginUrl
         ? new URL(clinic.misAuthLoginUrl)
         : new URL(`${ambulatory.origin}${defaultLogin.pathname}`);
-      url.searchParams.set('loginName', clinic.misAuthLoginName || this.loginName);
+      loginEndpoint = `${url.origin}${url.pathname}`;
+      url.searchParams.set(
+        'loginName',
+        clinic.misAuthLoginName || this.loginName,
+      );
       url.searchParams.set('password', clinic.misAuthPassword || this.password);
       let response = await fetch(url.toString(), {
         method: 'GET',
-        headers: { LoginToken: this.clinicTokens.get(key) || clinic.misAuthLoginToken || '' },
+        headers: {
+          LoginToken:
+            this.clinicTokens.get(key) || clinic.misAuthLoginToken || '',
+        },
       });
-      if (!response.ok && (this.clinicTokens.has(key) || clinic.misAuthLoginToken)) {
+      if (
+        !response.ok &&
+        (this.clinicTokens.has(key) || clinic.misAuthLoginToken)
+      ) {
         this.clinicTokens.delete(key);
-        response = await fetch(url.toString(), { method: 'GET', headers: { LoginToken: '' } });
+        response = await fetch(url.toString(), {
+          method: 'GET',
+          headers: { LoginToken: '' },
+        });
       }
       if (!response.ok) {
         this.logger.error(`MIS clinic ${key} login HTTP ${response.status}`);
@@ -478,13 +557,21 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
       }
       const parsed = parseMisLoginResponse(await response.json());
       if (!parsed?.value) {
-        this.logger.error(`MIS clinic ${key} login returned no token: ${parsed?.message || 'invalid response'}`);
+        this.logger.error(
+          `MIS clinic ${key} login returned no token: ${parsed?.message || 'invalid response'}`,
+        );
         return null;
       }
       this.clinicTokens.set(key, parsed.value);
       return parsed.value;
     } catch (error) {
-      this.logger.error(`MIS clinic ${key} login failed: ${error instanceof Error ? error.message : String(error)}`);
+      const cause = error instanceof Error ? (error as Error & { cause?: unknown }).cause : undefined;
+      const causeMessage = cause instanceof Error
+        ? `${cause.message}${'code' in cause ? ` (${String(cause.code)})` : ''}`
+        : cause ? String(cause) : '';
+      this.logger.error(
+        `MIS clinic ${key} login failed at ${loginEndpoint}: ${error instanceof Error ? error.message : String(error)}${causeMessage ? `; cause: ${causeMessage}` : ''}`,
+      );
       return null;
     }
   }
@@ -579,7 +666,9 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
 
     const bootstrapToken = this.getStoredValue();
     if (bootstrapToken) {
-      this.logger.log(`MIS bootstrap token ready | length=${bootstrapToken.length}`);
+      this.logger.log(
+        `MIS bootstrap token ready | length=${bootstrapToken.length}`,
+      );
     } else {
       this.logger.warn('MIS bootstrap token missing after initial login');
     }

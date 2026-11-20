@@ -15,6 +15,9 @@ const defaultClinicForm = {
   bogClientId: '',
   bogClientSecret: '',
   misAmbulatoryBaseUrl: '',
+  misAuthLoginUrl: '',
+  misAuthLoginName: '',
+  misAuthPassword: '',
 };
 
 export default function ClinicsPage() {
@@ -67,6 +70,9 @@ export default function ClinicsPage() {
         bogClientSecret: clinicForm.bogClientSecret.trim() || undefined,
         misAmbulatoryBaseUrl:
           clinicForm.misAmbulatoryBaseUrl.trim().replace(/\/$/, '') || undefined,
+        misAuthLoginUrl: clinicForm.misAuthLoginUrl.trim() || undefined,
+        misAuthLoginName: clinicForm.misAuthLoginName.trim() || undefined,
+        misAuthPassword: clinicForm.misAuthPassword.trim() || undefined,
       };
 
       if (editingClinicId) {
@@ -100,6 +106,9 @@ export default function ClinicsPage() {
       bogClientId: clinic.bogClientId || '',
       bogClientSecret: '',
       misAmbulatoryBaseUrl: clinic.misAmbulatoryBaseUrl || '',
+      misAuthLoginUrl: clinic.misAuthLoginUrl || '',
+      misAuthLoginName: clinic.misAuthLoginName || '',
+      misAuthPassword: '',
     });
   };
 
@@ -296,6 +305,25 @@ export default function ClinicsPage() {
                         აქედან გაიგზავნება: AddOrUpdatePatient, GenerateService, GetFormsByServiceID.
                         ექიმზე ამ კლინიკის მიბმისას გამოიყენება ეს endpoint.
                       </p>
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className={labelClass}>MIS Authentication API URL</label>
+                      <input type="url" value={clinicForm.misAuthLoginUrl}
+                        onChange={(e) => setClinicForm({ ...clinicForm, misAuthLoginUrl: e.target.value })}
+                        placeholder="ცარიელი დატოვე, თუ Ambulatory-ის host/port-ზე დეფოლტ Login API გზაა"
+                        className={inputClass} />
+                    </div>
+                    <div>
+                      <label className={labelClass}>MIS მომხმარებელი</label>
+                      <input type="text" value={clinicForm.misAuthLoginName}
+                        onChange={(e) => setClinicForm({ ...clinicForm, misAuthLoginName: e.target.value })}
+                        autoComplete="off" className={inputClass} />
+                    </div>
+                    <div>
+                      <label className={labelClass}>MIS პაროლი {editingClinicId && clinicForm.misAuthPassword === '' ? '(ცარიელი დატოვე, თუ არ იცვლება)' : ''}</label>
+                      <input type="password" value={clinicForm.misAuthPassword}
+                        onChange={(e) => setClinicForm({ ...clinicForm, misAuthPassword: e.target.value })}
+                        autoComplete="new-password" className={inputClass} />
                     </div>
                     <div className="flex items-center gap-2">
                       <input

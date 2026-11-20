@@ -98,6 +98,9 @@ export class ShopService {
     bogClientId?: string;
     bogClientSecret?: string;
     misAmbulatoryBaseUrl?: string;
+    misAuthLoginUrl?: string;
+    misAuthLoginName?: string;
+    misAuthPassword?: string;
     createdAt?: Date;
     updatedAt?: Date;
   }) {
@@ -115,6 +118,9 @@ export class ShopService {
         clinic.bogClientId?.trim() && clinic.bogClientSecret?.trim(),
       ),
       misAmbulatoryBaseUrl: clinic.misAmbulatoryBaseUrl,
+      misAuthLoginUrl: clinic.misAuthLoginUrl,
+      misAuthLoginName: clinic.misAuthLoginName,
+      hasMisAuthPassword: Boolean(clinic.misAuthPassword?.trim()),
       createdAt: clinic.createdAt,
       updatedAt: clinic.updatedAt,
     };
@@ -591,6 +597,8 @@ export class ShopService {
         bogClientId: savedClinic.bogClientId,
         bogClientSecret: savedClinic.bogClientSecret,
         misAmbulatoryBaseUrl: savedClinic.misAmbulatoryBaseUrl,
+        misAuthLoginUrl: savedClinic.misAuthLoginUrl,
+        misAuthLoginName: savedClinic.misAuthLoginName,
         createdAt: clinicDoc.createdAt,
         updatedAt: clinicDoc.updatedAt,
       }),
@@ -623,6 +631,8 @@ export class ShopService {
           bogClientId: clinic.bogClientId,
           bogClientSecret: clinic.bogClientSecret,
           misAmbulatoryBaseUrl: clinic.misAmbulatoryBaseUrl,
+          misAuthLoginUrl: clinic.misAuthLoginUrl,
+          misAuthLoginName: clinic.misAuthLoginName,
           createdAt: clinic.createdAt,
           updatedAt: clinic.updatedAt,
         }),
@@ -655,6 +665,8 @@ export class ShopService {
         bogClientId: clinicDoc.bogClientId,
         bogClientSecret: clinicDoc.bogClientSecret,
         misAmbulatoryBaseUrl: clinicDoc.misAmbulatoryBaseUrl,
+        misAuthLoginUrl: clinicDoc.misAuthLoginUrl,
+        misAuthLoginName: clinicDoc.misAuthLoginName,
         createdAt: clinicDoc.createdAt,
         updatedAt: clinicDoc.updatedAt,
       }),
@@ -685,6 +697,11 @@ export class ShopService {
         updatePayload.misAmbulatoryBaseUrl.trim().replace(/\/$/, '') ||
         undefined;
     }
+    if (typeof updatePayload.misAuthPassword === 'string') {
+      const password = updatePayload.misAuthPassword.trim();
+      if (password) updatePayload.misAuthPassword = password;
+      else delete updatePayload.misAuthPassword;
+    }
 
     const clinic = await this.clinicModel.findByIdAndUpdate(
       id,
@@ -714,6 +731,8 @@ export class ShopService {
         bogClientId: clinic.bogClientId,
         bogClientSecret: clinic.bogClientSecret,
         misAmbulatoryBaseUrl: clinic.misAmbulatoryBaseUrl,
+        misAuthLoginUrl: clinic.misAuthLoginUrl,
+        misAuthLoginName: clinic.misAuthLoginName,
         createdAt: clinicDoc.createdAt,
         updatedAt: clinicDoc.updatedAt,
       }),

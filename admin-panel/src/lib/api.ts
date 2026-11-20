@@ -161,6 +161,9 @@ export interface Clinic {
   hasBogCredentials?: boolean;
   /** MIS Ambulatory API base, მაგ. http://host/MISNew/MIS.AmbulatoryTest.API */
   misAmbulatoryBaseUrl?: string;
+  misAuthLoginUrl?: string;
+  misAuthLoginName?: string;
+  hasMisAuthPassword?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -1343,6 +1346,9 @@ class ApiService {
     bogClientId?: string;
     bogClientSecret?: string;
     misAmbulatoryBaseUrl?: string;
+    misAuthLoginUrl?: string;
+    misAuthLoginName?: string;
+    misAuthPassword?: string;
   }): Promise<ApiResponse<Clinic>> {
     const response = await fetch(`${this.baseURL}/admin/shop/clinics`, {
       method: "POST",
@@ -1355,7 +1361,7 @@ class ApiService {
 
   async updateClinic(
     id: string,
-    data: Partial<Clinic> & { bogClientSecret?: string },
+    data: Partial<Clinic> & { bogClientSecret?: string; misAuthPassword?: string },
   ): Promise<ApiResponse<Clinic>> {
     const response = await fetch(`${this.baseURL}/admin/shop/clinics/${id}`, {
       method: "PATCH",

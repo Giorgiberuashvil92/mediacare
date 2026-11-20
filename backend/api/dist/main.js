@@ -5,9 +5,14 @@ const core_1 = require("@nestjs/core");
 const mongoose_1 = require("@nestjs/mongoose");
 const swagger_1 = require("@nestjs/swagger");
 const mongoose_2 = require("mongoose");
+const node_dns_1 = require("node:dns");
 const path_1 = require("path");
 const app_module_1 = require("./app.module");
 async function bootstrap() {
+    const mongoDnsServer = process.env.MONGODB_DNS_SERVER ||
+        (process.env.NODE_ENV === 'production' ? undefined : '1.1.1.1');
+    if (mongoDnsServer)
+        (0, node_dns_1.setServers)([mongoDnsServer]);
     const app = await core_1.NestFactory.create(app_module_1.AppModule);
     app.useStaticAssets((0, path_1.join)(__dirname, '..', 'uploads'), {
         prefix: '/uploads/',

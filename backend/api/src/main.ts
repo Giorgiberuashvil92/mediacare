@@ -4,10 +4,17 @@ import { getConnectionToken } from '@nestjs/mongoose';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Connection, ConnectionStates } from 'mongoose';
+import { setServers } from 'node:dns';
 import { join } from 'path';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
+  // Some local DNS resolvers return EBADRESP for Atlas mongodb+srv records.
+  // Node's DNS resolver is independent of `dig`; choose a resolver before
+  // Mongoose initializes. Override with MONGODB_DNS_SERVER if needed.
+  const mongoDnsServer = process.env.MONGODB_DNS_SERVER ||
+    (process.env.NODE_ENV === 'production' ? undefined : '1.1.1.1');
+  if (mongoDnsServer) setServers([mongoDnsServer]);
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   // Serve static files (uploaded documents)
