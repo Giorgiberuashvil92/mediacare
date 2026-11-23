@@ -991,10 +991,16 @@ export default function RegisterScreen() {
       }
 
       const resultData = await resultResponse.json();
-      console.log(
-        "✅ [IDENTOMAT] Result data:",
-        JSON.stringify(resultData, null, 2),
-      );
+      const result = resultData?.result;
+      console.log("[IDENTOMAT] Verification result:", result);
+      if (result !== "approved") {
+        setIsIdentomatVerified(false);
+        setIdentomatData(null);
+        if (result === "rejected") {
+          throw new Error("IDENTOMAT-მა იდენტიფიკაცია უარყო. გთხოვთ, სცადოთ თავიდან.");
+        }
+        throw new Error("IDENTOMAT-ის დადასტურება ჯერ არ დასრულებულა. გთხოვთ, დაელოდოთ საბოლოო შედეგს.");
+      }
       let faceImage: string | null = null;
       let documentFrontImage: string | null = null;
       let documentBackImage: string | null = null;
@@ -1614,6 +1620,8 @@ export default function RegisterScreen() {
                           if (identomatLoading) return;
 
                           try {
+                            setIsIdentomatVerified(false);
+                            setIdentomatData(null);
                             setIdentomatLoading(true);
 
                             const COMPANY_KEY =
