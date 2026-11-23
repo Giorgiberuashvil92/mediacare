@@ -1,135 +1,14 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import Constants from "expo-constants";
 import * as FileSystem from "expo-file-system/legacy";
 import { logger } from "../utils/logger";
 import { HERA_AI_API_KEY, HERA_AI_API_URL } from "../utils/heraApiConfig";
 import type { HeraMessageAttachment } from "../utils/heraAttachment";
 import { resolveMessageImageUri } from "../utils/heraAttachment";
 
-// Development build-ისთვის IP მისამართის ავტომატურად გამოყენება
-const getDevelopmentIP = (): string | null => {
-  // დეტალური ლოგირება debug-ისთვის
-  console.log("🔍 IP Detection Debug Info:");
-  console.log("  - Constants.debuggerHost:", Constants.debuggerHost);
-  console.log(
-    "  - Constants.expoConfig?.hostUri:",
-    Constants.expoConfig?.hostUri,
-  );
-  console.log(
-    "  - Constants.manifest?.hostUri:",
-    (Constants.manifest as any)?.hostUri,
-  );
-
-  // პირველ რიგში ვცდილობთ expo-constants-დან ავტომატურად მივიღოთ IP
-  const debuggerHost = Constants.debuggerHost;
-  if (debuggerHost) {
-    // debuggerHost არის "IP:port" ფორმატში, მაგ: "192.168.1.100:8081"
-    const ip = debuggerHost.split(":")[0];
-    console.log(`  - Extracted IP from debuggerHost: ${ip}`);
-    if (ip && ip !== "localhost" && ip !== "127.0.0.1") {
-      console.log(`🌐 ✅ Auto-detected IP from debuggerHost: ${ip}`);
-      return ip;
-    }
-  }
-
-  // ალტერნატიულად ვცდილობთ hostUri-დან
-  const hostUri =
-    Constants.expoConfig?.hostUri || (Constants.manifest as any)?.hostUri;
-  if (hostUri) {
-    console.log(`  - hostUri value: ${hostUri}`);
-
-    // hostUri შეიძლება იყოს "exp://IP:port", "http://IP:port" ან "IP:port" ფორმატში
-    let ip: string | null = null;
-
-    // ვცდილობთ exp:// ან http:// prefix-ით
-    const matchWithPrefix = hostUri.match(/(?:exp|http):\/\/([^:]+)/);
-    if (matchWithPrefix && matchWithPrefix[1]) {
-      ip = matchWithPrefix[1];
-      console.log(`  - Extracted IP from hostUri (with prefix): ${ip}`);
-    } else {
-      // თუ prefix არ აქვს, ვცდილობთ პირდაპირ IP:port format-ს
-      const matchWithoutPrefix = hostUri.match(/^([^:]+):/);
-      if (matchWithoutPrefix && matchWithoutPrefix[1]) {
-        ip = matchWithoutPrefix[1];
-        console.log(`  - Extracted IP from hostUri (without prefix): ${ip}`);
-      }
-    }
-
-    if (ip && ip !== "localhost" && ip !== "127.0.0.1") {
-      console.log(`🌐 ✅ Auto-detected IP from hostUri: ${ip}`);
-      return ip;
-    }
-  }
-
-  // Fallback: სტატიკური IP (თუ ავტომატურად ვერ მოიძებნა)
-  const STATIC_IP = "172.20.10.2"; // შეცვალეთ თქვენი IP-ით თუ ავტომატურად ვერ მოიძებნა
-  if (STATIC_IP) {
-    console.log(`🌐 ⚠️ Using static IP (fallback): ${STATIC_IP}`);
-    return STATIC_IP;
-  }
-
-  console.log("🌐 ❌ No IP found!");
-  return null;
-};
-
 const getDefaultBaseUrl = () => {
-  // Railway production URL
   const RAILWAY_URL = "https://mediacare-production.up.railway.app";
-
-  const envUrl =
-    process.env.EXPO_PUBLIC_API_URL ||
-    (Constants.expoConfig?.extra as any)?.API_URL ||
-    (Constants.expoConfig?.extra as any)?.apiUrl ||
-    (Constants.manifest as any)?.extra?.API_URL ||
-    (Constants.manifest as any)?.extra?.apiUrl;
-
-  console.log("🌐 API URL Configuration:", {
-    isDev: __DEV__,
-    envUrl: envUrl,
-    hasEnvUrl: !!envUrl,
-    expoConfigExtra: (Constants.expoConfig?.extra as any)?.apiUrl,
-    manifestExtra: (Constants.manifest as any)?.extra?.apiUrl,
-  });
-
-  // Production-ისთვის (არა development) გამოვიყენოთ Railway URL
-  if (!__DEV__) {
-    // თუ envUrl არის განსაზღვრული და არ არის localhost, გამოვიყენოთ ის
-    if (
-      envUrl &&
-      !envUrl.includes("localhost") &&
-      !envUrl.includes("127.0.0.1")
-    ) {
-      console.log("✅ Using production URL from env:", envUrl);
-      return envUrl;
-    }
-    // Production-ისთვის Railway URL
-    console.log("🚂 Using Railway production URL:", RAILWAY_URL);
-    return RAILWAY_URL;
-  }
-
-  // Development: ლოკალური backend (ადმინ ცვლილებების სანახავად).
-  // Production/Railway URL მხოლოდ production build-ში გამოიყენება.
-  if (__DEV__) {
-    const isRemoteProdUrl =
-      envUrl &&
-      (envUrl.includes("mediacare-production") ||
-        envUrl.includes("railway.app"));
-
-    if (envUrl && !isRemoteProdUrl) {
-      console.log("✅ Using development URL from env:", envUrl);
-      return envUrl;
-    }
-
-    const devIP = getDevelopmentIP();
-    if (devIP) {
-      const devUrl = `http://${devIP}:4001`;
-      console.log("🔧 Using local development API:", devUrl);
-      return devUrl;
-    }
-
-    console.warn("⚠️ No local IP found, using localhost fallback");
-    return "http://localhost:4001";
-  }
+  console.log("🚂 Using Railway API:", RAILWAY_URL);
+  return RAILWAY_URL;
 };
 
 const API_BASE_URL = getDefaultBaseUrl();

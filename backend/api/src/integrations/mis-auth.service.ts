@@ -531,7 +531,7 @@ export class MisAuthService implements OnApplicationBootstrap, OnModuleDestroy {
       const ambulatory = new URL(base);
       const url = clinicLogin
         ? new URL(
-            'http://31.146.99.156/MISNew/MIS.Authentication.API/api/Home/Login',
+            'http://31.146.99.156:9629/MISNew/MIS.AuthenticationTest.API/api/Home/Login',
           )
         : clinic.misAuthLoginUrl
           ? new URL(clinic.misAuthLoginUrl)
